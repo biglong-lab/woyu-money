@@ -10,6 +10,9 @@ node_modules/
 dist/
 build/
 
+# 本地上傳檔案
+uploads/
+
 # macOS
 .DS_Store
 *.DS_Store
@@ -31,6 +34,9 @@ build/
 # 日誌
 *.log
 npm-debug.log*
+
+# Claude Code
+.claude/
 
 # 憑證與密鑰
 *.pem
