@@ -1,0 +1,38 @@
+# 依賴
+node_modules/
+
+# 環境變數
+.env
+.env.*
+!.env.example
+
+# 構建產物
+dist/
+build/
+
+# macOS
+.DS_Store
+*.DS_Store
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 壓縮備份檔（僅保留解壓後的資料夾）
+*.tar.gz
+
+# Replit
+.replit
+.cache/
+.config/
+
+# 日誌
+*.log
+npm-debug.log*
+
+# 憑證與密鑰
+*.pem
+*.key
+*.cert

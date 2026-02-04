@@ -1,0 +1,393 @@
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { 
+  DollarSign, 
+  TrendingUp, 
+  Calendar, 
+  Building2,
+  BarChart3,
+  PieChart as PieChartIcon,
+  LineChart as LineChartIcon
+} from "lucide-react";
+import { 
+  LineChart, 
+  Line, 
+  BarChart, 
+  Bar, 
+  PieChart, 
+  Pie, 
+  Cell, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  ResponsiveContainer, 
+  Area, 
+  AreaChart 
+} from "recharts";
+
+import { DailyRevenueDialog } from "@/components/daily-revenue-dialog";
+
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D'];
+
+export default function RevenueReports() {
+  const [selectedTab, setSelectedTab] = useState("overview");
+
+  // 每日收入統計
+  const { data: revenueStats } = useQuery({
+    queryKey: ["/api/revenue/reports/stats"],
+  });
+
+  // 專案收入分布
+  const { data: projectRevenues = [] } = useQuery({
+    queryKey: ["/api/revenue/reports/by-project"],
+  });
+
+  // 每日收入趨勢
+  const { data: dailyTrend = [] } = useQuery({
+    queryKey: ["/api/revenue/reports/daily-trend"],
+  });
+
+  // 月度收入趨勢
+  const { data: monthlyTrend = [] } = useQuery({
+    queryKey: ["/api/revenue/reports/monthly-trend"],
+  });
+
+  // 年度同期比較
+  const { data: yearlyComparison = [] } = useQuery({
+    queryKey: ["/api/revenue/reports/yearly-comparison"],
+  });
+
+  // 每日收款記錄
+  const { data: dailyRevenues = [] } = useQuery({
+    queryKey: ["/api/daily-revenues"],
+  });
+
+  // 處理月度趨勢數據
+  const processedMonthlyTrend = monthlyTrend.map((item: any) => ({
+    ...item,
+    month: `${item.month.substring(0, 4)}年${item.month.substring(5, 7)}月`
+  }));
+
+  // 處理年度比較數據
+  const processedYearlyData = () => {
+    const grouped = yearlyComparison.reduce((acc: any, item: any) => {
+      const monthKey = `${item.month}月`;
+      if (!acc[monthKey]) {
+        acc[monthKey] = { month: monthKey };
+      }
+      acc[monthKey][`${item.year}年`] = item.totalRevenue;
+      return acc;
+    }, {});
+    return Object.values(grouped);
+  };
+
+  // 準備專案收入餅圖數據
+  const projectChartData = projectRevenues.map((project: any, index: number) => ({
+    ...project,
+    fill: COLORS[index % COLORS.length]
+  }));
+
+  return (
+    
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">每日收入分析報表</h1>
+            <p className="text-gray-600 mt-1">專案收款記錄與趨勢分析</p>
+          </div>
+          <DailyRevenueDialog />
+        </div>
+
+        {/* 統計概覽 */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">總收入</CardTitle>
+              <DollarSign className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                NT$ {(revenueStats?.totalRevenue || 0).toLocaleString()}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                累計收款金額
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">收款次數</CardTitle>
+              <Calendar className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {revenueStats?.recordCount || 0}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                總記錄筆數
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">日均收入</CardTitle>
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                NT$ {Math.round(revenueStats?.avgDaily || 0).toLocaleString()}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                平均每日收入
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">活躍專案</CardTitle>
+              <Building2 className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {projectRevenues.length}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                有收款記錄的專案
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* 詳細分析 Tabs */}
+        <Tabs value={selectedTab} onValueChange={setSelectedTab} className="space-y-4">
+          <TabsList className="grid w-full grid-cols-5">
+            <TabsTrigger value="overview">總覽</TabsTrigger>
+            <TabsTrigger value="daily">每日趨勢</TabsTrigger>
+            <TabsTrigger value="monthly">月度趨勢</TabsTrigger>
+            <TabsTrigger value="yearly">年度比較</TabsTrigger>
+            <TabsTrigger value="projects">專案分析</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="overview" className="space-y-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* 專案收入分布 */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <PieChartIcon className="h-5 w-5" />
+                    專案收入分布
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {projectChartData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height={300}>
+                      <PieChart>
+                        <Pie
+                          data={projectChartData}
+                          cx="50%"
+                          cy="50%"
+                          outerRadius={80}
+                          dataKey="totalRevenue"
+                          label={({ projectName, percent }: any) => 
+                            `${projectName} ${(percent * 100).toFixed(0)}%`
+                          }
+                        >
+                          {projectChartData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.fill} />
+                          ))}
+                        </Pie>
+                        <Tooltip formatter={(value: number) => [`NT$ ${value.toLocaleString()}`, '收入']} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="h-[300px] flex items-center justify-center text-gray-500">
+                      尚無收入數據
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* 近期收款記錄 */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>近期收款記錄</CardTitle>
+                  <CardDescription>最新 10 筆收款記錄</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {dailyRevenues.slice(0, 10).map((revenue: any) => (
+                      <div key={revenue.id} className="flex items-center justify-between p-2 border rounded">
+                        <div>
+                          <div className="font-medium">{revenue.description || '收款記錄'}</div>
+                          <div className="text-sm text-gray-500">{revenue.date}</div>
+                        </div>
+                        <div className="font-bold text-green-600">
+                          NT$ {parseInt(revenue.amount).toLocaleString()}
+                        </div>
+                      </div>
+                    ))}
+                    {dailyRevenues.length === 0 && (
+                      <div className="text-center py-6 text-gray-500">
+                        尚無收款記錄
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="daily" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <LineChartIcon className="h-5 w-5" />
+                  每日收入趨勢
+                </CardTitle>
+                <CardDescription>顯示每日收款金額變化</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {dailyTrend.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={400}>
+                    <AreaChart data={dailyTrend}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="date" />
+                      <YAxis />
+                      <Tooltip formatter={(value: number) => [`NT$ ${value.toLocaleString()}`, '收入']} />
+                      <Area type="monotone" dataKey="totalRevenue" stroke="#0088FE" fill="#0088FE" fillOpacity={0.3} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-[400px] flex items-center justify-center text-gray-500">
+                    尚無每日收入數據
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="monthly" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <BarChart3 className="h-5 w-5" />
+                  月度收入趨勢
+                </CardTitle>
+                <CardDescription>每月累計收入統計</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {processedMonthlyTrend.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={400}>
+                    <BarChart data={processedMonthlyTrend}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="month" />
+                      <YAxis />
+                      <Tooltip formatter={(value: number) => [`NT$ ${value.toLocaleString()}`, '收入']} />
+                      <Bar dataKey="totalRevenue" fill="#00C49F" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-[400px] flex items-center justify-center text-gray-500">
+                    尚無月度收入數據
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="yearly" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <LineChartIcon className="h-5 w-5" />
+                  年度同期比較
+                </CardTitle>
+                <CardDescription>不同年度同月份收入比較</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {processedYearlyData().length > 0 ? (
+                  <ResponsiveContainer width="100%" height={400}>
+                    <LineChart data={processedYearlyData()}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="month" />
+                      <YAxis />
+                      <Tooltip formatter={(value: number) => [`NT$ ${value?.toLocaleString() || 0}`, '收入']} />
+                      {Object.keys(processedYearlyData()[0] || {})
+                        .filter(key => key !== 'month')
+                        .map((year, index) => (
+                          <Line 
+                            key={year} 
+                            type="monotone" 
+                            dataKey={year} 
+                            stroke={COLORS[index % COLORS.length]} 
+                            strokeWidth={2}
+                          />
+                        ))}
+                    </LineChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-[400px] flex items-center justify-center text-gray-500">
+                    尚無年度比較數據
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="projects" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Building2 className="h-5 w-5" />
+                  專案收入排行
+                </CardTitle>
+                <CardDescription>各專案收入統計與排名</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {projectRevenues.map((project: any, index: number) => (
+                    <div key={project.projectId} className="flex items-center justify-between p-3 border rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold">
+                          {index + 1}
+                        </div>
+                        <div>
+                          <div className="font-medium">{project.projectName}</div>
+                          <div className="text-sm text-gray-500">
+                            {project.recordCount} 筆記錄
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-bold text-lg">
+                          NT$ {project.totalRevenue.toLocaleString()}
+                        </div>
+                        <Badge variant="secondary">
+                          {((project.totalRevenue / (revenueStats?.totalRevenue || 1)) * 100).toFixed(1)}%
+                        </Badge>
+                      </div>
+                    </div>
+                  ))}
+                  {projectRevenues.length === 0 && (
+                    <div className="text-center py-6 text-gray-500">
+                      尚無專案收入數據
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </div>
+    
+  );
+}
