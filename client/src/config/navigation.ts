@@ -161,6 +161,13 @@ export const viewNavItems: NavItem[] = [
     badge: "NEW",
     description: "年度總覽、月度明細、趨勢分析",
   },
+  {
+    title: "稅務報表",
+    href: "/tax-reports",
+    icon: Receipt,
+    badge: "NEW",
+    description: "營業稅、薪資扣繳、二代健保",
+  },
 ];
 
 // 系統管理分類（含模板管理，收合顯示）
