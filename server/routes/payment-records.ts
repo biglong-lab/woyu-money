@@ -169,7 +169,7 @@ router.get("/api/payment-items/:itemId/notes", async (req, res) => {
 router.post("/api/payment-items/:itemId/notes", requireAuth, async (req, res) => {
   try {
     const itemId = parseInt(req.params.itemId)
-    const user = req.user
+    const user = req.user as any
     const noteData = {
       ...req.body,
       itemId,

@@ -40,7 +40,7 @@ export function PaymentFileUpload({ paymentId, onUploadComplete }: PaymentFileUp
   const queryClient = useQueryClient();
 
   // 獲取現有檔案
-  const { data: attachments = [], isLoading } = useQuery({
+  const { data: attachments = [], isLoading } = useQuery<FileAttachment[]>({
     queryKey: [`/api/payment/${paymentId}/files`],
   });
 

@@ -87,14 +87,14 @@ export function BatchImportWizard({ isOpen, onClose }: BatchImportWizardProps) {
       const formData = new FormData();
       formData.append('file', file);
 
-      const result = await apiRequest('POST', '/api/payment/batch-import/parse', formData);
+      const result: any = await apiRequest('POST', '/api/payment/batch-import/parse', formData);
       console.log('批量導入 - 前端收到結果:', result);
       setImportData(result.records || []);
       setCurrentStep(2);
-      
+
       toast({
         title: "檔案解析成功",
-        description: `解析到 ${result.records?.length || 0} 筆記錄`,
+        description: `解析到 ${(result as any).records?.length || 0} 筆記錄`,
       });
     } catch (error: any) {
       console.error('批量導入 - 前端錯誤:', error);
@@ -118,7 +118,7 @@ export function BatchImportWizard({ isOpen, onClose }: BatchImportWizardProps) {
       console.log('批量導入 - 執行結果:', result);
       return result;
     },
-    onSuccess: (results) => {
+    onSuccess: (results: any) => {
       setImportResults(results);
       setCurrentStep(3);
       queryClient.invalidateQueries({ queryKey: ['/api/payment/items'] });

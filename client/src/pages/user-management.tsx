@@ -92,7 +92,7 @@ export default function UserManagement() {
   const createUserMutation = useMutation({
     mutationFn: async (userData: any) => {
       const response = await apiRequest("POST", "/api/admin/users", userData);
-      return response.json();
+      return response;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
@@ -121,7 +121,7 @@ export default function UserManagement() {
   const updateUserMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: any }) => {
       const response = await apiRequest("PUT", `/api/admin/users/${id}`, data);
-      return response.json();
+      return response;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
@@ -144,7 +144,7 @@ export default function UserManagement() {
   const updatePasswordMutation = useMutation({
     mutationFn: async ({ id, password }: { id: number; password: string }) => {
       const response = await apiRequest("PUT", `/api/admin/users/${id}/password`, { password });
-      return response.json();
+      return response;
     },
     onSuccess: () => {
       setPasswordDialogOpen(false);
@@ -167,7 +167,7 @@ export default function UserManagement() {
   const updatePermissionsMutation = useMutation({
     mutationFn: async ({ id, permissions }: { id: number; permissions: MenuPermissions }) => {
       const response = await apiRequest("PUT", `/api/admin/users/${id}/permissions`, { menuPermissions: permissions });
-      return response.json();
+      return response;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
@@ -191,7 +191,7 @@ export default function UserManagement() {
   const deleteUserMutation = useMutation({
     mutationFn: async (id: number) => {
       const response = await apiRequest("DELETE", `/api/admin/users/${id}`);
-      return response.json();
+      return response;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });

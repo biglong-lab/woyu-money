@@ -117,6 +117,7 @@ export default function GeneralPaymentManagement() {
       dueDate: "",
       paymentDate: "",
       notes: "",
+      categoryType: "",
     },
   });
 
@@ -280,15 +281,15 @@ export default function GeneralPaymentManagement() {
   };
 
   // 核心數據查詢 - 一般付款管理專用API調用，排除租約資料
-  const { data: paymentItemsResponse, isLoading, refetch: refetchItems } = useQuery({
+  const { data: paymentItemsResponse, isLoading, refetch: refetchItems } = useQuery<any>({
     queryKey: ["/api/payment/items?limit=500&itemType=general"],
     staleTime: 30000, // 30秒緩存
     refetchOnWindowFocus: false,
   });
 
   // 處理API響應格式：可能是數組或包含items的對象
-  const paymentItems = Array.isArray(paymentItemsResponse) 
-    ? paymentItemsResponse 
+  const paymentItems: PaymentItem[] = Array.isArray(paymentItemsResponse)
+    ? paymentItemsResponse
     : (paymentItemsResponse?.items || []);
 
   // 調試信息
@@ -682,7 +683,7 @@ export default function GeneralPaymentManagement() {
       queryClient.invalidateQueries({ queryKey: ["/api/payment/items?limit=500&itemType=general"] });
       queryClient.invalidateQueries({ queryKey: ["/api/payment/project"] });
       setIsEditDialogOpen(false);
-      setEditingItem(null);
+      setEditItem(null);
       editForm.reset();
       toast({
         title: "付款項目更新成功",

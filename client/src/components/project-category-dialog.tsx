@@ -31,7 +31,7 @@ export function ProjectCategoryDialog({ open, onOpenChange }: ProjectCategoryDia
   const [isEditing, setIsEditing] = useState(false);
 
   // 獲取專案分類
-  const { data: categories = [], isLoading } = useQuery({
+  const { data: categories = [], isLoading } = useQuery<any[]>({
     queryKey: ["/api/categories/project"],
     enabled: open,
   });

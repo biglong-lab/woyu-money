@@ -375,7 +375,7 @@ function PaymentProjectContent() {
         userInfo: "批量更新"
       });
 
-      if (response.ok) {
+      if ((response as any).ok !== false) {
         // 更新所有相關的查詢快取
         queryClient.invalidateQueries({ queryKey: ["/api/payment/items"] });
         queryClient.invalidateQueries({ queryKey: ["/api/payment/items?limit=500&itemType=general"] });
@@ -496,7 +496,7 @@ function PaymentProjectContent() {
   });
 
   // 查詢專案
-  const { data: projects, isLoading: projectsLoading } = useQuery({
+  const { data: projects, isLoading: projectsLoading } = useQuery<any[]>({
     queryKey: ["/api/payment/projects"],
     staleTime: 60000, // 專案變動較少，可以快取更久
   });

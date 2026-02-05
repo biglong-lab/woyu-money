@@ -91,27 +91,27 @@ export default function ProjectSubcategoryManagement() {
   // 資料查詢
   const { data: projects = [] } = useQuery<PaymentProject[]>({
     queryKey: ["/api/payment/projects"],
-    queryFn: () => apiRequest("/api/payment/projects"),
+    queryFn: () => apiRequest("GET", "/api/payment/projects"),
   });
 
   const { data: categories = [] } = useQuery<Category[]>({
     queryKey: ["/api/categories/project"],
-    queryFn: () => apiRequest("/api/categories/project"),
+    queryFn: () => apiRequest("GET", "/api/categories/project"),
   });
 
   const { data: subcategoryStatuses = [] } = useQuery<SubcategoryStatus[]>({
     queryKey: ["/api/subcategory/status", selectedParentCategory, selectedProject],
-    queryFn: () => 
-      selectedParentCategory 
-        ? apiRequest(`/api/subcategory/status/${selectedParentCategory}${selectedProject ? `?projectId=${selectedProject}` : ''}`)
+    queryFn: () =>
+      selectedParentCategory
+        ? apiRequest("GET", `/api/subcategory/status/${selectedParentCategory}${selectedProject ? `?projectId=${selectedProject}` : ''}`)
         : Promise.resolve([]),
     enabled: !!selectedParentCategory,
   });
 
   // 子分類付款處理
   const processPaymentMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("/api/subcategory/process-payment", "POST", data),
-    onSuccess: (result) => {
+    mutationFn: (data: any) => apiRequest("POST", "/api/subcategory/process-payment", data),
+    onSuccess: (result: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/subcategory/status"] });
       queryClient.invalidateQueries({ queryKey: ["/api/payment/items"] });
       setIsPaymentDialogOpen(false);

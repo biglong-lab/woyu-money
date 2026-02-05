@@ -48,11 +48,11 @@ export default function SimpleCategoryManagement() {
   const [selectedCategoryType, setSelectedCategoryType] = useState<string>("fixed");
 
   // Queries
-  const { data: fixedCategories = [] } = useQuery({
+  const { data: fixedCategories = [] } = useQuery<any[]>({
     queryKey: ["/api/fixed-categories"],
   });
 
-  const { data: projectCategories = [] } = useQuery({
+  const { data: projectCategories = [] } = useQuery<any[]>({
     queryKey: ["/api/categories/project"],
   });
 
@@ -60,7 +60,7 @@ export default function SimpleCategoryManagement() {
     queryKey: ["/api/payment/projects"],
   });
 
-  const { data: fixedSubOptions = [] } = useQuery({
+  const { data: fixedSubOptions = [] } = useQuery<any[]>({
     queryKey: ["/api/fixed-category-sub-options"],
   });
 

@@ -28,15 +28,15 @@ export default function PaymentReports() {
   const [selectedProject, setSelectedProject] = useState("all");
 
   // 查詢穩定的數據來源 - 統計報表需要所有數據，不使用分頁
-  const { data: paymentItems = [] } = useQuery({
+  const { data: paymentItems = [] } = useQuery<any[]>({
     queryKey: ["/api/payment/items?includeAll=true"]
   });
 
-  const { data: projects = [] } = useQuery({
+  const { data: projects = [] } = useQuery<any[]>({
     queryKey: ["/api/payment/projects"]
   });
 
-  const { data: categories = [] } = useQuery({
+  const { data: categories = [] } = useQuery<any[]>({
     queryKey: ["/api/categories/project"]
   });
 
@@ -186,7 +186,7 @@ export default function PaymentReports() {
   // 安全的數據訪問
   const safeProjects = projects || [];
   const safePaymentMethods = methodData || [];
-  const safeProjectStats = projectStats || { projectBreakdown: [] };
+  const safeProjectStats = { ...projectStats, projectBreakdown: projectBreakdown };
 
   // 提取統計數據 - 直接使用計算結果
   const totalPlanned = projectStats?.totalPlanned || 0;

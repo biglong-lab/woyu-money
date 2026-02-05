@@ -24,7 +24,7 @@ router.post("/api/upload", receiptUpload.single("file"), async (req, res) => {
 router.put("/api/user/profile", requireAuth, async (req, res) => {
   try {
     const { fullName, email } = req.body
-    const userId = req.user!.id
+    const userId = (req.user as any)!.id
 
     const updatedUser = await storage.updateUser(userId, {
       fullName,
@@ -51,7 +51,7 @@ router.put("/api/user/profile", requireAuth, async (req, res) => {
 router.put("/api/user/password", requireAuth, async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body
-    const user = req.user!
+    const user = req.user! as any
 
     if (user.password) {
       const isCurrentPasswordValid = await comparePasswords(currentPassword, user.password)

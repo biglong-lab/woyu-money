@@ -19,12 +19,12 @@ export function LoanDocumentExport({ recordId, recordTitle, recordData }: LoanDo
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
 
   // Fetch payment history for the record
-  const { data: payments = [] } = useQuery({
+  const { data: payments = [] } = useQuery<any[]>({
     queryKey: [`/api/loan-investment/records/${recordId}/payments`],
   });
 
   // Fetch payment statistics
-  const { data: paymentStats = {} } = useQuery({
+  const { data: paymentStats = {} as any } = useQuery<any>({
     queryKey: [`/api/loan-investment/records/${recordId}/payment-stats`],
   });
 

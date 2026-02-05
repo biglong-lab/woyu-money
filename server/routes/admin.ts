@@ -13,7 +13,7 @@ const router = Router()
 router.get("/api/admin/users", requireAuth, async (req, res) => {
   try {
     const currentUser = req.user!
-    if (currentUser.role !== "admin") {
+    if ((currentUser as any).role !== "admin") {
       return res.status(403).json({ message: "需要管理員權限" })
     }
 
@@ -42,7 +42,7 @@ router.get("/api/admin/users", requireAuth, async (req, res) => {
 router.post("/api/admin/users", requireAuth, async (req, res) => {
   try {
     const currentUser = req.user!
-    if (currentUser.role !== "admin") {
+    if ((currentUser as any).role !== "admin") {
       return res.status(403).json({ message: "需要管理員權限" })
     }
 
@@ -92,7 +92,7 @@ router.post("/api/admin/users", requireAuth, async (req, res) => {
 router.put("/api/admin/users/:id/role", requireAuth, async (req, res) => {
   try {
     const currentUser = req.user!
-    if (currentUser.role !== "admin") {
+    if ((currentUser as any).role !== "admin") {
       return res.status(403).json({ message: "需要管理員權限" })
     }
 
@@ -122,7 +122,7 @@ router.put("/api/admin/users/:id/role", requireAuth, async (req, res) => {
 router.put("/api/admin/users/:id/permissions", requireAuth, async (req, res) => {
   try {
     const currentUser = req.user!
-    if (currentUser.role !== "admin") {
+    if ((currentUser as any).role !== "admin") {
       return res.status(403).json({ message: "需要管理員權限" })
     }
 
@@ -145,7 +145,7 @@ router.put("/api/admin/users/:id/permissions", requireAuth, async (req, res) => 
 router.put("/api/admin/users/:id/password", requireAuth, async (req, res) => {
   try {
     const currentUser = req.user!
-    if (currentUser.role !== "admin") {
+    if ((currentUser as any).role !== "admin") {
       return res.status(403).json({ message: "需要管理員權限" })
     }
 
@@ -170,14 +170,14 @@ router.put("/api/admin/users/:id/password", requireAuth, async (req, res) => {
 router.put("/api/admin/users/:id/status", requireAuth, async (req, res) => {
   try {
     const currentUser = req.user!
-    if (currentUser.role !== "admin") {
+    if ((currentUser as any).role !== "admin") {
       return res.status(403).json({ message: "需要管理員權限" })
     }
 
     const userId = parseInt(req.params.id)
     const { isActive } = req.body
 
-    const updatedUser = await storage.toggleUserStatus(userId, isActive)
+    const updatedUser = await (storage as any).toggleUserStatus(userId, isActive as boolean)
 
     res.json({
       id: updatedUser.id,
@@ -193,7 +193,7 @@ router.put("/api/admin/users/:id/status", requireAuth, async (req, res) => {
 router.put("/api/admin/users/:id/toggle-status", requireAuth, async (req, res) => {
   try {
     const currentUser = req.user!
-    if (currentUser.role !== "admin") {
+    if ((currentUser as any).role !== "admin") {
       return res.status(403).json({ message: "需要管理員權限" })
     }
 
@@ -218,13 +218,13 @@ router.put("/api/admin/users/:id/toggle-status", requireAuth, async (req, res) =
 router.delete("/api/admin/users/:id", requireAuth, async (req, res) => {
   try {
     const currentUser = req.user!
-    if (currentUser.role !== "admin") {
+    if ((currentUser as any).role !== "admin") {
       return res.status(403).json({ message: "需要管理員權限" })
     }
 
     const userId = parseInt(req.params.id)
 
-    if (userId === currentUser.id) {
+    if (userId === (currentUser as any).id) {
       return res.status(400).json({ message: "不能刪除自己的帳戶" })
     }
 
@@ -241,7 +241,7 @@ router.delete("/api/admin/users/:id", requireAuth, async (req, res) => {
 router.get("/api/admin/system-status", requireAuth, async (req, res) => {
   try {
     const currentUser = req.user!
-    if (currentUser.role !== "admin") {
+    if ((currentUser as any).role !== "admin") {
       return res.status(403).json({ message: "需要管理員權限" })
     }
 
@@ -278,7 +278,7 @@ router.get("/api/admin/system-status", requireAuth, async (req, res) => {
 router.post("/api/admin/backup", requireAuth, async (req, res) => {
   try {
     const currentUser = req.user!
-    if (currentUser.role !== "admin") {
+    if ((currentUser as any).role !== "admin") {
       return res.status(403).json({ message: "需要管理員權限" })
     }
 
@@ -301,7 +301,7 @@ router.post("/api/admin/backup", requireAuth, async (req, res) => {
 router.post("/api/admin/clear-cache", requireAuth, async (req, res) => {
   try {
     const currentUser = req.user!
-    if (currentUser.role !== "admin") {
+    if ((currentUser as any).role !== "admin") {
       return res.status(403).json({ message: "需要管理員權限" })
     }
 
@@ -321,7 +321,7 @@ router.post("/api/admin/clear-cache", requireAuth, async (req, res) => {
 router.post("/api/admin/validate-data", requireAuth, async (req, res) => {
   try {
     const currentUser = req.user!
-    if (currentUser.role !== "admin") {
+    if ((currentUser as any).role !== "admin") {
       return res.status(403).json({ message: "需要管理員權限" })
     }
 
@@ -341,7 +341,7 @@ router.post("/api/admin/validate-data", requireAuth, async (req, res) => {
 router.get("/api/line-config", requireAuth, async (req, res) => {
   try {
     const currentUser = req.user!
-    if (currentUser.role !== "admin") {
+    if ((currentUser as any).role !== "admin") {
       return res.status(403).json({ message: "需要管理員權限" })
     }
 
@@ -356,7 +356,7 @@ router.get("/api/line-config", requireAuth, async (req, res) => {
 router.post("/api/line-config", requireAuth, async (req, res) => {
   try {
     const currentUser = req.user!
-    if (currentUser.role !== "admin") {
+    if ((currentUser as any).role !== "admin") {
       return res.status(403).json({ message: "需要管理員權限" })
     }
 
@@ -379,7 +379,7 @@ router.post("/api/line-config", requireAuth, async (req, res) => {
 router.put("/api/line-config/:id", requireAuth, async (req, res) => {
   try {
     const currentUser = req.user!
-    if (currentUser.role !== "admin") {
+    if ((currentUser as any).role !== "admin") {
       return res.status(403).json({ message: "需要管理員權限" })
     }
 
@@ -415,7 +415,7 @@ router.get("/api/line-config/generate-callback", requireAuth, async (req, res) =
 router.post("/api/line-config/test", requireAuth, async (req, res) => {
   try {
     const currentUser = req.user!
-    if (currentUser.role !== "admin") {
+    if ((currentUser as any).role !== "admin") {
       return res.status(403).json({ message: "需要管理員權限" })
     }
 
@@ -479,7 +479,7 @@ router.get("/api/line/callback", async (req, res) => {
       return res.redirect("/auth?error=profile_fetch_failed")
     }
 
-    let user = await storage.getUserByLineId(profileData.userId)
+    let user = await storage.getUserByLineUserId(profileData.userId)
 
     if (!user) {
       user = await storage.createUser({
@@ -501,8 +501,8 @@ router.get("/api/line/callback", async (req, res) => {
       })
     }
 
-    req.session.userId = user.id
-    req.session.isAuthenticated = true
+    ;(req.session as any).userId = user.id
+    ;(req.session as any).isAuthenticated = true
 
     res.redirect("/?line_login_success=true")
   } catch (error: any) {
@@ -573,7 +573,7 @@ router.get("/api/file-attachments/:entityType/:entityId", async (req, res) => {
 router.delete("/api/file-attachments/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id)
-    const attachment = await storage.getFileAttachmentById(id)
+    const attachment = await storage.getFileAttachment(id)
 
     if (!attachment) {
       return res.status(404).json({ message: "File attachment not found" })
@@ -595,7 +595,7 @@ router.delete("/api/file-attachments/:id", async (req, res) => {
 router.get("/api/file-attachments/download/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id)
-    const attachment = await storage.getFileAttachmentById(id)
+    const attachment = await storage.getFileAttachment(id)
 
     if (!attachment) {
       return res.status(404).json({ message: "File attachment not found" })

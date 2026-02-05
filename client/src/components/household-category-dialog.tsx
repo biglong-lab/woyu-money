@@ -31,7 +31,7 @@ export function HouseholdCategoryDialog({ open, onOpenChange }: HouseholdCategor
   const [isEditing, setIsEditing] = useState(false);
 
   // 獲取家用分類
-  const { data: categories = [], isLoading } = useQuery({
+  const { data: categories = [], isLoading } = useQuery<any[]>({
     queryKey: ["/api/categories/household"],
     enabled: open,
   });

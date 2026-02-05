@@ -34,7 +34,7 @@ router.post("/api/document-inbox/upload", requireAuth, documentUpload.array("fil
       return res.status(400).json({ message: "請選擇要上傳的檔案" })
     }
 
-    const userId = req.session?.userId || (req.user as any)?.id
+    const userId = (req.session as any)?.userId || (req.user as any)?.id
     const documentType = (req.body.documentType as "bill" | "payment" | "invoice") || "bill"
     const uploadNotes = req.body.notes || null
 
@@ -354,7 +354,7 @@ router.post("/api/document-inbox/:id/archive-to-payment-item", requireAuth, asyn
       return res.status(404).json({ message: "找不到該項目" })
     }
 
-    const userId = req.session?.userId
+    const userId = (req.session as any)?.userId
     const { projectId, categoryId, itemName, totalAmount, dueDate, notes } = req.body
 
     let archivedByUsername = "未知用戶"
@@ -395,21 +395,19 @@ router.post("/api/document-inbox/:id/archive-to-payment-item", requireAuth, asyn
         paidAmount: "0",
         status: "unpaid",
         startDate: startDateValue,
-        dueDate: dueDate || doc.confirmedDate || doc.recognizedDate || null,
-        vendor: doc.confirmedVendor || doc.recognizedVendor,
-        receiptImage: doc.imagePath,
+        endDate: dueDate || doc.confirmedDate || doc.recognizedDate || null,
         notes: trackingNotes,
         createdAt: now,
         updatedAt: now,
         source: "ai_scan",
         sourceDocumentId: doc.id,
         documentUploadedAt: doc.createdAt,
-        documentUploadedByUserId: doc.uploadedByUserId,
+        documentUploadedByUserId: (doc as any).uploadedByUserId,
         documentUploadedByUsername: doc.uploadedByUsername,
         archivedByUserId: userId,
         archivedByUsername,
         archivedAt: now,
-      })
+      } as any)
       .returning()
 
     await db
@@ -442,7 +440,7 @@ router.post("/api/document-inbox/:id/archive-to-payment-record", requireAuth, as
       return res.status(404).json({ message: "找不到該項目" })
     }
 
-    const userId = req.session?.userId
+    const userId = (req.session as any)?.userId
     const { paymentItemId, amount, paymentDate, paymentMethod, notes } = req.body
 
     if (!paymentItemId) {
@@ -532,7 +530,7 @@ router.post("/api/document-inbox/:id/archive-to-invoice", requireAuth, async (re
       return res.status(404).json({ message: "找不到該項目" })
     }
 
-    const userId = req.session?.userId
+    const userId = (req.session as any)?.userId
     const {
       invoiceNumber,
       invoiceDate,
@@ -630,7 +628,7 @@ router.patch("/api/document-inbox/:id/notes", requireAuth, async (req, res) => {
   try {
     const id = parseInt(req.params.id)
     const { notes } = req.body
-    const userId = req.session?.userId
+    const userId = (req.session as any)?.userId
 
     let editedByUsername = "未知用戶"
     if (userId) {

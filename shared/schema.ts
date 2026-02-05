@@ -1188,8 +1188,8 @@ export type InsertEmployee = z.infer<typeof insertEmployeeSchema>;
 export type MonthlyHrCost = typeof monthlyHrCosts.$inferSelect;
 export type InsertMonthlyHrCost = z.infer<typeof insertMonthlyHrCostSchema>;
 
-// Final consolidated types
-export type User = typeof users.$inferSelect;
+// Final consolidated types (User 已在上方定義)
+// export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type LineConfig = typeof lineConfigs.$inferSelect;
 export type InsertLineConfig = z.infer<typeof insertLineConfigSchema>;

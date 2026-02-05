@@ -12,12 +12,12 @@ export function setupLineAuth(app: express.Express) {
       }
 
       const state = Math.random().toString(36).substring(7);
-      req.session.lineState = state;
-      
+      (req.session as any).lineState = state;
+
       const authUrl = `https://access.line.me/oauth2/v2.1/authorize?` +
         `response_type=code&` +
         `client_id=${config.channelId}&` +
-        `redirect_uri=${encodeURIComponent(config.callbackUrl)}&` +
+        `redirect_uri=${encodeURIComponent(config.callbackUrl || '')}&` +
         `state=${state}&` +
         `scope=profile%20openid%20email`;
       

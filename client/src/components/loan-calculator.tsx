@@ -23,6 +23,7 @@ interface CalculationResult {
   annualRate: number;
   monthlyRate: number;
   repaymentMode: string;
+  repaymentYears?: number;
   totalMonths?: number | string;
   graceMonths?: number;
   amortizationMonths?: number;
@@ -89,7 +90,7 @@ export default function LoanCalculator() {
       const response = await apiRequest("/api/loan-investment/calculate", "POST", data);
       return response;
     },
-    onSuccess: (result) => {
+    onSuccess: (result: any) => {
       setCalculation(result);
     }
   });
@@ -99,7 +100,7 @@ export default function LoanCalculator() {
       const response = await apiRequest("POST", "/api/loan-investment/advice", { calculations });
       return response;
     },
-    onSuccess: (result) => {
+    onSuccess: (result: any) => {
       setAiAdvice(result.advice);
     }
   });
@@ -336,7 +337,7 @@ ${calculation?.totalPayment ? `總還款：NT$ ${calculation.totalPayment.toLoca
               <div className="space-y-4">
                 <h3 className="text-lg font-semibold">本息攤還詳情</h3>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {calculation.graceMonths > 0 && (
+                  {(calculation.graceMonths ?? 0) > 0 && (
                     <>
                       <div>
                         <p className="text-sm text-gray-600">緩衝期</p>
@@ -344,33 +345,33 @@ ${calculation?.totalPayment ? `總還款：NT$ ${calculation.totalPayment.toLoca
                       </div>
                       <div>
                         <p className="text-sm text-gray-600">緩衝期月付</p>
-                        <p className="font-semibold">{formatCurrency(calculation.monthlyInterestOnly)}</p>
+                        <p className="font-semibold">{formatCurrency(calculation.monthlyInterestOnly ?? 0)}</p>
                       </div>
                     </>
                   )}
                   <div>
                     <p className="text-sm text-gray-600">攤還月付</p>
-                    <p className="font-semibold">{formatCurrency(calculation.monthlyPayment)}</p>
+                    <p className="font-semibold">{formatCurrency(calculation.monthlyPayment ?? 0)}</p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-600">月付本金</p>
-                    <p className="font-semibold">{formatCurrency(calculation.monthlyPrincipal)}</p>
+                    <p className="font-semibold">{formatCurrency(calculation.monthlyPrincipal ?? 0)}</p>
                   </div>
                 </div>
                 <div className="bg-gray-50 p-4 rounded-lg">
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                       <p className="text-sm text-gray-600">總還款金額</p>
-                      <p className="text-xl font-bold">{formatCurrency(calculation.totalPayment)}</p>
+                      <p className="text-xl font-bold">{formatCurrency(calculation.totalPayment ?? 0)}</p>
                     </div>
                     <div>
                       <p className="text-sm text-gray-600">總利息支出</p>
-                      <p className="text-xl font-bold text-red-600">{formatCurrency(calculation.totalInterest)}</p>
+                      <p className="text-xl font-bold text-red-600">{formatCurrency(calculation.totalInterest ?? 0)}</p>
                     </div>
                     <div>
                       <p className="text-sm text-gray-600">利息佔比</p>
                       <p className="text-xl font-bold">
-                        {((calculation.totalInterest as number / calculation.principal) * 100).toFixed(1)}%
+                        {(((calculation.totalInterest as number ?? 0) / calculation.principal) * 100).toFixed(1)}%
                       </p>
                     </div>
                   </div>
@@ -384,7 +385,7 @@ ${calculation?.totalPayment ? `總還款：NT$ ${calculation.totalPayment.toLoca
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                   <div>
                     <p className="text-sm text-gray-600">每月利息</p>
-                    <p className="font-semibold">{formatCurrency(calculation.monthlyInterest)}</p>
+                    <p className="font-semibold">{formatCurrency(calculation.monthlyInterest ?? 0)}</p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-600">付息期間</p>
@@ -392,18 +393,18 @@ ${calculation?.totalPayment ? `總還款：NT$ ${calculation.totalPayment.toLoca
                   </div>
                   <div>
                     <p className="text-sm text-gray-600">到期本金</p>
-                    <p className="font-semibold">{formatCurrency(calculation.finalPrincipalPayment)}</p>
+                    <p className="font-semibold">{formatCurrency(calculation.finalPrincipalPayment ?? 0)}</p>
                   </div>
                 </div>
                 <div className="bg-gray-50 p-4 rounded-lg">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <p className="text-sm text-gray-600">總還款金額</p>
-                      <p className="text-xl font-bold">{formatCurrency(calculation.totalPayment)}</p>
+                      <p className="text-xl font-bold">{formatCurrency(calculation.totalPayment ?? 0)}</p>
                     </div>
                     <div>
                       <p className="text-sm text-gray-600">總利息支出</p>
-                      <p className="text-xl font-bold text-red-600">{formatCurrency(calculation.totalInterest)}</p>
+                      <p className="text-xl font-bold text-red-600">{formatCurrency(calculation.totalInterest ?? 0)}</p>
                     </div>
                   </div>
                 </div>
@@ -420,11 +421,11 @@ ${calculation?.totalPayment ? `總還款：NT$ ${calculation.totalPayment.toLoca
                   </div>
                   <div>
                     <p className="text-sm text-gray-600">月利息累積</p>
-                    <p className="font-semibold">{formatCurrency(calculation.monthlyAccrual)}</p>
+                    <p className="font-semibold">{formatCurrency(calculation.monthlyAccrual ?? 0)}</p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-600">到期總額</p>
-                    <p className="font-semibold text-red-600">{formatCurrency(calculation.finalPayment)}</p>
+                    <p className="font-semibold text-red-600">{formatCurrency(calculation.finalPayment ?? 0)}</p>
                   </div>
                 </div>
                 <div className="bg-gray-50 p-4 rounded-lg">
@@ -435,7 +436,7 @@ ${calculation?.totalPayment ? `總還款：NT$ ${calculation.totalPayment.toLoca
                     </div>
                     <div>
                       <p className="text-sm text-gray-600">複利利息</p>
-                      <p className="text-xl font-bold text-red-600">{formatCurrency(calculation.totalInterest)}</p>
+                      <p className="text-xl font-bold text-red-600">{formatCurrency(calculation.totalInterest ?? 0)}</p>
                     </div>
                   </div>
                 </div>

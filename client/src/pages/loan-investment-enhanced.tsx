@@ -467,8 +467,8 @@ export default function LoanInvestmentEnhanced() {
       installmentAmount: record.installmentAmount || "",
       annualPaymentDate: record.annualPaymentDate || "",
     };
-    
-    form.reset(formData);
+
+    form.reset(formData as any);
     setEditDialogOpen(true);
   };
 

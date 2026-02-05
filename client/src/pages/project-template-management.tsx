@@ -139,8 +139,8 @@ export default function ProjectTemplateManagement() {
   const handleEdit = (template: ProjectCategoryTemplate) => {
     setEditingTemplate(template);
     form.reset({
-      projectId: template.projectId,
-      categoryId: template.categoryId,
+      projectId: template.projectId ?? undefined,
+      categoryId: template.categoryId ?? undefined,
       templateName: template.templateName,
       accountInfo: template.accountInfo || "",
       notes: template.notes || "",
@@ -177,7 +177,7 @@ export default function ProjectTemplateManagement() {
 
   // Group templates by category
   const templatesByCategory = templates.reduce((acc, template) => {
-    const categoryId = template.categoryId;
+    const categoryId = template.categoryId ?? 0;
     if (!acc[categoryId]) {
       acc[categoryId] = [];
     }

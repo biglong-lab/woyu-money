@@ -147,7 +147,7 @@ export default function IntegratedPaymentAnalysisOptimized() {
   });
 
   // 資料查詢 - 獲取所有數據用於完整分析
-  const { data: paymentItems = [] } = useQuery({
+  const { data: paymentItems = [] } = useQuery<PaymentItem[]>({
     queryKey: [`/api/payment/items?includeDeleted=${showDeletedItems}&includeAll=true`],
   });
 
@@ -155,7 +155,7 @@ export default function IntegratedPaymentAnalysisOptimized() {
     queryKey: ["/api/payment/projects"],
   });
 
-  const { data: categories = [] } = useQuery({
+  const { data: categories = [] } = useQuery<any[]>({
     queryKey: ["/api/categories/project"],
   });
 

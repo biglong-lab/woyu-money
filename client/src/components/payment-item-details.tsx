@@ -57,7 +57,7 @@ export function PaymentItemDetails({ item, open, onOpenChange }: PaymentItemDeta
   });
 
   // 查詢備註記錄 - 用於顯示數量
-  const { data: itemNotes = [] } = useQuery({
+  const { data: itemNotes = [] } = useQuery<any[]>({
     queryKey: ["/api/payment-items", item?.id, "notes"],
     queryFn: async () => {
       if (!item?.id) return [];
@@ -76,13 +76,13 @@ export function PaymentItemDetails({ item, open, onOpenChange }: PaymentItemDeta
   // 更新備註的 mutation
   const updateNotesMutation = useMutation({
     mutationFn: async (newNotes: string) => {
-      const response = await apiRequest("PUT", `/api/payment/items/${item.id}`, {
+      const response: any = await apiRequest("PUT", `/api/payment/items/${item.id}`, {
         notes: newNotes,
         changeReason: "更新備註"
       });
-      return response.json();
+      return response;
     },
-    onSuccess: () => {
+    onSuccess: (_response: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/payment/items"] });
       setIsEditingNotes(false);
       toast({

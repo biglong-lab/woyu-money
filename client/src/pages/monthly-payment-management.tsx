@@ -101,22 +101,22 @@ export default function MonthlyPaymentManagement() {
   const [showBatchPayConfirm, setShowBatchPayConfirm] = useState(false);
 
   // Queries - 獲取所有付款項目數據用於月付款管理
-  const { data: paymentItemsResponse, isLoading } = useQuery({
+  const { data: paymentItemsResponse, isLoading } = useQuery<any>({
     queryKey: ["/api/payment/items", { includeAll: true }],
     queryFn: () => fetch("/api/payment/items?includeAll=true").then(res => res.json()),
   });
-  
-  const paymentItems = Array.isArray(paymentItemsResponse) ? paymentItemsResponse : (paymentItemsResponse?.items || []);
 
-  const { data: categories = [] } = useQuery({
+  const paymentItems: PaymentItem[] = Array.isArray(paymentItemsResponse) ? paymentItemsResponse : (paymentItemsResponse?.items || []);
+
+  const { data: categories = [] } = useQuery<any[]>({
     queryKey: ["/api/categories/project"],
   });
 
-  const { data: projects = [] } = useQuery({
+  const { data: projects = [] } = useQuery<any[]>({
     queryKey: ["/api/payment/projects"],
   });
 
-  const { data: fixedCategories = [] } = useQuery({
+  const { data: fixedCategories = [] } = useQuery<any[]>({
     queryKey: ["/api/fixed-categories"],
   });
 
@@ -222,7 +222,12 @@ export default function MonthlyPaymentManagement() {
       paymentDate: "",
       notes: "",
       fixedCategoryId: "",
-      categoryType: ""
+      categoryType: "",
+      totalAmount: "",
+      installments: "",
+      paymentType: "",
+      extraFirstPayment: "",
+      extraLastPayment: "",
     }
   });
 
@@ -235,7 +240,9 @@ export default function MonthlyPaymentManagement() {
       startDate: "",
       endDate: "",
       notes: "",
-      fixedCategoryId: ""
+      fixedCategoryId: "",
+      categoryType: "",
+      status: "",
     }
   });
 
