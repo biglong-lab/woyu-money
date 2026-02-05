@@ -1,4 +1,5 @@
 import { Switch, Route } from "wouter";
+import { useState } from "react";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -6,6 +7,10 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/hooks/use-auth";
 import { ProtectedRoute } from "@/lib/protected-route";
 import TopNavigation from "@/components/top-navigation";
+import MobileTabBar from "@/components/mobile-tab-bar";
+import AppBreadcrumb from "@/components/app-breadcrumb";
+import QuickActionFAB from "@/components/quick-action-fab";
+import QuickPaymentDialog from "@/components/quick-payment-dialog";
 import NotFound from "@/pages/not-found";
 import AuthPage from "@/pages/auth-page";
 
@@ -40,19 +45,27 @@ import FinancialOverview from "@/pages/financial-overview";
 import RecycleBin from "@/pages/recycle-bin";
 import ProjectBudgetManagement from "@/pages/project-budget-management";
 import DocumentInbox from "@/pages/document-inbox";
+import HRCostManagement from "@/pages/hr-cost-management";
+import FinancialStatements from "@/pages/financial-statements";
+import HRCostReports from "@/pages/hr-cost-reports";
 
 function Router() {
+  const [quickPaymentOpen, setQuickPaymentOpen] = useState(false);
+
   return (
     <AuthProvider>
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
         <Switch>
           {/* Authentication route - publicly accessible */}
           <Route path="/auth" component={AuthPage} />
-          
+
           {/* All other routes are protected */}
           <Route>
             <TopNavigation />
-            <main className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6">
+            {/* 主要內容區域 - 底部留空間給手機 Tab Bar */}
+            <main className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6 pb-20 md:pb-6">
+              {/* 麵包屑導航 */}
+              <AppBreadcrumb className="mb-4" />
               <Switch>
                 {/* Payment Home - Main dashboard */}
                 <ProtectedRoute path="/" component={PaymentHome} />
@@ -78,6 +91,8 @@ function Router() {
                 <ProtectedRoute path="/payment-project" component={PaymentProject} />
                 <ProtectedRoute path="/payment-schedule" component={PaymentSchedule} />
                 <ProtectedRoute path="/project-budget" component={ProjectBudgetManagement} />
+                <ProtectedRoute path="/financial-statements" component={FinancialStatements} />
+                <ProtectedRoute path="/hr-cost-reports" component={HRCostReports} />
                 
                 {/* Category Management */}
                 <ProtectedRoute path="/categories" component={SimpleCategoryManagement} />
@@ -92,6 +107,7 @@ function Router() {
                 <ProtectedRoute path="/user-management" component={UserManagement} />
                 <ProtectedRoute path="/recycle-bin" component={RecycleBin} />
                 <ProtectedRoute path="/document-inbox" component={DocumentInbox} />
+                <ProtectedRoute path="/hr-cost-management" component={HRCostManagement} />
                 
                 {/* Feature Showcase */}
                 <ProtectedRoute path="/features" component={FeatureShowcase} />
@@ -106,6 +122,15 @@ function Router() {
                 <Route component={NotFound} />
               </Switch>
             </main>
+            {/* 浮動快速操作按鈕 */}
+            <QuickActionFAB onQuickPayment={() => setQuickPaymentOpen(true)} />
+            {/* 快速付款對話框 */}
+            <QuickPaymentDialog
+              open={quickPaymentOpen}
+              onOpenChange={setQuickPaymentOpen}
+            />
+            {/* 手機版底部導航欄 */}
+            <MobileTabBar />
           </Route>
         </Switch>
       </div>

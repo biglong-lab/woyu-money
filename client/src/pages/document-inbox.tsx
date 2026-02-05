@@ -476,7 +476,7 @@ export default function DocumentInboxPage() {
                   alt={doc.originalFilename || '單據圖片'}
                   className="w-full h-full object-cover"
                   onError={(e) => {
-                    (e.target as HTMLImageElement).src = '/placeholder-document.png';
+                    (e.target as HTMLImageElement).src = '/placeholder-document.svg';
                   }}
                 />
                 <div className="absolute top-2 left-2 flex gap-1">
@@ -585,6 +585,9 @@ export default function DocumentInboxPage() {
                       src={selectedDoc.imagePath}
                       alt="單據圖片"
                       className="w-full h-full object-contain"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = '/placeholder-document.svg';
+                      }}
                     />
                   </div>
                   <div className="text-sm text-gray-500">

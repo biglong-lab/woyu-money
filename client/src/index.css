@@ -2,6 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
+/* 引入設計 Token */
+@import "./styles/tokens.css";
+
 :root {
   --background: 210 11% 98%; /* #F5F7FA */
   --foreground: 210 14% 15%; /* #1E293B */

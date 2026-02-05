@@ -183,18 +183,20 @@ export default function FinancialHealthDashboard({
 
   return (
     <div className={`space-y-4 ${className}`}>
-      <div className="grid grid-cols-12 gap-4">
-        <Card className="col-span-4" data-testid="card-health-score">
+      {/* 響應式網格：手機單欄，平板雙欄，桌面三欄 */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <Card data-testid="card-health-score">
           <CardHeader className="pb-2">
-            <CardTitle className="text-lg flex items-center">
-              <Activity className="h-5 w-5 mr-2" />
+            <CardTitle className="text-base sm:text-lg flex items-center">
+              <Activity className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
               財務健康評分
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center justify-center py-4">
-              <div className="relative">
-                <svg className="w-32 h-32">
+            <div className="flex items-center justify-center py-2 sm:py-4">
+              <div className="relative w-24 h-24 sm:w-32 sm:h-32">
+                {/* 響應式圓形圖表 - 使用 viewBox 保持比例 */}
+                <svg viewBox="0 0 128 128" className="w-full h-full">
                   <circle
                     className="text-gray-200"
                     strokeWidth="10"
@@ -221,13 +223,13 @@ export default function FinancialHealthDashboard({
                   />
                 </svg>
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className={`text-3xl font-bold ${
+                  <span className={`text-2xl sm:text-3xl font-bold ${
                     getScoreStatus(healthScore) === 'good' ? 'text-green-600' :
                     getScoreStatus(healthScore) === 'warning' ? 'text-yellow-600' : 'text-red-600'
                   }`}>
                     {healthScore.toFixed(0)}
                   </span>
-                  <span className="text-sm text-gray-500">分</span>
+                  <span className="text-xs sm:text-sm text-gray-500">分</span>
                 </div>
               </div>
             </div>
@@ -243,12 +245,12 @@ export default function FinancialHealthDashboard({
           </CardContent>
         </Card>
 
-        <Card className="col-span-4" data-testid="card-status-distribution">
+        <Card data-testid="card-status-distribution">
           <CardHeader className="pb-2">
-            <CardTitle className="text-lg">狀態分佈</CardTitle>
+            <CardTitle className="text-base sm:text-lg">狀態分佈</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-[150px]">
+            <div className="h-[120px] sm:h-[150px]">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
@@ -257,8 +259,8 @@ export default function FinancialHealthDashboard({
                     nameKey="name"
                     cx="50%"
                     cy="50%"
-                    innerRadius={40}
-                    outerRadius={60}
+                    innerRadius={30}
+                    outerRadius={50}
                   >
                     {statusDistribution.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
@@ -268,11 +270,11 @@ export default function FinancialHealthDashboard({
                 </PieChart>
               </ResponsiveContainer>
             </div>
-            <div className="flex justify-center gap-4 mt-2">
+            <div className="flex flex-wrap justify-center gap-2 sm:gap-4 mt-2">
               {statusDistribution.map((item) => (
                 <div key={item.name} className="flex items-center text-xs">
-                  <div 
-                    className="w-3 h-3 rounded-full mr-1" 
+                  <div
+                    className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full mr-1"
                     style={{ backgroundColor: item.color }}
                   />
                   <span>{item.name}: {item.value}</span>
@@ -282,77 +284,78 @@ export default function FinancialHealthDashboard({
           </CardContent>
         </Card>
 
-        <Card className="col-span-4" data-testid="card-key-stats">
+        <Card data-testid="card-key-stats">
           <CardHeader className="pb-2">
-            <CardTitle className="text-lg">關鍵數據</CardTitle>
+            <CardTitle className="text-base sm:text-lg">關鍵數據</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="space-y-2 sm:space-y-3">
             <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600">待付總額</span>
-              <span className="font-bold text-orange-600">
+              <span className="text-xs sm:text-sm text-gray-600">待付總額</span>
+              <span className="font-bold text-orange-600 text-sm sm:text-base">
                 ${metrics.totalPending.toLocaleString()}
               </span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600">月付固定支出</span>
-              <span className="font-bold text-blue-600">
+              <span className="text-xs sm:text-sm text-gray-600">月付固定支出</span>
+              <span className="font-bold text-blue-600 text-sm sm:text-base">
                 ${metrics.monthlyTotal.toLocaleString()}
               </span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600">平均處理天數</span>
-              <span className="font-bold">
+              <span className="text-xs sm:text-sm text-gray-600">平均處理天數</span>
+              <span className="font-bold text-sm sm:text-base">
                 {metrics.avgDaysToComplete.toFixed(0)} 天
               </span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600">項目總數</span>
-              <span className="font-bold">{metrics.totalItems}</span>
+              <span className="text-xs sm:text-sm text-gray-600">項目總數</span>
+              <span className="font-bold text-sm sm:text-base">{metrics.totalItems}</span>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      <div className="grid grid-cols-4 gap-4">
+      {/* 響應式健康指標網格：手機 2x2，桌面 4x1 */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {healthMetrics.map((metric) => {
           const Icon = metric.icon;
           return (
-            <Card 
-              key={metric.label} 
+            <Card
+              key={metric.label}
               className={`${
                 metric.status === 'danger' ? 'border-red-200 bg-red-50' :
                 metric.status === 'warning' ? 'border-yellow-200 bg-yellow-50' : ''
               }`}
               data-testid={`card-metric-${metric.label}`}
             >
-              <CardContent className="pt-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm text-gray-600">{metric.label}</span>
-                  <Icon className={`h-5 w-5 ${
+              <CardContent className="p-3 sm:pt-4 sm:px-4">
+                <div className="flex items-center justify-between mb-1 sm:mb-2">
+                  <span className="text-xs sm:text-sm text-gray-600 truncate">{metric.label}</span>
+                  <Icon className={`h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0 ${
                     metric.status === 'good' ? 'text-green-500' :
                     metric.status === 'warning' ? 'text-yellow-500' : 'text-red-500'
                   }`} />
                 </div>
-                <div className="flex items-baseline gap-2">
-                  <span className={`text-2xl font-bold ${
+                <div className="flex flex-col sm:flex-row sm:items-baseline sm:gap-2">
+                  <span className={`text-xl sm:text-2xl font-bold ${
                     metric.status === 'good' ? 'text-green-600' :
                     metric.status === 'warning' ? 'text-yellow-600' : 'text-red-600'
                   }`}>
                     {metric.label === '高優先待處理' ? metric.value : `${metric.value.toFixed(0)}%`}
                   </span>
                   {metric.target !== undefined && (
-                    <span className="text-xs text-gray-500">
+                    <span className="text-[10px] sm:text-xs text-gray-500">
                       目標: {metric.label === '逾期率' ? `≤${metric.target}%` : `≥${metric.target}%`}
                     </span>
                   )}
                 </div>
                 {metric.target !== undefined && (
-                  <Progress 
-                    value={metric.label === '逾期率' ? 100 - metric.value : metric.value} 
-                    className="h-1.5 mt-2"
+                  <Progress
+                    value={metric.label === '逾期率' ? 100 - metric.value : metric.value}
+                    className="h-1 sm:h-1.5 mt-1 sm:mt-2"
                   />
                 )}
-                <p className="text-xs text-gray-500 mt-2">{metric.description}</p>
+                <p className="text-[10px] sm:text-xs text-gray-500 mt-1 sm:mt-2 line-clamp-2">{metric.description}</p>
               </CardContent>
             </Card>
           );

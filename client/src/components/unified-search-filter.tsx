@@ -190,7 +190,8 @@ export default function UnifiedSearchFilter({
 
   return (
     <div className={`space-y-3 ${className}`}>
-      <div className="flex items-center gap-2">
+      {/* 響應式搜尋列 */}
+      <div className="flex flex-col sm:flex-row gap-2">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
           <Input
@@ -199,26 +200,27 @@ export default function UnifiedSearchFilter({
             placeholder={placeholder}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-10 pr-20"
+            className="pl-10 pr-4 sm:pr-20 h-10"
           />
-          <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-xs text-gray-400">
+          <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-xs text-gray-400 hidden sm:block">
             Ctrl+K
           </div>
         </div>
 
-        <Popover open={isAdvancedOpen} onOpenChange={setIsAdvancedOpen}>
-          <PopoverTrigger asChild>
-            <Button variant="outline" className="relative" data-testid="btn-advanced-filter">
-              <Filter className="h-4 w-4 mr-2" />
-              篩選
-              {activeFilterCount > 0 && (
-                <Badge variant="destructive" className="ml-2 h-5 w-5 p-0 flex items-center justify-center text-xs">
-                  {activeFilterCount}
-                </Badge>
-              )}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-80" align="end">
+        <div className="flex gap-2">
+          <Popover open={isAdvancedOpen} onOpenChange={setIsAdvancedOpen}>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className="relative flex-1 sm:flex-none min-h-[40px]" data-testid="btn-advanced-filter">
+                <Filter className="h-4 w-4 mr-2" />
+                <span>篩選</span>
+                {activeFilterCount > 0 && (
+                  <Badge variant="destructive" className="ml-2 h-5 w-5 p-0 flex items-center justify-center text-xs">
+                    {activeFilterCount}
+                  </Badge>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[calc(100vw-2rem)] sm:w-80 max-w-sm" align="end">
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h4 className="font-medium">進階篩選</h4>
@@ -340,18 +342,20 @@ export default function UnifiedSearchFilter({
                 </div>
               )}
             </div>
-          </PopoverContent>
-        </Popover>
+            </PopoverContent>
+          </Popover>
 
-        {(search || activeFilterCount > 0) && (
-          <Button variant="ghost" size="icon" onClick={clearAllFilters} data-testid="btn-clear-all">
-            <X className="h-4 w-4" />
-          </Button>
-        )}
+          {(search || activeFilterCount > 0) && (
+            <Button variant="ghost" size="icon" onClick={clearAllFilters} data-testid="btn-clear-all" className="min-h-[40px] min-w-[40px]">
+              <X className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
       </div>
 
+      {/* 響應式已選篩選標籤 */}
       {(selectedProjects.length > 0 || selectedCategories.length > 0 || selectedStatuses.length > 0 || selectedPriorities.length > 0 || dueDateRange !== 'all') && (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-1.5 sm:gap-2">
           {selectedProjects.map((projectId) => {
             const project = config.projects?.find(p => p.id === projectId);
             return project ? (

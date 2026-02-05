@@ -274,39 +274,39 @@ export default function PaymentRecords() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">付款記錄</h1>
-        <p className="text-gray-600">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1 sm:mb-2">付款記錄</h1>
+        <p className="text-sm sm:text-base text-gray-600">
           完整的付款歷史記錄，支援多維度篩選和詳細查看
         </p>
       </div>
 
-      {/* 統計卡片 */}
-      <div className="grid gap-6 md:grid-cols-4 mb-8">
+      {/* 響應式統計卡片 */}
+      <div className="grid gap-3 sm:gap-6 grid-cols-2 lg:grid-cols-4 mb-4 sm:mb-8">
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">總付款金額</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 sm:pb-2">
+            <CardTitle className="text-xs sm:text-sm font-medium">總付款金額</CardTitle>
+            <DollarSign className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">
+          <CardContent className="pt-0">
+            <div className="text-lg sm:text-2xl font-bold text-green-600">
               ${totalAmount.toLocaleString()}
             </div>
           </CardContent>
         </Card>
-        
+
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">付款記錄數</CardTitle>
-            <Receipt className="h-4 w-4 text-muted-foreground" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 sm:pb-2">
+            <CardTitle className="text-xs sm:text-sm font-medium">付款記錄數</CardTitle>
+            <Receipt className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalRecords}</div>
+          <CardContent className="pt-0">
+            <div className="text-lg sm:text-2xl font-bold">{totalRecords}</div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="hidden sm:block">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">主要付款方式</CardTitle>
             <FileText className="h-4 w-4 text-muted-foreground" />
@@ -326,7 +326,7 @@ export default function PaymentRecords() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="hidden sm:block">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">平均付款金額</CardTitle>
             <Target className="h-4 w-4 text-muted-foreground" />
@@ -340,18 +340,18 @@ export default function PaymentRecords() {
       </div>
 
       {/* 篩選控制 */}
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Filter className="w-5 h-5" />
+      <Card className="mb-4 sm:mb-6">
+        <CardHeader className="pb-2 sm:pb-4">
+          <CardTitle className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-2 text-base sm:text-lg">
+              <Filter className="w-4 h-4 sm:w-5 sm:h-5" />
               篩選與搜尋
             </div>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               size="sm"
               onClick={() => refetchRecords()}
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 w-full sm:w-auto"
             >
               <Download className="w-4 h-4" />
               刷新記錄
@@ -359,9 +359,9 @@ export default function PaymentRecords() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            {/* 第一行：搜尋和基本篩選 */}
-            <div className="grid gap-4 md:grid-cols-6">
+          <div className="space-y-3 sm:space-y-4">
+            {/* 響應式篩選網格 */}
+            <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-6">
               <div className="relative">
                 <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                 <Input
@@ -450,8 +450,8 @@ export default function PaymentRecords() {
               </Button>
             </div>
 
-            {/* 第二行：年月和日期範圍篩選 */}
-            <div className="grid gap-4 md:grid-cols-7 items-end">
+            {/* 響應式第二行篩選 */}
+            <div className="grid gap-3 sm:gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 items-end">
               <div className="flex flex-col space-y-1">
                 <label className="text-sm font-medium">年份</label>
                 <Select value={selectedYear.toString()} onValueChange={(value) => setSelectedYear(parseInt(value))}>
@@ -515,10 +515,11 @@ export default function PaymentRecords() {
                 匯出記錄
               </Button>
 
-              <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 col-span-2">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 col-span-2 sm:col-span-3 lg:col-span-2">
                 <p className="text-xs text-blue-700">
                   <span className="font-medium">💡 提示：</span>
-                  可同時使用年月篩選和自訂日期範圍進行精確查詢
+                  <span className="hidden sm:inline">可同時使用年月篩選和自訂日期範圍進行精確查詢</span>
+                  <span className="sm:hidden">使用篩選精確查詢</span>
                 </p>
               </div>
             </div>
@@ -537,19 +538,20 @@ export default function PaymentRecords() {
         <CardContent>
           <div className="space-y-4">
             {filteredRecords.length === 0 ? (
-              <div className="text-center py-12 text-gray-500">
-                <Receipt className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                <p className="text-lg font-medium mb-2">無符合條件的付款記錄</p>
-                <p>請調整篩選條件或搜尋關鍵字</p>
+              <div className="text-center py-8 sm:py-12 text-gray-500">
+                <Receipt className="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-3 sm:mb-4 text-gray-300" />
+                <p className="text-base sm:text-lg font-medium mb-1 sm:mb-2">無符合條件的付款記錄</p>
+                <p className="text-sm">請調整篩選條件或搜尋關鍵字</p>
               </div>
             ) : (
               filteredRecords.map((record: PaymentRecordWithDetails) => (
-                <div key={record.id} className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <h3 className="font-medium text-lg">{record.itemName}</h3>
-                        <Badge variant="secondary" className="text-xs">
+                <div key={record.id} className="border rounded-lg p-3 sm:p-4 hover:bg-gray-50 transition-colors">
+                  {/* 響應式記錄卡片 */}
+                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-wrap items-center gap-2 mb-2">
+                        <h3 className="font-medium text-base sm:text-lg truncate">{record.itemName}</h3>
+                        <Badge variant="secondary" className="text-xs flex-shrink-0">
                           {getPaymentMethodText(record.paymentMethod)}
                         </Badge>
                         {record.receiptImageUrl && (
@@ -579,21 +581,21 @@ export default function PaymentRecords() {
                         )}
                       </div>
                       
-                      <div className="grid md:grid-cols-4 gap-4 text-sm text-gray-600 mb-2">
-                        <div className="flex items-center gap-1">
-                          <Building2 className="w-3 h-3" />
-                          <span>{record.projectName || "無專案"}</span>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4 text-xs sm:text-sm text-gray-600 mb-2">
+                        <div className="flex items-center gap-1 truncate">
+                          <Building2 className="w-3 h-3 flex-shrink-0" />
+                          <span className="truncate">{record.projectName || "無專案"}</span>
+                        </div>
+                        <div className="flex items-center gap-1 truncate">
+                          <Target className="w-3 h-3 flex-shrink-0" />
+                          <span className="truncate">{record.categoryName || "無分類"}</span>
                         </div>
                         <div className="flex items-center gap-1">
-                          <Target className="w-3 h-3" />
-                          <span>{record.categoryName || "無分類"}</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Calendar className="w-3 h-3" />
+                          <Calendar className="w-3 h-3 flex-shrink-0" />
                           <span>{new Date(record.paymentDate).toLocaleDateString('zh-TW')}</span>
                         </div>
-                        <div className="flex items-center gap-1">
-                          <FileText className="w-3 h-3" />
+                        <div className="flex items-center gap-1 hidden sm:flex">
+                          <FileText className="w-3 h-3 flex-shrink-0" />
                           <span>{record.itemType === 'project' ? '專案項目' : record.itemType === 'home' ? '家用項目' : '一般項目'}</span>
                         </div>
                       </div>
@@ -605,18 +607,20 @@ export default function PaymentRecords() {
                       )}
                     </div>
                     
-                    <div className="text-right ml-4">
-                      <div className="text-2xl font-bold text-green-600 mb-2">
+                    {/* 金額和操作按鈕 */}
+                    <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-start gap-2 sm:ml-4">
+                      <div className="text-xl sm:text-2xl font-bold text-green-600">
                         +${parseInt(record.amount).toLocaleString()}
                       </div>
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => handleViewItemDetails(record)}
-                        className="flex items-center gap-1"
+                        className="flex items-center gap-1 touch-target"
                       >
                         <Eye className="w-3 h-3" />
-                        查看項目
+                        <span className="hidden sm:inline">查看項目</span>
+                        <span className="sm:hidden">查看</span>
                       </Button>
                     </div>
                   </div>

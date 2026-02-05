@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useLocation } from 'wouter';
-import { Calendar, DollarSign, TrendingUp, AlertCircle, Clock, CheckCircle, XCircle, Eye, CreditCard, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
+import { Calendar, DollarSign, TrendingUp, AlertCircle, Clock, CheckCircle, XCircle, Eye, CreditCard, ChevronLeft, ChevronRight, Plus, Zap, RotateCcw, ArrowRight } from 'lucide-react';
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, startOfWeek, endOfWeek } from 'date-fns';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -67,6 +68,36 @@ interface MonthSchedule {
   isOverdue: boolean;
 }
 
+// 智慧排程結果型別
+interface PrioritizedItem {
+  id: number;
+  itemName: string;
+  totalAmount: number;
+  paidAmount: number;
+  remainingAmount: number;
+  dueDate?: string;
+  paymentType?: string;
+  categoryType?: string;
+  isOverdue: boolean;
+  overdueDays: number;
+  hasLateFee: boolean;
+  projectName?: string;
+  priority: number;
+  priorityLevel: 'critical' | 'high' | 'medium' | 'low';
+  reason: string;
+}
+
+interface SmartScheduleResult {
+  budget: number;
+  totalNeeded: number;
+  isOverBudget: boolean;
+  criticalItems: PrioritizedItem[];
+  scheduledItems: PrioritizedItem[];
+  deferredItems: PrioritizedItem[];
+  scheduledTotal: number;
+  remainingBudget: number;
+}
+
 const scheduleFormSchema = z.object({
   scheduledAmount: z.string().min(1, '請輸入金額'),
   notes: z.string().optional(),
@@ -79,6 +110,9 @@ export default function PaymentScheduleOptimized() {
   const [showScheduleDialog, setShowScheduleDialog] = useState(false);
   const [showDetailDialog, setShowDetailDialog] = useState(false);
   const [viewSchedule, setViewSchedule] = useState<Schedule | null>(null);
+  const [showSmartSchedule, setShowSmartSchedule] = useState(false);
+  const [budgetInput, setBudgetInput] = useState('');
+  const [smartResult, setSmartResult] = useState<SmartScheduleResult | null>(null);
   const { toast } = useToast();
   const [, setLocation] = useLocation();
 
@@ -204,6 +238,43 @@ export default function PaymentScheduleOptimized() {
     },
   });
 
+  // 智慧排程建議
+  const smartScheduleMutation = useMutation({
+    mutationFn: async (data: { year: number; month: number; budget: number }) => {
+      return await apiRequest('POST', '/api/payment/schedule/smart-suggest', data) as SmartScheduleResult;
+    },
+    onSuccess: (data) => {
+      setSmartResult(data);
+      setShowSmartSchedule(true);
+    },
+    onError: (error: any) => {
+      toast({
+        title: '錯誤',
+        description: error.message || '智慧排程建議產生失敗',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // 批次重排逾期項目
+  const autoRescheduleMutation = useMutation({
+    mutationFn: async (data: { targetYear: number; targetMonth: number }) => {
+      return await apiRequest('POST', '/api/payment/schedule/auto-reschedule', data) as { message: string; rescheduled: number; total: number };
+    },
+    onSuccess: (data) => {
+      toast({ title: '成功', description: data.message });
+      queryClient.invalidateQueries({ queryKey: ['/api/payment/items/integrated'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/payment/schedule'] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: '錯誤',
+        description: error.message || '自動重排失敗',
+        variant: 'destructive',
+      });
+    },
+  });
+
   // 重新排程
   const rescheduleMutation = useMutation({
     mutationFn: async ({ id, newDate, notes }: { id: number; newDate: string; notes?: string }) => {
@@ -247,6 +318,46 @@ export default function PaymentScheduleOptimized() {
       scheduledAmount: data.scheduledAmount.replace(/,/g, ''),
       notes: data.notes,
     });
+  };
+
+  // 觸發智慧排程
+  const handleSmartSchedule = () => {
+    const budget = parseFloat(budgetInput);
+    if (!budget || budget <= 0) {
+      toast({ title: '提示', description: '請輸入有效的月度預算金額', variant: 'destructive' });
+      return;
+    }
+    smartScheduleMutation.mutate({ year, month, budget });
+  };
+
+  // 觸發自動重排逾期項目
+  const handleAutoReschedule = () => {
+    autoRescheduleMutation.mutate({ targetYear: year, targetMonth: month });
+  };
+
+  // 從智慧建議批次建立排程
+  const handleApplySmartSchedule = async (items: PrioritizedItem[]) => {
+    let successCount = 0;
+    for (const item of items) {
+      try {
+        // 將排程安排在月初 1 號
+        const scheduledDate = `${year}-${String(month).padStart(2, '0')}-01`;
+        await apiRequest('POST', '/api/payment/schedule', {
+          paymentItemId: item.id,
+          scheduledDate,
+          scheduledAmount: item.remainingAmount.toString(),
+          notes: `智慧排程建議：${item.reason}`,
+        });
+        successCount++;
+      } catch {
+        // 單筆失敗不中斷
+      }
+    }
+    toast({ title: '成功', description: `已建立 ${successCount} 筆排程計劃` });
+    queryClient.invalidateQueries({ queryKey: ['/api/payment/items/integrated'] });
+    queryClient.invalidateQueries({ queryKey: ['/api/payment/schedule'] });
+    setShowSmartSchedule(false);
+    setSmartResult(null);
   };
 
   const handleDragEnd = (result: any) => {
@@ -401,59 +512,60 @@ export default function PaymentScheduleOptimized() {
   }
 
   return (
-    <div className="space-y-6 p-6">
-      {/* 標題與控制 */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">給付款項時間計劃</h1>
-          <p className="text-gray-600 mt-2">預算規劃與執行追蹤系統</p>
+    <div className="space-y-4 sm:space-y-6 p-3 sm:p-6">
+      {/* 響應式標題與控制 */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold truncate">給付款項時間計劃</h1>
+          <p className="text-sm sm:text-base text-gray-600 mt-1 sm:mt-2">預算規劃與執行追蹤系統</p>
         </div>
 
-        <div className="flex items-center gap-4">
-          <Button variant="outline" onClick={() => setCurrentDate(subMonths(currentDate, 1))} data-testid="btn-prev-month">
+        <div className="flex items-center justify-center gap-2 sm:gap-4">
+          <Button variant="outline" size="sm" onClick={() => setCurrentDate(subMonths(currentDate, 1))} data-testid="btn-prev-month">
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <span className="text-lg font-semibold min-w-[120px] text-center" data-testid="text-current-month">
+          <span className="text-sm sm:text-lg font-semibold min-w-[100px] sm:min-w-[120px] text-center" data-testid="text-current-month">
             {format(currentDate, 'yyyy年MM月')}
           </span>
-          <Button variant="outline" onClick={() => setCurrentDate(addMonths(currentDate, 1))} data-testid="btn-next-month">
+          <Button variant="outline" size="sm" onClick={() => setCurrentDate(addMonths(currentDate, 1))} data-testid="btn-next-month">
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
       </div>
 
-      {/* 預算概覽面板 */}
+      {/* 響應式預算概覽面板 */}
       <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200" data-testid="card-budget-overview">
-        <CardHeader>
-          <CardTitle className="flex items-center text-lg">
-            <TrendingUp className="h-5 w-5 mr-2 text-blue-600" />
-            {format(currentDate, 'yyyy年MM月')} 預算概覽與執行追蹤
+        <CardHeader className="pb-2 sm:pb-4">
+          <CardTitle className="flex items-center text-base sm:text-lg">
+            <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 mr-2 text-blue-600" />
+            <span className="truncate">{format(currentDate, 'yyyy年MM月')} 預算概覽</span>
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-5 gap-6">
-            <div className="text-center">
-              <div className="text-sm text-gray-600 mb-1">月度預算</div>
-              <div className="text-2xl font-bold text-gray-900">${monthlyBudget.toLocaleString()}</div>
+          {/* 響應式網格：手機 2x3，平板 3x2，桌面 5x1 */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 lg:gap-6">
+            <div className="text-center p-2 sm:p-0">
+              <div className="text-xs sm:text-sm text-gray-600 mb-1">月度預算</div>
+              <div className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">${monthlyBudget.toLocaleString()}</div>
             </div>
-            <div className="text-center">
-              <div className="text-sm text-gray-600 mb-1">已排程金額</div>
-              <div className="text-2xl font-bold text-blue-600">${stats.scheduledAmount.toLocaleString()}</div>
+            <div className="text-center p-2 sm:p-0">
+              <div className="text-xs sm:text-sm text-gray-600 mb-1">已排程金額</div>
+              <div className="text-lg sm:text-xl lg:text-2xl font-bold text-blue-600">${stats.scheduledAmount.toLocaleString()}</div>
               <div className="text-xs text-gray-500 mt-1">{stats.totalScheduled} 筆排程</div>
             </div>
-            <div className="text-center">
-              <div className="text-sm text-gray-600 mb-1">已執行付款</div>
-              <div className="text-2xl font-bold text-green-600">${currentMonthPaid.toLocaleString()}</div>
+            <div className="text-center p-2 sm:p-0">
+              <div className="text-xs sm:text-sm text-gray-600 mb-1">已執行付款</div>
+              <div className="text-lg sm:text-xl lg:text-2xl font-bold text-green-600">${currentMonthPaid.toLocaleString()}</div>
               <div className="text-xs text-gray-500 mt-1">實際已付款</div>
             </div>
-            <div className="text-center">
-              <div className="text-sm text-gray-600 mb-1">可用額度</div>
-              <div className="text-2xl font-bold text-orange-600">${availableBudget.toLocaleString()}</div>
+            <div className="text-center p-2 sm:p-0">
+              <div className="text-xs sm:text-sm text-gray-600 mb-1">可用額度</div>
+              <div className="text-lg sm:text-xl lg:text-2xl font-bold text-orange-600">${availableBudget.toLocaleString()}</div>
               <div className="text-xs text-gray-500 mt-1">剩餘可規劃</div>
             </div>
-            <div className="text-center">
-              <div className="text-sm text-gray-600 mb-1">計劃執行率</div>
-              <div className={`text-2xl font-bold ${scheduleExecutionRate >= 80 ? 'text-green-600' : scheduleExecutionRate >= 50 ? 'text-yellow-600' : 'text-red-600'}`}>
+            <div className="text-center p-2 sm:p-0 col-span-2 sm:col-span-3 lg:col-span-1">
+              <div className="text-xs sm:text-sm text-gray-600 mb-1">計劃執行率</div>
+              <div className={`text-lg sm:text-xl lg:text-2xl font-bold ${scheduleExecutionRate >= 80 ? 'text-green-600' : scheduleExecutionRate >= 50 ? 'text-yellow-600' : 'text-red-600'}`}>
                 {scheduleExecutionRate.toFixed(0)}%
               </div>
               <div className="text-xs text-gray-500 mt-1">已付/已排程</div>
@@ -502,73 +614,217 @@ export default function PaymentScheduleOptimized() {
         </CardContent>
       </Card>
 
-      {/* 統計卡片 */}
-      <div className="grid grid-cols-4 gap-4">
+      {/* 智慧排程工具列 */}
+      <Card className="border-purple-200 bg-gradient-to-r from-purple-50 to-pink-50">
+        <CardHeader className="pb-2 sm:pb-3">
+          <CardTitle className="flex items-center text-base sm:text-lg">
+            <Zap className="h-4 w-4 sm:h-5 sm:w-5 mr-2 text-purple-600" />
+            智慧排程助手
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col sm:flex-row gap-3">
+            {/* 預算輸入 + 智慧建議 */}
+            <div className="flex-1 flex items-center gap-2">
+              <div className="relative flex-1">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
+                <Input
+                  type="number"
+                  placeholder="輸入本月可用預算..."
+                  value={budgetInput}
+                  onChange={(e) => setBudgetInput(e.target.value)}
+                  className="pl-8"
+                />
+              </div>
+              <Button
+                onClick={handleSmartSchedule}
+                disabled={smartScheduleMutation.isPending}
+                className="bg-purple-600 hover:bg-purple-700 whitespace-nowrap"
+              >
+                <Zap className="h-4 w-4 mr-1" />
+                {smartScheduleMutation.isPending ? '分析中...' : '智慧建議'}
+              </Button>
+            </div>
+            {/* 逾期重排按鈕 */}
+            {categories.overdueUnexecuted.length > 0 && (
+              <Button
+                variant="outline"
+                onClick={handleAutoReschedule}
+                disabled={autoRescheduleMutation.isPending}
+                className="border-red-300 text-red-700 hover:bg-red-50 whitespace-nowrap"
+              >
+                <RotateCcw className="h-4 w-4 mr-1" />
+                {autoRescheduleMutation.isPending
+                  ? '重排中...'
+                  : `重排 ${categories.overdueUnexecuted.length} 筆逾期`}
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* 智慧排程建議結果 */}
+      {showSmartSchedule && smartResult && (
+        <Card className="border-purple-300 bg-white">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center text-base sm:text-lg">
+                <Zap className="h-5 w-5 mr-2 text-purple-600" />
+                排程建議結果
+              </CardTitle>
+              <Button variant="ghost" size="sm" onClick={() => { setShowSmartSchedule(false); setSmartResult(null); }}>
+                關閉
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* 預算摘要 */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="p-3 bg-gray-50 rounded-lg text-center">
+                <div className="text-xs text-gray-500">可用預算</div>
+                <div className="text-lg font-bold">${smartResult.budget.toLocaleString()}</div>
+              </div>
+              <div className="p-3 bg-orange-50 rounded-lg text-center">
+                <div className="text-xs text-orange-600">總需求金額</div>
+                <div className="text-lg font-bold text-orange-700">${smartResult.totalNeeded.toLocaleString()}</div>
+              </div>
+              <div className="p-3 bg-green-50 rounded-lg text-center">
+                <div className="text-xs text-green-600">建議排入</div>
+                <div className="text-lg font-bold text-green-700">${smartResult.scheduledTotal.toLocaleString()}</div>
+              </div>
+              <div className="p-3 bg-blue-50 rounded-lg text-center">
+                <div className="text-xs text-blue-600">剩餘預算</div>
+                <div className="text-lg font-bold text-blue-700">${smartResult.remainingBudget.toLocaleString()}</div>
+              </div>
+            </div>
+
+            {smartResult.isOverBudget && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-center gap-2">
+                <AlertCircle className="h-4 w-4" />
+                預算不足！總需求 ${smartResult.totalNeeded.toLocaleString()} 超過預算 ${smartResult.budget.toLocaleString()}，
+                以下按優先級排入預算內項目。
+              </div>
+            )}
+
+            <Tabs defaultValue="scheduled" className="w-full">
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="scheduled">
+                  建議排入 ({smartResult.scheduledItems.length})
+                </TabsTrigger>
+                <TabsTrigger value="critical">
+                  關鍵項目 ({smartResult.criticalItems.length})
+                </TabsTrigger>
+                <TabsTrigger value="deferred">
+                  建議延後 ({smartResult.deferredItems.length})
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="scheduled" className="space-y-2 mt-3">
+                {smartResult.scheduledItems.map((item) => (
+                  <SmartScheduleItemCard key={item.id} item={item} />
+                ))}
+                {smartResult.scheduledItems.length > 0 && (
+                  <Button
+                    className="w-full mt-3 bg-purple-600 hover:bg-purple-700"
+                    onClick={() => handleApplySmartSchedule(smartResult.scheduledItems)}
+                  >
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    確認排入 {smartResult.scheduledItems.length} 筆（共 ${smartResult.scheduledTotal.toLocaleString()}）
+                  </Button>
+                )}
+              </TabsContent>
+
+              <TabsContent value="critical" className="space-y-2 mt-3">
+                {smartResult.criticalItems.map((item) => (
+                  <SmartScheduleItemCard key={item.id} item={item} />
+                ))}
+                {smartResult.criticalItems.length === 0 && (
+                  <div className="text-center text-gray-500 py-6">目前沒有關鍵緊急項目</div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="deferred" className="space-y-2 mt-3">
+                {smartResult.deferredItems.map((item) => (
+                  <SmartScheduleItemCard key={item.id} item={item} />
+                ))}
+                {smartResult.deferredItems.length === 0 && (
+                  <div className="text-center text-gray-500 py-6">所有項目都已排入預算</div>
+                )}
+              </TabsContent>
+            </Tabs>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* 響應式統計卡片 */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <Card data-testid="card-scheduled">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600 flex items-center">
-              <Calendar className="h-4 w-4 mr-1" />
+          <CardHeader className="pb-1 sm:pb-2">
+            <CardTitle className="text-xs sm:text-sm font-medium text-gray-600 flex items-center">
+              <Calendar className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
               本月排程
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-600">{stats.totalScheduled}</div>
+          <CardContent className="pt-0">
+            <div className="text-xl sm:text-2xl font-bold text-blue-600">{stats.totalScheduled}</div>
             <div className="text-xs text-gray-500">${stats.scheduledAmount.toLocaleString()}</div>
           </CardContent>
         </Card>
 
         <Card data-testid="card-pending">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600 flex items-center">
-              <DollarSign className="h-4 w-4 mr-1" />
+          <CardHeader className="pb-1 sm:pb-2">
+            <CardTitle className="text-xs sm:text-sm font-medium text-gray-600 flex items-center">
+              <DollarSign className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
               總待付金額
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-orange-600">${stats.totalPending.toLocaleString()}</div>
+          <CardContent className="pt-0">
+            <div className="text-xl sm:text-2xl font-bold text-orange-600">${stats.totalPending.toLocaleString()}</div>
           </CardContent>
         </Card>
 
         <Card data-testid="card-unscheduled">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600 flex items-center">
-              <Clock className="h-4 w-4 mr-1" />
+          <CardHeader className="pb-1 sm:pb-2">
+            <CardTitle className="text-xs sm:text-sm font-medium text-gray-600 flex items-center">
+              <Clock className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
               未排程項目
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-gray-600">{categories.unscheduled.length}</div>
+          <CardContent className="pt-0">
+            <div className="text-xl sm:text-2xl font-bold text-gray-600">{categories.unscheduled.length}</div>
           </CardContent>
         </Card>
 
         <Card data-testid="card-overdue">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600 flex items-center">
-              <AlertCircle className="h-4 w-4 mr-1" />
+          <CardHeader className="pb-1 sm:pb-2">
+            <CardTitle className="text-xs sm:text-sm font-medium text-gray-600 flex items-center">
+              <AlertCircle className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
               逾期未執行
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600">{stats.overdueCount}</div>
+          <CardContent className="pt-0">
+            <div className="text-xl sm:text-2xl font-bold text-red-600">{stats.overdueCount}</div>
           </CardContent>
         </Card>
       </div>
 
       <DragDropContext onDragEnd={handleDragEnd}>
-        <div className="grid grid-cols-12 gap-6">
-          {/* 日曆區域 */}
-          <div className="col-span-8">
+        {/* 響應式雙欄佈局：手機版為單欄垂直排列 */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
+          {/* 日曆區域 - 手機版全寬，桌面版 8 欄 */}
+          <div className="lg:col-span-8 order-2 lg:order-1">
             <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Calendar className="mr-2 h-5 w-5" />
-                  {format(currentDate, 'yyyy年MM月')} 付款時間計劃
+              <CardHeader className="pb-2 sm:pb-4">
+                <CardTitle className="flex items-center text-base sm:text-lg">
+                  <Calendar className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
+                  <span className="truncate">{format(currentDate, 'yyyy年MM月')} 付款計劃</span>
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-7 gap-2">
+              <CardContent className="p-2 sm:p-6">
+                {/* 響應式日曆網格 */}
+                <div className="grid grid-cols-7 gap-1 sm:gap-2">
                   {['日', '一', '二', '三', '四', '五', '六'].map(day => (
-                    <div key={day} className="p-2 text-center font-medium text-gray-500 border-b">
+                    <div key={day} className="p-1 sm:p-2 text-center text-xs sm:text-sm font-medium text-gray-500 border-b">
                       {day}
                     </div>
                   ))}
@@ -587,14 +843,14 @@ export default function PaymentScheduleOptimized() {
                             ref={provided.innerRef}
                             {...provided.droppableProps}
                             className={`
-                              min-h-[100px] p-2 border rounded-lg transition-colors
+                              min-h-[60px] sm:min-h-[100px] p-1 sm:p-2 border rounded-md sm:rounded-lg transition-colors
                               ${isToday ? 'bg-blue-50 border-blue-300' : 'bg-white border-gray-200'}
                               ${!isCurrentMonth ? 'opacity-40' : ''}
                               ${snapshot.isDraggingOver ? 'bg-blue-100 border-blue-400' : ''}
                             `}
                             data-testid={`day-${dateStr}`}
                           >
-                            <div className={`text-sm font-medium mb-1 ${isToday ? 'text-blue-600' : 'text-gray-700'}`}>
+                            <div className={`text-xs sm:text-sm font-medium mb-0.5 sm:mb-1 ${isToday ? 'text-blue-600' : 'text-gray-700'}`}>
                               {format(day, 'd')}
                             </div>
 
@@ -645,13 +901,13 @@ export default function PaymentScheduleOptimized() {
             </Card>
           </div>
 
-          {/* 項目列表區域 */}
-          <div className="col-span-4 space-y-4">
+          {/* 項目列表區域 - 手機版全寬在上方，桌面版 4 欄在右側 */}
+          <div className="lg:col-span-4 space-y-4 order-1 lg:order-2">
             {/* 逾期未執行 */}
             {categories.overdueUnexecuted.length > 0 && (
               <div>
-                <h3 className="text-lg font-semibold text-red-600 mb-3 flex items-center">
-                  <XCircle className="h-5 w-5 mr-2" />
+                <h3 className="text-base sm:text-lg font-semibold text-red-600 mb-2 sm:mb-3 flex items-center">
+                  <XCircle className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
                   逾期未執行 ({categories.overdueUnexecuted.length})
                 </h3>
                 <Droppable droppableId="item-list-overdue">
@@ -676,8 +932,8 @@ export default function PaymentScheduleOptimized() {
             {/* 已計劃待執行 */}
             {categories.scheduledPending.length > 0 && (
               <div>
-                <h3 className="text-lg font-semibold text-yellow-600 mb-3 flex items-center">
-                  <Clock className="h-5 w-5 mr-2" />
+                <h3 className="text-base sm:text-lg font-semibold text-yellow-600 mb-2 sm:mb-3 flex items-center">
+                  <Clock className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
                   已計劃待執行 ({categories.scheduledPending.length})
                 </h3>
                 <Droppable droppableId="item-list-scheduled">
@@ -702,8 +958,8 @@ export default function PaymentScheduleOptimized() {
             {/* 未排程 */}
             {categories.unscheduled.length > 0 && (
               <div>
-                <h3 className="text-lg font-semibold text-gray-600 mb-3 flex items-center">
-                  <AlertCircle className="h-5 w-5 mr-2" />
+                <h3 className="text-base sm:text-lg font-semibold text-gray-600 mb-2 sm:mb-3 flex items-center">
+                  <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
                   未排程項目 ({categories.unscheduled.length})
                 </h3>
                 <Droppable droppableId="item-list-unscheduled">
@@ -923,6 +1179,51 @@ export default function PaymentScheduleOptimized() {
           )}
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+// 智慧排程建議項目卡片
+function SmartScheduleItemCard({ item }: { item: PrioritizedItem }) {
+  const priorityColors = {
+    critical: 'bg-red-50 border-red-300 text-red-800',
+    high: 'bg-orange-50 border-orange-300 text-orange-800',
+    medium: 'bg-yellow-50 border-yellow-300 text-yellow-800',
+    low: 'bg-gray-50 border-gray-300 text-gray-700',
+  };
+
+  const priorityLabels = {
+    critical: '緊急',
+    high: '高',
+    medium: '中',
+    low: '低',
+  };
+
+  return (
+    <div className={`p-3 rounded-lg border ${priorityColors[item.priorityLevel]}`}>
+      <div className="flex items-start justify-between">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-sm truncate">{item.itemName}</span>
+            <Badge
+              variant={item.priorityLevel === 'critical' ? 'destructive' : 'secondary'}
+              className="text-xs shrink-0"
+            >
+              {priorityLabels[item.priorityLevel]}
+            </Badge>
+          </div>
+          <div className="text-xs mt-1 opacity-75">{item.reason}</div>
+          {item.projectName && (
+            <div className="text-xs mt-0.5 opacity-60">專案：{item.projectName}</div>
+          )}
+        </div>
+        <div className="text-right shrink-0 ml-3">
+          <div className="text-sm font-bold">${item.remainingAmount.toLocaleString()}</div>
+          {item.isOverdue && (
+            <div className="text-xs text-red-600">逾期 {item.overdueDays} 天</div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

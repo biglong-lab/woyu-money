@@ -3,6 +3,7 @@ import { storage } from "../storage"
 import { paymentSchedules } from "@shared/schema"
 import { eq, desc } from "drizzle-orm"
 import { db } from "../db"
+import { generateSmartSchedule, type ScheduleItem } from "@shared/schedule-utils"
 
 const router = Router()
 
@@ -268,6 +269,131 @@ router.get("/api/payment/items/:itemId/schedules", async (req, res) => {
   } catch (error: any) {
     console.error("Error fetching item schedules:", error)
     res.status(500).json({ message: "Failed to fetch item schedules" })
+  }
+})
+
+// 智慧排程建議 API
+router.post("/api/payment/schedule/smart-suggest", async (req, res) => {
+  try {
+    const { year, month, budget } = req.body
+
+    if (!year || !month || budget === undefined) {
+      return res.status(400).json({
+        message: "需要提供 year、month、budget 參數",
+      })
+    }
+
+    const yearNum = parseInt(year)
+    const monthNum = parseInt(month)
+    const budgetNum = parseFloat(budget)
+
+    // 取得所有待付款項目
+    const items = await storage.getPaymentItems({}, undefined, 10000)
+    const today = new Date()
+
+    // 取得已有排程
+    const existingSchedules = await storage.getPaymentSchedules(yearNum, monthNum)
+    const scheduledItemIds = new Set(existingSchedules.map((s) => s.paymentItemId))
+
+    // 篩選需要排程的項目
+    // getPaymentItems 透過 SQL JOIN 回傳額外欄位（projectName 等），用擴展型別處理
+    type ItemWithJoin = typeof items[number] & { projectName?: string }
+    const scheduleItems: ScheduleItem[] = (items as ItemWithJoin[])
+      .filter((item) => {
+        if (item.isDeleted || item.status === "completed") return false
+        const paid = parseFloat(item.paidAmount || "0")
+        const total = parseFloat(item.totalAmount || "0")
+        return paid < total
+      })
+      .map((item) => {
+        const total = parseFloat(item.totalAmount || "0")
+        const paid = parseFloat(item.paidAmount || "0")
+        const remaining = total - paid
+
+        // 判斷是否逾期
+        const dueDate = item.endDate || item.startDate
+        const dueDateObj = dueDate ? new Date(dueDate) : null
+        const isOverdue = dueDateObj ? dueDateObj < today : false
+        const overdueDays = dueDateObj
+          ? Math.max(0, Math.ceil((today.getTime() - dueDateObj.getTime()) / (1000 * 60 * 60 * 24)))
+          : 0
+
+        // 判斷分類類型
+        let categoryType = "general"
+        const name = (item.itemName || "").toLowerCase()
+        if (name.includes("租金") || name.includes("房租")) categoryType = "rent"
+        else if (name.includes("勞保") || name.includes("健保") || name.includes("勞健保"))
+          categoryType = "insurance"
+        else if (name.includes("水電") || name.includes("電費") || name.includes("水費"))
+          categoryType = "utility"
+
+        return {
+          id: item.id,
+          itemName: item.itemName,
+          totalAmount: total,
+          paidAmount: paid,
+          remainingAmount: remaining,
+          dueDate: dueDate || undefined,
+          paymentType: item.paymentType || "single",
+          categoryType,
+          isOverdue,
+          overdueDays,
+          hasLateFee: categoryType === "insurance" || categoryType === "rent",
+          projectName: item.projectName,
+        }
+      })
+
+    const result = generateSmartSchedule(scheduleItems, budgetNum)
+
+    res.json(result)
+  } catch (error: any) {
+    console.error("Error generating smart schedule:", error)
+    res.status(500).json({ message: "Failed to generate smart schedule" })
+  }
+})
+
+// 批次重排逾期項目
+router.post("/api/payment/schedule/auto-reschedule", async (req, res) => {
+  try {
+    const { targetYear, targetMonth } = req.body
+
+    if (!targetYear || !targetMonth) {
+      return res.status(400).json({ message: "需要提供 targetYear、targetMonth 參數" })
+    }
+
+    // 取得所有逾期排程
+    const overdueSchedules = await storage.getOverdueSchedules()
+
+    if (overdueSchedules.length === 0) {
+      return res.json({ message: "沒有逾期項目需要重排", rescheduled: 0 })
+    }
+
+    // 將逾期排程移到目標月份的 1 號
+    const targetDate = `${targetYear}-${String(targetMonth).padStart(2, "0")}-01`
+    let rescheduledCount = 0
+
+    for (const schedule of overdueSchedules) {
+      try {
+        await storage.reschedulePayment(
+          schedule.id,
+          targetDate,
+          `自動重排：原排期 ${schedule.scheduledDate}，逾期移至 ${targetDate}`
+        )
+        rescheduledCount++
+      } catch (err) {
+        // 單筆失敗不中斷整批
+        console.error(`重排排程 ${schedule.id} 失敗:`, err)
+      }
+    }
+
+    res.json({
+      message: `已將 ${rescheduledCount} 筆逾期項目重排至 ${targetYear}年${targetMonth}月`,
+      rescheduled: rescheduledCount,
+      total: overdueSchedules.length,
+    })
+  } catch (error: any) {
+    console.error("Error auto-rescheduling:", error)
+    res.status(500).json({ message: "Failed to auto-reschedule" })
   }
 })
 

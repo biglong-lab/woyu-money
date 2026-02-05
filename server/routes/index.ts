@@ -21,6 +21,8 @@ import paymentScheduleRoutes from "./payment-schedule"
 import budgetRoutes from "./budget"
 import documentInboxRoutes from "./document-inbox"
 import invoiceRoutes from "./invoice"
+import hrCostRoutes from "./hr-costs"
+import reportRoutes from "./reports"
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // 設定認證系統
@@ -32,6 +34,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // 靜態檔案服務
   app.use("/uploads", express.static(uploadDir))
+  // 相容舊的 /objects 路徑（從 Replit Object Storage 遷移）
+  app.use("/objects", express.static(uploadDir))
 
   // 註冊所有領域路由
   app.use(authRoutes)
@@ -48,6 +52,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use(budgetRoutes)
   app.use(documentInboxRoutes)
   app.use(invoiceRoutes)
+  app.use(hrCostRoutes)
+  app.use(reportRoutes)
 
   const httpServer = createServer(app)
   return httpServer
