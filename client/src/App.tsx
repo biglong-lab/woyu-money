@@ -35,7 +35,6 @@ import FeatureShowcase from "@/pages/feature-showcase";
 
 import UnifiedPaymentSimple from "@/pages/unified-payment-simple";
 import PaymentProject from "@/pages/payment-project";
-import PaymentProjectClean from "@/pages/payment-project-clean";
 import PaymentSchedule from "@/pages/payment-schedule-optimized";
 import FinancialOverview from "@/pages/financial-overview";
 import RecycleBin from "@/pages/recycle-bin";
