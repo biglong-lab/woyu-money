@@ -8,25 +8,33 @@ import { sql } from "drizzle-orm"
 
 const router = Router()
 
+/** 取得月份日期範圍：startDate 為當月第一天，endDate 為下月第一天（搭配 < 使用） */
+function getDateRange(year: number, month: number) {
+  const startDate = `${year}-${String(month).padStart(2, "0")}-01`
+  const nextMonth = month === 12 ? 1 : month + 1
+  const nextYear = month === 12 ? year + 1 : year
+  const endDate = `${nextYear}-${String(nextMonth).padStart(2, "0")}-01`
+  return { startDate, endDate }
+}
+
 // 簡易損益表
 router.get("/api/reports/income-statement", async (req, res) => {
   try {
     const year = parseInt(req.query.year as string) || new Date().getFullYear()
     const month = parseInt(req.query.month as string) || new Date().getMonth() + 1
 
-    const startDate = `${year}-${String(month).padStart(2, "0")}-01`
-    const endDate = `${year}-${String(month).padStart(2, "0")}-31`
+    const { startDate, endDate } = getDateRange(year, month)
 
     // 收入：從 rental_revenue 和收入類型的付款記錄
     const incomeResult = await db.execute(sql`
       SELECT
         COALESCE(dc.category_name, '其他收入') as category,
-        SUM(CAST(pr.amount AS DECIMAL(12,2))) as amount
+        SUM(CAST(pr.amount_paid AS DECIMAL(12,2))) as amount
       FROM payment_records pr
       LEFT JOIN payment_items pi ON pr.payment_item_id = pi.id
       LEFT JOIN debt_categories dc ON pi.category_id = dc.id
       WHERE pr.payment_date >= ${startDate}
-        AND pr.payment_date <= ${endDate}
+        AND pr.payment_date < ${endDate}
         AND pi.item_type = 'income'
       GROUP BY dc.category_name
       ORDER BY amount DESC
@@ -36,10 +44,10 @@ router.get("/api/reports/income-statement", async (req, res) => {
     const rentalIncomeResult = await db.execute(sql`
       SELECT
         '租金收入' as category,
-        COALESCE(SUM(CAST(monthly_rent AS DECIMAL(12,2))), 0) as amount
+        COALESCE(SUM(CAST(base_amount AS DECIMAL(12,2))), 0) as amount
       FROM rental_contracts
       WHERE is_active = true
-        AND start_date <= ${endDate}
+        AND start_date < ${endDate}
         AND (end_date IS NULL OR end_date >= ${startDate})
     `)
 
@@ -47,12 +55,12 @@ router.get("/api/reports/income-statement", async (req, res) => {
     const expenseResult = await db.execute(sql`
       SELECT
         COALESCE(dc.category_name, '其他支出') as category,
-        SUM(CAST(pr.amount AS DECIMAL(12,2))) as amount
+        SUM(CAST(pr.amount_paid AS DECIMAL(12,2))) as amount
       FROM payment_records pr
       LEFT JOIN payment_items pi ON pr.payment_item_id = pi.id
       LEFT JOIN debt_categories dc ON pi.category_id = dc.id
       WHERE pr.payment_date >= ${startDate}
-        AND pr.payment_date <= ${endDate}
+        AND pr.payment_date < ${endDate}
         AND (pi.item_type IS NULL OR pi.item_type != 'income')
       GROUP BY dc.category_name
       ORDER BY amount DESC
@@ -108,16 +116,16 @@ router.get("/api/reports/balance-sheet", async (req, res) => {
   try {
     const year = parseInt(req.query.year as string) || new Date().getFullYear()
     const month = parseInt(req.query.month as string) || new Date().getMonth() + 1
-    const endDate = `${year}-${String(month).padStart(2, "0")}-31`
+    const { endDate } = getDateRange(year, month)
 
     // 資產：累計現金收入 - 累計現金支出
     const cashResult = await db.execute(sql`
       SELECT
-        COALESCE(SUM(CASE WHEN pi.item_type = 'income' THEN CAST(pr.amount AS DECIMAL(12,2)) ELSE 0 END), 0) as total_income,
-        COALESCE(SUM(CASE WHEN pi.item_type IS NULL OR pi.item_type != 'income' THEN CAST(pr.amount AS DECIMAL(12,2)) ELSE 0 END), 0) as total_expense
+        COALESCE(SUM(CASE WHEN pi.item_type = 'income' THEN CAST(pr.amount_paid AS DECIMAL(12,2)) ELSE 0 END), 0) as total_income,
+        COALESCE(SUM(CASE WHEN pi.item_type IS NULL OR pi.item_type != 'income' THEN CAST(pr.amount_paid AS DECIMAL(12,2)) ELSE 0 END), 0) as total_expense
       FROM payment_records pr
       LEFT JOIN payment_items pi ON pr.payment_item_id = pi.id
-      WHERE pr.payment_date <= ${endDate}
+      WHERE pr.payment_date < ${endDate}
     `)
 
     const cashRow = (cashResult.rows || [])[0] as any
@@ -126,7 +134,7 @@ router.get("/api/reports/balance-sheet", async (req, res) => {
 
     // 應收帳款：未收到的租金
     const receivableResult = await db.execute(sql`
-      SELECT COALESCE(SUM(CAST(monthly_rent AS DECIMAL(12,2))), 0) as receivable
+      SELECT COALESCE(SUM(CAST(base_amount AS DECIMAL(12,2))), 0) as receivable
       FROM rental_contracts
       WHERE is_active = true
     `)
@@ -141,13 +149,18 @@ router.get("/api/reports/balance-sheet", async (req, res) => {
     `)
     const payable = parseFloat((payableResult.rows?.[0] as any)?.payable || "0")
 
-    // 借入款項
-    const loanResult = await db.execute(sql`
-      SELECT COALESCE(SUM(CAST(remaining_amount AS DECIMAL(12,2))), 0) as loan_balance
-      FROM loans
-      WHERE status = 'active' AND loan_type = 'borrow'
-    `)
-    const loanBalance = parseFloat((loanResult.rows?.[0] as any)?.loan_balance || "0")
+    // 借入款項（loan_investments 表）
+    let loanBalance = 0
+    try {
+      const loanResult = await db.execute(sql`
+        SELECT COALESCE(SUM(CAST(remaining_amount AS DECIMAL(12,2))), 0) as loan_balance
+        FROM loan_investments
+        WHERE status = 'active' AND type = 'borrow'
+      `)
+      loanBalance = parseFloat((loanResult.rows?.[0] as any)?.loan_balance || "0")
+    } catch {
+      // 表可能不存在，忽略
+    }
 
     // 未付人事費
     const unpaidHrResult = await db.execute(sql`
@@ -192,55 +205,47 @@ router.get("/api/reports/cash-flow", async (req, res) => {
   try {
     const year = parseInt(req.query.year as string) || new Date().getFullYear()
     const month = parseInt(req.query.month as string) || new Date().getMonth() + 1
-    const startDate = `${year}-${String(month).padStart(2, "0")}-01`
-    const endDate = `${year}-${String(month).padStart(2, "0")}-31`
+    const { startDate, endDate } = getDateRange(year, month)
 
     // 營業現金流
     const operatingResult = await db.execute(sql`
       SELECT
-        COALESCE(SUM(CASE WHEN pi.item_type = 'income' THEN CAST(pr.amount AS DECIMAL(12,2)) ELSE 0 END), 0) as income,
-        COALESCE(SUM(CASE WHEN pi.item_type IS NULL OR pi.item_type != 'income' THEN CAST(pr.amount AS DECIMAL(12,2)) ELSE 0 END), 0) as expense
+        COALESCE(SUM(CASE WHEN pi.item_type = 'income' THEN CAST(pr.amount_paid AS DECIMAL(12,2)) ELSE 0 END), 0) as income,
+        COALESCE(SUM(CASE WHEN pi.item_type IS NULL OR pi.item_type != 'income' THEN CAST(pr.amount_paid AS DECIMAL(12,2)) ELSE 0 END), 0) as expense
       FROM payment_records pr
       LEFT JOIN payment_items pi ON pr.payment_item_id = pi.id
       WHERE pr.payment_date >= ${startDate}
-        AND pr.payment_date <= ${endDate}
+        AND pr.payment_date < ${endDate}
     `)
 
     const opRow = (operatingResult.rows || [])[0] as any
     const opIncome = parseFloat(opRow?.income || "0")
     const opExpense = parseFloat(opRow?.expense || "0")
 
-    // 投資現金流：從 loans 表（invest 類型）
-    const investResult = await db.execute(sql`
-      SELECT
-        COALESCE(SUM(CASE WHEN lt.transaction_type = 'repayment' THEN CAST(lt.amount AS DECIMAL(12,2)) ELSE 0 END), 0) as invest_return,
-        COALESCE(SUM(CASE WHEN lt.transaction_type = 'disbursement' THEN CAST(lt.amount AS DECIMAL(12,2)) ELSE 0 END), 0) as new_invest
-      FROM loan_transactions lt
-      JOIN loans l ON lt.loan_id = l.id
-      WHERE lt.transaction_date >= ${startDate}
-        AND lt.transaction_date <= ${endDate}
-        AND l.loan_type = 'invest'
-    `)
-
-    const invRow = (investResult.rows || [])[0] as any
-    const investReturn = parseFloat(invRow?.invest_return || "0")
-    const newInvest = parseFloat(invRow?.new_invest || "0")
-
-    // 融資現金流：借入和還款
-    const financeResult = await db.execute(sql`
-      SELECT
-        COALESCE(SUM(CASE WHEN lt.transaction_type = 'disbursement' THEN CAST(lt.amount AS DECIMAL(12,2)) ELSE 0 END), 0) as borrowed,
-        COALESCE(SUM(CASE WHEN lt.transaction_type = 'repayment' THEN CAST(lt.amount AS DECIMAL(12,2)) ELSE 0 END), 0) as repaid
-      FROM loan_transactions lt
-      JOIN loans l ON lt.loan_id = l.id
-      WHERE lt.transaction_date >= ${startDate}
-        AND lt.transaction_date <= ${endDate}
-        AND l.loan_type = 'borrow'
-    `)
-
-    const finRow = (financeResult.rows || [])[0] as any
-    const borrowed = parseFloat(finRow?.borrowed || "0")
-    const repaid = parseFloat(finRow?.repaid || "0")
+    // 投資現金流和融資現金流（從 loan_investments 表，可能不存在）
+    let investReturn = 0
+    let newInvest = 0
+    let borrowed = 0
+    let repaid = 0
+    try {
+      const investResult = await db.execute(sql`
+        SELECT
+          COALESCE(SUM(CASE WHEN type = 'invest' AND status = 'completed' THEN CAST(total_amount AS DECIMAL(12,2)) ELSE 0 END), 0) as invest_return,
+          COALESCE(SUM(CASE WHEN type = 'invest' AND status = 'active' THEN CAST(total_amount AS DECIMAL(12,2)) ELSE 0 END), 0) as new_invest,
+          COALESCE(SUM(CASE WHEN type = 'borrow' AND status = 'active' THEN CAST(total_amount AS DECIMAL(12,2)) ELSE 0 END), 0) as borrowed,
+          COALESCE(SUM(CASE WHEN type = 'borrow' AND status = 'completed' THEN CAST(total_amount AS DECIMAL(12,2)) ELSE 0 END), 0) as repaid
+        FROM loan_investments
+        WHERE created_at >= ${startDate}
+          AND created_at < ${endDate}
+      `)
+      const row = (investResult.rows || [])[0] as any
+      investReturn = parseFloat(row?.invest_return || "0")
+      newInvest = parseFloat(row?.new_invest || "0")
+      borrowed = parseFloat(row?.borrowed || "0")
+      repaid = parseFloat(row?.repaid || "0")
+    } catch {
+      // 表可能不存在，忽略
+    }
 
     const operating = {
       items: [
@@ -382,6 +387,200 @@ router.get("/api/reports/hr-cost-report/:year/:month", async (req, res) => {
   } catch (error: any) {
     console.error("人事費月度明細查詢錯誤:", error)
     res.status(500).json({ message: "人事費月度明細查詢失敗" })
+  }
+})
+
+// ========== 稅務報表 ==========
+
+// 營業稅彙總（每兩個月一期）
+router.get("/api/reports/tax/business-tax", async (req, res) => {
+  try {
+    const year = parseInt(req.query.year as string) || new Date().getFullYear()
+    const period = parseInt(req.query.period as string) || 1 // 1~6（每期兩個月）
+
+    const startMonth = (period - 1) * 2 + 1
+    const endMonth = period * 2
+    const startDate = `${year}-${String(startMonth).padStart(2, "0")}-01`
+    // 用下個月第一天作為結束日期（搭配 < 使用）
+    const nextMonth = endMonth === 12 ? 1 : endMonth + 1
+    const nextYear = endMonth === 12 ? year + 1 : year
+    const endDate = `${nextYear}-${String(nextMonth).padStart(2, "0")}-01`
+
+    // 銷項（收入）
+    const salesResult = await db.execute(sql`
+      SELECT
+        COALESCE(dc.category_name, '其他') as category,
+        COUNT(*) as invoice_count,
+        COALESCE(SUM(CAST(pr.amount_paid AS DECIMAL(12,2))), 0) as amount
+      FROM payment_records pr
+      LEFT JOIN payment_items pi ON pr.payment_item_id = pi.id
+      LEFT JOIN debt_categories dc ON pi.category_id = dc.id
+      WHERE pr.payment_date >= ${startDate}
+        AND pr.payment_date < ${endDate}
+        AND pi.item_type = 'income'
+      GROUP BY dc.category_name
+      ORDER BY amount DESC
+    `)
+
+    // 進項（支出）
+    const purchaseResult = await db.execute(sql`
+      SELECT
+        COALESCE(dc.category_name, '其他') as category,
+        COUNT(*) as invoice_count,
+        COALESCE(SUM(CAST(pr.amount_paid AS DECIMAL(12,2))), 0) as amount
+      FROM payment_records pr
+      LEFT JOIN payment_items pi ON pr.payment_item_id = pi.id
+      LEFT JOIN debt_categories dc ON pi.category_id = dc.id
+      WHERE pr.payment_date >= ${startDate}
+        AND pr.payment_date < ${endDate}
+        AND (pi.item_type IS NULL OR pi.item_type != 'income')
+      GROUP BY dc.category_name
+      ORDER BY amount DESC
+    `)
+
+    const salesItems = (salesResult.rows || []).map((r: any) => ({
+      category: r.category,
+      invoiceCount: parseInt(r.invoice_count || "0"),
+      amount: parseFloat(r.amount || "0"),
+    }))
+
+    const purchaseItems = (purchaseResult.rows || []).map((r: any) => ({
+      category: r.category,
+      invoiceCount: parseInt(r.invoice_count || "0"),
+      amount: parseFloat(r.amount || "0"),
+    }))
+
+    const salesTotal = salesItems.reduce((s, i) => s + i.amount, 0)
+    const purchaseTotal = purchaseItems.reduce((s, i) => s + i.amount, 0)
+    const taxRate = 0.05
+    const salesTax = Math.round(salesTotal * taxRate)
+    const purchaseTax = Math.round(purchaseTotal * taxRate)
+
+    res.json({
+      year,
+      period,
+      periodLabel: `${startMonth}-${endMonth}月`,
+      sales: { items: salesItems, total: salesTotal, tax: salesTax },
+      purchases: { items: purchaseItems, total: purchaseTotal, tax: purchaseTax },
+      taxPayable: salesTax - purchaseTax,
+      taxRate,
+    })
+  } catch (error: any) {
+    console.error("營業稅彙總查詢錯誤:", error)
+    res.status(500).json({ message: "營業稅彙總查詢失敗" })
+  }
+})
+
+// 薪資扣繳彙總（年度）
+router.get("/api/reports/tax/salary-withholding", async (req, res) => {
+  try {
+    const year = parseInt(req.query.year as string) || new Date().getFullYear()
+
+    const result = await db.execute(sql`
+      SELECT
+        e.employee_name,
+        COALESCE(SUM(CAST(hc.base_salary AS DECIMAL(12,2))), 0) as total_salary,
+        COALESCE(SUM(CAST(hc.employee_labor_insurance AS DECIMAL(12,2))), 0) as total_labor_insurance,
+        COALESCE(SUM(CAST(hc.employee_health_insurance AS DECIMAL(12,2))), 0) as total_health_insurance,
+        COALESCE(SUM(CAST(hc.employee_pension AS DECIMAL(12,2))), 0) as total_pension,
+        COALESCE(SUM(CAST(hc.employee_total AS DECIMAL(12,2))), 0) as total_deduction,
+        COALESCE(SUM(CAST(hc.net_salary AS DECIMAL(12,2))), 0) as total_net_salary,
+        COUNT(*) as months_worked
+      FROM monthly_hr_costs hc
+      JOIN employees e ON hc.employee_id = e.id
+      WHERE hc.year = ${year}
+      GROUP BY e.id, e.employee_name
+      ORDER BY e.employee_name
+    `)
+
+    const employees = (result.rows || []).map((r: any) => ({
+      employeeName: r.employee_name,
+      totalSalary: parseFloat(r.total_salary || "0"),
+      totalLaborInsurance: parseFloat(r.total_labor_insurance || "0"),
+      totalHealthInsurance: parseFloat(r.total_health_insurance || "0"),
+      totalPension: parseFloat(r.total_pension || "0"),
+      totalDeduction: parseFloat(r.total_deduction || "0"),
+      totalNetSalary: parseFloat(r.total_net_salary || "0"),
+      monthsWorked: parseInt(r.months_worked || "0"),
+    }))
+
+    const totals = employees.reduce(
+      (acc, e) => ({
+        totalSalary: acc.totalSalary + e.totalSalary,
+        totalDeduction: acc.totalDeduction + e.totalDeduction,
+        totalNetSalary: acc.totalNetSalary + e.totalNetSalary,
+      }),
+      { totalSalary: 0, totalDeduction: 0, totalNetSalary: 0 }
+    )
+
+    res.json({ year, employees, totals })
+  } catch (error: any) {
+    console.error("薪資扣繳彙總查詢錯誤:", error)
+    res.status(500).json({ message: "薪資扣繳彙總查詢失敗" })
+  }
+})
+
+// 二代健保補充保費試算
+router.get("/api/reports/tax/supplementary-health", async (req, res) => {
+  try {
+    const year = parseInt(req.query.year as string) || new Date().getFullYear()
+
+    // 二代健保補充保費費率 2.11%（2024年起）
+    const supplementaryRate = 0.0211
+    // 單次給付超過基本工資的部分需繳補充保費
+    const baseWageThreshold = 27470 // 2025 基本工資
+
+    // 查詢年度獎金發放（假設有 bonus 類型的付款記錄）
+    const bonusResult = await db.execute(sql`
+      SELECT
+        e.employee_name,
+        hc.month,
+        CAST(hc.base_salary AS DECIMAL(12,2)) as monthly_salary
+      FROM monthly_hr_costs hc
+      JOIN employees e ON hc.employee_id = e.id
+      WHERE hc.year = ${year}
+      ORDER BY e.employee_name, hc.month
+    `)
+
+    // 以年度薪資計算是否有超過門檻的部分
+    const employeeMap = new Map<string, { name: string; totalSalary: number; months: number }>()
+    for (const r of (bonusResult.rows || []) as any[]) {
+      const name = r.employee_name
+      const existing = employeeMap.get(name) || { name, totalSalary: 0, months: 0 }
+      existing.totalSalary += parseFloat(r.monthly_salary || "0")
+      existing.months += 1
+      employeeMap.set(name, existing)
+    }
+
+    const employees = Array.from(employeeMap.values()).map((e) => {
+      const avgMonthly = e.months > 0 ? e.totalSalary / e.months : 0
+      // 年終獎金假設為一個月薪資，超過基本工資門檻需繳補充保費
+      const estimatedBonus = avgMonthly
+      const taxableAmount = Math.max(0, estimatedBonus - baseWageThreshold)
+      const supplementaryPremium = Math.round(taxableAmount * supplementaryRate)
+
+      return {
+        employeeName: e.name,
+        avgMonthlySalary: Math.round(avgMonthly),
+        estimatedBonus: Math.round(estimatedBonus),
+        taxableAmount: Math.round(taxableAmount),
+        supplementaryPremium,
+      }
+    })
+
+    const totalPremium = employees.reduce((s, e) => s + e.supplementaryPremium, 0)
+
+    res.json({
+      year,
+      supplementaryRate,
+      baseWageThreshold,
+      employees,
+      totalPremium,
+      note: "試算結果僅供參考，實際以政府公告為準。年終獎金以月薪估算。",
+    })
+  } catch (error: any) {
+    console.error("二代健保補充保費試算錯誤:", error)
+    res.status(500).json({ message: "二代健保補充保費試算失敗" })
   }
 })
 

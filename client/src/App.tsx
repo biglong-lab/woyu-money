@@ -48,6 +48,7 @@ import DocumentInbox from "@/pages/document-inbox";
 import HRCostManagement from "@/pages/hr-cost-management";
 import FinancialStatements from "@/pages/financial-statements";
 import HRCostReports from "@/pages/hr-cost-reports";
+import TaxReports from "@/pages/tax-reports";
 
 function Router() {
   const [quickPaymentOpen, setQuickPaymentOpen] = useState(false);
@@ -93,6 +94,7 @@ function Router() {
                 <ProtectedRoute path="/project-budget" component={ProjectBudgetManagement} />
                 <ProtectedRoute path="/financial-statements" component={FinancialStatements} />
                 <ProtectedRoute path="/hr-cost-reports" component={HRCostReports} />
+                <ProtectedRoute path="/tax-reports" component={TaxReports} />
                 
                 {/* Category Management */}
                 <ProtectedRoute path="/categories" component={SimpleCategoryManagement} />
