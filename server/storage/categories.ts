@@ -394,16 +394,20 @@ export async function getProjectCategoryTemplates(
   projectId: number,
   categoryId?: number
 ): Promise<ProjectCategoryTemplate[]> {
-  let query = db
-    .select()
-    .from(projectCategoryTemplates)
-    .where(and(eq(projectCategoryTemplates.projectId, projectId), eq(projectCategoryTemplates.isActive, true)))
+  const conditions = [
+    eq(projectCategoryTemplates.projectId, projectId),
+    eq(projectCategoryTemplates.isActive, true),
+  ]
 
   if (categoryId) {
-    query = query.where(eq(projectCategoryTemplates.categoryId, categoryId))
+    conditions.push(eq(projectCategoryTemplates.categoryId, categoryId))
   }
 
-  return await query.orderBy(projectCategoryTemplates.templateName)
+  return await db
+    .select()
+    .from(projectCategoryTemplates)
+    .where(and(...conditions))
+    .orderBy(projectCategoryTemplates.templateName)
 }
 
 export async function createProjectCategoryTemplate(

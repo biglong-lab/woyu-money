@@ -98,41 +98,41 @@ export default function RentalManagementEnhanced() {
   }, [viewingContract]);
 
   // 查詢數據
-  const { data: contracts = [], isLoading } = useQuery({
+  const { data: contracts = [], isLoading } = useQuery<any[]>({
     queryKey: ["/api/rental/contracts"],
   });
 
-  const { data: projects = [] } = useQuery({
+  const { data: projects = [] } = useQuery<any[]>({
     queryKey: ["/api/payment/projects"],
   });
 
-  const { data: rentalStats } = useQuery({
+  const { data: rentalStats } = useQuery<any>({
     queryKey: ["/api/rental/stats"],
   });
 
-  const { data: rentalPayments = [] } = useQuery({
+  const { data: rentalPayments = [] } = useQuery<any[]>({
     queryKey: ["/api/rental/payments"],
   });
 
-  const { data: documents = [] } = useQuery({
+  const { data: documents = [] } = useQuery<any[]>({
     queryKey: [`/api/rental/contracts/${selectedContract?.id}/documents`],
     enabled: !!selectedContract?.id,
   });
 
   // 查詢選中租約的詳細資料（包含價格階層）
-  const { data: contractDetails } = useQuery({
+  const { data: contractDetails } = useQuery<any>({
     queryKey: ["/api/rental/contracts", editingContract?.id],
     enabled: !!editingContract?.id,
   });
 
   // 查詢檢視租約的詳細資料
-  const { data: viewingContractDetails, isLoading: isLoadingContractDetails } = useQuery({
+  const { data: viewingContractDetails, isLoading: isLoadingContractDetails } = useQuery<any>({
     queryKey: [`/api/rental/contracts/${viewingContract?.id}`],
     enabled: !!viewingContract?.id,
   });
 
   // 查詢特定租約的付款項目
-  const { data: contractPaymentItems = [] } = useQuery({
+  const { data: contractPaymentItems = [] } = useQuery<any[]>({
     queryKey: [`/api/rental/contracts/${viewingContract?.id}/payments`],
     enabled: !!viewingContract?.id,
   });
@@ -314,7 +314,7 @@ export default function RentalManagementEnhanced() {
     mutationFn: async (contractId: number) => {
       return apiRequest("POST", `/api/rental/contracts/${contractId}/generate-payments`);
     },
-    onSuccess: (data) => {
+    onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/rental/payments"] });
       toast({
         title: "付款項目生成成功",
@@ -421,7 +421,7 @@ export default function RentalManagementEnhanced() {
     mutationFn: async (data: any) => {
       return apiRequest("POST", `/api/rental/contracts/${selectedContract?.id}/smart-adjust`, data);
     },
-    onSuccess: (data) => {
+    onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/rental/contracts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/rental/payments"] });
       setIsSmartAdjustDialogOpen(false);
@@ -468,7 +468,7 @@ export default function RentalManagementEnhanced() {
     
     // 獲取完整的合約詳情資料
     try {
-      const detailResponse = await apiRequest("GET", `/api/rental/contracts/${contract.id}`);
+      const detailResponse: any = await apiRequest("GET", `/api/rental/contracts/${contract.id}`);
       
       // 填充表單資料
       form.reset({

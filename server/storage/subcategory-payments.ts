@@ -117,26 +117,7 @@ export async function getSubcategoryStatus(
 
 export async function getSubcategoryPaymentPriority(subcategoryId: number): Promise<PaymentItem[]> {
   return await db
-    .select({
-      id: paymentItems.id,
-      categoryId: paymentItems.categoryId,
-      fixedCategoryId: paymentItems.fixedCategoryId,
-      fixedSubOptionId: paymentItems.fixedSubOptionId,
-      projectId: paymentItems.projectId,
-      itemName: paymentItems.itemName,
-      totalAmount: paymentItems.totalAmount,
-      itemType: paymentItems.itemType,
-      paymentType: paymentItems.paymentType,
-      startDate: paymentItems.startDate,
-      endDate: paymentItems.endDate,
-      paidAmount: paymentItems.paidAmount,
-      status: paymentItems.status,
-      priority: paymentItems.priority,
-      notes: paymentItems.notes,
-      isDeleted: paymentItems.isDeleted,
-      createdAt: paymentItems.createdAt,
-      updatedAt: paymentItems.updatedAt,
-    })
+    .select()
     .from(paymentItems)
     .where(and(eq(paymentItems.categoryId, subcategoryId), eq(paymentItems.isDeleted, false), sql`status != 'paid'`))
     .orderBy(
@@ -195,13 +176,11 @@ export async function processSubcategoryPayment(
 
     await db.insert(paymentRecords).values({
       itemId: item.id,
-      amount: allocatedAmount.toFixed(2),
+      amountPaid: allocatedAmount.toFixed(2),
       paymentDate: paymentDate,
       paymentMethod: "subcategory_allocation",
       notes: `子分類統一付款分配 - ${item.itemName}`,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    })
+    } as any)
 
     await db.insert(auditLogs).values({
       tableName: "payment_items",
@@ -358,13 +337,11 @@ export async function executeUnifiedPayment(
 
     await db.insert(paymentRecords).values({
       itemId: item.id,
-      amount: allocatedAmount.toFixed(2),
+      amountPaid: allocatedAmount.toFixed(2),
       paymentDate: new Date().toISOString().split("T")[0],
       paymentMethod: "unified_payment",
       notes: notes || `統一付款分配 - ${item.itemName}`,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    })
+    } as any)
 
     await db.insert(auditLogs).values({
       tableName: "payment_items",

@@ -226,7 +226,7 @@ export default function AccountSettings() {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Label>用戶名</Label>
-                      <Input value={user.username} disabled className="bg-muted" />
+                      <Input value={user.username ?? ""} disabled className="bg-muted" />
                     </div>
                     <div>
                       <Label>角色</Label>

@@ -64,7 +64,7 @@ router.get("/api/payment/cashflow/stats", async (req, res) => {
 
     const paymentRecords = await storage.getPaymentRecords(filters)
     const paymentItems = await storage.getPaymentItems({}, undefined, 10000)
-    const itemsMap = new Map(paymentItems.map((item) => [item.id, item]))
+    const itemsMap = new Map(paymentItems.map((item: any) => [item.id, item]))
 
     const filteredRecords = paymentRecords.filter((record) => {
       if (!record.paymentDate) return false
@@ -82,7 +82,7 @@ router.get("/api/payment/cashflow/stats", async (req, res) => {
 
     const projectCashFlow = filteredRecords.reduce(
       (acc, record) => {
-        const item = itemsMap.get(record.itemId)
+        const item: any = itemsMap.get(record.itemId)
         if (!item) return acc
         const pId = item.projectId || 0
         const projectName = item.projectName || "未分類"
@@ -124,7 +124,7 @@ router.get("/api/payment/cashflow/details", async (req, res) => {
     const paymentItems = await storage.getPaymentItems({}, undefined, 10000)
     const projects = await storage.getPaymentProjects()
 
-    const itemsMap = new Map(paymentItems.map((item) => [item.id, item]))
+    const itemsMap = new Map(paymentItems.map((item: any) => [item.id, item]))
     const projectsMap = new Map(projects.map((project) => [project.id, project]))
 
     const filteredRecords = paymentRecords.filter((record) => {
@@ -138,7 +138,7 @@ router.get("/api/payment/cashflow/details", async (req, res) => {
     })
 
     const detailItems = filteredRecords.map((record) => {
-      const item = itemsMap.get(record.itemId)
+      const item: any = itemsMap.get(record.itemId)
       const project = item?.projectId ? projectsMap.get(item.projectId) : null
       return {
         recordId: record.id,

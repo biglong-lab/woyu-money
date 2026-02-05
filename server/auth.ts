@@ -5,11 +5,19 @@ import session from "express-session";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { storage } from "./storage";
-import { User } from "@shared/schema";
+import { User as SchemaUser } from "@shared/schema";
 
 declare global {
   namespace Express {
-    interface User extends User {}
+    interface User extends SchemaUser {}
+  }
+}
+
+declare module "express-session" {
+  interface SessionData {
+    userId: number;
+    isAuthenticated: boolean;
+    lineState: string;
   }
 }
 
@@ -144,7 +152,7 @@ export function setupAuth(app: Express) {
 
   // Login endpoint
   app.post("/api/login", (req, res, next) => {
-    passport.authenticate("local", (err, user, info) => {
+    passport.authenticate("local", (err: any, user: any, info: any) => {
       if (err) {
         return next(err);
       }
@@ -213,7 +221,7 @@ export function setupAuth(app: Express) {
 }
 
 // Middleware to check if user is authenticated
-export function requireAuth(req: Express.Request, res: Express.Response, next: Express.NextFunction) {
+export function requireAuth(req: import("express").Request, res: import("express").Response, next: import("express").NextFunction) {
   // Check passport authentication first
   if (req.isAuthenticated() && req.user) {
     return next();

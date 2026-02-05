@@ -63,20 +63,7 @@ export async function updateUserLoginAttempts(id: number, attempts: number, lock
 // 進階使用者管理方法
 
 export async function getAllUsers(): Promise<User[]> {
-  return await db.select({
-    id: users.id,
-    username: users.username,
-    email: users.email,
-    fullName: users.fullName,
-    role: users.role,
-    isActive: users.isActive,
-    menuPermissions: users.menuPermissions,
-    lastLogin: users.lastLogin,
-    authProvider: users.authProvider,
-    lineDisplayName: users.lineDisplayName,
-    createdAt: users.createdAt,
-    updatedAt: users.updatedAt,
-  }).from(users).orderBy(desc(users.createdAt));
+  return await db.select().from(users).orderBy(desc(users.createdAt)) as User[];
 }
 
 export async function updateUserRole(id: number, role: string): Promise<User> {

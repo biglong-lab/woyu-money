@@ -38,32 +38,32 @@ export default function RevenueReports() {
   const [selectedTab, setSelectedTab] = useState("overview");
 
   // 每日收入統計
-  const { data: revenueStats } = useQuery({
+  const { data: revenueStats } = useQuery<any>({
     queryKey: ["/api/revenue/reports/stats"],
   });
 
   // 專案收入分布
-  const { data: projectRevenues = [] } = useQuery({
+  const { data: projectRevenues = [] } = useQuery<any[]>({
     queryKey: ["/api/revenue/reports/by-project"],
   });
 
   // 每日收入趨勢
-  const { data: dailyTrend = [] } = useQuery({
+  const { data: dailyTrend = [] } = useQuery<any[]>({
     queryKey: ["/api/revenue/reports/daily-trend"],
   });
 
   // 月度收入趨勢
-  const { data: monthlyTrend = [] } = useQuery({
+  const { data: monthlyTrend = [] } = useQuery<any[]>({
     queryKey: ["/api/revenue/reports/monthly-trend"],
   });
 
   // 年度同期比較
-  const { data: yearlyComparison = [] } = useQuery({
+  const { data: yearlyComparison = [] } = useQuery<any[]>({
     queryKey: ["/api/revenue/reports/yearly-comparison"],
   });
 
   // 每日收款記錄
-  const { data: dailyRevenues = [] } = useQuery({
+  const { data: dailyRevenues = [] } = useQuery<any[]>({
     queryKey: ["/api/daily-revenues"],
   });
 
@@ -201,7 +201,7 @@ export default function RevenueReports() {
                             `${projectName} ${(percent * 100).toFixed(0)}%`
                           }
                         >
-                          {projectChartData.map((entry, index) => (
+                          {projectChartData.map((entry: any, index: number) => (
                             <Cell key={`cell-${index}`} fill={entry.fill} />
                           ))}
                         </Pie>

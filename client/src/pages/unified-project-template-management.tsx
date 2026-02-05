@@ -105,7 +105,7 @@ export default function UnifiedProjectTemplateManagement() {
 
   // Group custom templates by category
   const customTemplatesByCategory = customTemplates.reduce((acc, template) => {
-    const categoryId = template.categoryId;
+    const categoryId = template.categoryId ?? 0;
     if (!acc[categoryId]) {
       acc[categoryId] = [];
     }

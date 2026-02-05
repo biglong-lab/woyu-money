@@ -41,17 +41,21 @@ export async function getUserNotifications(userId: number, limit: number = 50): 
 
 export async function getNewNotifications(userId: number, lastCheck?: string): Promise<Notification[]> {
   try {
-    let query = db
+    let query: any = db
       .select()
       .from(notifications)
       .where(eq(notifications.userId, userId))
       .orderBy(desc(notifications.createdAt));
 
     if (lastCheck) {
-      query = query.where(and(
-        eq(notifications.userId, userId),
-        sql`${notifications.createdAt} > ${lastCheck}`
-      ));
+      query = db
+        .select()
+        .from(notifications)
+        .where(and(
+          eq(notifications.userId, userId),
+          sql`${notifications.createdAt} > ${lastCheck}`
+        ))
+        .orderBy(desc(notifications.createdAt));
     }
 
     const results = await query.limit(20);

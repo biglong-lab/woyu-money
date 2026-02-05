@@ -16,20 +16,20 @@ import { apiRequest } from "@/lib/queryClient";
 // Dynamic categories will be loaded from API
 
 export default function HouseholdBudget() {
-  const { data: monthlyBudget, isLoading: isLoadingBudget } = useQuery({
+  const { data: monthlyBudget, isLoading: isLoadingBudget } = useQuery<any>({
     queryKey: ["/api/household/budget"],
   });
 
-  const { data: dailyExpenses, isLoading: isLoadingExpenses } = useQuery({
+  const { data: dailyExpenses, isLoading: isLoadingExpenses } = useQuery<any[]>({
     queryKey: ["/api/household/expenses"],
   });
 
-  const { data: monthlyStats, isLoading: isLoadingStats } = useQuery({
+  const { data: monthlyStats, isLoading: isLoadingStats } = useQuery<any>({
     queryKey: ["/api/household/stats"],
   });
 
   // Load household categories from the category management system
-  const { data: householdCategories = [], isLoading: isLoadingCategories } = useQuery({
+  const { data: householdCategories = [], isLoading: isLoadingCategories } = useQuery<any[]>({
     queryKey: ["/api/categories/household"],
     staleTime: 10 * 60 * 1000, // Cache for 10 minutes
   });

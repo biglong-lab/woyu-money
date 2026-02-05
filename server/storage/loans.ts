@@ -21,7 +21,7 @@ export async function getLoanInvestmentRecords(): Promise<any[]> {
       .where(ne(loanInvestmentRecords.status, "cancelled"))
       .orderBy(desc(loanInvestmentRecords.createdAt))
 
-    return records.map((record) => ({
+    return records.map((record: any) => ({
       ...record,
       partyContact: record.partyContact || "",
       interestRate: record.interestRate || "0",
@@ -89,7 +89,7 @@ export async function createLoanInvestmentRecord(
 
     if (
       record.recordType === "loan" &&
-      record.paymentFrequency === "monthly" &&
+      (record as any).paymentFrequency === "monthly" &&
       record.monthlyPaymentAmount
     ) {
       await generateLoanPaymentSchedule(record.id)

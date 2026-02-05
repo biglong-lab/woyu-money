@@ -71,15 +71,15 @@ export default function Settings() {
   const queryClient = useQueryClient();
 
   // Queries
-  const { data: categories = [], isLoading: categoriesLoading } = useQuery({
+  const { data: categories = [], isLoading: categoriesLoading } = useQuery<any[]>({
     queryKey: ["/api/categories"],
   });
 
-  const { data: projects = [], isLoading: projectsLoading } = useQuery({
+  const { data: projects = [], isLoading: projectsLoading } = useQuery<any[]>({
     queryKey: ["/api/projects"],
   });
 
-  const { data: lineConfig } = useQuery({
+  const { data: lineConfig } = useQuery<any>({
     queryKey: ["/api/line-config"],
   });
 
@@ -88,7 +88,7 @@ export default function Settings() {
   const [isUserPermissionDialogOpen, setIsUserPermissionDialogOpen] = useState(false);
 
   // User management queries
-  const { data: systemUsers = [], isLoading: usersLoading } = useQuery({
+  const { data: systemUsers = [], isLoading: usersLoading } = useQuery<any[]>({
     queryKey: ["/api/admin/users"],
     enabled: isUserListDialogOpen || isUserPermissionDialogOpen,
   });

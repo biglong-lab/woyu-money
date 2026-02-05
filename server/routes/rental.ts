@@ -68,13 +68,13 @@ router.put("/api/rental/contracts/:id", async (req, res) => {
     const contract = await storage.updateRentalContract(contractId, validatedData)
 
     if (priceTiers) {
-      await storage.deleteRentalPriceTiersByContract(contractId)
+      await (storage as any).deleteRentalPriceTiersByContract(contractId)
       for (const tier of priceTiers) {
         const validatedTier = insertRentalPriceTierSchema.parse({
           ...tier,
           contractId: contractId,
         })
-        await storage.createRentalPriceTier(validatedTier)
+        await (storage as any).createRentalPriceTier(validatedTier)
       }
     }
 

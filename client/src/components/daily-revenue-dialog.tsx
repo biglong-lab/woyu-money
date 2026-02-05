@@ -50,7 +50,7 @@ export function DailyRevenueDialog({
   });
 
   // 獲取專案列表
-  const { data: projects = [] } = useQuery({
+  const { data: projects = [] } = useQuery<any[]>({
     queryKey: ["/api/payment/projects"],
   });
 

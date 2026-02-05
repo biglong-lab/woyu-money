@@ -13,12 +13,12 @@ import { eq, and, sql, desc } from "drizzle-orm"
 // === 家用預算 ===
 
 export async function getHouseholdBudget(month: string): Promise<HouseholdBudget | undefined> {
-  const [budget] = await db.select().from(householdBudgets).where(eq(householdBudgets.month, month))
+  const [budget] = await db.select().from(householdBudgets).where(eq(householdBudgets.month, month as any))
   return budget
 }
 
 export async function setHouseholdBudget(budgetData: InsertHouseholdBudget): Promise<HouseholdBudget> {
-  const existing = await getHouseholdBudget(budgetData.month)
+  const existing = await getHouseholdBudget(budgetData.month as any)
 
   if (existing) {
     const [updated] = await db
@@ -27,7 +27,7 @@ export async function setHouseholdBudget(budgetData: InsertHouseholdBudget): Pro
         budgetAmount: budgetData.budgetAmount,
         updatedAt: new Date(),
       })
-      .where(eq(householdBudgets.month, budgetData.month))
+      .where(eq(householdBudgets.month, budgetData.month as any))
       .returning()
     return updated
   } else {
@@ -45,7 +45,7 @@ export async function getHouseholdBudgets(month: string): Promise<any[]> {
       month: householdBudgets.month,
     })
     .from(householdBudgets)
-    .where(eq(householdBudgets.month, month))
+    .where(eq(householdBudgets.month, month as any))
 
   return budgets
 }
@@ -109,7 +109,7 @@ export async function getHouseholdExpenses(
     conditions.push(eq(householdExpenses.categoryId, filters.categoryId))
   }
 
-  let query = db.select().from(householdExpenses)
+  let query: any = db.select().from(householdExpenses)
 
   if (conditions.length > 0) {
     query = query.where(conditions.length === 1 ? conditions[0] : and(...conditions))
@@ -147,7 +147,7 @@ export async function deleteHouseholdExpense(id: number): Promise<void> {
 // === 家用分類預算 ===
 
 export async function getHouseholdCategoryBudgets(filters?: any): Promise<HouseholdBudget[]> {
-  let query = db.select().from(householdBudgets)
+  let query: any = db.select().from(householdBudgets)
 
   const conditions = []
   if (filters?.year) {

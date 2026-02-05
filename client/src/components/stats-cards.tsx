@@ -7,7 +7,7 @@ export default function StatsCards() {
     queryKey: ["/api/stats/monthly"],
   });
 
-  const { data: debtStats } = useQuery({
+  const { data: debtStats } = useQuery<any>({
     queryKey: ["/api/stats/debts"],
   });
 

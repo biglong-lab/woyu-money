@@ -63,7 +63,7 @@ export default function PaymentItemNotes({ itemId, itemName }: PaymentItemNotesP
     },
   });
 
-  const { data: notes = [], isLoading } = useQuery({
+  const { data: notes = [], isLoading } = useQuery<PaymentItemNote[]>({
     queryKey: ["/api/payment-items", itemId, "notes"],
     queryFn: async () => {
       return await apiRequest("GET", `/api/payment-items/${itemId}/notes`);

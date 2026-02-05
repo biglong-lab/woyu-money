@@ -209,15 +209,15 @@ export default function InstallmentPaymentManagement() {
     };
   }, [paymentItems]);
 
-  const { data: categories = [] } = useQuery({
+  const { data: categories = [] } = useQuery<any[]>({
     queryKey: ["/api/categories/project"],
   });
 
-  const { data: projects = [] } = useQuery({
+  const { data: projects = [] } = useQuery<any[]>({
     queryKey: ["/api/payment/projects"],
   });
 
-  const { data: fixedCategories = [] } = useQuery({
+  const { data: fixedCategories = [] } = useQuery<any[]>({
     queryKey: ["/api/fixed-categories"],
   });
 
@@ -1230,7 +1230,7 @@ export default function InstallmentPaymentManagement() {
                     <CardContent className="space-y-4">
                       {(() => {
                         const progress = calculateProgress(viewingItem);
-                        const monthlyAmount = parseFloat(viewingItem.installmentAmount) || 0;
+                        const monthlyAmount = parseFloat(viewingItem.installmentAmount || "0") || 0;
                         const paidPeriods = monthlyAmount > 0 ? Math.floor(parseFloat(viewingItem.paidAmount) / monthlyAmount) : 0;
                         const totalPeriods = viewingItem.installmentCount || 0;
                         const remainingAmount = parseFloat(viewingItem.totalAmount) - parseFloat(viewingItem.paidAmount);

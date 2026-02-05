@@ -113,22 +113,22 @@ export default function HouseholdCategoryManagement() {
   });
 
   // Data queries
-  const { data: categories = [], isLoading: isLoadingCategories } = useQuery({
+  const { data: categories = [], isLoading: isLoadingCategories } = useQuery<any[]>({
     queryKey: ["/api/categories/household"],
     staleTime: 5 * 60 * 1000,
   });
 
-  const { data: budgets = [], isLoading: isLoadingBudgets } = useQuery({
+  const { data: budgets = [], isLoading: isLoadingBudgets } = useQuery<any[]>({
     queryKey: [`/api/household/budgets?year=${selectedYear}&month=${selectedMonth}`],
     enabled: !!selectedCategory,
   });
 
-  const { data: expenses = [], isLoading: isLoadingExpenses } = useQuery({
+  const { data: expenses = [], isLoading: isLoadingExpenses } = useQuery<any[]>({
     queryKey: [`/api/household/expenses?categoryId=${selectedCategory?.id}&year=${selectedYear}&month=${selectedMonth}`],
     enabled: !!selectedCategory,
   });
 
-  const { data: categoryStats } = useQuery({
+  const { data: categoryStats } = useQuery<any>({
     queryKey: [`/api/household/category-stats/${selectedCategory?.id}?year=${selectedYear}&month=${selectedMonth}`],
     enabled: !!selectedCategory,
   });

@@ -77,12 +77,12 @@ export default function LoanPaymentHistory({ recordId, recordTitle }: LoanPaymen
   });
 
   // 查詢還款歷史
-  const { data: payments = [], isLoading: paymentsLoading } = useQuery({
+  const { data: payments = [], isLoading: paymentsLoading } = useQuery<LoanPaymentHistory[]>({
     queryKey: [`/api/loan-investment/records/${recordId}/payments`],
   });
 
   // 查詢還款統計
-  const { data: stats = {} as PaymentStatistics, isLoading: statsLoading } = useQuery({
+  const { data: stats = {} as PaymentStatistics, isLoading: statsLoading } = useQuery<PaymentStatistics>({
     queryKey: [`/api/loan-investment/records/${recordId}/payment-stats`],
   });
 
@@ -248,7 +248,7 @@ export default function LoanPaymentHistory({ recordId, recordTitle }: LoanPaymen
       full_repayment: "全額還款",
       partial_payment: "部分還款"
     };
-    return types[type] || type;
+    return types[type as keyof typeof types] || type;
   };
 
   const getPaymentMethodLabel = (method: string) => {
@@ -258,7 +258,7 @@ export default function LoanPaymentHistory({ recordId, recordTitle }: LoanPaymen
       check: "支票",
       mobile_payment: "行動支付"
     };
-    return methods[method] || method;
+    return methods[method as keyof typeof methods] || method;
   };
 
   const getStatusColor = (status: string) => {
@@ -598,7 +598,7 @@ export default function LoanPaymentHistory({ recordId, recordTitle }: LoanPaymen
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  {stats.paymentMethods.map((method, index) => (
+                  {stats.paymentMethods.map((method: any, index: number) => (
                     <div key={index} className="flex justify-between items-center">
                       <span>{getPaymentMethodLabel(method.method)}</span>
                       <div className="text-right">

@@ -280,12 +280,12 @@ export function LoanAnalyticsCharts({ records }: { records: any[] }) {
   };
 
   const processTimelineData = () => {
-    const monthlyData = {};
-    
+    const monthlyData: Record<string, number> = {};
+
     records.forEach(record => {
       const date = new Date(record.startDate);
       const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-      
+
       if (!monthlyData[monthKey]) {
         monthlyData[monthKey] = 0;
       }

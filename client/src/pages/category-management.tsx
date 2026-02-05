@@ -51,7 +51,7 @@ export default function CategoryManagement() {
     resolver: zodResolver(categorySchema),
     defaultValues: {
       categoryName: "",
-      categoryType: "project" as const,
+      categoryType: "project" as "project" | "household",
       description: "",
       isTemplate: false,
       accountInfo: "",
@@ -67,7 +67,7 @@ export default function CategoryManagement() {
         apiRequest("/api/categories/project", "GET"),
         apiRequest("/api/categories/household", "GET")
       ]);
-      return [...projectCategories, ...householdCategories];
+      return [...(projectCategories as any[]), ...(householdCategories as any[])];
     }
   });
 
@@ -185,7 +185,7 @@ export default function CategoryManagement() {
       categoryType: "project",
       description: "",
       isTemplate: false,
-      defaultAmount: "",
+      accountInfo: "",
       templateNotes: "",
     });
     setIsDialogOpen(true);

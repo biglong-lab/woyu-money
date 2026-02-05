@@ -83,12 +83,12 @@ export default function LoanInvestmentManagement() {
   const queryClient = useQueryClient();
 
   // Fetch loan investment records
-  const { data: records = [], isLoading } = useQuery({
+  const { data: records = [], isLoading } = useQuery<any[]>({
     queryKey: ["/api/loan-investment/records"],
   });
 
   // Fetch statistics
-  const { data: stats = {} } = useQuery({
+  const { data: stats = {} } = useQuery<any>({
     queryKey: ["/api/loan-investment/stats"],
   });
 

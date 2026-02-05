@@ -489,7 +489,7 @@ export default function UnifiedPaymentSimple() {
                             <Badge variant="secondary" className="text-xs">
                               {getPaymentMethodText(record.paymentMethod || "")}
                             </Badge>
-                            {record.receiptImage && (
+                            {record.receiptImageUrl && (
                               <Dialog>
                                 <DialogTrigger asChild>
                                   <Badge variant="outline" className="text-xs cursor-pointer hover:bg-gray-100">
@@ -505,8 +505,8 @@ export default function UnifiedPaymentSimple() {
                                     </DialogDescription>
                                   </DialogHeader>
                                   <div className="flex justify-center">
-                                    <img 
-                                      src={`/uploads/${record.receiptImage}`} 
+                                    <img
+                                      src={`/uploads/${record.receiptImageUrl}`}
                                       alt="付款收據" 
                                       className="max-w-full max-h-96 object-contain rounded-lg border"
                                       onError={(e) => {
@@ -543,12 +543,12 @@ export default function UnifiedPaymentSimple() {
                         
                         <div className="text-right">
                           <p className="font-bold text-green-600">
-                            +${parseInt(record.amount).toLocaleString()}
+                            +${parseInt(record.amountPaid).toLocaleString()}
                           </p>
                           <p className="text-xs text-gray-500">
                             {new Date(record.createdAt || '').toLocaleString()}
                           </p>
-                          {record.receiptImage && (
+                          {record.receiptImageUrl && (
                             <Badge variant="outline" className="text-xs mt-1">
                               📷 有收據
                             </Badge>
@@ -709,13 +709,13 @@ export default function UnifiedPaymentSimple() {
                                     {record.notes && (
                                       <p className="text-sm text-gray-600 mb-1">{record.notes}</p>
                                     )}
-                                    {record.receiptImage && (
+                                    {record.receiptImageUrl && (
                                       <p className="text-xs text-blue-600">📷 有收據圖片</p>
                                     )}
                                   </div>
                                   <div className="text-right">
                                     <p className="font-medium text-green-600">
-                                      +${parseInt(record.amount).toLocaleString()}
+                                      +${parseInt(record.amountPaid).toLocaleString()}
                                     </p>
                                     <p className="text-xs text-gray-500">
                                       {new Date(record.createdAt || '').toLocaleString()}

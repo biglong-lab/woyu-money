@@ -66,7 +66,7 @@ export function IntelligentReports({ data, onExport }: IntelligentReportsProps) 
   }, [data.monthlyTrends]);
 
   // KPI 卡片組件
-  const KPICard = ({ title, value, format = 'number', trend, icon: Icon, color = 'blue' }) => (
+  const KPICard = ({ title, value, format = 'number', trend, icon: Icon, color = 'blue' }: { title: any; value: any; format?: string; trend?: any; icon: any; color?: string }) => (
     <Card>
       <CardContent className="p-6">
         <div className="flex items-center justify-between">
@@ -199,6 +199,7 @@ export function IntelligentReports({ data, onExport }: IntelligentReportsProps) 
           title="總計劃金額"
           value={data.kpis.totalPlanned}
           format="currency"
+          trend={0}
           icon={DollarSign}
           color="blue"
         />
@@ -206,6 +207,7 @@ export function IntelligentReports({ data, onExport }: IntelligentReportsProps) 
           title="已付金額"
           value={data.kpis.totalPaid}
           format="currency"
+          trend={0}
           icon={TrendingUp}
           color="green"
         />
@@ -221,6 +223,7 @@ export function IntelligentReports({ data, onExport }: IntelligentReportsProps) 
           title="平均金額"
           value={data.kpis.averageAmount}
           format="currency"
+          trend={0}
           icon={Calendar}
           color="orange"
         />

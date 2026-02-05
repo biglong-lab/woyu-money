@@ -129,31 +129,12 @@ export async function getPaymentItemsCount(filters?: any): Promise<number> {
   `
 
   const result = await db.execute(query)
-  return parseInt(result.rows[0]?.count || "0")
+  return parseInt((result.rows[0] as any)?.count || "0")
 }
 
 export async function getPaymentItem(id: number): Promise<PaymentItem | undefined> {
   const [item] = await db
-    .select({
-      id: paymentItems.id,
-      categoryId: paymentItems.categoryId,
-      fixedCategoryId: paymentItems.fixedCategoryId,
-      fixedSubOptionId: paymentItems.fixedSubOptionId,
-      projectId: paymentItems.projectId,
-      itemName: paymentItems.itemName,
-      totalAmount: paymentItems.totalAmount,
-      paidAmount: paymentItems.paidAmount,
-      status: paymentItems.status,
-      paymentType: paymentItems.paymentType,
-      startDate: paymentItems.startDate,
-      endDate: paymentItems.endDate,
-      priority: paymentItems.priority,
-      notes: paymentItems.notes,
-      itemType: paymentItems.itemType,
-      isDeleted: paymentItems.isDeleted,
-      createdAt: paymentItems.createdAt,
-      updatedAt: paymentItems.updatedAt,
-    })
+    .select()
     .from(paymentItems)
     .where(eq(paymentItems.id, id))
   return item
@@ -161,13 +142,13 @@ export async function getPaymentItem(id: number): Promise<PaymentItem | undefine
 
 // 建立月付項目的輔助函式
 async function createMonthlyPaymentItems(itemData: InsertPaymentItem, userInfo: string): Promise<PaymentItem> {
-  const startDate = new Date(itemData.startDate)
+  const startDate = new Date(itemData.startDate!)
   const endDate = new Date(itemData.endDate!)
   const monthlyAmount = parseFloat(itemData.totalAmount) / calculateMonthsBetween(startDate, endDate)
 
   const [parentItem] = await db
     .insert(paymentItems)
-    .values({ ...itemData, updatedAt: new Date() })
+    .values({ ...itemData, updatedAt: new Date() } as any)
     .returning()
 
   const currentDate = new Date(startDate)
@@ -196,7 +177,7 @@ async function createMonthlyPaymentItems(itemData: InsertPaymentItem, userInfo: 
 
 // 建立分期付款項目的輔助函式
 async function createInstallmentPaymentItems(itemData: InsertPaymentItem, userInfo: string): Promise<PaymentItem> {
-  const startDate = new Date(itemData.startDate)
+  const startDate = new Date(itemData.startDate!)
   const endDate = new Date(itemData.endDate!)
   const totalAmount = parseFloat(itemData.totalAmount)
 
@@ -205,7 +186,7 @@ async function createInstallmentPaymentItems(itemData: InsertPaymentItem, userIn
 
   const [parentItem] = await db
     .insert(paymentItems)
-    .values({ ...itemData, updatedAt: new Date() })
+    .values({ ...itemData, updatedAt: new Date() } as any)
     .returning()
 
   const currentDate = new Date(startDate)
@@ -256,7 +237,7 @@ export async function createPaymentItem(itemData: InsertPaymentItem, userInfo = 
   } else {
     const [item] = await db
       .insert(paymentItems)
-      .values({ ...cleanData, updatedAt: new Date() })
+      .values({ ...cleanData, updatedAt: new Date() } as any)
       .returning()
 
     if (cleanData.fixedCategoryId && cleanData.projectId && cleanData.itemName) {
@@ -311,7 +292,7 @@ export async function updatePaymentItem(
 
     const [updatedItem] = await db
       .update(paymentItems)
-      .set({ ...cleanedData, updatedAt: new Date() })
+      .set({ ...cleanedData, updatedAt: new Date() } as any)
       .where(eq(paymentItems.id, id))
       .returning()
 
@@ -415,7 +396,7 @@ export async function restorePaymentItem(id: number, userInfo = "系統管理員
   return item
 }
 
-export async function getDeletedPaymentItems(): Promise<PaymentItem[]> {
+export async function getDeletedPaymentItems(): Promise<any[]> {
   const result = await db.execute(sql`
     SELECT
       pi.*,

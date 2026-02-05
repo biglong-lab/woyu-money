@@ -167,7 +167,7 @@ export async function bulkUpdatePaymentItems(
 
     await tx
       .update(paymentItems)
-      .set({ ...updates, updatedAt: new Date() })
+      .set({ ...updates, updatedAt: new Date() } as any)
       .where(sql`id = ANY(${itemIds})`)
 
     for (const oldItem of oldItems) {

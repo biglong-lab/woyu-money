@@ -44,7 +44,7 @@ export async function getSmartAlerts(): Promise<any[]> {
       .from(loanInvestmentRecords)
       .where(
         and(
-          gte(loanInvestmentRecords.annualInterestRate, "15"),
+          sql`${loanInvestmentRecords.annualInterestRate} >= 15`,
           eq(loanInvestmentRecords.status, "active")
         )
       )
@@ -62,7 +62,7 @@ export async function getSmartAlerts(): Promise<any[]> {
         amount: loan.principalAmount,
         interestRate: parseFloat(loan.annualInterestRate),
         isRead: false,
-        createdAt: loan.createdAt.toISOString(),
+        createdAt: (loan.createdAt || new Date()).toISOString(),
       })
     }
 
@@ -72,21 +72,15 @@ export async function getSmartAlerts(): Promise<any[]> {
       .from(loanInvestmentRecords)
       .where(
         and(
-          lte(
-            loanInvestmentRecords.endDate,
-            thirtyDaysFromNow.toISOString().split("T")[0]
-          ),
-          gte(
-            loanInvestmentRecords.endDate,
-            currentDate.toISOString().split("T")[0]
-          ),
+          sql`${loanInvestmentRecords.endDate} <= ${thirtyDaysFromNow.toISOString().split("T")[0]}`,
+          sql`${loanInvestmentRecords.endDate} >= ${currentDate.toISOString().split("T")[0]}`,
           eq(loanInvestmentRecords.status, "active")
         )
       )
 
     for (const loan of dueSoonLoans) {
       const daysUntilDue = Math.ceil(
-        (new Date(loan.endDate).getTime() - currentDate.getTime()) /
+        (new Date(loan.endDate!).getTime() - currentDate.getTime()) /
           (1000 * 60 * 60 * 24)
       )
       alerts.push({
@@ -100,7 +94,7 @@ export async function getSmartAlerts(): Promise<any[]> {
         amount: loan.principalAmount,
         dueDate: loan.endDate,
         isRead: false,
-        createdAt: loan.createdAt.toISOString(),
+        createdAt: (loan.createdAt || new Date()).toISOString(),
       })
     }
 
@@ -110,17 +104,14 @@ export async function getSmartAlerts(): Promise<any[]> {
       .from(loanInvestmentRecords)
       .where(
         and(
-          lt(
-            loanInvestmentRecords.endDate,
-            currentDate.toISOString().split("T")[0]
-          ),
+          sql`${loanInvestmentRecords.endDate} < ${currentDate.toISOString().split("T")[0]}`,
           eq(loanInvestmentRecords.status, "active")
         )
       )
 
     for (const loan of overdueLoans) {
       const daysOverdue = Math.ceil(
-        (currentDate.getTime() - new Date(loan.endDate).getTime()) /
+        (currentDate.getTime() - new Date(loan.endDate!).getTime()) /
           (1000 * 60 * 60 * 24)
       )
       alerts.push({
@@ -134,7 +125,7 @@ export async function getSmartAlerts(): Promise<any[]> {
         amount: loan.principalAmount,
         dueDate: loan.endDate,
         isRead: false,
-        createdAt: loan.createdAt.toISOString(),
+        createdAt: (loan.createdAt || new Date()).toISOString(),
       })
     }
 
@@ -172,7 +163,7 @@ export async function getSmartAlertStats(): Promise<any> {
       .from(loanInvestmentRecords)
       .where(
         and(
-          gte(loanInvestmentRecords.annualInterestRate, "15"),
+          sql`${loanInvestmentRecords.annualInterestRate} >= 15`,
           eq(loanInvestmentRecords.status, "active")
         )
       )
@@ -183,14 +174,8 @@ export async function getSmartAlertStats(): Promise<any> {
       .from(loanInvestmentRecords)
       .where(
         and(
-          lte(
-            loanInvestmentRecords.endDate,
-            thirtyDaysFromNow.toISOString().split("T")[0]
-          ),
-          gte(
-            loanInvestmentRecords.endDate,
-            currentDate.toISOString().split("T")[0]
-          ),
+          sql`${loanInvestmentRecords.endDate} <= ${thirtyDaysFromNow.toISOString().split("T")[0]}`,
+          sql`${loanInvestmentRecords.endDate} >= ${currentDate.toISOString().split("T")[0]}`,
           eq(loanInvestmentRecords.status, "active")
         )
       )
@@ -201,10 +186,7 @@ export async function getSmartAlertStats(): Promise<any> {
       .from(loanInvestmentRecords)
       .where(
         and(
-          lt(
-            loanInvestmentRecords.endDate,
-            currentDate.toISOString().split("T")[0]
-          ),
+          sql`${loanInvestmentRecords.endDate} < ${currentDate.toISOString().split("T")[0]}`,
           eq(loanInvestmentRecords.status, "active")
         )
       )
@@ -217,14 +199,8 @@ export async function getSmartAlertStats(): Promise<any> {
       .from(loanInvestmentRecords)
       .where(
         and(
-          lte(
-            loanInvestmentRecords.endDate,
-            thirtyDaysFromNow.toISOString().split("T")[0]
-          ),
-          gte(
-            loanInvestmentRecords.endDate,
-            currentDate.toISOString().split("T")[0]
-          ),
+          sql`${loanInvestmentRecords.endDate} <= ${thirtyDaysFromNow.toISOString().split("T")[0]}`,
+          sql`${loanInvestmentRecords.endDate} >= ${currentDate.toISOString().split("T")[0]}`,
           eq(loanInvestmentRecords.status, "active")
         )
       )
@@ -237,10 +213,7 @@ export async function getSmartAlertStats(): Promise<any> {
       .from(loanInvestmentRecords)
       .where(
         and(
-          lt(
-            loanInvestmentRecords.endDate,
-            currentDate.toISOString().split("T")[0]
-          ),
+          sql`${loanInvestmentRecords.endDate} < ${currentDate.toISOString().split("T")[0]}`,
           eq(loanInvestmentRecords.status, "active")
         )
       )
