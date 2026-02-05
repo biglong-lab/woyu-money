@@ -211,20 +211,21 @@ export default function FinancialOverview() {
   }
 
   return (
-    <div className="space-y-6 p-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold" data-testid="page-title">財務總覽</h1>
-          <p className="text-gray-600 mt-1">統一查看、管理、追蹤所有財務資訊</p>
+    <div className="space-y-4 sm:space-y-6 p-3 sm:p-6">
+      {/* 響應式標題和操作區 */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-2xl sm:text-3xl font-bold truncate" data-testid="page-title">財務總覽</h1>
+          <p className="text-sm sm:text-base text-gray-600 mt-1">統一查看、管理、追蹤所有財務資訊</p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={handleRefresh} data-testid="btn-refresh">
-            <RefreshCw className="h-4 w-4 mr-2" />
-            更新
+        <div className="flex gap-2 flex-shrink-0">
+          <Button variant="outline" size="sm" className="flex-1 sm:flex-none" onClick={handleRefresh} data-testid="btn-refresh">
+            <RefreshCw className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">更新</span>
           </Button>
-          <Button variant="outline" onClick={handleExport} data-testid="btn-export">
-            <Download className="h-4 w-4 mr-2" />
-            匯出報表
+          <Button variant="outline" size="sm" className="flex-1 sm:flex-none" onClick={handleExport} data-testid="btn-export">
+            <Download className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">匯出報表</span>
           </Button>
         </div>
       </div>
@@ -237,35 +238,39 @@ export default function FinancialOverview() {
       />
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="overview" className="flex items-center gap-2" data-testid="tab-overview">
+        {/* 響應式 Tab 列表 - 手機版 2x2 網格，桌面版 1x4 */}
+        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 h-auto gap-1 p-1">
+          <TabsTrigger value="overview" className="flex items-center justify-center gap-1 sm:gap-2 py-2 text-xs sm:text-sm" data-testid="tab-overview">
             <LayoutDashboard className="h-4 w-4" />
-            總覽
+            <span>總覽</span>
           </TabsTrigger>
-          <TabsTrigger value="due" className="flex items-center gap-2" data-testid="tab-due">
+          <TabsTrigger value="due" className="flex items-center justify-center gap-1 sm:gap-2 py-2 text-xs sm:text-sm" data-testid="tab-due">
             <CreditCard className="h-4 w-4" />
-            應付款
+            <span>應付款</span>
           </TabsTrigger>
-          <TabsTrigger value="forecast" className="flex items-center gap-2" data-testid="tab-forecast">
+          <TabsTrigger value="forecast" className="flex items-center justify-center gap-1 sm:gap-2 py-2 text-xs sm:text-sm" data-testid="tab-forecast">
             <TrendingUp className="h-4 w-4" />
-            現金流預測
+            <span className="hidden sm:inline">現金流</span>
+            <span className="sm:hidden">預測</span>
           </TabsTrigger>
-          <TabsTrigger value="health" className="flex items-center gap-2" data-testid="tab-health">
+          <TabsTrigger value="health" className="flex items-center justify-center gap-1 sm:gap-2 py-2 text-xs sm:text-sm" data-testid="tab-health">
             <FileText className="h-4 w-4" />
-            財務健康
+            <span className="hidden sm:inline">財務健康</span>
+            <span className="sm:hidden">健康</span>
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="mt-6">
-          <div className="space-y-6">
+        <TabsContent value="overview" className="mt-4 sm:mt-6">
+          <div className="space-y-4 sm:space-y-6">
             <FinancialHealthDashboard items={filteredItems} />
-            
-            <div className="grid grid-cols-2 gap-6">
+
+            {/* 響應式網格：手機版單欄，平板以上雙欄 */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
               <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">即將到期提醒</CardTitle>
+                <CardHeader className="pb-2 sm:pb-4">
+                  <CardTitle className="text-base sm:text-lg">即將到期提醒</CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="pt-0">
                   <DueDateDashboard
                     items={filteredItems.slice(0, 10)}
                     onItemClick={handleItemClick}
@@ -273,12 +278,12 @@ export default function FinancialOverview() {
                   />
                 </CardContent>
               </Card>
-              
+
               <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">未來3個月預測</CardTitle>
+                <CardHeader className="pb-2 sm:pb-4">
+                  <CardTitle className="text-base sm:text-lg">未來3個月預測</CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="pt-0">
                   <CashflowForecast
                     items={filteredItems}
                     schedules={schedules}
@@ -292,7 +297,7 @@ export default function FinancialOverview() {
           </div>
         </TabsContent>
 
-        <TabsContent value="due" className="mt-6">
+        <TabsContent value="due" className="mt-4 sm:mt-6">
           <DueDateDashboard
             items={filteredItems}
             onItemClick={handleItemClick}
@@ -300,7 +305,7 @@ export default function FinancialOverview() {
           />
         </TabsContent>
 
-        <TabsContent value="forecast" className="mt-6">
+        <TabsContent value="forecast" className="mt-4 sm:mt-6">
           <CashflowForecast
             items={filteredItems}
             schedules={schedules}
@@ -310,22 +315,23 @@ export default function FinancialOverview() {
           />
         </TabsContent>
 
-        <TabsContent value="health" className="mt-6">
+        <TabsContent value="health" className="mt-4 sm:mt-6">
           <FinancialHealthDashboard items={filteredItems} />
         </TabsContent>
       </Tabs>
 
+      {/* 響應式摘要卡片 */}
       <Card className="bg-gray-50" data-testid="card-summary">
-        <CardContent className="pt-4">
-          <div className="flex items-center justify-between text-sm text-gray-600">
+        <CardContent className="py-3 sm:pt-4">
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between text-xs sm:text-sm text-gray-600">
             <span>
               共 {paymentItems.length} 個項目
-              {activeFilters.search || activeFilters.projects.length > 0 || activeFilters.categories.length > 0 || 
+              {activeFilters.search || activeFilters.projects.length > 0 || activeFilters.categories.length > 0 ||
                activeFilters.statuses.length > 0 || activeFilters.priorities.length > 0 || activeFilters.dueDateRange !== 'all'
                 ? ` · 篩選後顯示 ${filteredItems.length} 個`
                 : ''}
             </span>
-            <span>
+            <span className="text-xs">
               最後更新: {new Date().toLocaleString('zh-TW')}
             </span>
           </div>

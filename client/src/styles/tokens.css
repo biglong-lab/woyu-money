@@ -1,0 +1,253 @@
+/**
+ * 設計 Token 系統
+ * 統一的色彩、間距、圓角、陰影定義
+ */
+
+:root {
+  /* ==================== 語意色彩 ==================== */
+  --color-success: 142 71% 45%;     /* hsl(142 71% 45%) - #10B981 */
+  --color-success-light: 142 76% 90%;
+  --color-success-dark: 142 76% 36%;
+
+  --color-warning: 45 93% 47%;      /* hsl(45 93% 47%) - #F59E0B */
+  --color-warning-light: 45 93% 90%;
+  --color-warning-dark: 45 93% 37%;
+
+  --color-error: 0 84% 60%;         /* hsl(0 84% 60%) - #EF4444 */
+  --color-error-light: 0 84% 92%;
+  --color-error-dark: 0 84% 50%;
+
+  --color-info: 213 94% 68%;        /* hsl(213 94% 68%) - #3B82F6 */
+  --color-info-light: 213 94% 92%;
+  --color-info-dark: 213 94% 58%;
+
+  /* ==================== 間距規模 ==================== */
+  --space-0: 0;
+  --space-px: 1px;
+  --space-0-5: 0.125rem;  /* 2px */
+  --space-1: 0.25rem;     /* 4px */
+  --space-1-5: 0.375rem;  /* 6px */
+  --space-2: 0.5rem;      /* 8px */
+  --space-2-5: 0.625rem;  /* 10px */
+  --space-3: 0.75rem;     /* 12px */
+  --space-3-5: 0.875rem;  /* 14px */
+  --space-4: 1rem;        /* 16px */
+  --space-5: 1.25rem;     /* 20px */
+  --space-6: 1.5rem;      /* 24px */
+  --space-7: 1.75rem;     /* 28px */
+  --space-8: 2rem;        /* 32px */
+  --space-9: 2.25rem;     /* 36px */
+  --space-10: 2.5rem;     /* 40px */
+  --space-11: 2.75rem;    /* 44px - 觸控最小尺寸 */
+  --space-12: 3rem;       /* 48px */
+  --space-14: 3.5rem;     /* 56px */
+  --space-16: 4rem;       /* 64px */
+  --space-20: 5rem;       /* 80px */
+  --space-24: 6rem;       /* 96px */
+
+  /* ==================== 圓角 ==================== */
+  --radius-none: 0;
+  --radius-sm: 0.125rem;  /* 2px */
+  --radius-md: 0.375rem;  /* 6px */
+  --radius-lg: 0.5rem;    /* 8px */
+  --radius-xl: 0.75rem;   /* 12px */
+  --radius-2xl: 1rem;     /* 16px */
+  --radius-3xl: 1.5rem;   /* 24px */
+  --radius-full: 9999px;
+
+  /* ==================== 陰影 ==================== */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+  --shadow-2xl: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+  --shadow-inner: inset 0 2px 4px 0 rgb(0 0 0 / 0.05);
+
+  /* ==================== 斷點 ==================== */
+  /* 這些值主要用於文檔，實際斷點由 Tailwind 控制 */
+  --bp-mobile: 0px;       /* 手機 (default) */
+  --bp-sm: 640px;         /* sm: 平板直立 */
+  --bp-md: 768px;         /* md: 平板橫向/小筆電 */
+  --bp-lg: 1024px;        /* lg: 桌面 */
+  --bp-xl: 1280px;        /* xl: 寬螢幕 */
+  --bp-2xl: 1536px;       /* 2xl: 超寬螢幕 */
+
+  /* ==================== 佈局 ==================== */
+  --header-height: 64px;
+  --sidebar-width: 280px;
+  --mobile-tab-height: 64px;
+  --container-max: 1440px;
+  --content-max: 1280px;
+
+  /* ==================== 觸控目標 ==================== */
+  --touch-target-min: 44px;  /* iOS/Android 建議的最小觸控目標 */
+
+  /* ==================== z-index 層級 ==================== */
+  --z-dropdown: 10;
+  --z-sticky: 20;
+  --z-fixed: 30;
+  --z-modal-backdrop: 40;
+  --z-modal: 50;
+  --z-popover: 60;
+  --z-tooltip: 70;
+  --z-toast: 80;
+
+  /* ==================== 動畫時間 ==================== */
+  --duration-fast: 150ms;
+  --duration-normal: 200ms;
+  --duration-slow: 300ms;
+  --duration-slower: 400ms;
+
+  /* ==================== 動畫緩動 ==================== */
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+/* ==================== 深色模式調整 ==================== */
+.dark {
+  --color-success-light: 142 76% 20%;
+  --color-warning-light: 45 93% 20%;
+  --color-error-light: 0 84% 20%;
+  --color-info-light: 213 94% 20%;
+}
+
+/* ==================== 狀態樣式 ==================== */
+@layer components {
+  /* 付款狀態徽章 */
+  .status-badge {
+    @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium;
+  }
+
+  .status-badge-paid {
+    @apply bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400;
+  }
+
+  .status-badge-pending {
+    @apply bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400;
+  }
+
+  .status-badge-overdue {
+    @apply bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400;
+  }
+
+  .status-badge-partial {
+    @apply bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400;
+  }
+
+  .status-badge-cancelled {
+    @apply bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400;
+  }
+
+  /* 付款類型徽章 */
+  .type-badge {
+    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium;
+  }
+
+  .type-badge-monthly {
+    @apply bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400;
+  }
+
+  .type-badge-installment {
+    @apply bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400;
+  }
+
+  .type-badge-general {
+    @apply bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400;
+  }
+
+  .type-badge-rental {
+    @apply bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400;
+  }
+
+  .type-badge-loan {
+    @apply bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400;
+  }
+
+  /* 統一卡片樣式 */
+  .card-base {
+    @apply bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800;
+  }
+
+  .card-interactive {
+    @apply card-base transition-all duration-200 cursor-pointer;
+    @apply hover:shadow-md hover:border-primary/20 hover:-translate-y-0.5;
+  }
+
+  .card-elevated {
+    @apply card-base shadow-md;
+  }
+
+  /* 觸控友好的按鈕 */
+  .touch-target {
+    @apply min-h-[44px] min-w-[44px];
+  }
+
+  /* 手機版卡片列表項目 */
+  .mobile-list-item {
+    @apply flex items-center gap-3 p-4 border-b border-gray-100 dark:border-gray-800;
+    @apply active:bg-gray-50 dark:active:bg-gray-800;
+  }
+
+  .mobile-list-item:last-child {
+    @apply border-b-0;
+  }
+
+  /* 響應式表格/卡片切換 */
+  .table-desktop {
+    @apply hidden md:table;
+  }
+
+  .cards-mobile {
+    @apply md:hidden space-y-3;
+  }
+
+  /* 響應式按鈕群組 */
+  .btn-group-responsive {
+    @apply flex flex-col sm:flex-row gap-2;
+  }
+
+  /* 響應式表單欄位 */
+  .form-grid {
+    @apply grid grid-cols-1 sm:grid-cols-2 gap-4;
+  }
+
+  .form-grid-3 {
+    @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4;
+  }
+}
+
+/* ==================== 安全區域（iPhone X+） ==================== */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .mb-safe {
+    margin-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+/* ==================== 列印樣式 ==================== */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+}
+
+/* ==================== 無障礙：減少動畫 ==================== */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
