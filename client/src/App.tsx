@@ -49,6 +49,8 @@ import HRCostManagement from "@/pages/hr-cost-management";
 import FinancialStatements from "@/pages/financial-statements";
 import HRCostReports from "@/pages/hr-cost-reports";
 import TaxReports from "@/pages/tax-reports";
+import HouseholdBudget from "@/pages/household-budget";
+import HouseholdCategoryManagement from "@/pages/household-category-management";
 
 function Router() {
   const [quickPaymentOpen, setQuickPaymentOpen] = useState(false);
@@ -110,6 +112,10 @@ function Router() {
                 <ProtectedRoute path="/recycle-bin" component={RecycleBin} />
                 <ProtectedRoute path="/document-inbox" component={DocumentInbox} />
                 <ProtectedRoute path="/hr-cost-management" component={HRCostManagement} />
+
+                {/* Household Management */}
+                <ProtectedRoute path="/household-budget" component={HouseholdBudget} />
+                <ProtectedRoute path="/household-category-management" component={HouseholdCategoryManagement} />
                 
                 {/* Feature Showcase */}
                 <ProtectedRoute path="/features" component={FeatureShowcase} />
