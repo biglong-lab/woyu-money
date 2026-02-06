@@ -1,9 +1,9 @@
+/* 引入設計 Token（@import 必須在最前面） */
+@import "./styles/tokens.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-/* 引入設計 Token */
-@import "./styles/tokens.css";
 
 :root {
   --background: 210 11% 98%; /* #F5F7FA */
