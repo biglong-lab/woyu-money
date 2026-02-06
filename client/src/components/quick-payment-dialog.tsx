@@ -48,16 +48,20 @@ export function QuickPaymentDialog({ open, onOpenChange }: QuickPaymentDialogPro
     new Date().toISOString().split("T")[0]
   );
 
-  // 查詢所有付款項目
-  const { data: paymentItems = [] } = useQuery({
-    queryKey: ["/api/payment/items"],
+  // 查詢所有付款項目（使用 includeAll 取得完整陣列）
+  const { data: paymentItemsData, isLoading } = useQuery<{ items?: any[] } | any[]>({
+    queryKey: ["/api/payment/items?includeAll=true"],
     enabled: open,
   });
 
+  // 處理 API 回傳格式（可能是陣列或物件）
+  const paymentItems = Array.isArray(paymentItemsData)
+    ? paymentItemsData
+    : (paymentItemsData?.items || []);
+
   // 篩選待付款項目
   const filteredItems = useMemo(() => {
-    const items = Array.isArray(paymentItems) ? paymentItems : [];
-    const pendingItems = items.filter((item: any) => {
+    const pendingItems = paymentItems.filter((item: any) => {
       const paid = parseFloat(item.paidAmount || "0");
       const total = parseFloat(item.totalAmount || "0");
       return paid < total && item.status !== "completed" && !item.isDeleted;
@@ -181,7 +185,12 @@ export function QuickPaymentDialog({ open, onOpenChange }: QuickPaymentDialogPro
               />
             </div>
             <div className="max-h-[300px] overflow-y-auto space-y-2">
-              {filteredItems.length > 0 ? (
+              {isLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+                  <span className="ml-2 text-gray-500">載入中...</span>
+                </div>
+              ) : filteredItems.length > 0 ? (
                 filteredItems.map((item: any) => {
                   const remaining =
                     parseFloat(item.totalAmount || "0") -
