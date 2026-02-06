@@ -35,7 +35,8 @@ function TabItem({ title, href, icon: Icon, isActive, badge, onClick }: TabItemP
     <div
       className={cn(
         "flex flex-col items-center justify-center gap-0.5 py-2 px-3 min-w-[64px] touch-target",
-        "transition-colors duration-200",
+        "transition-colors duration-200 cursor-pointer select-none",
+        "active:scale-95 active:opacity-70",
         isActive
           ? "text-primary"
           : "text-muted-foreground hover:text-foreground"
@@ -86,9 +87,15 @@ interface PopupMenuProps {
   isOpen: boolean;
   onClose: () => void;
   title: string;
+  color?: "blue" | "green" | "orange";
 }
 
-function PopupMenu({ items, isOpen, onClose, title }: PopupMenuProps) {
+function PopupMenu({ items, isOpen, onClose, title, color = "blue" }: PopupMenuProps) {
+  const colorClasses = {
+    blue: { bg: "bg-blue-50", text: "text-blue-600", header: "text-blue-900" },
+    green: { bg: "bg-green-50", text: "text-green-600", header: "text-green-900" },
+    orange: { bg: "bg-orange-50", text: "text-orange-600", header: "text-orange-900" },
+  };
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -98,21 +105,26 @@ function PopupMenu({ items, isOpen, onClose, title }: PopupMenuProps) {
       }
     }
     if (isOpen) {
+      // 使用 touchstart 優先處理觸控設備
+      document.addEventListener("touchstart", handleClickOutside as any);
       document.addEventListener("mousedown", handleClickOutside);
     }
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("touchstart", handleClickOutside as any);
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
   }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[60] bg-black/30 backdrop-blur-sm md:hidden">
+    <div className="fixed inset-0 z-[100] bg-black/40 backdrop-blur-sm md:hidden">
       <div
         ref={menuRef}
-        className="absolute bottom-16 left-2 right-2 bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden pb-safe animate-in slide-in-from-bottom-4 duration-200"
+        className="absolute bottom-20 left-2 right-2 bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden pb-safe animate-in slide-in-from-bottom-4 duration-200"
       >
-        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-          <h3 className="text-sm font-semibold text-gray-900">{title}</h3>
+        <div className={cn("flex items-center justify-between px-4 py-3 border-b border-gray-100", colorClasses[color].bg)}>
+          <h3 className={cn("text-sm font-semibold", colorClasses[color].header)}>{title}</h3>
           <button
             onClick={onClose}
             className="p-1 rounded-full hover:bg-gray-100 transition-colors"
@@ -129,8 +141,8 @@ function PopupMenu({ items, isOpen, onClose, title }: PopupMenuProps) {
                   className="flex flex-col items-center gap-1.5 p-3 rounded-xl hover:bg-gray-50 active:bg-gray-100 transition-colors"
                   onClick={onClose}
                 >
-                  <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center">
-                    <Icon className="w-5 h-5 text-blue-600" />
+                  <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center", colorClasses[color].bg)}>
+                    <Icon className={cn("w-5 h-5", colorClasses[color].text)} />
                   </div>
                   <span className="text-[11px] text-gray-700 font-medium text-center leading-tight">
                     {item.title}
@@ -191,18 +203,21 @@ export function MobileTabBar() {
         items={managementNavItems}
         isOpen={openMenu === "payment"}
         onClose={() => setOpenMenu(null)}
+        color="blue"
       />
       <PopupMenu
         title="統一查看"
         items={viewNavItems}
         isOpen={openMenu === "view"}
         onClose={() => setOpenMenu(null)}
+        color="green"
       />
       <PopupMenu
         title="系統管理"
         items={systemNavItems}
         isOpen={openMenu === "more"}
         onClose={() => setOpenMenu(null)}
+        color="orange"
       />
 
       {/* 底部 Tab Bar */}

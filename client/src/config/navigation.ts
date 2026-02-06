@@ -31,6 +31,7 @@ import {
   Link as LinkIcon,
   TrendingUp,
   PieChart,
+  Banknote,
   type LucideIcon,
 } from "lucide-react";
 
@@ -167,6 +168,18 @@ export const viewNavItems: NavItem[] = [
     icon: Receipt,
     badge: "NEW",
     description: "營業稅、薪資扣繳、二代健保",
+  },
+  {
+    title: "家庭預算",
+    href: "/household-budget",
+    icon: Banknote,
+    description: "家庭收支預算管理",
+  },
+  {
+    title: "家庭分類管理",
+    href: "/household-category-management",
+    icon: Layers,
+    description: "家庭收支分類設定",
   },
 ];
 
@@ -403,6 +416,18 @@ export const breadcrumbConfig: Record<string, BreadcrumbItem[]> = {
     { title: "首頁", href: "/" },
     { title: "系統管理" },
     { title: "帳戶設定" },
+  ],
+
+  // 家庭財務
+  "/household-budget": [
+    { title: "首頁", href: "/" },
+    { title: "統一查看" },
+    { title: "家庭預算" },
+  ],
+  "/household-category-management": [
+    { title: "首頁", href: "/" },
+    { title: "統一查看" },
+    { title: "家庭分類管理" },
   ],
 
   // 其他
