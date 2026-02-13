@@ -7,6 +7,12 @@ import {
   calcBudgetProgress,
   type CategoryStats,
 } from "./types";
+interface SelectedCategory {
+  categoryName: string;
+  categoryType: string;
+  description?: string | null;
+}
+
 
 // ============================================================
 // 概覽分頁 - 分類基本資訊、本月統計卡片、預算進度條
@@ -14,7 +20,7 @@ import {
 
 interface CategoryOverviewTabProps {
   /** 目前選取的分類 */
-  selectedCategory: any;
+  selectedCategory: SelectedCategory;
   /** 分類統計資料 */
   categoryStats: CategoryStats | undefined;
 }

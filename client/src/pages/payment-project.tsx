@@ -125,8 +125,8 @@ function PaymentProjectContent() {
         resetFilters={filters.resetFilters}
         applySmartFilter={filters.applySmartFilter}
         projects={queries.projects as PaymentProjectType[] | undefined}
-        fixedCategoriesData={queries.fixedCategoriesData}
-        projectCategoriesData={queries.projectCategoriesData}
+        fixedCategoriesData={queries.fixedCategoriesData as unknown as Parameters<typeof PaymentProjectFilters>[0]['fixedCategoriesData']}
+        projectCategoriesData={queries.projectCategoriesData as unknown as Parameters<typeof PaymentProjectFilters>[0]['projectCategoriesData']}
       />
 
       {/* 項目列表 */}
@@ -160,7 +160,7 @@ function PaymentProjectContent() {
 
       {/* 項目詳情對話框 */}
       <PaymentItemDetails
-        item={mutations.selectedItem}
+        item={mutations.selectedItem as Parameters<typeof PaymentItemDetails>[0]['item']}
         open={!!mutations.selectedItem}
         onOpenChange={(open) => !open && mutations.setSelectedItem(null)}
       />

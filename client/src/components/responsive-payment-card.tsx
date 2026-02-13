@@ -70,7 +70,7 @@ export function ResponsivePaymentCard({
   const remainingAmount = totalAmount - paidAmount;
   const progressPercentage = totalAmount > 0 ? (paidAmount / totalAmount) * 100 : 0;
   
-  const isDeleted = (item as any).isDeleted;
+  const isDeleted = (item as PaymentItem & { isDeleted?: boolean }).isDeleted;
   const isOverdue = item.status === 'overdue';
   const isCompleted = item.status === 'completed';
   const isPending = item.status === 'pending';

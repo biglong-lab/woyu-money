@@ -12,24 +12,71 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, Camera, Wallet, TrendingDown, TrendingUp, Calendar } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import type { HouseholdExpense } from "@shared/schema/household";
+import type { DebtCategory } from "@shared/schema/category";
 
-// Dynamic categories will be loaded from API
+// API 回應型別定義
+interface MonthlyBudgetResponse {
+  amount: string | number;
+}
+
+interface MonthlyStatsResponse {
+  totalSpent: number;
+  categoryBreakdown: Record<string, number>;
+}
+
+interface HouseholdCategory {
+  id: number;
+  categoryName: string;
+  color: string;
+}
+
+interface ExpenseWithCategory extends HouseholdExpense {
+  categoryName?: string;
+  receiptPhoto?: string;
+}
+
+// 表單型別定義
+interface QuickAddFormData {
+  amount: string;
+  categoryId: string;
+  description: string;
+  paymentMethod: string;
+  date: string;
+}
+
+interface BudgetFormData {
+  monthlyBudget: string;
+}
+
+interface AddExpensePayload {
+  amount: number;
+  categoryId: number;
+  description: string;
+  paymentMethod: string;
+  date: string;
+}
+
+interface SetBudgetPayload {
+  amount: number;
+  month: string;
+}
 
 export default function HouseholdBudget() {
-  const { data: monthlyBudget, isLoading: isLoadingBudget } = useQuery<any>({
+  const { data: monthlyBudget, isLoading: isLoadingBudget } = useQuery<MonthlyBudgetResponse>({
     queryKey: ["/api/household/budget"],
   });
 
-  const { data: dailyExpenses, isLoading: isLoadingExpenses } = useQuery<any[]>({
+  const { data: dailyExpenses, isLoading: isLoadingExpenses } = useQuery<ExpenseWithCategory[]>({
     queryKey: ["/api/household/expenses"],
   });
 
-  const { data: monthlyStats, isLoading: isLoadingStats } = useQuery<any>({
+  const { data: monthlyStats, isLoading: isLoadingStats } = useQuery<MonthlyStatsResponse>({
     queryKey: ["/api/household/stats"],
   });
 
   // Load household categories from the category management system
-  const { data: householdCategories = [], isLoading: isLoadingCategories } = useQuery<any[]>({
+  const { data: householdCategories = [], isLoading: isLoadingCategories } = useQuery<HouseholdCategory[]>({
     queryKey: ["/api/categories/household"],
     staleTime: 10 * 60 * 1000, // Cache for 10 minutes
   });
@@ -40,7 +87,7 @@ export default function HouseholdBudget() {
   const queryClient = useQueryClient();
 
   // 快速記帳表單
-  const quickAddForm = useForm({
+  const quickAddForm = useForm<QuickAddFormData>({
     defaultValues: {
       amount: "",
       categoryId: "",
@@ -51,16 +98,16 @@ export default function HouseholdBudget() {
   });
 
   // 預算設定表單
-  const budgetForm = useForm({
+  const budgetForm = useForm<BudgetFormData>({
     defaultValues: {
-      monthlyBudget: (monthlyBudget as any)?.amount || "",
+      monthlyBudget: monthlyBudget?.amount?.toString() || "",
     },
   });
 
   // 快速記帳
   const addExpenseMutation = useMutation({
-    mutationFn: async (data: any) => {
-      const formattedData = {
+    mutationFn: async (data: QuickAddFormData) => {
+      const formattedData: AddExpensePayload = {
         ...data,
         amount: parseFloat(data.amount),
         categoryId: parseInt(data.categoryId)
@@ -88,8 +135,12 @@ export default function HouseholdBudget() {
 
   // 設定預算
   const setBudgetMutation = useMutation({
-    mutationFn: async (data: any) => {
-      return await apiRequest("/api/household/budget", "POST", data);
+    mutationFn: async (data: BudgetFormData) => {
+      const budgetData: SetBudgetPayload = {
+        amount: parseFloat(data.monthlyBudget),
+        month: new Date().toISOString().slice(0, 7), // YYYY-MM
+      };
+      return await apiRequest("/api/household/budget", "POST", budgetData);
     },
     onSuccess: () => {
       toast({
@@ -109,7 +160,7 @@ export default function HouseholdBudget() {
     },
   });
 
-  const onQuickAdd = (data: any) => {
+  const onQuickAdd = (data: QuickAddFormData) => {
     if (!data.categoryId || !data.amount) {
       toast({
         title: "請填寫必要欄位",
@@ -121,12 +172,8 @@ export default function HouseholdBudget() {
     addExpenseMutation.mutate(data);
   };
 
-  const onSetBudget = (data: any) => {
-    const budgetData = {
-      amount: parseFloat(data.monthlyBudget),
-      month: new Date().toISOString().slice(0, 7), // YYYY-MM
-    };
-    setBudgetMutation.mutate(budgetData);
+  const onSetBudget = (data: BudgetFormData) => {
+    setBudgetMutation.mutate(data);
   };
 
   // 計算本月統計
@@ -135,8 +182,8 @@ export default function HouseholdBudget() {
     ? dailyExpenses.filter(expense => expense.date?.startsWith(currentMonth))
     : [];
   
-  const totalSpent = thisMonthExpenses.reduce((sum, expense) => sum + parseFloat(expense.amount || 0), 0);
-  const budgetAmount = parseFloat(monthlyBudget?.amount || 0);
+  const totalSpent = thisMonthExpenses.reduce((sum, expense) => sum + parseFloat(expense.amount?.toString() || '0'), 0);
+  const budgetAmount = parseFloat(monthlyBudget?.amount?.toString() || '0');
   const remaining = budgetAmount - totalSpent;
   const spentPercentage = budgetAmount > 0 ? (totalSpent / budgetAmount) * 100 : 0;
 
@@ -184,12 +231,12 @@ export default function HouseholdBudget() {
                 </div>
                 <div>
                   <Label htmlFor="categoryId">分類</Label>
-                  <Select onValueChange={(value) => quickAddForm.setValue("categoryId", value)}>
+                  <Select onValueChange={(value: string) => quickAddForm.setValue("categoryId", value)}>
                     <SelectTrigger>
                       <SelectValue placeholder="選擇分類" />
                     </SelectTrigger>
                     <SelectContent>
-                      {householdCategories.map((category: any) => (
+                      {householdCategories.map((category: HouseholdCategory) => (
                         <SelectItem key={category.id} value={category.id.toString()}>
                           <span className="flex items-center gap-2">
                             <div 
@@ -213,7 +260,7 @@ export default function HouseholdBudget() {
                 </div>
                 <div>
                   <Label htmlFor="paymentMethod">付款方式</Label>
-                  <Select onValueChange={(value) => quickAddForm.setValue("paymentMethod", value)}>
+                  <Select onValueChange={(value: string) => quickAddForm.setValue("paymentMethod", value)}>
                     <SelectTrigger>
                       <SelectValue placeholder="選擇付款方式" />
                     </SelectTrigger>
@@ -379,8 +426,8 @@ export default function HouseholdBudget() {
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            {thisMonthExpenses.length > 0 ? thisMonthExpenses.slice(0, 10).map((expense: any, index: number) => {
-              const category = householdCategories.find((cat: any) => cat.id === expense.categoryId);
+            {thisMonthExpenses.length > 0 ? thisMonthExpenses.slice(0, 10).map((expense: ExpenseWithCategory, index: number) => {
+              const category = householdCategories.find((cat: HouseholdCategory) => cat.id === expense.categoryId);
               return (
                 <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
                   <div className="flex items-center gap-3">
@@ -397,7 +444,7 @@ export default function HouseholdBudget() {
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="font-medium text-red-600">-NT$ {parseInt(expense.amount).toLocaleString()}</div>
+                    <div className="font-medium text-red-600">-NT$ {parseInt(expense.amount?.toString() || '0').toLocaleString()}</div>
                     {expense.receiptPhoto && (
                       <Badge variant="outline" className="text-xs">有發票</Badge>
                     )}

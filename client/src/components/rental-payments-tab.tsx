@@ -9,13 +9,30 @@ import {
   Calendar, Eye, TrendingUp, CheckCircle, Clock, Search, SortAsc, SortDesc, X
 } from "lucide-react";
 import { AnnualStatsReport } from "@/components/rental-annual-stats";
+import type { PaymentItem } from "@shared/schema";
+
+// 租金付款項目型別（對應 API 回傳的 RentalPaymentItem）
+interface RentalPaymentItem {
+  readonly id: number;
+  readonly itemName: string;
+  readonly totalAmount: string;
+  readonly paidAmount: string | null;
+  readonly status: string | null;
+  readonly startDate: string;
+  readonly endDate: string | null;
+  readonly notes: string | null;
+  readonly projectId: number | null;
+  readonly projectName: string | null;
+  readonly categoryName: string | null;
+  readonly createdAt: Date | null;
+}
 
 interface RentalPaymentsTabProps {
-  readonly rentalPayments: any[];
+  readonly rentalPayments: RentalPaymentItem[];
   readonly monthlyPaymentYear: number;
   readonly onMonthlyPaymentYearChange: (year: number) => void;
   readonly onExportPayments: (format: 'excel' | 'csv') => void;
-  readonly onViewPaymentDetail: (payment: any) => void;
+  readonly onViewPaymentDetail: (payment: RentalPaymentItem) => void;
 }
 
 // 租金付款項目 Tab 元件
@@ -41,7 +58,7 @@ export function RentalPaymentsTab({
   const filteredAndSortedPayments = useMemo(() => {
     if (!rentalPayments || !Array.isArray(rentalPayments)) return [];
 
-    const filtered = rentalPayments.filter((payment: any) => {
+    const filtered = rentalPayments.filter((payment: RentalPaymentItem) => {
       const matchesSearch = !paymentSearchTerm ||
         payment.itemName?.toLowerCase().includes(paymentSearchTerm.toLowerCase()) ||
         payment.notes?.toLowerCase().includes(paymentSearchTerm.toLowerCase()) ||
@@ -61,14 +78,14 @@ export function RentalPaymentsTab({
     });
 
     const sorted = [...filtered];
-    sorted.sort((a: any, b: any) => {
-      let aValue: any;
-      let bValue: any;
+    sorted.sort((a: RentalPaymentItem, b: RentalPaymentItem) => {
+      let aValue: string | number | Date;
+      let bValue: string | number | Date;
 
       switch (paymentSortBy) {
         case "amount":
-          aValue = parseFloat(a.totalAmount || 0);
-          bValue = parseFloat(b.totalAmount || 0);
+          aValue = parseFloat(a.totalAmount || "0");
+          bValue = parseFloat(b.totalAmount || "0");
           break;
         case "name":
           aValue = a.itemName || "";
@@ -80,8 +97,8 @@ export function RentalPaymentsTab({
           break;
         case "date":
         default:
-          aValue = new Date(a.startDate || a.createdAt);
-          bValue = new Date(b.startDate || b.createdAt);
+          aValue = new Date(a.startDate || a.createdAt || 0);
+          bValue = new Date(b.startDate || b.createdAt || 0);
           break;
       }
 
@@ -97,7 +114,9 @@ export function RentalPaymentsTab({
   // 唯一專案列表
   const uniqueProjects = useMemo(() => {
     if (!rentalPayments || !Array.isArray(rentalPayments)) return [];
-    const projectNames = rentalPayments.map((payment: any) => payment.projectName).filter(Boolean);
+    const projectNames = rentalPayments
+      .map((payment: RentalPaymentItem) => payment.projectName)
+      .filter((name): name is string => Boolean(name));
     return projectNames.filter((name: string, index: number) => projectNames.indexOf(name) === index);
   }, [rentalPayments]);
 
@@ -202,7 +221,7 @@ export function RentalPaymentsTab({
 
           {/* 年度統計報表 */}
           <AnnualStatsReport
-            rentalPayments={rentalPayments}
+            rentalPayments={rentalPayments as unknown as PaymentItem[]}
             monthlyPaymentYear={monthlyPaymentYear}
             onMonthlyPaymentYearChange={onMonthlyPaymentYearChange}
             onExportPayments={onExportPayments}
@@ -273,14 +292,14 @@ export function RentalPaymentsTab({
 // ==========================================
 // 付款統計摘要卡片
 // ==========================================
-function PaymentSummaryCards({ payments }: { readonly payments: any[] }) {
+function PaymentSummaryCards({ payments }: { readonly payments: RentalPaymentItem[] }) {
   const totalItems = payments.length;
-  const completedItems = payments.filter((p: any) => {
+  const completedItems = payments.filter((p: RentalPaymentItem) => {
     const total = p.totalAmount ? parseFloat(p.totalAmount) : 0;
     const paid = p.paidAmount ? parseFloat(p.paidAmount) : 0;
     return p.status === 'paid' || paid >= total;
   }).length;
-  const partialItems = payments.filter((p: any) => {
+  const partialItems = payments.filter((p: RentalPaymentItem) => {
     const total = p.totalAmount ? parseFloat(p.totalAmount) : 0;
     const paid = p.paidAmount ? parseFloat(p.paidAmount) : 0;
     return paid > 0 && paid < total;
@@ -336,10 +355,10 @@ function PaymentTable({
   itemsPerPage,
   onViewDetail,
 }: {
-  readonly payments: any[];
+  readonly payments: RentalPaymentItem[];
   readonly currentPage: number;
   readonly itemsPerPage: number;
-  readonly onViewDetail: (payment: any) => void;
+  readonly onViewDetail: (payment: RentalPaymentItem) => void;
 }) {
   return (
     <Table>
@@ -357,7 +376,7 @@ function PaymentTable({
       <TableBody>
         {payments
           .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
-          .map((payment: any) => {
+          .map((payment: RentalPaymentItem) => {
           const amount = payment.totalAmount ? parseFloat(payment.totalAmount) : 0;
           const paidAmount = payment.paidAmount ? parseFloat(payment.paidAmount) : 0;
           const isPaid = payment.status === 'paid' || paidAmount >= amount;

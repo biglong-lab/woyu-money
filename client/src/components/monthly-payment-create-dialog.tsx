@@ -5,14 +5,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Plus, CreditCard } from "lucide-react";
-import { UseFormReturn } from "react-hook-form";
+import { UseFormReturn, Control, FieldValues } from "react-hook-form";
 import CategorySelector from "@/components/category-selector";
 
 export interface MonthlyPaymentCreateDialogProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
-  createForm: UseFormReturn<any>;
-  onSubmit: (data: any) => void;
+  createForm: UseFormReturn<FieldValues>;
+  onSubmit: (data: FieldValues) => void;
   isPending: boolean;
 }
 
@@ -46,8 +46,9 @@ export function MonthlyPaymentCreateDialog({
         <Form {...createForm}>
           <form onSubmit={createForm.handleSubmit(onSubmit)} className="space-y-4">
             {/* 統一分類選擇組件 */}
-            <CategorySelector
-              form={createForm}
+            /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+              <CategorySelector
+              form={createForm as unknown as { control: Control<FieldValues>; watch: (name: string) => string; setValue: (name: string, value: string) => void; }}
               onCategoryChange={() => {}}
             />
 
@@ -137,9 +138,9 @@ export function MonthlyPaymentCreateDialog({
 
             {/* 費用計算明細 */}
             <PaymentCalculationPreview
-              totalAmount={watchTotalAmount}
-              installments={watchInstallments}
-              startDate={createForm.watch("dueDate")}
+              totalAmount={watchTotalAmount as string}
+              installments={watchInstallments as string}
+              startDate={createForm.watch("dueDate") as string}
             />
 
             <FormField

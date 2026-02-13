@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import type { PaymentProject } from "@shared/schema";
 
 const dailyRevenueSchema = z.object({
   projectId: z.number().min(1, "請選擇專案"),
@@ -21,10 +22,21 @@ const dailyRevenueSchema = z.object({
   description: z.string().optional(),
 });
 
+type DailyRevenueFormData = z.infer<typeof dailyRevenueSchema>;
+
+interface DailyRevenueRecord {
+  id: number;
+  projectId: number;
+  date: string;
+  amount: string;
+  description?: string | null;
+  receiptImageUrl?: string | null;
+}
+
 interface DailyRevenueDialogProps {
   trigger?: React.ReactNode;
   mode?: "create" | "edit";
-  revenue?: any;
+  revenue?: DailyRevenueRecord;
   onSuccess?: () => void;
 }
 
@@ -39,7 +51,7 @@ export function DailyRevenueDialog({
   const [isOpen, setIsOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
-  const form = useForm({
+  const form = useForm<DailyRevenueFormData>({
     resolver: zodResolver(dailyRevenueSchema),
     defaultValues: {
       projectId: revenue?.projectId || 0,
@@ -50,16 +62,17 @@ export function DailyRevenueDialog({
   });
 
   // 獲取專案列表
-  const { data: projects = [] } = useQuery<any[]>({
+  const { data: projects = [] } = useQuery<PaymentProject[]>({
     queryKey: ["/api/payment/projects"],
   });
 
   const mutation = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: DailyRevenueFormData) => {
       const formData = new FormData();
-      Object.keys(data).forEach(key => {
-        if (data[key] !== undefined && data[key] !== "") {
-          formData.append(key, data[key]);
+      Object.keys(data).forEach((key) => {
+        const value = data[key as keyof DailyRevenueFormData];
+        if (value !== undefined && value !== "") {
+          formData.append(key, value.toString());
         }
       });
       
@@ -87,7 +100,7 @@ export function DailyRevenueDialog({
           : "新收款記錄已成功新增。",
       });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: mode === "edit" ? "更新失敗" : "新增失敗",
         description: error.message || "操作失敗，請稍後再試。",
@@ -96,7 +109,7 @@ export function DailyRevenueDialog({
     },
   });
 
-  const onSubmit = (data: any) => {
+  const onSubmit = (data: DailyRevenueFormData) => {
     mutation.mutate(data);
   };
 
@@ -150,7 +163,7 @@ export function DailyRevenueDialog({
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {projects.map((project: any) => (
+                      {projects.map((project: PaymentProject) => (
                         <SelectItem key={project.id} value={project.id.toString()}>
                           {project.projectName}
                         </SelectItem>

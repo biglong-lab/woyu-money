@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useForm } from "react-hook-form";
+import { useForm, type UseFormReturn, type FieldValues } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Plus, Search, ClipboardList, FileText, PieChart } from "lucide-react";
@@ -27,6 +27,42 @@ import {
 
 // 型別
 import type { BudgetPlan, BudgetItem, Project, Category } from "@/components/project-budget-types";
+
+// 預算計劃摘要 API 回傳型別
+interface PaymentTypeStat {
+  count: number;
+  total: number;
+}
+
+interface BudgetSummary {
+  totalBudget: number;
+  calculatedTotal: number;
+  totalPlanned?: number;
+  totalActual: number;
+  variance: number;
+  utilizationRate: string | number;
+  conversionRate: string | number;
+  itemCount: number;
+  convertedCount: number;
+  pendingCount: number;
+  byPaymentType: {
+    single: PaymentTypeStat;
+    installment: PaymentTypeStat;
+    monthly: PaymentTypeStat;
+  };
+}
+
+interface BudgetPlanSummaryResponse {
+  plan: BudgetPlan;
+  summary: BudgetSummary;
+}
+
+// 轉換預算項目為付款項目的 API 回傳型別
+interface ConvertItemResponse {
+  message: string;
+  paymentItem: { id: number };
+  budgetItemId: number;
+}
 
 // Zod 驗證 Schema
 const budgetPlanSchema = z.object({
@@ -55,6 +91,10 @@ const budgetItemSchema = z.object({
   categoryId: z.string().optional(),
   notes: z.string().optional(),
 });
+
+// 表單資料型別（由 Zod schema 推導）
+type BudgetPlanFormData = z.infer<typeof budgetPlanSchema>;
+type BudgetItemFormData = z.infer<typeof budgetItemSchema>;
 
 export default function ProjectBudgetManagement() {
   // 頁面狀態
@@ -107,7 +147,7 @@ export default function ProjectBudgetManagement() {
     enabled: !!selectedPlanId,
   });
 
-  const { data: planSummary } = useQuery<any>({
+  const { data: planSummary } = useQuery<BudgetPlanSummaryResponse>({
     queryKey: ["/api/budget/plans", selectedPlanId, "summary"],
     queryFn: async () => {
       const res = await fetch(`/api/budget/plans/${selectedPlanId}/summary`);
@@ -163,7 +203,7 @@ export default function ProjectBudgetManagement() {
 
   // Mutations
   const createPlanMutation = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: BudgetPlanFormData) => {
       const payload = {
         ...data,
         projectId: data.projectId && data.projectId !== "none" ? parseInt(data.projectId) : null,
@@ -176,13 +216,13 @@ export default function ProjectBudgetManagement() {
       setIsPlanDialogOpen(false);
       planForm.reset();
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({ title: "錯誤", description: error.message || "建立失敗", variant: "destructive" });
     },
   });
 
   const updatePlanMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: number; data: any }) => {
+    mutationFn: async ({ id, data }: { id: number; data: BudgetPlanFormData }) => {
       const payload = {
         ...data,
         projectId: data.projectId && data.projectId !== "none" ? parseInt(data.projectId) : null,
@@ -196,7 +236,7 @@ export default function ProjectBudgetManagement() {
       setEditingPlan(null);
       planForm.reset();
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({ title: "錯誤", description: error.message || "更新失敗", variant: "destructive" });
     },
   });
@@ -213,13 +253,13 @@ export default function ProjectBudgetManagement() {
         setSelectedPlanId(null);
       }
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({ title: "錯誤", description: error.message || "刪除失敗", variant: "destructive" });
     },
   });
 
   const createItemMutation = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: BudgetItemFormData) => {
       const payload = {
         itemName: data.itemName,
         description: data.description || null,
@@ -246,13 +286,13 @@ export default function ProjectBudgetManagement() {
       setIsItemDialogOpen(false);
       itemForm.reset();
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({ title: "錯誤", description: error.message || "建立失敗", variant: "destructive" });
     },
   });
 
   const updateItemMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: number; data: any }) => {
+    mutationFn: async ({ id, data }: { id: number; data: BudgetItemFormData }) => {
       const payload = {
         itemName: data.itemName,
         description: data.description || null,
@@ -279,7 +319,7 @@ export default function ProjectBudgetManagement() {
       setEditingItem(null);
       itemForm.reset();
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({ title: "錯誤", description: error.message || "更新失敗", variant: "destructive" });
     },
   });
@@ -294,16 +334,16 @@ export default function ProjectBudgetManagement() {
       queryClient.invalidateQueries({ queryKey: ["/api/budget/plans", selectedPlanId, "summary"] });
       setDeleteItem(null);
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({ title: "錯誤", description: error.message || "刪除失敗", variant: "destructive" });
     },
   });
 
   const convertItemMutation = useMutation({
     mutationFn: async (id: number) => {
-      return apiRequest("POST", `/api/budget/items/${id}/convert`);
+      return apiRequest<ConvertItemResponse>("POST", `/api/budget/items/${id}/convert`);
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data: ConvertItemResponse) => {
       toast({
         title: "成功",
         description: `預算項目已轉換為付款項目 (ID: ${data.paymentItem.id})`,
@@ -312,7 +352,7 @@ export default function ProjectBudgetManagement() {
       queryClient.invalidateQueries({ queryKey: ["/api/budget/plans", selectedPlanId, "summary"] });
       setConvertItem(null);
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({ title: "錯誤", description: error.message || "轉換失敗", variant: "destructive" });
     },
   });
@@ -353,7 +393,7 @@ export default function ProjectBudgetManagement() {
     setIsItemDialogOpen(true);
   };
 
-  const onPlanSubmit = (data: any) => {
+  const onPlanSubmit = (data: BudgetPlanFormData) => {
     if (editingPlan) {
       updatePlanMutation.mutate({ id: editingPlan.id, data });
     } else {
@@ -361,7 +401,7 @@ export default function ProjectBudgetManagement() {
     }
   };
 
-  const onItemSubmit = (data: any) => {
+  const onItemSubmit = (data: BudgetItemFormData) => {
     if (editingItem) {
       updateItemMutation.mutate({ id: editingItem.id, data });
     } else {
@@ -498,7 +538,7 @@ export default function ProjectBudgetManagement() {
         </TabsContent>
 
         <TabsContent value="dashboard" className="space-y-4">
-          <ProjectBudgetDashboard planSummary={planSummary} />
+          <ProjectBudgetDashboard planSummary={planSummary as unknown as import("@/components/project-budget-dashboard").PlanSummary | null} />
         </TabsContent>
       </Tabs>
 
@@ -506,8 +546,8 @@ export default function ProjectBudgetManagement() {
       <ProjectBudgetPlanDialog
         open={isPlanDialogOpen}
         onOpenChange={setIsPlanDialogOpen}
-        form={planForm}
-        onSubmit={onPlanSubmit}
+        form={planForm as unknown as UseFormReturn<FieldValues>}
+        onSubmit={onPlanSubmit as unknown as (data: FieldValues) => void}
         isPending={createPlanMutation.isPending || updatePlanMutation.isPending}
         editingPlan={editingPlan}
         projects={projects}
@@ -516,8 +556,8 @@ export default function ProjectBudgetManagement() {
       <ProjectBudgetItemDialog
         open={isItemDialogOpen}
         onOpenChange={setIsItemDialogOpen}
-        form={itemForm}
-        onSubmit={onItemSubmit}
+        form={itemForm as unknown as UseFormReturn<FieldValues>}
+        onSubmit={onItemSubmit as unknown as (data: FieldValues) => void}
         isPending={createItemMutation.isPending || updateItemMutation.isPending}
         editingItem={editingItem}
         categories={categories}

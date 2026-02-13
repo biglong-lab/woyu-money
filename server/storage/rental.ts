@@ -15,11 +15,71 @@ import {
   type InstallmentPlan,
   type InsertInstallmentPlan,
 } from "@shared/schema"
-import { eq, and, sql, desc, asc, like, gte, lte, or } from "drizzle-orm"
+import { eq, and, sql, desc, asc, like, gte, lte, or, inArray } from "drizzle-orm"
+import type { RentalPriceTier, InsertRentalPriceTier } from "@shared/schema"
+
+/** 租約列表項目 */
+interface RentalContractListItem {
+  id: number
+  projectId: number
+  contractName: string
+  startDate: string
+  endDate: string
+  totalYears: number
+  baseAmount: string
+  isActive: boolean | null
+  notes: string | null
+  projectName: string | null
+  createdAt: Date | null
+}
+
+/** 租約詳情（含價格階段） */
+interface RentalContractDetail extends RentalContractListItem {
+  hasBufferPeriod: boolean | null
+  bufferMonths: number | null
+  bufferIncludedInTerm: boolean | null
+  payeeName: string | null
+  payeeUnit: string | null
+  bankCode: string | null
+  accountNumber: string | null
+  contractPaymentDay: number | null
+  updatedAt: Date | null
+  priceTiers: RentalPriceTier[]
+}
+
+/** 租約統計 */
+interface RentalStatsResult {
+  totalContracts: number
+  activeContracts: number
+  totalMonthlyRent: string
+}
+
+/** 租約付款項目 */
+interface RentalPaymentItem {
+  id: number
+  itemName: string
+  totalAmount: string
+  paidAmount: string | null
+  status: string | null
+  startDate: string
+  endDate: string | null
+  notes: string | null
+  projectId: number | null
+  projectName: string | null
+  categoryName: string | null
+  createdAt: Date | null
+}
+
+/** 價格階段輸入資料 */
+interface PriceTierInput {
+  yearStart: number
+  yearEnd: number
+  monthlyAmount: string | number
+}
 
 // === 租約管理 ===
 
-export async function getRentalContracts(): Promise<any[]> {
+export async function getRentalContracts(): Promise<RentalContractListItem[]> {
   try {
     const contracts = await db
       .select({
@@ -46,7 +106,7 @@ export async function getRentalContracts(): Promise<any[]> {
   }
 }
 
-export async function getRentalContract(contractId: number): Promise<any> {
+export async function getRentalContract(contractId: number): Promise<RentalContractDetail | null> {
   try {
     const [contract] = await db
       .select({
@@ -92,7 +152,7 @@ export async function getRentalContract(contractId: number): Promise<any> {
 
 export async function createRentalContract(
   contractData: InsertRentalContract,
-  priceTiers: any[]
+  priceTiers: PriceTierInput[]
 ): Promise<RentalContract> {
   try {
     const [contract] = await db.insert(rentalContracts).values(contractData).returning()
@@ -118,10 +178,13 @@ export async function createRentalContract(
 export async function updateRentalContract(
   contractId: number,
   contractData: Partial<InsertRentalContract>,
-  priceTiers?: any[]
+  priceTiers?: PriceTierInput[]
 ): Promise<RentalContract> {
   try {
-    const [oldContract] = await db.select().from(rentalContracts).where(eq(rentalContracts.id, contractId))
+    const [oldContract] = await db
+      .select()
+      .from(rentalContracts)
+      .where(eq(rentalContracts.id, contractId))
 
     const [contract] = await db
       .update(rentalContracts)
@@ -175,7 +238,10 @@ export async function updateRentalContract(
 
 export async function deleteRentalContract(contractId: number): Promise<void> {
   try {
-    const [contract] = await db.select().from(rentalContracts).where(eq(rentalContracts.id, contractId))
+    const [contract] = await db
+      .select()
+      .from(rentalContracts)
+      .where(eq(rentalContracts.id, contractId))
 
     if (contract) {
       const unpaidItems = await db
@@ -191,7 +257,7 @@ export async function deleteRentalContract(contractId: number): Promise<void> {
 
       if (unpaidItems.length > 0) {
         const itemIds = unpaidItems.map((item) => item.id)
-        await db.delete(paymentRecords).where(sql`${paymentRecords.itemId} = ANY(ARRAY[${sql.raw(itemIds.join(","))}])`)
+        await db.delete(paymentRecords).where(inArray(paymentRecords.itemId, itemIds))
       }
 
       await db
@@ -216,7 +282,7 @@ export async function deleteRentalContract(contractId: number): Promise<void> {
 
 // === 價格階段 ===
 
-export async function getRentalPriceTiers(contractId: number): Promise<any[]> {
+export async function getRentalPriceTiers(contractId: number): Promise<RentalPriceTier[]> {
   try {
     return await db
       .select()
@@ -231,9 +297,14 @@ export async function getRentalPriceTiers(contractId: number): Promise<any[]> {
 
 // === 租金付款生成 ===
 
-export async function generateRentalPayments(contractId: number): Promise<{ generatedCount: number }> {
+export async function generateRentalPayments(
+  contractId: number
+): Promise<{ generatedCount: number }> {
   try {
-    const [contract] = await db.select().from(rentalContracts).where(eq(rentalContracts.id, contractId))
+    const [contract] = await db
+      .select()
+      .from(rentalContracts)
+      .where(eq(rentalContracts.id, contractId))
 
     if (!contract) throw new Error("租約不存在")
 
@@ -246,7 +317,9 @@ export async function generateRentalPayments(contractId: number): Promise<{ gene
     const [rentCategory] = await db
       .select()
       .from(debtCategories)
-      .where(and(eq(debtCategories.categoryName, "租金"), eq(debtCategories.categoryType, "project")))
+      .where(
+        and(eq(debtCategories.categoryName, "租金"), eq(debtCategories.categoryType, "project"))
+      )
 
     if (!rentCategory) throw new Error("找不到租金分類")
 
@@ -280,12 +353,12 @@ export async function generateRentalPayments(contractId: number): Promise<{ gene
     const bufferMonths = contract.bufferMonths || 0
     const bufferIncludedInTerm = contract.bufferIncludedInTerm === true
 
-    let paymentStartDate = new Date(startDate)
+    const paymentStartDate = new Date(startDate)
     if (hasBufferPeriod && !bufferIncludedInTerm) {
       paymentStartDate.setMonth(paymentStartDate.getMonth() + bufferMonths)
     }
 
-    let currentDate = new Date(paymentStartDate)
+    const currentDate = new Date(paymentStartDate)
     let billingMonthIndex = 0
 
     while (currentDate <= endDate) {
@@ -301,9 +374,13 @@ export async function generateRentalPayments(contractId: number): Promise<{ gene
 
       const currentYear = Math.floor(billingMonthIndex / 12) + 1
 
-      const currentTier = tiers.find((tier) => currentYear >= tier.yearStart && currentYear <= tier.yearEnd)
+      const currentTier = tiers.find(
+        (tier) => currentYear >= tier.yearStart && currentYear <= tier.yearEnd
+      )
 
-      const monthlyAmount = currentTier ? parseFloat(currentTier.monthlyAmount) : parseFloat(contract.baseAmount)
+      const monthlyAmount = currentTier
+        ? parseFloat(currentTier.monthlyAmount)
+        : parseFloat(contract.baseAmount)
 
       const monthKey = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, "0")}`
       const itemName = `${monthKey}-${contract.contractName}`
@@ -326,7 +403,8 @@ export async function generateRentalPayments(contractId: number): Promise<{ gene
         generatedCount++
       } else {
         const existingItem = existingItems.find(
-          (item) => item.itemName.includes(monthKey) && item.itemName.includes(contract.contractName)
+          (item) =>
+            item.itemName.includes(monthKey) && item.itemName.includes(contract.contractName)
         )
 
         if (existingItem && parseFloat(existingItem.totalAmount) !== monthlyAmount) {
@@ -358,7 +436,7 @@ export async function generateRentalPayments(contractId: number): Promise<{ gene
 
 // === 租約統計 ===
 
-export async function getRentalStats(): Promise<any> {
+export async function getRentalStats(): Promise<RentalStatsResult> {
   try {
     const stats = await db
       .select({
@@ -375,7 +453,7 @@ export async function getRentalStats(): Promise<any> {
   }
 }
 
-export async function getRentalPaymentItems(): Promise<any[]> {
+export async function getRentalPaymentItems(): Promise<RentalPaymentItem[]> {
   try {
     const rentalItems = await db
       .select({
@@ -418,9 +496,30 @@ export async function getRentalPaymentItems(): Promise<any[]> {
 
 // === 合約付款查詢 ===
 
-export async function getRentalContractPayments(contractId: number): Promise<any[]> {
+/** 租約付款明細 */
+interface ContractPaymentRow {
+  id: number
+  itemName: string
+  totalAmount: string
+  paidAmount: string | null
+  startDate: string
+  endDate: string | null
+  status: string | null
+  notes: string | null
+  projectId: number | null
+  categoryId: number | null
+  createdAt: Date | null
+  updatedAt: Date | null
+  projectName: string | null
+  categoryName: string | null
+}
+
+export async function getRentalContractPayments(contractId: number): Promise<ContractPaymentRow[]> {
   try {
-    const [contract] = await db.select().from(rentalContracts).where(eq(rentalContracts.id, contractId))
+    const [contract] = await db
+      .select()
+      .from(rentalContracts)
+      .where(eq(rentalContracts.id, contractId))
 
     if (!contract) throw new Error("租約不存在")
 
@@ -462,7 +561,9 @@ export async function getRentalContractPayments(contractId: number): Promise<any
 
 // === 分期計劃 ===
 
-export async function createInstallmentPlan(planData: InsertInstallmentPlan): Promise<InstallmentPlan> {
+export async function createInstallmentPlan(
+  planData: InsertInstallmentPlan
+): Promise<InstallmentPlan> {
   try {
     const [plan] = await db.insert(installmentPlans).values(planData).returning()
     return plan
@@ -472,13 +573,18 @@ export async function createInstallmentPlan(planData: InsertInstallmentPlan): Pr
   }
 }
 
-export async function generateInstallmentPayments(planId: number): Promise<{ generatedCount: number }> {
+export async function generateInstallmentPayments(
+  planId: number
+): Promise<{ generatedCount: number }> {
   try {
     const [plan] = await db.select().from(installmentPlans).where(eq(installmentPlans.id, planId))
 
     if (!plan) throw new Error("分期計劃不存在")
 
-    const [originalItem] = await db.select().from(paymentItems).where(eq(paymentItems.id, plan.itemId))
+    const [originalItem] = await db
+      .select()
+      .from(paymentItems)
+      .where(eq(paymentItems.id, plan.itemId))
 
     if (!originalItem) throw new Error("付款項目不存在")
 
@@ -548,9 +654,14 @@ export async function getContractDocuments(contractId: number): Promise<Contract
   }
 }
 
-export async function getContractDocument(documentId: number): Promise<ContractDocument | undefined> {
+export async function getContractDocument(
+  documentId: number
+): Promise<ContractDocument | undefined> {
   try {
-    const [document] = await db.select().from(contractDocuments).where(eq(contractDocuments.id, documentId))
+    const [document] = await db
+      .select()
+      .from(contractDocuments)
+      .where(eq(contractDocuments.id, documentId))
     return document
   } catch (error) {
     console.error("Error fetching contract document:", error)
@@ -558,7 +669,9 @@ export async function getContractDocument(documentId: number): Promise<ContractD
   }
 }
 
-export async function createContractDocument(document: InsertContractDocument): Promise<ContractDocument> {
+export async function createContractDocument(
+  document: InsertContractDocument
+): Promise<ContractDocument> {
   try {
     const [newDocument] = await db.insert(contractDocuments).values(document).returning()
     return newDocument
@@ -634,7 +747,23 @@ export async function updateContractPaymentInfo(
 
 // === 合約詳情與搜尋 ===
 
-export async function getContractDetails(contractId: number): Promise<any> {
+/** 合約完整詳情 */
+interface ContractDetailsResult {
+  contract: Record<string, unknown>
+  priceTiers: RentalPriceTier[]
+  paymentStats: Record<string, unknown>
+  recentPayments: Record<string, unknown>[]
+  documents: ContractDocument[]
+  progress: {
+    percentage: number
+    remainingMonths: number
+    isExpired: boolean
+  }
+}
+
+export async function getContractDetails(
+  contractId: number
+): Promise<ContractDetailsResult | null> {
   try {
     const [contract] = await db
       .select({
@@ -744,9 +873,9 @@ export async function searchContracts(searchParams: {
   isActive?: boolean
   startDateFrom?: string
   startDateTo?: string
-}): Promise<any[]> {
+}): Promise<Record<string, unknown>[]> {
   try {
-    let query = db
+    const query = db
       .select({
         id: rentalContracts.id,
         projectId: rentalContracts.projectId,

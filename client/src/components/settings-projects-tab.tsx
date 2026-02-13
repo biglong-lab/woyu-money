@@ -19,6 +19,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Project } from "@/components/settings-types";
 import { getProjectTypeText } from "@/components/settings-types";
+import type { PaymentProject } from "@shared/schema";
 
 const projectSchema = z.object({
   projectName: z.string().min(1, "專案名稱不能為空"),
@@ -26,17 +27,19 @@ const projectSchema = z.object({
   description: z.string().optional(),
 });
 
+type ProjectFormData = z.infer<typeof projectSchema>;
+
 export default function SettingsProjectsTab() {
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [isProjectDialogOpen, setIsProjectDialogOpen] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: projects = [], isLoading: projectsLoading } = useQuery<any[]>({
+  const { data: projects = [], isLoading: projectsLoading } = useQuery<PaymentProject[]>({
     queryKey: ["/api/projects"],
   });
 
-  const projectForm = useForm({
+  const projectForm = useForm<ProjectFormData>({
     resolver: zodResolver(projectSchema),
     defaultValues: {
       projectName: editingProject?.projectName || "",
@@ -47,7 +50,7 @@ export default function SettingsProjectsTab() {
 
   // 新增專案
   const createProjectMutation = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: ProjectFormData) => {
       return await apiRequest("POST", "/api/projects", data);
     },
     onSuccess: () => {
@@ -64,7 +67,7 @@ export default function SettingsProjectsTab() {
 
   // 更新專案
   const updateProjectMutation = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: ProjectFormData) => {
       return await apiRequest("PUT", `/api/projects/${editingProject?.id}`, data);
     },
     onSuccess: () => {
@@ -137,7 +140,7 @@ export default function SettingsProjectsTab() {
                 <Loader2 className="w-6 h-6 animate-spin" />
               </div>
             ) : (
-              projects.map((project: Project) => (
+              projects.map((project) => (
                 <div key={project.id} className="flex items-center justify-between p-4 border rounded-lg">
                   <div className="flex-1">
                     <h3 className="font-medium">{project.projectName}</h3>
@@ -147,9 +150,6 @@ export default function SettingsProjectsTab() {
                     <div className="flex items-center gap-2 mt-2">
                       <Badge variant="outline">
                         {getProjectTypeText(project.projectType)}
-                      </Badge>
-                      <Badge variant="secondary">
-                        項目數: {project.itemCount || 0}
                       </Badge>
                       {project.isActive ? (
                         <Badge variant="default" className="bg-green-600">
@@ -166,7 +166,7 @@ export default function SettingsProjectsTab() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => handleEditProject(project)}
+                      onClick={() => handleEditProject(project as Project)}
                     >
                       <Edit className="w-4 h-4" />
                     </Button>

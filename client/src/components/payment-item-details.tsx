@@ -3,16 +3,14 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Separator } from "@/components/ui/separator";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { Eye, Receipt, Calendar, Building2, Target, DollarSign, Image, Edit3, Save, X, Clock, FileText, Plus, TrendingUp, AlertTriangle } from "lucide-react";
+import { Eye, Receipt, Calendar, Building2, DollarSign, Image, Clock, FileText, TrendingUp, AlertTriangle } from "lucide-react";
 import PaymentItemNotes from "./payment-item-notes";
+import type { PaymentItem, PaymentRecord, PaymentItemNote } from "@/../../shared/schema";
 
 // 付款方式中文對照表
 const getPaymentMethodText = (method: string) => {
@@ -27,21 +25,51 @@ const getPaymentMethodText = (method: string) => {
   return methodMap[method] || method || '未知方式';
 };
 
+// 付款項目顯示型別（接受任何包含 id 的付款項目物件）
+type PaymentItemDisplay = {
+  id: number;
+  itemName?: string | null;
+  totalAmount?: string | null;
+  paidAmount?: string | null;
+  status?: string | null;
+  notes?: string | null;
+  categoryName?: string;
+  projectName?: string;
+  startDate?: string | Date | null;
+  endDate?: string | Date | null;
+  paymentFrequency?: string | null;
+  createdAt?: string | Date | null;
+  updatedAt?: string | Date | null;
+  itemType?: string | null;
+  paymentType?: string | null;
+}
+
+// 擴展 PaymentRecord 型別以包含前端顯示用的額外欄位
+interface PaymentRecordWithExtras extends PaymentRecord {
+  amount?: string;
+}
+
 interface PaymentItemDetailsProps {
-  item: any;
+  item: PaymentItemDisplay | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
+// API 回應型別
+interface UpdateNotesResponse {
+  success: boolean;
+  data?: PaymentItem;
+  message?: string;
+}
+
 export function PaymentItemDetails({ item, open, onOpenChange }: PaymentItemDetailsProps) {
-  const [showPaymentRecords, setShowPaymentRecords] = useState(true);
-  const [isEditingNotes, setIsEditingNotes] = useState(false);
-  const [notes, setNotes] = useState(item?.notes || "");
+  const [showPaymentRecords] = useState(true);
+  const [_notes, _setNotes] = useState(item?.notes || "");
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   // 查詢付款記錄 - 僅在需要時啟用
-  const { data: paymentRecords = [] } = useQuery({
+  const { data: paymentRecords = [] } = useQuery<PaymentRecordWithExtras[]>({
     queryKey: ["/api/payment/items", item?.id, "records"],
     queryFn: async () => {
       if (!item?.id) return [];
@@ -57,7 +85,7 @@ export function PaymentItemDetails({ item, open, onOpenChange }: PaymentItemDeta
   });
 
   // 查詢備註記錄 - 用於顯示數量
-  const { data: itemNotes = [] } = useQuery<any[]>({
+  const { data: itemNotes = [] } = useQuery<PaymentItemNote[]>({
     queryKey: ["/api/payment-items", item?.id, "notes"],
     queryFn: async () => {
       if (!item?.id) return [];
@@ -70,27 +98,26 @@ export function PaymentItemDetails({ item, open, onOpenChange }: PaymentItemDeta
 
   // 同步備註狀態當項目改變時
   useEffect(() => {
-    setNotes(item?.notes || "");
+    _setNotes(item?.notes || "");
   }, [item?.notes]);
 
-  // 更新備註的 mutation
-  const updateNotesMutation = useMutation({
+  // 更新備註的 mutation（預留給未來的備註編輯功能）
+  const _updateNotesMutation = useMutation<UpdateNotesResponse, Error, string>({
     mutationFn: async (newNotes: string) => {
-      const response: any = await apiRequest("PUT", `/api/payment/items/${item.id}`, {
+      const response = await apiRequest("PUT", `/api/payment/items/${item?.id}`, {
         notes: newNotes,
         changeReason: "更新備註"
-      });
+      }) as UpdateNotesResponse;
       return response;
     },
-    onSuccess: (_response: any) => {
+    onSuccess: (_response: UpdateNotesResponse) => {
       queryClient.invalidateQueries({ queryKey: ["/api/payment/items"] });
-      setIsEditingNotes(false);
       toast({
         title: "成功",
         description: "備註已更新",
       });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "更新失敗",
         description: error.message || "備註更新時發生錯誤",
@@ -102,7 +129,7 @@ export function PaymentItemDetails({ item, open, onOpenChange }: PaymentItemDeta
   if (!item) return null;
 
   // 計算實際已付金額
-  const actualPaidAmount = paymentRecords.reduce((total: number, record: any) => {
+  const actualPaidAmount = paymentRecords.reduce((total: number, record: PaymentRecordWithExtras) => {
     return total + parseFloat(record.amount || record.amountPaid || "0");
   }, 0);
 
@@ -110,17 +137,6 @@ export function PaymentItemDetails({ item, open, onOpenChange }: PaymentItemDeta
   const totalAmount = parseFloat(item.totalAmount || "0");
   const remainingAmount = totalAmount - actualPaidAmount;
   const paymentProgress = totalAmount > 0 ? (actualPaidAmount / totalAmount) * 100 : 0;
-
-  // 保存備註
-  const handleSaveNotes = () => {
-    updateNotesMutation.mutate(notes);
-  };
-
-  // 取消編輯備註
-  const handleCancelEdit = () => {
-    setNotes(item?.notes || "");
-    setIsEditingNotes(false);
-  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -253,24 +269,24 @@ export function PaymentItemDetails({ item, open, onOpenChange }: PaymentItemDeta
                     <div className="space-y-2 text-sm">
                       <div className="flex justify-between">
                         <span className="text-gray-600">開始日期</span>
-                        <span>{item.startDate}</span>
+                        <span>{item.startDate instanceof Date ? item.startDate.toLocaleDateString() : item.startDate}</span>
                       </div>
                       {item.endDate && (
                         <div className="flex justify-between">
                           <span className="text-gray-600">結束日期</span>
-                          <span>{item.endDate}</span>
+                          <span>{item.endDate instanceof Date ? item.endDate.toLocaleDateString() : item.endDate}</span>
                         </div>
                       )}
                       <div className="flex justify-between">
                         <span className="text-gray-600">創建時間</span>
                         <span className="text-xs">
-                          {item.createdAt ? new Date(item.createdAt).toLocaleString() : '未知'}
+                          {item.createdAt ? new Date(item.createdAt as string | Date).toLocaleString() : '未知'}
                         </span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600">更新時間</span>
                         <span className="text-xs">
-                          {item.updatedAt ? new Date(item.updatedAt).toLocaleString() : '未知'}
+                          {item.updatedAt ? new Date(item.updatedAt as string | Date).toLocaleString() : '未知'}
                         </span>
                       </div>
                     </div>
@@ -291,15 +307,17 @@ export function PaymentItemDetails({ item, open, onOpenChange }: PaymentItemDeta
               ) : (
                 <div className="space-y-2">
                   {paymentRecords
-                    .sort((a: any, b: any) => new Date(b.paymentDate).getTime() - new Date(a.paymentDate).getTime())
-                    .map((record: any) => (
+                    .sort((a: PaymentRecordWithExtras, b: PaymentRecordWithExtras) => 
+                      new Date(b.paymentDate).getTime() - new Date(a.paymentDate).getTime()
+                    )
+                    .map((record: PaymentRecordWithExtras) => (
                       <Card key={record.id} className="hover:shadow-sm transition-shadow">
                         <CardContent className="p-4">
                           <div className="flex justify-between items-start">
                             <div className="flex-1 space-y-2">
                               <div className="flex items-center gap-2">
                                 <Badge variant="outline" className="text-xs">
-                                  {getPaymentMethodText(record.paymentMethod)}
+                                  {getPaymentMethodText(record.paymentMethod || '')}
                                 </Badge>
                                 <div className="flex items-center gap-1 text-xs text-gray-500">
                                   <Calendar className="w-3 h-3" />
@@ -322,7 +340,7 @@ export function PaymentItemDetails({ item, open, onOpenChange }: PaymentItemDeta
                                           src={record.receiptImageUrl} 
                                           alt="付款收據" 
                                           className="max-w-full max-h-96 object-contain rounded-lg border"
-                                          onError={(e) => {
+                                          onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
                                             e.currentTarget.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjNmNGY2Ii8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzk5YTNhZiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPuWcluePh+eEoeazleaaguWFpTwvdGV4dD48L3N2Zz4=';
                                           }}
                                         />

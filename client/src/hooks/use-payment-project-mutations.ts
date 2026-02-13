@@ -16,6 +16,22 @@ import {
   editItemSchema,
 } from "@/components/payment-project-types";
 
+/** 批量狀態更新回應型別 */
+interface BatchStatusResponse {
+  ok?: boolean;
+  success?: boolean;
+}
+
+/** 圖片上傳回應型別 */
+interface UploadResponse {
+  url: string;
+}
+
+/** PaymentItem 擴充型別（包含資料庫中的 notes 欄位） */
+interface PaymentItemWithNotes extends PaymentItem {
+  notes?: string | null;
+}
+
 /** 使所有付款相關查詢失效 */
 function invalidatePaymentQueries(queryClient: ReturnType<typeof useQueryClient>) {
   queryClient.invalidateQueries({ queryKey: ["/api/payment/items"] });
@@ -122,9 +138,9 @@ export function usePaymentProjectMutations(params: UsePaymentProjectMutationsPar
         itemIds,
         status,
         userInfo: "批量更新"
-      });
+      }) as BatchStatusResponse;
 
-      if ((response as any).ok !== false) {
+      if (response.ok !== false) {
         invalidatePaymentQueries(queryClient);
         setSelectedItems(new Set());
         setIsAllSelected(false);
@@ -157,7 +173,7 @@ export function usePaymentProjectMutations(params: UsePaymentProjectMutationsPar
       setPaymentItem(null);
       paymentForm.reset();
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "付款失敗",
         description: error.message,
@@ -183,7 +199,7 @@ export function usePaymentProjectMutations(params: UsePaymentProjectMutationsPar
       setEditingItem(null);
       editForm.reset();
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "修改失敗",
         description: error.message,
@@ -207,7 +223,7 @@ export function usePaymentProjectMutations(params: UsePaymentProjectMutationsPar
       setDeleteItem(null);
       setIsDeleteDialogOpen(false);
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "刪除失敗",
         description: error.message || "刪除付款項目時發生錯誤",
@@ -232,7 +248,7 @@ export function usePaymentProjectMutations(params: UsePaymentProjectMutationsPar
         });
 
         if (uploadResponse.ok) {
-          const uploadResult = await uploadResponse.json();
+          const uploadResult = await uploadResponse.json() as UploadResponse;
           receiptImageUrl = uploadResult.url;
         } else {
           throw new Error('圖片上傳失敗');
@@ -246,10 +262,11 @@ export function usePaymentProjectMutations(params: UsePaymentProjectMutationsPar
 
       setSelectedImage(null);
       setImagePreview(null);
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "未知錯誤";
       toast({
         title: "付款失敗",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive",
       });
     }
@@ -271,13 +288,14 @@ export function usePaymentProjectMutations(params: UsePaymentProjectMutationsPar
 
   const openEditDialog = (item: PaymentItem) => {
     setEditingItem(item);
+    const itemWithNotes = item as PaymentItemWithNotes;
     editForm.reset({
       itemName: item.itemName,
       totalAmount: item.totalAmount,
       startDate: item.startDate,
       endDate: item.endDate || "",
       priority: item.priority?.toString() || "2",
-      notes: (item as any).notes || "",
+      notes: itemWithNotes.notes || "",
       paymentType: item.paymentType,
     });
     setIsEditDialogOpen(true);

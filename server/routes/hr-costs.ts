@@ -3,17 +3,10 @@
  * 包含員工 CRUD、月度人事費計算和查詢
  */
 import { Router } from "express"
-import { requireAuth } from "../auth"
-import { db } from "../db"
-import {
-  employees,
-  monthlyHrCosts,
-  insertEmployeeSchema,
-  type Employee,
-  type MonthlyHrCost,
-} from "@shared/schema"
-import { eq, and, desc, asc } from "drizzle-orm"
+import { asyncHandler, AppError } from "../middleware/error-handler"
+import { insertEmployeeSchema } from "@shared/schema"
 import { calculateInsurance } from "@shared/insurance-utils"
+import * as hrStorage from "../storage/hr-costs"
 
 const router = Router()
 
@@ -22,106 +15,98 @@ const router = Router()
 // ============================================================
 
 // 取得所有員工
-router.get("/api/hr/employees", async (req, res) => {
-  try {
+router.get(
+  "/api/hr/employees",
+  asyncHandler(async (req, res) => {
     const { active } = req.query
-    const conditions = active === "true" ? eq(employees.isActive, true) : undefined
+    const filters = active !== undefined ? { active: active === "true" } : {}
 
-    const result = await db.query.employees.findMany({
-      where: conditions,
-      orderBy: [asc(employees.employeeName)],
-    })
-
+    const result = await hrStorage.getEmployees(filters)
     res.json(result)
-  } catch (error: any) {
-    res.status(500).json({ error: error.message })
-  }
-})
+  })
+)
 
 // 取得單一員工
-router.get("/api/hr/employees/:id", async (req, res) => {
-  try {
+router.get(
+  "/api/hr/employees/:id",
+  asyncHandler(async (req, res) => {
     const id = parseInt(req.params.id)
-    const result = await db.query.employees.findFirst({
-      where: eq(employees.id, id),
-    })
+    if (isNaN(id)) throw new AppError(400, "無效的員工 ID")
 
-    if (!result) {
-      return res.status(404).json({ error: "找不到該員工" })
-    }
+    const result = await hrStorage.getEmployee(id)
+    if (!result) throw new AppError(404, "找不到該員工")
 
     res.json(result)
-  } catch (error: any) {
-    res.status(500).json({ error: error.message })
-  }
-})
+  })
+)
 
 // 新增員工
-router.post("/api/hr/employees", async (req, res) => {
-  try {
-    const parsed = insertEmployeeSchema.parse(req.body)
-    const [result] = await db.insert(employees).values(parsed).returning()
-    res.json(result)
-  } catch (error: any) {
-    res.status(400).json({ error: error.message })
-  }
-})
+router.post(
+  "/api/hr/employees",
+  asyncHandler(async (req, res) => {
+    try {
+      const parsed = insertEmployeeSchema.parse(req.body)
+      const result = await hrStorage.createEmployee(parsed)
+      res.json(result)
+    } catch (error: unknown) {
+      if (error instanceof AppError) throw error
+      if (
+        error &&
+        typeof error === "object" &&
+        "name" in error &&
+        error.name === "ZodError" &&
+        "errors" in error
+      ) {
+        return res.status(400).json({
+          message: "資料驗證失敗",
+          errors: (error as { errors: unknown }).errors,
+        })
+      }
+      throw error
+    }
+  })
+)
 
 // 更新員工
-router.put("/api/hr/employees/:id", async (req, res) => {
-  try {
+router.put(
+  "/api/hr/employees/:id",
+  asyncHandler(async (req, res) => {
     const id = parseInt(req.params.id)
-    const updateData = {
-      ...req.body,
-      updatedAt: new Date(),
-    }
-    const [result] = await db
-      .update(employees)
-      .set(updateData)
-      .where(eq(employees.id, id))
-      .returning()
+    if (isNaN(id)) throw new AppError(400, "無效的員工 ID")
 
-    if (!result) {
-      return res.status(404).json({ error: "找不到該員工" })
-    }
+    const result = await hrStorage.updateEmployee(id, req.body)
+    if (!result) throw new AppError(404, "找不到該員工")
 
     res.json(result)
-  } catch (error: any) {
-    res.status(400).json({ error: error.message })
-  }
-})
+  })
+)
 
 // 刪除（軟刪除）員工
-router.delete("/api/hr/employees/:id", async (req, res) => {
-  try {
+router.delete(
+  "/api/hr/employees/:id",
+  asyncHandler(async (req, res) => {
     const id = parseInt(req.params.id)
-    const [result] = await db
-      .update(employees)
-      .set({ isActive: false, terminationDate: new Date().toISOString().split("T")[0], updatedAt: new Date() })
-      .where(eq(employees.id, id))
-      .returning()
+    if (isNaN(id)) throw new AppError(400, "無效的員工 ID")
 
-    if (!result) {
-      return res.status(404).json({ error: "找不到該員工" })
-    }
+    const result = await hrStorage.softDeleteEmployee(id)
+    if (!result) throw new AppError(404, "找不到該員工")
 
     res.json(result)
-  } catch (error: any) {
-    res.status(500).json({ error: error.message })
-  }
-})
+  })
+)
 
 // ============================================================
 // 薪資計算
 // ============================================================
 
-// 計算單一員工的薪資明細
-router.post("/api/hr/calculate", async (req, res) => {
-  try {
+// 計算單一員工的薪資明細（純計算，保留在路由層）
+router.post(
+  "/api/hr/calculate",
+  asyncHandler(async (req, res) => {
     const { monthlySalary, insuredSalary, dependentsCount = 0, voluntaryPensionRate = 0 } = req.body
 
     if (!monthlySalary || monthlySalary <= 0) {
-      return res.status(400).json({ error: "請輸入有效的月薪" })
+      throw new AppError(400, "請輸入有效的月薪")
     }
 
     const result = calculateInsurance({
@@ -132,74 +117,58 @@ router.post("/api/hr/calculate", async (req, res) => {
     })
 
     res.json(result)
-  } catch (error: any) {
-    res.status(400).json({ error: error.message })
-  }
-})
+  })
+)
 
 // ============================================================
 // 月度人事費
 // ============================================================
 
 // 取得指定月份的人事費
-router.get("/api/hr/monthly-costs", async (req, res) => {
-  try {
+router.get(
+  "/api/hr/monthly-costs",
+  asyncHandler(async (req, res) => {
     const { year, month } = req.query
 
     if (!year || !month) {
-      return res.status(400).json({ error: "請提供年份和月份" })
+      throw new AppError(400, "請提供年份和月份")
     }
 
-    const result = await db.query.monthlyHrCosts.findMany({
-      where: and(
-        eq(monthlyHrCosts.year, parseInt(year as string)),
-        eq(monthlyHrCosts.month, parseInt(month as string))
-      ),
-      with: {
-        employee: true,
-      },
-      orderBy: [asc(monthlyHrCosts.employeeId)],
-    })
+    const result = await hrStorage.getMonthlyHrCosts(
+      parseInt(year as string),
+      parseInt(month as string)
+    )
 
     res.json(result)
-  } catch (error: any) {
-    res.status(500).json({ error: error.message })
-  }
-})
+  })
+)
 
 // 自動生成指定月份的人事費
-router.post("/api/hr/monthly-costs/generate", async (req, res) => {
-  try {
+router.post(
+  "/api/hr/monthly-costs/generate",
+  asyncHandler(async (req, res) => {
     const { year, month } = req.body
 
     if (!year || !month) {
-      return res.status(400).json({ error: "請提供年份和月份" })
+      throw new AppError(400, "請提供年份和月份")
     }
 
     const yearNum = parseInt(year)
     const monthNum = parseInt(month)
 
     // 取得所有在職員工
-    const activeEmployees = await db.query.employees.findMany({
-      where: eq(employees.isActive, true),
-    })
+    const activeEmployees = await hrStorage.getActiveEmployees()
 
     if (activeEmployees.length === 0) {
-      return res.status(400).json({ error: "沒有在職員工" })
+      throw new AppError(400, "沒有在職員工")
     }
 
     // 刪除已有的該月記錄
-    await db.delete(monthlyHrCosts).where(
-      and(
-        eq(monthlyHrCosts.year, yearNum),
-        eq(monthlyHrCosts.month, monthNum)
-      )
-    )
+    await hrStorage.deleteMonthlyHrCosts(yearNum, monthNum)
 
-    // 為每位員工計算並產生月度記錄
+    // 為每位符合條件的員工計算月度記錄
     const records = activeEmployees
       .filter((emp) => {
-        // 確認到職日在該月之前
         const hireDate = new Date(emp.hireDate)
         const monthStart = new Date(yearNum, monthNum - 1, 1)
         return hireDate <= monthStart
@@ -239,69 +208,63 @@ router.post("/api/hr/monthly-costs/generate", async (req, res) => {
       })
 
     if (records.length === 0) {
-      return res.json({ message: "該月沒有符合條件的員工", records: [] })
+      return res.json({
+        message: "該月沒有符合條件的員工",
+        records: [],
+      })
     }
 
-    const inserted = await db.insert(monthlyHrCosts).values(records).returning()
+    const inserted = await hrStorage.createMonthlyHrCosts(records)
 
     res.json({
       message: `已為 ${inserted.length} 位員工產生 ${yearNum}年${monthNum}月 人事費`,
       records: inserted,
     })
-  } catch (error: any) {
-    res.status(500).json({ error: error.message })
-  }
-})
+  })
+)
 
 // 更新月度人事費付款狀態
-router.put("/api/hr/monthly-costs/:id/pay", async (req, res) => {
-  try {
+router.put(
+  "/api/hr/monthly-costs/:id/pay",
+  asyncHandler(async (req, res) => {
     const id = parseInt(req.params.id)
+    if (isNaN(id)) throw new AppError(400, "無效的記錄 ID")
+
     const { isPaid, insurancePaid } = req.body
 
-    const updateData: Record<string, any> = { updatedAt: new Date() }
+    const updateData: { isPaid?: boolean; insurancePaid?: boolean } = {}
     if (isPaid !== undefined) updateData.isPaid = isPaid
     if (insurancePaid !== undefined) updateData.insurancePaid = insurancePaid
 
-    const [result] = await db
-      .update(monthlyHrCosts)
-      .set(updateData)
-      .where(eq(monthlyHrCosts.id, id))
-      .returning()
-
-    if (!result) {
-      return res.status(404).json({ error: "找不到該記錄" })
-    }
+    const result = await hrStorage.updateMonthlyHrCost(id, updateData)
+    if (!result) throw new AppError(404, "找不到該記錄")
 
     res.json(result)
-  } catch (error: any) {
-    res.status(500).json({ error: error.message })
-  }
-})
+  })
+)
 
 // 取得人事費彙總統計
-router.get("/api/hr/summary", async (req, res) => {
-  try {
+router.get(
+  "/api/hr/summary",
+  asyncHandler(async (req, res) => {
     const { year } = req.query
     const yearNum = year ? parseInt(year as string) : new Date().getFullYear()
 
     // 取得該年所有月度記錄
-    const records = await db.query.monthlyHrCosts.findMany({
-      where: eq(monthlyHrCosts.year, yearNum),
-      with: {
-        employee: true,
-      },
-    })
+    const records = await hrStorage.getHrCostsByYear(yearNum)
 
     // 按月份彙總
-    const monthlySummary: Record<number, {
-      totalSalary: number
-      totalEmployerCost: number
-      totalCost: number
-      employeeCount: number
-      salaryPaid: number
-      insurancePaid: number
-    }> = {}
+    const monthlySummary: Record<
+      number,
+      {
+        totalSalary: number
+        totalEmployerCost: number
+        totalCost: number
+        employeeCount: number
+        salaryPaid: number
+        insurancePaid: number
+      }
+    > = {}
 
     for (let m = 1; m <= 12; m++) {
       const monthRecords = records.filter((r) => r.month === m)
@@ -316,23 +279,22 @@ router.get("/api/hr/summary", async (req, res) => {
     }
 
     // 在職人數
-    const activeEmployees = await db.query.employees.findMany({
-      where: eq(employees.isActive, true),
-    })
+    const activeEmployeeCount = await hrStorage.getActiveEmployeeCount()
 
     res.json({
       year: yearNum,
-      activeEmployeeCount: activeEmployees.length,
+      activeEmployeeCount,
       monthlySummary,
       annualTotal: {
         totalSalary: Object.values(monthlySummary).reduce((s, m) => s + m.totalSalary, 0),
-        totalEmployerCost: Object.values(monthlySummary).reduce((s, m) => s + m.totalEmployerCost, 0),
+        totalEmployerCost: Object.values(monthlySummary).reduce(
+          (s, m) => s + m.totalEmployerCost,
+          0
+        ),
         totalCost: Object.values(monthlySummary).reduce((s, m) => s + m.totalCost, 0),
       },
     })
-  } catch (error: any) {
-    res.status(500).json({ error: error.message })
-  }
-})
+  })
+)
 
 export default router

@@ -7,13 +7,43 @@ import {
   type InsertLoanInvestmentRecord,
   type LoanPaymentHistory,
   type InsertLoanPaymentHistory,
+  type LoanPaymentSchedule,
 } from "@shared/schema"
 import { eq, and, sql, desc, ne, gte, lt, lte } from "drizzle-orm"
 import { createAuditLog } from "./payment-items"
 
 // === 借貸投資記錄 CRUD ===
 
-export async function getLoanInvestmentRecords(): Promise<any[]> {
+/** 借貸投資記錄（含擴展欄位） */
+interface LoanInvestmentRecordExtended {
+  [key: string]: unknown
+  id: number
+  itemName: string
+  recordType: string
+  partyName: string
+  partyPhone: string | null
+  partyContact: string
+  partyRelationship: string | null
+  partyNotes: string
+  principalAmount: string
+  annualInterestRate: string | number
+  interestRate: string
+  startDate: string
+  endDate: string | null
+  interestPaymentMethod: string
+  monthlyPaymentAmount: string | null
+  agreedPaymentDay: number | null
+  hasAgreedReturn: boolean
+  isHighRisk: boolean
+  documentNotes: string
+  status: string
+  totalPaidAmount: string | null
+  notes: string | null
+  createdAt: Date | null
+  updatedAt: Date | null
+}
+
+export async function getLoanInvestmentRecords(): Promise<LoanInvestmentRecordExtended[]> {
   try {
     const records = await db
       .select()
@@ -21,20 +51,22 @@ export async function getLoanInvestmentRecords(): Promise<any[]> {
       .where(ne(loanInvestmentRecords.status, "cancelled"))
       .orderBy(desc(loanInvestmentRecords.createdAt))
 
-    return records.map((record: any) => ({
+    return records.map((record) => ({
       ...record,
-      partyContact: record.partyContact || "",
-      interestRate: record.interestRate || "0",
+      partyContact: ((record as Record<string, unknown>).partyContact as string) || "",
+      interestRate: ((record as Record<string, unknown>).interestRate as string) || "0",
       partyNotes: record.partyNotes || "",
       annualInterestRate:
         record.annualInterestRate ||
-        parseFloat(record.interestRate || "0"),
+        parseFloat(((record as Record<string, unknown>).interestRate as string) || "0"),
       interestPaymentMethod: record.interestPaymentMethod || "annual",
       hasAgreedReturn: record.hasAgreedReturn || false,
       isHighRisk:
         record.isHighRisk ||
         parseFloat(
-          record.annualInterestRate || record.interestRate || "0"
+          record.annualInterestRate ||
+            ((record as Record<string, unknown>).interestRate as string) ||
+            "0"
         ) >= 15,
       documentNotes: record.documentNotes || "",
     }))
@@ -44,7 +76,15 @@ export async function getLoanInvestmentRecords(): Promise<any[]> {
   }
 }
 
-export async function getLoanInvestmentRecord(id: number): Promise<any> {
+/** 借貸投資記錄詳情（含還款計劃和歷史） */
+interface LoanInvestmentRecordDetail extends LoanInvestmentRecord {
+  paymentSchedule: LoanPaymentSchedule[]
+  paymentHistory: LoanPaymentHistory[]
+}
+
+export async function getLoanInvestmentRecord(
+  id: number
+): Promise<LoanInvestmentRecordDetail | null> {
   try {
     const [record] = await db
       .select()
@@ -82,16 +122,10 @@ export async function createLoanInvestmentRecord(
   recordData: InsertLoanInvestmentRecord
 ): Promise<LoanInvestmentRecord> {
   try {
-    const [record] = await db
-      .insert(loanInvestmentRecords)
-      .values(recordData)
-      .returning()
+    const [record] = await db.insert(loanInvestmentRecords).values(recordData).returning()
 
-    if (
-      record.recordType === "loan" &&
-      (record as any).paymentFrequency === "monthly" &&
-      record.monthlyPaymentAmount
-    ) {
+    // paymentFrequency 欄位已移除，以 monthlyPaymentAmount 判斷
+    if (record.recordType === "loan" && record.monthlyPaymentAmount) {
       await generateLoanPaymentSchedule(record.id)
     }
 
@@ -134,9 +168,7 @@ export async function deleteLoanInvestmentRecord(id: number): Promise<void> {
 
 // === 還款計劃 ===
 
-export async function generateLoanPaymentSchedule(
-  recordId: number
-): Promise<void> {
+export async function generateLoanPaymentSchedule(recordId: number): Promise<void> {
   try {
     const [record] = await db
       .select()
@@ -151,11 +183,7 @@ export async function generateLoanPaymentSchedule(
     const startDate = new Date(record.startDate)
     const endDate = record.endDate
       ? new Date(record.endDate)
-      : new Date(
-          startDate.getFullYear() + 1,
-          startDate.getMonth(),
-          startDate.getDate()
-        )
+      : new Date(startDate.getFullYear() + 1, startDate.getMonth(), startDate.getDate())
 
     const currentDate = new Date(startDate)
     let monthCount = 0
@@ -190,9 +218,30 @@ export async function generateLoanPaymentSchedule(
 
 // === 還款紀錄 ===
 
+/** 借貸付款輸入資料 */
+interface LoanPaymentInput {
+  amount: string | number
+  paymentType: string
+  paymentDate: string
+  paymentMethod: string
+  paymentStatus?: string
+  isEarlyPayment?: boolean
+  isLatePayment?: boolean
+  hasReceipt?: boolean
+  notes?: string | null
+  communicationNotes?: string | null
+  riskNotes?: string | null
+  receiptNotes?: string | null
+  recordedBy?: string
+  isVerified?: boolean
+  receiptFileUrl?: string | null
+  verifiedBy?: string | null
+  scheduleId?: number | null
+}
+
 export async function addLoanPayment(
   recordId: number,
-  paymentData: any
+  paymentData: LoanPaymentInput
 ): Promise<LoanPaymentHistory> {
   try {
     const [record] = await db
@@ -206,12 +255,9 @@ export async function addLoanPayment(
 
     const currentPaid = parseFloat(record.totalPaidAmount || "0")
     const principalAmount = parseFloat(record.principalAmount)
-    const paymentAmount = parseFloat(paymentData.amount)
+    const paymentAmount = parseFloat(String(paymentData.amount))
 
-    const remainingPrincipal = Math.max(
-      0,
-      principalAmount - currentPaid - paymentAmount
-    )
+    const remainingPrincipal = Math.max(0, principalAmount - currentPaid - paymentAmount)
     const remainingInterest = 0
 
     const insertData = {
@@ -237,10 +283,7 @@ export async function addLoanPayment(
       scheduleId: paymentData.scheduleId || null,
     }
 
-    const [payment] = await db
-      .insert(loanPaymentHistory)
-      .values(insertData)
-      .returning()
+    const [payment] = await db.insert(loanPaymentHistory).values(insertData).returning()
 
     const newPaid = currentPaid + paymentAmount
 
@@ -258,7 +301,7 @@ export async function addLoanPayment(
         .set({
           isPaid: true,
           paidDate: paymentData.paymentDate,
-          paidAmount: paymentData.amount,
+          paidAmount: String(paymentData.amount),
         })
         .where(eq(loanPaymentSchedule.id, payment.scheduleId))
     }
@@ -277,18 +320,13 @@ export async function addLoanPayment(
   }
 }
 
-export async function getLoanPaymentHistory(
-  recordId: number
-): Promise<LoanPaymentHistory[]> {
+export async function getLoanPaymentHistory(recordId: number): Promise<LoanPaymentHistory[]> {
   try {
     return await db
       .select()
       .from(loanPaymentHistory)
       .where(eq(loanPaymentHistory.recordId, recordId))
-      .orderBy(
-        desc(loanPaymentHistory.paymentDate),
-        desc(loanPaymentHistory.createdAt)
-      )
+      .orderBy(desc(loanPaymentHistory.paymentDate), desc(loanPaymentHistory.createdAt))
   } catch (error) {
     console.error("Error fetching loan payment history:", error)
     throw error
@@ -477,7 +515,21 @@ export async function getLoanPaymentStatistics(recordId: number): Promise<{
   }
 }
 
-export async function getLoanInvestmentStats(): Promise<any> {
+/** 借貸投資統計結果 */
+interface LoanInvestmentStatsResult {
+  totalLoanAmount: string
+  activeLoanAmount: string
+  totalInvestmentAmount: string
+  activeInvestmentAmount: string
+  thisMonthDue: string
+  nextMonthDue: string
+  monthlyInterest: string
+  yearlyInterest: string
+  highRiskCount: number
+  dueSoonAmount: string
+}
+
+export async function getLoanInvestmentStats(): Promise<LoanInvestmentStatsResult> {
   try {
     const [loanStats] = await db
       .select({
@@ -490,8 +542,10 @@ export async function getLoanInvestmentStats(): Promise<any> {
       .where(ne(loanInvestmentRecords.status, "cancelled"))
 
     const currentDate = new Date()
-    const thisMonthStart = `${currentDate.getFullYear()}-${(currentDate.getMonth() + 1).toString().padStart(2, "0")}-01`
-    const nextMonthStart = `${currentDate.getFullYear()}-${(currentDate.getMonth() + 2).toString().padStart(2, "0")}-01`
+    const thisMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1)
+    const nextMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1)
+    const thisMonthStart = thisMonth.toISOString().split("T")[0]
+    const nextMonthStart = nextMonth.toISOString().split("T")[0]
 
     const [thisMonthDue] = await db
       .select({
@@ -506,7 +560,8 @@ export async function getLoanInvestmentStats(): Promise<any> {
         )
       )
 
-    const nextMonthEnd = `${currentDate.getFullYear()}-${(currentDate.getMonth() + 3).toString().padStart(2, "0")}-01`
+    const twoMonthsLater = new Date(currentDate.getFullYear(), currentDate.getMonth() + 2, 1)
+    const nextMonthEnd = twoMonthsLater.toISOString().split("T")[0]
     const [nextMonthDue] = await db
       .select({
         amount: sql<string>`COALESCE(SUM(amount::numeric), 0)`,
@@ -522,13 +577,13 @@ export async function getLoanInvestmentStats(): Promise<any> {
 
     const [monthlyInterest] = await db
       .select({
-        amount: sql<string>`COALESCE(SUM(principal_amount::numeric * COALESCE(annual_interest_rate, CAST(interest_rate AS DECIMAL(5,2)))::numeric / 100 / 12), 0)`,
+        amount: sql<string>`COALESCE(SUM(principal_amount::numeric * annual_interest_rate::numeric / 100 / 12), 0)`,
       })
       .from(loanInvestmentRecords)
       .where(
         and(
           eq(loanInvestmentRecords.status, "active"),
-          sql`COALESCE(annual_interest_rate, CAST(interest_rate AS DECIMAL(5,2))) > 0`
+          sql`annual_interest_rate::numeric > 0`
         )
       )
 
@@ -540,7 +595,7 @@ export async function getLoanInvestmentStats(): Promise<any> {
       .where(
         and(
           eq(loanInvestmentRecords.status, "active"),
-          sql`COALESCE(annual_interest_rate, CAST(interest_rate AS DECIMAL(5,2))) >= 15`
+          sql`annual_interest_rate::numeric >= 15`
         )
       )
 
@@ -552,13 +607,10 @@ export async function getLoanInvestmentStats(): Promise<any> {
       thisMonthDue: thisMonthDue?.amount || "0",
       nextMonthDue: nextMonthDue?.amount || "0",
       monthlyInterest: monthlyInterest?.amount || "0",
-      yearlyInterest: (
-        parseFloat(monthlyInterest?.amount || "0") * 12
-      ).toString(),
+      yearlyInterest: (parseFloat(monthlyInterest?.amount || "0") * 12).toString(),
       highRiskCount: highRiskCount?.count || 0,
       dueSoonAmount: (
-        parseFloat(thisMonthDue?.amount || "0") +
-        parseFloat(nextMonthDue?.amount || "0")
+        parseFloat(thisMonthDue?.amount || "0") + parseFloat(nextMonthDue?.amount || "0")
       ).toString(),
     }
   } catch (error) {

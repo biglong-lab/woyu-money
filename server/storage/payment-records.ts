@@ -14,25 +14,58 @@ import {
   type PaymentItemNote,
   type InsertPaymentItemNote,
 } from "@shared/schema"
-import { eq, and, desc, asc, sql, gte, lte } from "drizzle-orm"
+import { eq, and, desc, asc, sql, gte, lte, type SQL } from "drizzle-orm"
 
 // === 付款記錄 ===
 
-export async function getPaymentRecords(filters: any = {}, page: number = 1, limit: number = 100): Promise<any[]> {
+/** 付款記錄篩選條件 */
+interface PaymentRecordFilters {
+  itemId?: number
+  startDate?: Date
+  endDate?: Date
+}
+
+/** 付款記錄查詢結果行 */
+interface PaymentRecordRow extends Record<string, unknown> {
+  id: number
+  itemId: number
+  amount: string
+  paymentDate: string
+  paymentMethod: string | null
+  notes: string
+  receiptImageUrl: string
+  createdAt: Date
+  updatedAt: Date
+  itemName: string
+  itemType: string
+  totalAmount: string
+  projectId: number
+  projectName: string
+  projectType: string
+  categoryId: number
+  categoryName: string
+}
+
+export async function getPaymentRecords(
+  filters: PaymentRecordFilters = {},
+  page: number = 1,
+  limit: number = 100
+): Promise<Record<string, unknown>[]> {
   const offset = (page - 1) * limit
 
-  let whereConditions = []
+  const whereConditions: SQL[] = []
   if (filters.itemId) {
-    whereConditions.push(`pr.payment_item_id = ${filters.itemId}`)
+    whereConditions.push(sql`pr.payment_item_id = ${Number(filters.itemId)}`)
   }
   if (filters.startDate) {
-    whereConditions.push(`pr.payment_date >= '${filters.startDate.toISOString().split("T")[0]}'`)
+    whereConditions.push(sql`pr.payment_date >= ${filters.startDate.toISOString().split("T")[0]}`)
   }
   if (filters.endDate) {
-    whereConditions.push(`pr.payment_date <= '${filters.endDate.toISOString().split("T")[0]}'`)
+    whereConditions.push(sql`pr.payment_date <= ${filters.endDate.toISOString().split("T")[0]}`)
   }
 
-  const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(" AND ")}` : ""
+  const whereClause =
+    whereConditions.length > 0 ? sql`WHERE ${sql.join(whereConditions, sql` AND `)}` : sql``
 
   const rawResults = await db.execute(sql`
     SELECT
@@ -58,7 +91,7 @@ export async function getPaymentRecords(filters: any = {}, page: number = 1, lim
     LEFT JOIN payment_projects pp ON pi.project_id = pp.id
     LEFT JOIN debt_categories dc ON pi.category_id = dc.id
     LEFT JOIN fixed_categories fc ON pi.fixed_category_id = fc.id
-    ${sql.raw(whereClause)}
+    ${whereClause}
     ORDER BY
       CASE WHEN pr.payment_date >= CURRENT_DATE - INTERVAL '30 days' THEN 0 ELSE 1 END,
       pr.payment_date DESC,
@@ -66,25 +99,28 @@ export async function getPaymentRecords(filters: any = {}, page: number = 1, lim
     LIMIT ${limit} OFFSET ${offset}
   `)
 
-  return rawResults.rows.map((row: any) => ({
-    id: row.id,
-    itemId: row.itemId,
-    amount: row.amount,
-    paymentDate: row.paymentDate,
-    paymentMethod: row.paymentMethod || "轉帳",
-    notes: row.notes,
-    receiptImageUrl: row.receiptImageUrl,
-    createdAt: new Date(row.createdAt),
-    updatedAt: new Date(row.updatedAt),
-    itemName: row.itemName,
-    itemType: row.itemType,
-    totalAmount: row.totalAmount,
-    projectId: row.projectId,
-    projectName: row.projectName,
-    projectType: row.projectType,
-    categoryId: row.categoryId,
-    categoryName: row.categoryName,
-  }))
+  return rawResults.rows.map((r: Record<string, unknown>) => {
+    const row = r as PaymentRecordRow
+    return {
+      id: row.id,
+      itemId: row.itemId,
+      amount: row.amount,
+      paymentDate: row.paymentDate,
+      paymentMethod: row.paymentMethod || "轉帳",
+      notes: row.notes,
+      receiptImageUrl: row.receiptImageUrl,
+      createdAt: new Date(row.createdAt),
+      updatedAt: new Date(row.updatedAt),
+      itemName: row.itemName,
+      itemType: row.itemType,
+      totalAmount: row.totalAmount,
+      projectId: row.projectId,
+      projectName: row.projectName,
+      projectType: row.projectType,
+      categoryId: row.categoryId,
+      categoryName: row.categoryName,
+    }
+  })
 }
 
 export async function getPaymentRecordsByItemId(itemId: number): Promise<PaymentRecord[]> {
@@ -97,19 +133,22 @@ export async function getPaymentRecordsByItemId(itemId: number): Promise<Payment
     ORDER BY payment_date DESC, created_at DESC
   `)
 
-  return result.rows.map((row: any) => ({
-    id: row.id,
-    itemId: row.itemId,
-    amountPaid: row.amount,
-    paymentDate: row.paymentDate,
-    paymentMethod: row.paymentMethod || null,
-    notes: row.notes || null,
-    receiptImageUrl: row.receiptImageUrl || null,
-    receiptText: null,
-    isPartialPayment: null,
-    createdAt: row.createdAt ? new Date(row.createdAt) : null,
-    updatedAt: row.updatedAt ? new Date(row.updatedAt) : null,
-  }))
+  return result.rows.map((r: Record<string, unknown>) => {
+    const row = r as PaymentRecordRow
+    return {
+      id: row.id,
+      itemId: row.itemId,
+      amountPaid: row.amount,
+      paymentDate: row.paymentDate,
+      paymentMethod: row.paymentMethod || null,
+      notes: row.notes || null,
+      receiptImageUrl: row.receiptImageUrl || null,
+      receiptText: null,
+      isPartialPayment: null,
+      createdAt: row.createdAt ? new Date(row.createdAt) : null,
+      updatedAt: row.updatedAt ? new Date(row.updatedAt) : null,
+    }
+  })
 }
 
 export async function getFilteredPaymentRecords(filters: {
@@ -117,9 +156,9 @@ export async function getFilteredPaymentRecords(filters: {
   dateTo?: string
   projectId?: number
   categoryId?: number
-}): Promise<any[]> {
-  let whereConditions = ["pi.is_deleted = false"]
-  const params: any[] = []
+}): Promise<Record<string, unknown>[]> {
+  const whereConditions = ["pi.is_deleted = false"]
+  const params: (string | number)[] = []
   let paramCount = 0
 
   if (filters.dateFrom) {
@@ -143,8 +182,9 @@ export async function getFilteredPaymentRecords(filters: {
   if (filters.categoryId) {
     const categoryParam = paramCount + 1
     const fixedCategoryParam = paramCount + 2
-    paramCount += 2
-    whereConditions.push(`(pi.category_id = $${categoryParam} OR pi.fixed_category_id = $${fixedCategoryParam})`)
+    whereConditions.push(
+      `(pi.category_id = $${categoryParam} OR pi.fixed_category_id = $${fixedCategoryParam})`
+    )
     params.push(filters.categoryId)
     params.push(filters.categoryId)
   }
@@ -181,25 +221,28 @@ export async function getFilteredPaymentRecords(filters: {
 
   const rawResults = await pool.query(query, params)
 
-  return rawResults.rows.map((row: any) => ({
-    id: row.id,
-    itemId: row.itemId,
-    amount: row.amount,
-    paymentDate: row.paymentDate,
-    paymentMethod: row.paymentMethod || "轉帳",
-    notes: row.notes,
-    receiptImageUrl: row.receiptImageUrl,
-    createdAt: new Date(row.createdAt),
-    updatedAt: new Date(row.updatedAt),
-    itemName: row.itemName,
-    itemType: row.itemType,
-    totalAmount: row.totalAmount,
-    projectId: row.projectId,
-    projectName: row.projectName,
-    projectType: row.projectType,
-    categoryId: row.categoryId,
-    categoryName: row.categoryName,
-  }))
+  return rawResults.rows.map((r: Record<string, unknown>) => {
+    const row = r as PaymentRecordRow
+    return {
+      id: row.id,
+      itemId: row.itemId,
+      amount: row.amount,
+      paymentDate: row.paymentDate,
+      paymentMethod: row.paymentMethod || "轉帳",
+      notes: row.notes,
+      receiptImageUrl: row.receiptImageUrl,
+      createdAt: new Date(row.createdAt),
+      updatedAt: new Date(row.updatedAt),
+      itemName: row.itemName,
+      itemType: row.itemType,
+      totalAmount: row.totalAmount,
+      projectId: row.projectId,
+      projectName: row.projectName,
+      projectType: row.projectType,
+      categoryId: row.categoryId,
+      categoryName: row.categoryName,
+    }
+  })
 }
 
 export async function createPaymentRecord(recordData: InsertPaymentRecord): Promise<PaymentRecord> {
@@ -237,8 +280,15 @@ export async function createPaymentRecord(recordData: InsertPaymentRecord): Prom
   }
 }
 
-export async function updatePaymentRecord(id: number, recordData: InsertPaymentRecord): Promise<PaymentRecord> {
-  const [record] = await db.update(paymentRecords).set(recordData).where(eq(paymentRecords.id, id)).returning()
+export async function updatePaymentRecord(
+  id: number,
+  recordData: InsertPaymentRecord
+): Promise<PaymentRecord> {
+  const [record] = await db
+    .update(paymentRecords)
+    .set(recordData)
+    .where(eq(paymentRecords.id, id))
+    .returning()
   return record
 }
 
@@ -270,7 +320,12 @@ export async function getPaymentSchedules(year: number, month: number): Promise<
       updatedAt: paymentSchedules.updatedAt,
     })
     .from(paymentSchedules)
-    .where(and(gte(paymentSchedules.scheduledDate, startDate), lte(paymentSchedules.scheduledDate, endDateStr)))
+    .where(
+      and(
+        gte(paymentSchedules.scheduledDate, startDate),
+        lte(paymentSchedules.scheduledDate, endDateStr)
+      )
+    )
     .orderBy(paymentSchedules.scheduledDate)
 
   return schedules
@@ -281,7 +336,9 @@ export async function getPaymentSchedule(id: number): Promise<PaymentSchedule | 
   return schedule
 }
 
-export async function createPaymentSchedule(scheduleData: InsertPaymentSchedule): Promise<PaymentSchedule> {
+export async function createPaymentSchedule(
+  scheduleData: InsertPaymentSchedule
+): Promise<PaymentSchedule> {
   const [schedule] = await db.insert(paymentSchedules).values(scheduleData).returning()
   return schedule
 }
@@ -311,7 +368,11 @@ export async function getOverdueSchedules(): Promise<PaymentSchedule[]> {
   return schedules
 }
 
-export async function reschedulePayment(id: number, newDate: string, notes?: string): Promise<PaymentSchedule> {
+export async function reschedulePayment(
+  id: number,
+  newDate: string,
+  notes?: string
+): Promise<PaymentSchedule> {
   const [schedule] = await db
     .update(paymentSchedules)
     .set({
@@ -335,7 +396,10 @@ export async function getSchedulesByPaymentItem(paymentItemId: number): Promise<
   return schedules
 }
 
-export async function getUnscheduledPaymentItems(year: number, month: number): Promise<any[]> {
+export async function getUnscheduledPaymentItems(
+  year: number,
+  month: number
+): Promise<Record<string, unknown>[]> {
   const startDate = `${year}-${month.toString().padStart(2, "0")}-01`
   const endDate = new Date(year, month, 0)
   const endDateStr = `${year}-${month.toString().padStart(2, "0")}-${endDate.getDate()}`
@@ -390,7 +454,7 @@ export async function getUnscheduledPaymentItems(year: number, month: number): P
   `
 
   const result = await db.execute(query)
-  return result.rows as any[]
+  return result.rows as Record<string, unknown>[]
 }
 
 // === 付款備註 ===
@@ -409,7 +473,10 @@ export async function createPaymentItemNote(note: InsertPaymentItemNote): Promis
   return newNote
 }
 
-export async function updatePaymentItemNote(id: number, note: Partial<InsertPaymentItemNote>): Promise<PaymentItemNote> {
+export async function updatePaymentItemNote(
+  id: number,
+  note: Partial<InsertPaymentItemNote>
+): Promise<PaymentItemNote> {
   const [updatedNote] = await db
     .update(paymentItemNotes)
     .set({ ...note, updatedAt: new Date() })
@@ -419,7 +486,10 @@ export async function updatePaymentItemNote(id: number, note: Partial<InsertPaym
 }
 
 export async function deletePaymentItemNote(id: number): Promise<void> {
-  await db.update(paymentItemNotes).set({ isDeleted: true, updatedAt: new Date() }).where(eq(paymentItemNotes.id, id))
+  await db
+    .update(paymentItemNotes)
+    .set({ isDeleted: true, updatedAt: new Date() })
+    .where(eq(paymentItemNotes.id, id))
 }
 
 // === 付款金額同步 ===
@@ -455,4 +525,85 @@ export async function updatePaymentItemAmounts(itemId: number): Promise<void> {
         updated_at = NOW()
     WHERE id = ${itemId}
   `)
+}
+
+// === 現金流查詢 ===
+
+/** 現金流付款記錄（含項目與專案名稱） */
+interface CashFlowRecord {
+  id: number
+  itemId: number
+  amountPaid: string
+  paymentDate: string
+  paymentMethod: string | null
+  notes: string | null
+  itemName: string
+  itemStartDate: string
+  itemEndDate: string | null
+  projectId: number | null
+  projectName: string | null
+}
+
+/** 取得現金流用付款記錄（聯結項目與專案資訊） */
+export async function getPaymentRecordsCashFlow(monthsBack: number = 6): Promise<CashFlowRecord[]> {
+  const startDate = new Date()
+  startDate.setMonth(startDate.getMonth() - monthsBack)
+  startDate.setDate(1)
+
+  const records = await db
+    .select({
+      id: paymentRecords.id,
+      itemId: paymentRecords.itemId,
+      amountPaid: paymentRecords.amountPaid,
+      paymentDate: paymentRecords.paymentDate,
+      paymentMethod: paymentRecords.paymentMethod,
+      notes: paymentRecords.notes,
+      itemName: paymentItems.itemName,
+      itemStartDate: paymentItems.startDate,
+      itemEndDate: paymentItems.endDate,
+      projectId: paymentItems.projectId,
+    })
+    .from(paymentRecords)
+    .innerJoin(paymentItems, eq(paymentRecords.itemId, paymentItems.id))
+    .where(
+      and(
+        gte(paymentRecords.paymentDate, startDate.toISOString().split("T")[0]),
+        eq(paymentItems.isDeleted, false)
+      )
+    )
+    .orderBy(desc(paymentRecords.paymentDate))
+
+  // 取得專案名稱對照
+  const projectsList = await db.select().from(paymentProjects)
+  const projectMap = new Map(projectsList.map((p) => [p.id, p.projectName]))
+
+  return records.map((r) => ({
+    id: r.id,
+    itemId: r.itemId,
+    amountPaid: r.amountPaid,
+    paymentDate: r.paymentDate,
+    paymentMethod: r.paymentMethod,
+    notes: r.notes,
+    itemName: r.itemName,
+    itemStartDate: r.itemStartDate,
+    itemEndDate: r.itemEndDate,
+    projectId: r.projectId,
+    projectName: r.projectId ? (projectMap.get(r.projectId) ?? null) : null,
+  }))
+}
+
+// === 排程額外查詢 ===
+
+/** 取得所有付款排程（不限月份，用於跨月追蹤） */
+export async function getAllPaymentSchedules() {
+  return await db.select().from(paymentSchedules).orderBy(desc(paymentSchedules.scheduledDate))
+}
+
+/** 取得指定項目的所有排程歷史 */
+export async function getPaymentSchedulesByItemId(itemId: number) {
+  return await db
+    .select()
+    .from(paymentSchedules)
+    .where(eq(paymentSchedules.paymentItemId, itemId))
+    .orderBy(desc(paymentSchedules.scheduledDate))
 }

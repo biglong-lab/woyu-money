@@ -8,10 +8,22 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Building2, DollarSign, Calendar, TrendingUp, CheckCircle, Clock, FileText } from "lucide-react";
 import { Link } from "wouter";
 
+// 租金付款項目型別
+interface RentalPaymentItem {
+  id: number;
+  itemName: string;
+  totalAmount: string;
+  paidAmount: string | null;
+  status: string;
+  notes?: string;
+  updatedAt?: string;
+  receiptImageUrl?: string;
+}
+
 interface RentalPaymentDetailDialogProps {
   readonly isOpen: boolean;
   readonly onOpenChange: (open: boolean) => void;
-  readonly viewingPayment: any | null;
+  readonly viewingPayment: RentalPaymentItem | null;
 }
 
 // 租金付款項目詳細資訊對話框
@@ -63,7 +75,7 @@ export function RentalPaymentDetailDialog({
 }
 
 // 付款基本資訊
-function PaymentBasicInfo({ payment }: { readonly payment: any }) {
+function PaymentBasicInfo({ payment }: { readonly payment: RentalPaymentItem }) {
   const totalAmount = payment.totalAmount ? parseFloat(payment.totalAmount) : 0;
   const paidAmount = payment.paidAmount ? parseFloat(payment.paidAmount) : 0;
   const isPaid = payment.status === 'paid' || paidAmount >= totalAmount;
@@ -137,7 +149,7 @@ function PaymentBasicInfo({ payment }: { readonly payment: any }) {
 }
 
 // 付款記錄預覽
-function PaymentRecordPreview({ payment }: { readonly payment: any }) {
+function PaymentRecordPreview({ payment }: { readonly payment: RentalPaymentItem }) {
   return (
     <Card>
       <CardHeader>
@@ -152,13 +164,13 @@ function PaymentRecordPreview({ payment }: { readonly payment: any }) {
           <div className="flex justify-between items-center">
             <span className="text-sm text-gray-600">累計已付款</span>
             <span className="font-bold text-green-600">
-              NT${parseFloat(payment.paidAmount || 0).toLocaleString()}
+              NT${parseFloat(payment.paidAmount || "0").toLocaleString()}
             </span>
           </div>
           <div className="flex justify-between items-center">
             <span className="text-sm text-gray-600">待付金額</span>
             <span className="font-bold text-orange-600">
-              NT${(parseFloat(payment.totalAmount || 0) - parseFloat(payment.paidAmount || 0)).toLocaleString()}
+              NT${(parseFloat(payment.totalAmount || "0") - parseFloat(payment.paidAmount || "0")).toLocaleString()}
             </span>
           </div>
         </div>
@@ -198,7 +210,7 @@ function PaymentRecordPreview({ payment }: { readonly payment: any }) {
                         <div>
                           <span className="text-gray-500">付款金額：</span>
                           <span className="font-medium text-green-600">
-                            NT${parseFloat(payment.paidAmount || 0).toLocaleString()}
+                            NT${parseFloat(payment.paidAmount || "0").toLocaleString()}
                           </span>
                         </div>
                         <div>
@@ -232,8 +244,11 @@ function PaymentRecordPreview({ payment }: { readonly payment: any }) {
                             alt="收據附件"
                             className="w-full h-full object-cover"
                             onError={(e) => {
-                              (e.target as HTMLImageElement).style.display = 'none';
-                              (e.target as HTMLImageElement).parentElement!.innerHTML = '<div class="flex items-center justify-center h-full text-gray-400"><svg class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg></div>';
+                              const target = e.target as HTMLImageElement;
+                              target.style.display = 'none';
+                              if (target.parentElement) {
+                                target.parentElement.innerHTML = '<div class="flex items-center justify-center h-full text-gray-400"><svg class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg></div>';
+                              }
                             }}
                           />
                         </div>

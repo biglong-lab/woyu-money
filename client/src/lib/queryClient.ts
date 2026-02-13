@@ -59,7 +59,7 @@ export const queryClient = new QueryClient({
       refetchOnWindowFocus: false, // 禁用視窗焦點刷新
       staleTime: 10 * 60 * 1000, // 延長至10分鐘緩存時間
       gcTime: 30 * 60 * 1000, // 30分鐘垃圾回收時間
-      retry: (failureCount, error: any) => {
+      retry: (failureCount, error: Error) => {
         // 智能重試策略
         if (error?.message?.includes('Too many database connection attempts')) {
           return failureCount < 3;
@@ -74,7 +74,7 @@ export const queryClient = new QueryClient({
       networkMode: 'online', // 只在線上時執行查詢
     },
     mutations: {
-      retry: (failureCount, error: any) => {
+      retry: (failureCount, error: Error) => {
         // 對連線錯誤進行重試
         if (error?.message?.includes('Too many database connection attempts')) {
           return failureCount < 2;

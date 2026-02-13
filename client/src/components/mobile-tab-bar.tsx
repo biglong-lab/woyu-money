@@ -106,11 +106,11 @@ function PopupMenu({ items, isOpen, onClose, title, color = "blue" }: PopupMenuP
     }
     if (isOpen) {
       // 使用 touchstart 優先處理觸控設備
-      document.addEventListener("touchstart", handleClickOutside as any);
+      document.addEventListener("touchstart", handleClickOutside as EventListener);
       document.addEventListener("mousedown", handleClickOutside);
     }
     return () => {
-      document.removeEventListener("touchstart", handleClickOutside as any);
+      document.removeEventListener("touchstart", handleClickOutside as EventListener);
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [isOpen, onClose]);

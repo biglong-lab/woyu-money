@@ -1,6 +1,6 @@
 // 預算計劃建立/編輯對話框元件
 
-import { UseFormReturn } from "react-hook-form";
+import { UseFormReturn, FieldValues } from "react-hook-form";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,8 +12,8 @@ import type { BudgetPlan, Project } from "./project-budget-types";
 export interface ProjectBudgetPlanDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  form: UseFormReturn<any>;
-  onSubmit: (data: any) => void;
+  form: UseFormReturn<FieldValues>;
+  onSubmit: (data: FieldValues) => void;
   isPending: boolean;
   editingPlan: BudgetPlan | null;
   projects: Project[];

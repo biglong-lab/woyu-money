@@ -26,10 +26,56 @@ import {
   Home as HomeIcon,
   TrendingUp,
   CreditCard,
-  AlertCircle,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useState, useMemo } from "react";
+import type { PaymentItem, PaymentRecord, PaymentSchedule } from "@shared/schema";
+
+/** API 回傳的付款項目（含關聯專案名） */
+interface PaymentItemWithProject extends PaymentItem {
+  projectName?: string;
+}
+
+/** API 回傳的專案統計摘要 */
+interface ProjectStatsOverall {
+  totalPlanned?: string | number;
+  totalPaid?: string | number;
+  totalUnpaid?: string | number;
+}
+
+/** API 回傳的單一專案統計 */
+interface ProjectStatItem {
+  id: number;
+  projectName?: string;
+  projectType?: string;
+  completionRate?: number;
+  totalPaid?: string | number;
+  totalPlanned?: string | number;
+}
+
+/** API 回傳的專案統計資料結構 */
+interface ProjectStatsResponse {
+  projects?: ProjectStatItem[];
+}
+
+/** API 回傳的排程（含關聯名稱） */
+interface ScheduleWithNames extends PaymentSchedule {
+  itemName?: string;
+  projectName?: string;
+}
+
+/** API 回傳的付款記錄（含關聯名稱） */
+interface RecordWithNames extends PaymentRecord {
+  itemName?: string;
+  projectName?: string;
+  amount?: string;
+}
+
+/** 緊急待辦項目（帶到期日與天數差） */
+interface UrgentItem extends PaymentItemWithProject {
+  dueDate: Date;
+  diffDays: number;
+}
 
 export default function PaymentHome() {
   const [, setLocation] = useLocation();
@@ -50,7 +96,7 @@ export default function PaymentHome() {
 
   const { data: recentRecords } = useQuery({
     queryKey: ["/api/payment/records"],
-    select: (data: any) => (Array.isArray(data) ? data.slice(0, 5) : []),
+    select: (data: RecordWithNames[]) => (Array.isArray(data) ? data.slice(0, 5) : []),
   });
 
   const { data: scheduleData } = useQuery({
@@ -58,16 +104,17 @@ export default function PaymentHome() {
   });
 
   // 安全的資料取出
-  const stats = (overallStats as any) || {};
-  const items = Array.isArray(paymentItems) ? paymentItems : [];
-  const projectStats = Array.isArray((projectStatsData as any)?.projects)
-    ? (projectStatsData as any).projects
+  const stats = (overallStats as ProjectStatsOverall) || {};
+  const items: PaymentItemWithProject[] = Array.isArray(paymentItems) ? paymentItems : [];
+  const projectStatsTyped = projectStatsData as ProjectStatsResponse | undefined;
+  const projectStats: ProjectStatItem[] = Array.isArray(projectStatsTyped?.projects)
+    ? projectStatsTyped.projects
     : [];
-  const schedules = Array.isArray(scheduleData) ? scheduleData : [];
+  const schedules: ScheduleWithNames[] = Array.isArray(scheduleData) ? scheduleData : [];
 
   // 格式化函數
-  const formatCurrency = (value: any) => {
-    const num = parseFloat(value || "0");
+  const formatCurrency = (value: string | number | null | undefined) => {
+    const num = parseFloat(String(value || "0"));
     return isNaN(num) ? "0" : Math.round(num).toLocaleString();
   };
 
@@ -77,7 +124,7 @@ export default function PaymentHome() {
     const threeDaysLater = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
 
     return items
-      .filter((item: any) => {
+      .filter((item: PaymentItemWithProject) => {
         if (item.isDeleted || item.status === "completed") return false;
         const paid = parseFloat(item.paidAmount || "0");
         const total = parseFloat(item.totalAmount || "0");
@@ -92,16 +139,16 @@ export default function PaymentHome() {
 
         return dueDate <= threeDaysLater;
       })
-      .map((item: any) => {
+      .map((item: PaymentItemWithProject) => {
         const dueDate = item.endDate
           ? new Date(item.endDate)
           : new Date(item.startDate);
         const diffDays = Math.ceil(
           (dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
         );
-        return { ...item, dueDate, diffDays };
+        return { ...item, dueDate, diffDays } as UrgentItem;
       })
-      .sort((a: any, b: any) => a.diffDays - b.diffDays)
+      .sort((a: UrgentItem, b: UrgentItem) => a.diffDays - b.diffDays)
       .slice(0, 5);
   }, [items]);
 
@@ -111,18 +158,18 @@ export default function PaymentHome() {
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
 
-    const thisMonthItems = items.filter((item: any) => {
+    const thisMonthItems = items.filter((item: PaymentItemWithProject) => {
       if (!item?.startDate) return false;
       const d = new Date(item.startDate);
       return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
     });
 
     const totalDue = thisMonthItems.reduce(
-      (sum: number, item: any) => sum + parseFloat(item.totalAmount || "0"),
+      (sum: number, item: PaymentItemWithProject) => sum + parseFloat(item.totalAmount || "0"),
       0
     );
     const totalPaid = thisMonthItems.reduce(
-      (sum: number, item: any) => sum + parseFloat(item.paidAmount || "0"),
+      (sum: number, item: PaymentItemWithProject) => sum + parseFloat(item.paidAmount || "0"),
       0
     );
 
@@ -138,12 +185,12 @@ export default function PaymentHome() {
   const upcomingSchedules = useMemo(() => {
     const now = new Date();
     return schedules
-      .filter((s: any) => {
+      .filter((s: ScheduleWithNames) => {
         const d = new Date(s.scheduledDate);
         return d >= now && s.status !== "completed";
       })
       .sort(
-        (a: any, b: any) =>
+        (a: ScheduleWithNames, b: ScheduleWithNames) =>
           new Date(a.scheduledDate).getTime() -
           new Date(b.scheduledDate).getTime()
       )
@@ -156,7 +203,7 @@ export default function PaymentHome() {
     const q = searchQuery.toLowerCase();
     return items
       .filter(
-        (item: any) =>
+        (item: PaymentItemWithProject) =>
           item.itemName?.toLowerCase().includes(q) ||
           item.projectName?.toLowerCase().includes(q)
       )
@@ -217,7 +264,7 @@ export default function PaymentHome() {
         {/* 搜尋結果下拉 */}
         {searchResults.length > 0 && (
           <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-30 max-h-[300px] overflow-y-auto">
-            {searchResults.map((item: any) => (
+            {searchResults.map((item: PaymentItemWithProject) => (
               <Link
                 key={item.id}
                 href={`/payment-records`}
@@ -255,7 +302,7 @@ export default function PaymentHome() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            {urgentItems.map((item: any) => {
+            {urgentItems.map((item: UrgentItem) => {
               const remaining =
                 parseFloat(item.totalAmount || "0") -
                 parseFloat(item.paidAmount || "0");
@@ -462,7 +509,7 @@ export default function PaymentHome() {
             <div className="relative">
               <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-gray-200" />
               <div className="space-y-4">
-                {upcomingSchedules.map((schedule: any, index: number) => (
+                {upcomingSchedules.map((schedule: ScheduleWithNames) => (
                   <div key={schedule.id} className="flex items-start gap-4 relative">
                     <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center z-10 flex-shrink-0">
                       <span className="text-xs font-medium text-blue-700">
@@ -506,7 +553,7 @@ export default function PaymentHome() {
             </Link>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {projectStats.slice(0, 6).map((project: any) => {
+            {projectStats.slice(0, 6).map((project: ProjectStatItem) => {
               const rate = Math.min(project.completionRate || 0, 100);
               return (
                 <Card key={project.id} className="hover:shadow-md transition-shadow">
@@ -559,7 +606,7 @@ export default function PaymentHome() {
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              {recentRecords.map((record: any) => (
+              {recentRecords.map((record: RecordWithNames) => (
                 <div
                   key={record.id}
                   className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"

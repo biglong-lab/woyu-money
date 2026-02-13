@@ -4,6 +4,7 @@ import {
   TrendingUp, TrendingDown, CheckCircle, AlertTriangle, Clock, 
   Target, DollarSign, Activity, ArrowUpRight, ArrowDownRight 
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -13,6 +14,7 @@ import {
   Cell,
   ResponsiveContainer,
   Tooltip,
+  TooltipProps,
 } from 'recharts';
 
 interface PaymentItem {
@@ -39,7 +41,7 @@ interface HealthMetric {
   value: number;
   target?: number;
   status: 'good' | 'warning' | 'danger';
-  icon: any;
+  icon: LucideIcon;
   description: string;
 }
 
@@ -168,9 +170,9 @@ export default function FinancialHealthDashboard({
     },
   ];
 
-  const CustomTooltip = ({ active, payload }: any) => {
+  const CustomTooltip = ({ active, payload }: TooltipProps<number, string>) => {
     if (active && payload && payload.length) {
-      const data = payload[0].payload;
+      const data = payload[0].payload as { name: string; value: number };
       return (
         <div className="bg-white p-2 border rounded shadow-lg text-sm">
           <p className="font-medium">{data.name}</p>

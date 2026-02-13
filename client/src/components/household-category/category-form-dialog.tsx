@@ -27,6 +27,13 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Plus } from "lucide-react";
 import type { CategoryFormData } from "./types";
+interface HouseholdCategory {
+  id: number;
+  categoryName: string;
+  categoryType: string;
+  description?: string | null;
+}
+
 
 // ============================================================
 // 分類表單對話框 - 新增或編輯分類
@@ -40,7 +47,7 @@ interface CategoryFormDialogProps {
   /** react-hook-form 表單實例 */
   form: UseFormReturn<CategoryFormData>;
   /** 目前是否為編輯模式 */
-  editingCategory: any;
+  editingCategory: HouseholdCategory | null;
   /** 表單送出回呼 */
   onSubmit: (data: CategoryFormData) => void;
   /** 新增或更新 mutation 是否進行中 */

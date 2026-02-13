@@ -14,26 +14,24 @@ export async function withRetry<T>(
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       return await operation()
-    } catch (error: any) {
-      lastError = error
+    } catch (error: unknown) {
+      lastError = error instanceof Error ? error : new Error(String(error))
+      const errorMessage = lastError.message
 
       if (
-        error.message?.includes("Too many database connection attempts") ||
-        error.message?.includes("timeout") ||
-        error.message?.includes("connection")
+        errorMessage?.includes("Too many database connection attempts") ||
+        errorMessage?.includes("timeout") ||
+        errorMessage?.includes("connection")
       ) {
         console.warn(
           `Database operation failed (attempt ${attempt}/${maxRetries}):`,
-          error.message
+          lastError.message
         )
 
         if (attempt < maxRetries) {
-          await handleDatabaseError(error)
+          await handleDatabaseError(lastError)
           await new Promise((resolve) =>
-            setTimeout(
-              resolve,
-              baseDelay * Math.pow(2, attempt - 1) + Math.random() * 1000
-            )
+            setTimeout(resolve, baseDelay * Math.pow(2, attempt - 1) + Math.random() * 1000)
           )
           continue
         }
@@ -68,9 +66,7 @@ export async function getCachedCategoryType(categoryId: number): Promise<string>
 // 非同步創建審計日誌
 export async function createAuditLogAsync(logData: InsertAuditLog): Promise<void> {
   try {
-    await db
-      .insert(auditLogs)
-      .values({ ...logData, createdAt: new Date() })
+    await db.insert(auditLogs).values({ ...logData, createdAt: new Date() })
   } catch (error) {
     console.error("非同步創建審計日誌失敗:", error)
   }

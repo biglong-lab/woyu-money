@@ -1,7 +1,7 @@
 // 月付管理 - 主頁面（重構後）
 import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useForm } from "react-hook-form";
+import { useForm, type UseFormReturn, type FieldValues } from "react-hook-form";
 import { Calendar } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -21,6 +21,52 @@ import type {
   DebtCategory,
   FixedCategory,
 } from "@/components/monthly-payment-types";
+
+// API 回應型別
+interface PaymentItemsResponse {
+  items?: PaymentItem[];
+}
+
+// 建立付款項目資料型別
+interface CreatePaymentItemData {
+  itemName: string;
+  amount: string;
+  categoryId: string;
+  projectId: string;
+  dueDate: string;
+  paymentDate: string;
+  notes: string;
+  fixedCategoryId: string;
+  categoryType: string;
+  totalAmount: string;
+  installments: string;
+  paymentType: string;
+  extraFirstPayment: string;
+  extraLastPayment: string;
+}
+
+// 更新付款項目資料型別
+interface UpdatePaymentItemData {
+  itemName: string;
+  amount: string;
+  categoryId: string;
+  projectId: string;
+  startDate: string;
+  endDate: string;
+  notes: string;
+  fixedCategoryId: string;
+  categoryType: string;
+  status: string;
+}
+
+// 表單提交資料型別（擴展版）
+interface CreateFormSubmitData extends CreatePaymentItemData {
+  [key: string]: string;
+}
+
+interface UpdateFormSubmitData extends UpdatePaymentItemData {
+  [key: string]: string | number | null;
+}
 
 export default function MonthlyPaymentManagement() {
   const { toast } = useToast();
@@ -55,7 +101,7 @@ export default function MonthlyPaymentManagement() {
 
   // =========== 資料查詢 ===========
 
-  const { data: paymentItemsResponse, isLoading } = useQuery<any>({
+  const { data: paymentItemsResponse, isLoading } = useQuery<PaymentItem[] | PaymentItemsResponse>({
     queryKey: ["/api/payment/items", { includeAll: true }],
     queryFn: () => fetch("/api/payment/items?includeAll=true").then(res => res.json()),
   });
@@ -116,7 +162,7 @@ export default function MonthlyPaymentManagement() {
 
       return matchesSearch && matchesProject && matchesStatus && matchesCategory;
     }).sort((a, b) => {
-      let comparison = 0;
+      let comparison: number;
       switch (sortBy) {
         case "startDate":
           comparison = new Date(a.startDate).getTime() - new Date(b.startDate).getTime();
@@ -144,7 +190,7 @@ export default function MonthlyPaymentManagement() {
 
   // =========== 表單 ===========
 
-  const createForm = useForm({
+  const createForm = useForm<CreatePaymentItemData>({
     defaultValues: {
       itemName: "",
       amount: "",
@@ -163,7 +209,7 @@ export default function MonthlyPaymentManagement() {
     }
   });
 
-  const editForm = useForm({
+  const editForm = useForm<UpdatePaymentItemData>({
     defaultValues: {
       itemName: "",
       amount: "",
@@ -195,7 +241,7 @@ export default function MonthlyPaymentManagement() {
   // =========== Mutations ===========
 
   const createMutation = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: CreateFormSubmitData) => {
       return apiRequest("/api/payment/items", "POST", data);
     },
     onSuccess: () => {
@@ -206,13 +252,13 @@ export default function MonthlyPaymentManagement() {
       setSelectedFixedCategoryId("");
       toast({ title: "月付項目建立成功", description: "新的月付項目已成功新增" });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({ title: "建立失敗", description: error.message || "建立月付項目時發生錯誤", variant: "destructive" });
     },
   });
 
   const updateMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: number; data: any }) => {
+    mutationFn: async ({ id, data }: { id: number; data: UpdateFormSubmitData }) => {
       return apiRequest("PUT", `/api/payment/items/${id}`, data);
     },
     onSuccess: () => {
@@ -222,7 +268,7 @@ export default function MonthlyPaymentManagement() {
       editForm.reset();
       toast({ title: "月付項目更新成功", description: "月付項目資訊已成功更新" });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({ title: "更新失敗", description: error.message || "更新月付項目時發生錯誤", variant: "destructive" });
     },
   });
@@ -235,7 +281,7 @@ export default function MonthlyPaymentManagement() {
       queryClient.invalidateQueries({ queryKey: ["/api/payment/items"] });
       toast({ title: "月付項目已移至回收站", description: "月付項目已成功移至回收站" });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({ title: "刪除失敗", description: error.message || "刪除月付項目時發生錯誤", variant: "destructive" });
     },
   });
@@ -251,7 +297,7 @@ export default function MonthlyPaymentManagement() {
       setShowBatchDeleteConfirm(false);
       toast({ title: "批量刪除成功", description: `已將 ${ids.length} 個項目移至回收站` });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({ title: "批量刪除失敗", description: error.message || "批量刪除時發生錯誤", variant: "destructive" });
     },
   });
@@ -274,7 +320,7 @@ export default function MonthlyPaymentManagement() {
       setShowBatchPayConfirm(false);
       toast({ title: "批量付款成功", description: `已將 ${ids.length} 個項目標記為已付款` });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({ title: "批量付款失敗", description: error.message || "批量更新付款狀態時發生錯誤", variant: "destructive" });
     },
   });
@@ -326,8 +372,8 @@ export default function MonthlyPaymentManagement() {
 
   // =========== 事件處理 ===========
 
-  const handleCreateSubmit = async (data: any) => {
-    const installments = data.installments || 1;
+  const handleCreateSubmit = async (data: CreateFormSubmitData) => {
+    const installments = parseInt(data.installments) || 1;
     const startDate = new Date(data.dueDate);
     const items = [];
 
@@ -370,23 +416,24 @@ export default function MonthlyPaymentManagement() {
       setSelectedCategoryId("");
       setSelectedFixedCategoryId("");
       toast({ title: "月付項目建立成功", description: `已成功建立 ${installments} 期付款項目` });
-    } catch (error: any) {
-      toast({ title: "建立失敗", description: error.message || "建立月付項目時發生錯誤", variant: "destructive" });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "建立月付項目時發生錯誤";
+      toast({ title: "建立失敗", description: errorMessage, variant: "destructive" });
     }
   };
 
-  const handleEditSubmit = (data: any) => {
+  const handleEditSubmit = (data: UpdateFormSubmitData) => {
     if (!editingItem) return;
-    const processedData = {
+    const processedData: UpdateFormSubmitData = {
       ...data,
-      categoryId: parseInt(data.categoryId),
-      projectId: parseInt(data.projectId),
-      fixedCategoryId: data.fixedCategoryId ? parseInt(data.fixedCategoryId) : null,
+      categoryId: parseInt(data.categoryId).toString(),
+      projectId: parseInt(data.projectId).toString(),
+      fixedCategoryId: data.fixedCategoryId ? parseInt(data.fixedCategoryId).toString() : "",
       amount: data.amount.toString(),
       totalAmount: data.amount.toString(),
       paymentType: "monthly",
-      startDate: data.startDate || null,
-      endDate: data.endDate || null,
+      startDate: data.startDate || "",
+      endDate: data.endDate || "",
       dueDate: data.startDate,
       itemType: data.fixedCategoryId ? "project" : "home",
     };
@@ -472,8 +519,8 @@ export default function MonthlyPaymentManagement() {
         <MonthlyPaymentCreateDialog
           isOpen={isCreateDialogOpen}
           onOpenChange={setIsCreateDialogOpen}
-          createForm={createForm}
-          onSubmit={handleCreateSubmit}
+          createForm={createForm as unknown as UseFormReturn<FieldValues>}
+          onSubmit={handleCreateSubmit as unknown as (data: FieldValues) => Promise<void>}
           isPending={createMutation.isPending}
         />
       </div>
@@ -548,11 +595,11 @@ export default function MonthlyPaymentManagement() {
       <MonthlyPaymentEditDialog
         isOpen={isEditDialogOpen}
         onOpenChange={setIsEditDialogOpen}
-        editForm={editForm}
+        editForm={editForm as unknown as UseFormReturn<FieldValues>}
         editingItem={editingItem}
         isEditUnlocked={isEditUnlocked}
         onToggleEditLock={toggleEditLock}
-        onSubmit={handleEditSubmit}
+        onSubmit={handleEditSubmit as unknown as (data: FieldValues) => void}
         isPending={updateMutation.isPending}
         projects={projects}
         categories={categories}

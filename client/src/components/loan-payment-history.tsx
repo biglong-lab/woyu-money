@@ -14,6 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, Edit, Trash2, Check, X, Upload, Download, AlertTriangle, CheckCircle } from "lucide-react";
 import { format } from "date-fns";
 import { PaymentFileUpload } from "./payment-file-upload";
+import type { InsertLoanPaymentHistory } from "shared/schema/loan";
 
 interface LoanPaymentHistory {
   id: number;
@@ -56,6 +57,24 @@ interface LoanPaymentHistoryProps {
   recordTitle: string;
 }
 
+interface PaymentFormData {
+  paymentType: string;
+  amount: string;
+  paymentDate: string;
+  paymentMethod: string;
+  paymentStatus: string;
+  notes: string;
+  communicationNotes: string;
+  riskNotes: string;
+  receiptNotes: string;
+  recordedBy: string;
+}
+
+interface UpdatePaymentMutationParams {
+  id: number;
+  data: PaymentFormData;
+}
+
 export default function LoanPaymentHistory({ recordId, recordTitle }: LoanPaymentHistoryProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -63,7 +82,7 @@ export default function LoanPaymentHistory({ recordId, recordTitle }: LoanPaymen
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<LoanPaymentHistory | null>(null);
-  const [paymentForm, setPaymentForm] = useState({
+  const [paymentForm, setPaymentForm] = useState<PaymentFormData>({
     paymentType: "interest",
     amount: "",
     paymentDate: new Date().toISOString().split('T')[0],
@@ -88,7 +107,7 @@ export default function LoanPaymentHistory({ recordId, recordTitle }: LoanPaymen
 
   // 新增還款記錄
   const addPaymentMutation = useMutation({
-    mutationFn: async (paymentData: any) => {
+    mutationFn: async (paymentData: PaymentFormData) => {
       return await apiRequest("POST", `/api/loan-investment/records/${recordId}/payments`, paymentData);
     },
     onSuccess: () => {
@@ -102,7 +121,7 @@ export default function LoanPaymentHistory({ recordId, recordTitle }: LoanPaymen
       setAddDialogOpen(false);
       resetForm();
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "錯誤",
         description: error.message || "新增還款記錄失敗",
@@ -113,7 +132,7 @@ export default function LoanPaymentHistory({ recordId, recordTitle }: LoanPaymen
 
   // 更新還款記錄
   const updatePaymentMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: number; data: any }) => {
+    mutationFn: async ({ id, data }: UpdatePaymentMutationParams) => {
       return await apiRequest("PUT", `/api/loan-investment/payments/${id}`, data);
     },
     onSuccess: () => {
@@ -126,7 +145,7 @@ export default function LoanPaymentHistory({ recordId, recordTitle }: LoanPaymen
       setEditDialogOpen(false);
       setSelectedPayment(null);
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "錯誤",
         description: error.message || "更新還款記錄失敗",
@@ -148,7 +167,7 @@ export default function LoanPaymentHistory({ recordId, recordTitle }: LoanPaymen
       queryClient.invalidateQueries({ queryKey: [`/api/loan-investment/records/${recordId}/payments`] });
       queryClient.invalidateQueries({ queryKey: [`/api/loan-investment/records/${recordId}/payment-stats`] });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "錯誤",
         description: error.message || "刪除還款記錄失敗",
@@ -170,7 +189,7 @@ export default function LoanPaymentHistory({ recordId, recordTitle }: LoanPaymen
       queryClient.invalidateQueries({ queryKey: [`/api/loan-investment/records/${recordId}/payments`] });
       queryClient.invalidateQueries({ queryKey: [`/api/loan-investment/records/${recordId}/payment-stats`] });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "錯誤",
         description: error.message || "驗證還款記錄失敗",
@@ -598,7 +617,7 @@ export default function LoanPaymentHistory({ recordId, recordTitle }: LoanPaymen
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  {stats.paymentMethods.map((method: any, index: number) => (
+                  {stats.paymentMethods.map((method: { method: string; count: number; amount: string }, index: number) => (
                     <div key={index} className="flex justify-between items-center">
                       <span>{getPaymentMethodLabel(method.method)}</span>
                       <div className="text-right">

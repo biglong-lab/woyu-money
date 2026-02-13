@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import type { Control, FieldValues } from "react-hook-form";
 import { useQuery } from "@tanstack/react-query";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -7,7 +8,11 @@ import { Badge } from "@/components/ui/badge";
 import { Layers, Building2, Tag } from "lucide-react";
 
 type CategorySelectorProps = {
-  form: any;
+  form: {
+    control: Control<FieldValues>;
+    watch: (name: string) => string;
+    setValue: (name: string, value: string) => void;
+  };
   readOnly?: boolean;
   onCategoryChange?: (categoryData: {
     categoryType: string;

@@ -1,3 +1,4 @@
+import React from "react";
 // 單據收件箱共用型別與常數
 import { FileText, CreditCard, Receipt, Clock, Loader2, CheckCircle2, AlertCircle, Archive } from "lucide-react";
 
@@ -14,7 +15,7 @@ export const DOCUMENT_TYPES = [
   { value: 'invoice', label: '發票', icon: Receipt, color: 'bg-purple-100 text-purple-700', description: '統一發票、電子發票' },
 ] as const;
 
-export const STATUS_LABELS: Record<string, { label: string; color: string; icon: any }> = {
+export const STATUS_LABELS: Record<string, { label: string; color: string; icon: React.ComponentType<{ className?: string }> }> = {
   pending: { label: '待處理', color: 'bg-gray-200 text-gray-800 border border-gray-300', icon: Clock },
   processing: { label: '辨識中', color: 'bg-amber-200 text-amber-900 border border-amber-300', icon: Loader2 },
   recognized: { label: '已辨識', color: 'bg-emerald-500 text-white border border-emerald-600', icon: CheckCircle2 },

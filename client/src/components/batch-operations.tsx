@@ -15,10 +15,17 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
+interface BatchUpdateData {
+  status?: string;
+  priority?: number;
+  categoryId?: number;
+  notes?: string;
+}
+
 interface BatchOperationsProps {
   selectedItems: string[];
   onSelectionChange: (items: string[]) => void;
-  onBatchUpdate: (action: string, data: any) => Promise<void>;
+  onBatchUpdate: (action: string, data: BatchUpdateData) => Promise<void>;
   onBulkImport: (file: File) => Promise<void>;
   onExport: (format: string) => void;
   totalItems: number;
@@ -43,7 +50,7 @@ export function BatchOperations({
   const [isBatchUpdateOpen, setIsBatchUpdateOpen] = useState(false);
   const [importProgress, setImportProgress] = useState<ImportProgress | null>(null);
   const [batchAction, setBatchAction] = useState('');
-  const [batchData, setBatchData] = useState<any>({});
+  const [batchData, setBatchData] = useState<BatchUpdateData>({});
   const { toast } = useToast();
 
   // 檔案匯入處理

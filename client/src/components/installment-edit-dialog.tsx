@@ -1,6 +1,6 @@
 // 分期付款編輯對話框元件（僅可編輯備註）
 
-import { UseFormReturn } from "react-hook-form";
+import { UseFormReturn, FieldValues } from "react-hook-form";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -10,8 +10,8 @@ import type { PaymentItem } from "./installment-types";
 export interface InstallmentEditDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  form: UseFormReturn<any>;
-  onSubmit: (data: any) => void;
+  form: UseFormReturn<FieldValues>;
+  onSubmit: (data: FieldValues) => void;
   isPending: boolean;
   editingItem: PaymentItem | null;
 }

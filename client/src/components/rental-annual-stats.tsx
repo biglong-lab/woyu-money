@@ -8,9 +8,32 @@ import { Progress } from "@/components/ui/progress";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Calendar, Download, FileText, TrendingUp, Info } from "lucide-react";
+import type { PaymentItem } from "@shared/schema";
+
+// 月度統計資料
+interface MonthlyStat {
+  readonly month: number;
+  readonly count: number;
+  readonly total: number;
+  readonly paid: number;
+  readonly paidCount: number;
+  readonly rate: number;
+  readonly items: PaymentItem[];
+}
+
+// 季度統計資料
+interface QuarterlyStat {
+  readonly quarter: number;
+  readonly count: number;
+  readonly total: number;
+  readonly paid: number;
+  readonly paidCount: number;
+  readonly rate: number;
+  readonly items: PaymentItem[];
+}
 
 interface AnnualStatsReportProps {
-  readonly rentalPayments: any[];
+  readonly rentalPayments: PaymentItem[];
   readonly monthlyPaymentYear: number;
   readonly onMonthlyPaymentYearChange: (year: number) => void;
   readonly onExportPayments: (format: 'excel' | 'csv') => void;
@@ -23,29 +46,29 @@ export function AnnualStatsReport({
   onMonthlyPaymentYearChange,
   onExportPayments,
 }: AnnualStatsReportProps) {
-  const yearPayments = rentalPayments.filter((item: any) => {
+  const yearPayments = rentalPayments.filter((item) => {
     if (!item.startDate) return false;
     const itemDate = new Date(item.startDate);
     return itemDate.getFullYear() === monthlyPaymentYear;
   });
 
-  const totalAmount = yearPayments.reduce((sum: number, item: any) =>
+  const totalAmount = yearPayments.reduce((sum: number, item) =>
     sum + (parseFloat(item.totalAmount) || 0), 0);
-  const paidAmount = yearPayments.reduce((sum: number, item: any) =>
-    sum + (parseFloat(item.paidAmount) || 0), 0);
-  const paidCount = yearPayments.filter((item: any) =>
-    parseFloat(item.paidAmount || 0) >= parseFloat(item.totalAmount || 0)).length;
+  const paidAmount = yearPayments.reduce((sum: number, item) =>
+    sum + (parseFloat(item.paidAmount ?? "0") || 0), 0);
+  const paidCount = yearPayments.filter((item) =>
+    parseFloat(item.paidAmount ?? "0") >= parseFloat(item.totalAmount ?? "0")).length;
   const completionRate = totalAmount > 0 ? (paidAmount / totalAmount) * 100 : 0;
 
   const monthlyStats = Array.from({ length: 12 }, (_, month) => {
-    const monthPayments = yearPayments.filter((item: any) => {
+    const monthPayments = yearPayments.filter((item) => {
       const itemDate = new Date(item.startDate);
       return itemDate.getMonth() === month;
     });
-    const monthTotal = monthPayments.reduce((s: number, i: any) => s + (parseFloat(i.totalAmount) || 0), 0);
-    const monthPaid = monthPayments.reduce((s: number, i: any) => s + (parseFloat(i.paidAmount) || 0), 0);
-    const monthPaidCount = monthPayments.filter((i: any) =>
-      parseFloat(i.paidAmount || 0) >= parseFloat(i.totalAmount || 0)).length;
+    const monthTotal = monthPayments.reduce((s: number, i) => s + (parseFloat(i.totalAmount) || 0), 0);
+    const monthPaid = monthPayments.reduce((s: number, i) => s + (parseFloat(i.paidAmount ?? "0") || 0), 0);
+    const monthPaidCount = monthPayments.filter((i) =>
+      parseFloat(i.paidAmount ?? "0") >= parseFloat(i.totalAmount ?? "0")).length;
     return {
       month: month + 1,
       count: monthPayments.length,
@@ -59,7 +82,7 @@ export function AnnualStatsReport({
 
   const quarterlyStats = [0, 1, 2, 3].map(q => {
     const quarterMonths = monthlyStats.slice(q * 3, q * 3 + 3);
-    const quarterItems = yearPayments.filter((item: any) => {
+    const quarterItems = yearPayments.filter((item) => {
       const itemDate = new Date(item.startDate);
       const itemMonth = itemDate.getMonth();
       return itemMonth >= q * 3 && itemMonth < (q + 1) * 3;
@@ -194,8 +217,8 @@ function QuarterlyStatsTable({
   paidAmount,
   completionRate,
 }: {
-  readonly quarterlyStats: any[];
-  readonly yearPayments: any[];
+  readonly quarterlyStats: QuarterlyStat[];
+  readonly yearPayments: PaymentItem[];
   readonly paidCount: number;
   readonly totalAmount: number;
   readonly paidAmount: number;
@@ -240,9 +263,11 @@ function QuarterlyStatsTable({
                         ) : (
                           <ScrollArea className="h-[200px]">
                             <div className="space-y-2 pr-3">
-                              {q.items.map((item: any) => {
-                                const isPaid = parseFloat(item.paidAmount || 0) >= parseFloat(item.totalAmount || 0);
-                                const isPartial = parseFloat(item.paidAmount || 0) > 0 && parseFloat(item.paidAmount || 0) < parseFloat(item.totalAmount || 0);
+                              {q.items.map((item) => {
+                                const paid = parseFloat(item.paidAmount ?? "0");
+                                const total = parseFloat(item.totalAmount ?? "0");
+                                const isPaid = paid >= total;
+                                const isPartial = paid > 0 && paid < total;
                                 return (
                                   <div key={item.id} className="flex items-center justify-between text-xs border-b pb-2">
                                     <div className="flex-1 min-w-0">
@@ -250,9 +275,9 @@ function QuarterlyStatsTable({
                                       <div className="text-gray-500">{new Date(item.startDate).toLocaleDateString('zh-TW')}</div>
                                     </div>
                                     <div className="text-right ml-2">
-                                      <div className="font-medium">NT${parseFloat(item.totalAmount || 0).toLocaleString()}</div>
+                                      <div className="font-medium">NT${total.toLocaleString()}</div>
                                       <div className={isPaid ? "text-green-600" : isPartial ? "text-yellow-600" : "text-red-600"}>
-                                        {isPaid ? "已付清" : isPartial ? `已付 ${((parseFloat(item.paidAmount || 0) / parseFloat(item.totalAmount || 0)) * 100).toFixed(0)}%` : "待付款"}
+                                        {isPaid ? "已付清" : isPartial ? `已付 ${((paid / total) * 100).toFixed(0)}%` : "待付款"}
                                       </div>
                                     </div>
                                   </div>
@@ -305,7 +330,7 @@ function QuarterlyStatsTable({
 // ==========================================
 // 月度統計矩陣
 // ==========================================
-function MonthlyStatsGrid({ monthlyStats }: { readonly monthlyStats: any[] }) {
+function MonthlyStatsGrid({ monthlyStats }: { readonly monthlyStats: MonthlyStat[] }) {
   return (
     <div data-testid="monthly-stats-section">
       <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
@@ -351,9 +376,11 @@ function MonthlyStatsGrid({ monthlyStats }: { readonly monthlyStats: any[] }) {
                   ) : (
                     <ScrollArea className="h-[180px]">
                       <div className="space-y-2 pr-3">
-                        {m.items.map((item: any) => {
-                          const isPaid = parseFloat(item.paidAmount || 0) >= parseFloat(item.totalAmount || 0);
-                          const isItemPartial = parseFloat(item.paidAmount || 0) > 0 && parseFloat(item.paidAmount || 0) < parseFloat(item.totalAmount || 0);
+                        {m.items.map((item) => {
+                          const paid = parseFloat(item.paidAmount ?? "0");
+                          const total = parseFloat(item.totalAmount ?? "0");
+                          const isPaid = paid >= total;
+                          const isItemPartial = paid > 0 && paid < total;
                           return (
                             <div key={item.id} className="flex items-center justify-between text-xs border-b pb-2">
                               <div className="flex-1 min-w-0">
@@ -361,9 +388,9 @@ function MonthlyStatsGrid({ monthlyStats }: { readonly monthlyStats: any[] }) {
                                 <div className="text-gray-500">{new Date(item.startDate).toLocaleDateString('zh-TW')}</div>
                               </div>
                               <div className="text-right ml-2">
-                                <div className="font-medium">NT${parseFloat(item.totalAmount || 0).toLocaleString()}</div>
+                                <div className="font-medium">NT${total.toLocaleString()}</div>
                                 <div className={isPaid ? "text-green-600" : isItemPartial ? "text-yellow-600" : "text-red-600"}>
-                                  {isPaid ? "已付清" : isItemPartial ? `已付 ${((parseFloat(item.paidAmount || 0) / parseFloat(item.totalAmount || 0)) * 100).toFixed(0)}%` : "待付款"}
+                                  {isPaid ? "已付清" : isItemPartial ? `已付 ${((paid / total) * 100).toFixed(0)}%` : "待付款"}
                                 </div>
                               </div>
                             </div>

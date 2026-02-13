@@ -1,7 +1,7 @@
 // 一般付款管理 - 主頁面（重構後）
 import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useForm } from "react-hook-form";
+import { useForm, type UseFormReturn, type FieldValues } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -27,6 +27,42 @@ import type {
   GeneralPaymentStatistics,
   CategoryWithSource,
 } from "@/components/general-payment-types";
+
+// API 回應型別
+interface PaymentItemsResponse {
+  items: PaymentItem[];
+}
+
+// 表單資料型別
+interface CreateFormData {
+  itemName: string;
+  amount: string;
+  categoryId: string;
+  projectId: string;
+  fixedCategoryId: string;
+  dueDate: string;
+  paymentDate: string;
+  notes: string;
+  categoryType: string;
+}
+
+interface EditFormData {
+  itemName: string;
+  totalAmount: string;
+  startDate: string;
+  notes: string;
+}
+
+interface PaymentFormData {
+  paymentAmount: string;
+  paymentDate: string;
+  notes: string;
+}
+
+// API 錯誤型別
+interface ApiError {
+  message: string;
+}
 
 export default function GeneralPaymentManagement() {
   const { toast } = useToast();
@@ -71,7 +107,7 @@ export default function GeneralPaymentManagement() {
 
   // =========== 表單 ===========
 
-  const createForm = useForm({
+  const createForm = useForm<CreateFormData>({
     defaultValues: {
       itemName: "",
       amount: "",
@@ -85,7 +121,7 @@ export default function GeneralPaymentManagement() {
     },
   });
 
-  const editForm = useForm({
+  const editForm = useForm<EditFormData>({
     defaultValues: {
       itemName: "",
       totalAmount: "",
@@ -94,7 +130,7 @@ export default function GeneralPaymentManagement() {
     },
   });
 
-  const paymentForm = useForm({
+  const paymentForm = useForm<PaymentFormData>({
     defaultValues: {
       paymentAmount: "",
       paymentDate: "",
@@ -104,7 +140,7 @@ export default function GeneralPaymentManagement() {
 
   // =========== 資料查詢 ===========
 
-  const { data: paymentItemsResponse, isLoading, refetch: refetchItems } = useQuery<any>({
+  const { data: paymentItemsResponse, isLoading, refetch: refetchItems } = useQuery<PaymentItem[] | PaymentItemsResponse>({
     queryKey: ["/api/payment/items?limit=500&itemType=general"],
     staleTime: 30000,
     refetchOnWindowFocus: false,
@@ -134,8 +170,8 @@ export default function GeneralPaymentManagement() {
 
   // 合併所有分類
   const allCategories: CategoryWithSource[] = [
-    ...fixedCategories.map((cat: any) => ({ ...cat, categoryType: 'fixed', source: '固定分類' })),
-    ...projectCategories.map((cat: any) => ({ ...cat, categoryType: 'project', source: '專案分類' }))
+    ...fixedCategories.map((cat: FixedCategory) => ({ ...cat, categoryType: 'fixed', source: '固定分類' })),
+    ...projectCategories.map((cat: DebtCategory) => ({ ...cat, categoryType: 'project', source: '專案分類' }))
   ];
 
   // 伺服器已篩選一般付款項目
@@ -252,7 +288,7 @@ export default function GeneralPaymentManagement() {
       return matchesSearch && matchesProject && matchesCategory && matchesStatus &&
              matchesPaymentType && showItem && matchesDate && matchesPriority;
     }).sort((a, b) => {
-      let comparison = 0;
+      let comparison: number;
       switch (sortBy) {
         case "dueDate":
           comparison = new Date(a.startDate).getTime() - new Date(b.startDate).getTime();
@@ -337,7 +373,16 @@ export default function GeneralPaymentManagement() {
   // =========== Mutations ===========
 
   const createMutation = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: {
+      itemName: string;
+      categoryId: number | null;
+      projectId: number;
+      fixedCategoryId: number | null;
+      totalAmount: string;
+      paymentType: string;
+      startDate: string;
+      notes: string | null;
+    }) => {
       return apiRequest("POST", "/api/payment/items", data);
     },
     onSuccess: () => {
@@ -347,13 +392,22 @@ export default function GeneralPaymentManagement() {
       createForm.reset();
       toast({ title: "一般付款項目建立成功", description: "新的付款項目已成功建立" });
     },
-    onError: (error: any) => {
-      toast({ title: "建立失敗", description: error.message || "建立付款項目時發生錯誤", variant: "destructive" });
+    onError: (error: Error | ApiError) => {
+      const message = 'message' in error ? error.message : '建立付款項目時發生錯誤';
+      toast({ title: "建立失敗", description: message, variant: "destructive" });
     },
   });
 
   const editMutation = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: {
+      itemName: string;
+      totalAmount: string;
+      startDate: string;
+      notes: string;
+      categoryId: number | null;
+      fixedCategoryId: number | null;
+      projectId: number | null;
+    }) => {
       if (!editItem?.id) throw new Error("無效的項目ID");
       const updateData = {
         itemName: data.itemName,
@@ -375,8 +429,9 @@ export default function GeneralPaymentManagement() {
       setEditSelectedProjectId("");
       toast({ title: "更新成功", description: "付款項目已成功更新" });
     },
-    onError: (error: any) => {
-      toast({ title: "更新失敗", description: error.message || "更新付款項目時發生錯誤", variant: "destructive" });
+    onError: (error: Error | ApiError) => {
+      const message = 'message' in error ? error.message : '更新付款項目時發生錯誤';
+      toast({ title: "更新失敗", description: message, variant: "destructive" });
     },
   });
 
@@ -401,8 +456,9 @@ export default function GeneralPaymentManagement() {
       paymentForm.reset();
       toast({ title: "付款成功", description: "付款記錄已成功添加" });
     },
-    onError: (error: any) => {
-      toast({ title: "付款失敗", description: error.message || "添加付款記錄時發生錯誤", variant: "destructive" });
+    onError: (error: Error | ApiError) => {
+      const message = 'message' in error ? error.message : '添加付款記錄時發生錯誤';
+      toast({ title: "付款失敗", description: message, variant: "destructive" });
     },
   });
 
@@ -415,14 +471,15 @@ export default function GeneralPaymentManagement() {
       setIsDeleteDialogOpen(false);
       toast({ title: "刪除成功", description: "付款項目已成功刪除" });
     },
-    onError: (error: any) => {
-      toast({ title: "刪除失敗", description: error.message || "刪除付款項目時發生錯誤", variant: "destructive" });
+    onError: (error: Error | ApiError) => {
+      const message = 'message' in error ? error.message : '刪除付款項目時發生錯誤';
+      toast({ title: "刪除失敗", description: message, variant: "destructive" });
     },
   });
 
   // =========== 事件處理 ===========
 
-  const handleCreateSubmit = (data: any) => {
+  const handleCreateSubmit = (data: CreateFormData) => {
     if (!data.itemName) {
       createForm.setError("itemName", { type: "manual", message: "項目名稱為必填欄位" });
       return;
@@ -461,9 +518,15 @@ export default function GeneralPaymentManagement() {
     createMutation.mutate(processedData);
   };
 
-  const handleEditSubmit = (data: any) => {
+  const handleEditSubmit = (data: EditFormData) => {
     if (!editItem) return;
-    editMutation.mutate(data);
+    editMutation.mutate({
+      ...data,
+      categoryId: editSelectedCategoryId ? parseInt(editSelectedCategoryId) : null,
+      fixedCategoryId: editSelectedCategoryId && fixedCategories.find(c => c.id === parseInt(editSelectedCategoryId))
+        ? parseInt(editSelectedCategoryId) : null,
+      projectId: editSelectedProjectId ? parseInt(editSelectedProjectId) : null,
+    });
   };
 
   const handleEdit = (item: PaymentItem) => {
@@ -496,7 +559,7 @@ export default function GeneralPaymentManagement() {
     setIsPaymentDialogOpen(true);
   };
 
-  const handlePaymentSubmit = (data: any, receiptFile: File | null) => {
+  const handlePaymentSubmit = (data: PaymentFormData, receiptFile: File | null) => {
     if (!paymentItem) return;
     paymentMutation.mutate({
       itemId: paymentItem.id,
@@ -660,8 +723,8 @@ export default function GeneralPaymentManagement() {
         <GeneralPaymentCreateDialog
           isOpen={isCreateDialogOpen}
           onOpenChange={setIsCreateDialogOpen}
-          createForm={createForm}
-          onSubmit={handleCreateSubmit}
+          createForm={createForm as unknown as UseFormReturn<FieldValues>}
+          onSubmit={handleCreateSubmit as unknown as (data: FieldValues) => void}
           isPending={createMutation.isPending}
           onBatchImportOpen={() => setIsBatchImportOpen(true)}
         />
@@ -735,9 +798,9 @@ export default function GeneralPaymentManagement() {
       <GeneralPaymentPaymentDialog
         isOpen={isPaymentDialogOpen}
         onOpenChange={setIsPaymentDialogOpen}
-        paymentForm={paymentForm}
+        paymentForm={paymentForm as unknown as UseFormReturn<FieldValues>}
         paymentItem={paymentItem}
-        onSubmit={handlePaymentSubmit}
+        onSubmit={handlePaymentSubmit as unknown as (data: FieldValues, receiptFile: File | null) => void}
         isPending={paymentMutation.isPending}
       />
 
@@ -745,8 +808,8 @@ export default function GeneralPaymentManagement() {
       <GeneralPaymentEditDialog
         isOpen={isEditDialogOpen}
         onOpenChange={setIsEditDialogOpen}
-        editForm={editForm}
-        onSubmit={handleEditSubmit}
+        editForm={editForm as unknown as UseFormReturn<FieldValues>}
+        onSubmit={handleEditSubmit as unknown as (data: FieldValues) => void}
         isPending={editMutation.isPending}
       />
 

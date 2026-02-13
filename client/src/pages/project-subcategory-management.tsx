@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -7,22 +7,21 @@ import { format } from "date-fns";
 import { zhTW } from "date-fns/locale";
 import { 
   Building2, CreditCard, DollarSign, Calendar, 
-  TrendingUp, TrendingDown, Clock, CheckCircle2,
-  AlertCircle, Plus, ArrowRight, Target
+  TrendingUp, Clock, Target
 } from "lucide-react";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import type { PaymentProject, DebtCategory } from "@shared/schema";
 
 
 // 類型定義
@@ -46,22 +45,6 @@ type SubcategoryStatus = {
   remainingAmount: string;
 };
 
-type PaymentProject = {
-  id: number;
-  projectName: string;
-  projectType: string;
-  description?: string;
-  isActive: boolean;
-};
-
-type Category = {
-  id: number;
-  categoryName: string;
-  parentId?: number;
-  description?: string;
-  isDeleted: boolean;
-};
-
 // 子分類付款表單 Schema
 const subcategoryPaymentSchema = z.object({
   subcategoryId: z.number().min(1, "請選擇子分類"),
@@ -69,6 +52,13 @@ const subcategoryPaymentSchema = z.object({
   paymentDate: z.string().min(1, "付款日期為必填"),
   userInfo: z.string().optional(),
 });
+
+type SubcategoryPaymentFormData = z.infer<typeof subcategoryPaymentSchema>;
+
+interface ProcessPaymentResult {
+  allocatedPayments: unknown[];
+  remainingAmount: string;
+}
 
 export default function ProjectSubcategoryManagement() {
   const [selectedProject, setSelectedProject] = useState<number | null>(null);
@@ -78,7 +68,7 @@ export default function ProjectSubcategoryManagement() {
   const { toast } = useToast();
 
   // 表單設定
-  const paymentForm = useForm({
+  const paymentForm = useForm<SubcategoryPaymentFormData>({
     resolver: zodResolver(subcategoryPaymentSchema),
     defaultValues: {
       subcategoryId: 0,
@@ -94,7 +84,7 @@ export default function ProjectSubcategoryManagement() {
     queryFn: () => apiRequest("GET", "/api/payment/projects"),
   });
 
-  const { data: categories = [] } = useQuery<Category[]>({
+  const { data: categories = [] } = useQuery<DebtCategory[]>({
     queryKey: ["/api/categories/project"],
     queryFn: () => apiRequest("GET", "/api/categories/project"),
   });
@@ -109,9 +99,12 @@ export default function ProjectSubcategoryManagement() {
   });
 
   // 子分類付款處理
-  const processPaymentMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/subcategory/process-payment", data),
-    onSuccess: (result: any) => {
+  const processPaymentMutation = useMutation<ProcessPaymentResult, Error, SubcategoryPaymentFormData>({
+    mutationFn: async (data) => {
+      const response = await apiRequest("POST", "/api/subcategory/process-payment", data);
+      return response as ProcessPaymentResult;
+    },
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["/api/subcategory/status"] });
       queryClient.invalidateQueries({ queryKey: ["/api/payment/items"] });
       setIsPaymentDialogOpen(false);
@@ -126,7 +119,7 @@ export default function ProjectSubcategoryManagement() {
         description: `成功分配到 ${allocatedCount} 個項目${remainingAmount > 0 ? `，剩餘金額：NT$ ${remainingAmount.toLocaleString()}` : ''}`,
       });
     },
-    onError: (error: any) => {
+    onError: (error) => {
       toast({
         title: "付款處理失敗",
         description: error.message || "處理付款時發生錯誤",
@@ -136,14 +129,15 @@ export default function ProjectSubcategoryManagement() {
   });
 
   // 獲取主分類（父分類）
-  const parentCategories = categories.filter(cat => !cat.parentId);
+  const parentCategories = categories.filter(cat => !cat.isDeleted);
 
   // 處理付款提交
-  const handlePaymentSubmit = (data: any) => {
-    processPaymentMutation.mutate({
-      subcategoryId: selectedSubcategory,
-      ...data
-    });
+  const handlePaymentSubmit = (data: SubcategoryPaymentFormData) => {
+    const submitData = {
+      ...data,
+      subcategoryId: selectedSubcategory || 0,
+    };
+    processPaymentMutation.mutate(submitData);
   };
 
   // 計算進度百分比

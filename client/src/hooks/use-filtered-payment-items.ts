@@ -3,6 +3,12 @@
 
 import { useMemo } from "react";
 import type { PaymentItem, PaymentStats } from "@/components/payment-project-types";
+import type { PaymentProject } from "@shared/schema";
+
+interface PaymentRecordLike {
+  itemId: number;
+  paymentDate: string | null;
+}
 
 interface UseFilteredPaymentItemsParams {
   /** 所有付款項目 */
@@ -32,9 +38,9 @@ interface UseFilteredPaymentItemsParams {
   /** 排序方向 */
   sortOrder: string;
   /** 專案列表 */
-  projects: any[] | undefined;
+  projects: PaymentProject[] | undefined;
   /** 付款記錄 */
-  paymentRecords: any;
+  paymentRecords: unknown;
   /** 選中的月份 */
   selectedMonth: number;
   /** 選中的年度 */
@@ -48,6 +54,14 @@ interface UseFilteredPaymentItemsReturn {
   filteredAndSortedItems: PaymentItem[];
   /** 統計資料 */
   stats: PaymentStats;
+}
+
+/** 型別守衛：檢查是否為付款記錄陣列 */
+function isPaymentRecordArray(value: unknown): value is PaymentRecordLike[] {
+  return Array.isArray(value) && value.every(
+    item => typeof item === 'object' && item !== null && 
+    'itemId' in item && 'paymentDate' in item
+  );
 }
 
 /** 根據付款項目取得有效日期 */
@@ -77,7 +91,7 @@ function filterItems(
     // 專案匹配
     const matchesProject = params.selectedProject === "all" ||
       (params.selectedProject && Array.isArray(params.projects) &&
-       item.projectName === params.projects.find((p: any) => p.id.toString() === params.selectedProject)?.projectName);
+       item.projectName === params.projects.find((p: PaymentProject) => p.id.toString() === params.selectedProject)?.projectName);
 
     // 分類匹配
     let matchesCategory = true;
@@ -118,13 +132,13 @@ function filterItems(
       const targetYear = params.selectedYear;
       const targetMonth = params.selectedMonth;
 
-      if (params.paymentRecords && Array.isArray(params.paymentRecords)) {
-        const itemPayments = params.paymentRecords.filter((record: any) =>
+      if (isPaymentRecordArray(params.paymentRecords)) {
+        const itemPayments = params.paymentRecords.filter((record: PaymentRecordLike) =>
           record.itemId === item.id && record.paymentDate
         );
 
-        matchesDateRange = itemPayments.some((payment: any) => {
-          const paymentDate = new Date(payment.paymentDate);
+        matchesDateRange = itemPayments.some((payment: PaymentRecordLike) => {
+          const paymentDate = new Date(payment.paymentDate!);
           return paymentDate.getMonth() === targetMonth && paymentDate.getFullYear() === targetYear;
         });
       } else {
@@ -150,7 +164,7 @@ function filterItems(
     }
 
     // 已刪除和已付款匹配
-    const matchesDeleted = params.showDeleted ? (item as any).isDeleted : !(item as any).isDeleted;
+    const matchesDeleted = params.showDeleted ? item.isDeleted : !item.isDeleted;
     const matchesShowPaid = params.showPaidItems ? true : item.status !== "paid";
 
     return matchesSearch && matchesProject && matchesCategory && matchesStatus &&
@@ -163,7 +177,7 @@ function sortItems(items: PaymentItem[], sortBy: string, sortOrder: string): Pay
   const sorted = [...items];
 
   sorted.sort((a: PaymentItem, b: PaymentItem) => {
-    let comparison = 0;
+    let comparison: number;
 
     switch (sortBy) {
       case "dueDate":

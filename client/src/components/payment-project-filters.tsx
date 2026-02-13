@@ -9,6 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ResponsiveButtonGroup } from "@/components/enhanced-responsive-components";
 import type { PaymentItem, PaymentProject } from "./payment-project-types";
+import type { FixedCategory, DebtCategory } from "@/../../shared/schema/category";
 
 export interface PaymentProjectFiltersProps {
   // 統計模式
@@ -61,8 +62,8 @@ export interface PaymentProjectFiltersProps {
   applySmartFilter: (filterType: 'urgent' | 'thisMonth' | 'highAmount' | 'overdue') => void;
   // 資料
   projects: PaymentProject[] | undefined;
-  fixedCategoriesData: any;
-  projectCategoriesData: any;
+  fixedCategoriesData: FixedCategory[];
+  projectCategoriesData: DebtCategory[];
 }
 
 export default function PaymentProjectFilters({
@@ -555,12 +556,12 @@ export default function PaymentProjectFilters({
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">全部分類</SelectItem>
-                      {(Array.isArray(fixedCategoriesData) ? fixedCategoriesData : []).map((category: any) => (
+                      {(Array.isArray(fixedCategoriesData) ? fixedCategoriesData : []).map((category: FixedCategory) => (
                         <SelectItem key={`fixed:${category.id}`} value={`fixed:${category.id}`}>
                           {category.categoryName} (固定)
                         </SelectItem>
                       ))}
-                      {(Array.isArray(projectCategoriesData) ? projectCategoriesData : []).map((category: any) => (
+                      {(Array.isArray(projectCategoriesData) ? projectCategoriesData : []).map((category: DebtCategory) => (
                         <SelectItem key={`project:${category.id}`} value={`project:${category.id}`}>
                           {category.categoryName} (專案)
                         </SelectItem>

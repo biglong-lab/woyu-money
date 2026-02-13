@@ -13,11 +13,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import type { DebtCategory } from "@shared/schema/category";
 
 const categorySchema = z.object({
   categoryName: z.string().min(1, "分類名稱為必填"),
   description: z.string().optional(),
 });
+
+type CategoryFormData = z.infer<typeof categorySchema>;
 
 interface ProjectCategoryDialogProps {
   open: boolean;
@@ -27,16 +30,16 @@ interface ProjectCategoryDialogProps {
 export function ProjectCategoryDialog({ open, onOpenChange }: ProjectCategoryDialogProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [selectedCategory, setSelectedCategory] = useState<any>(null);
+  const [selectedCategory, setSelectedCategory] = useState<DebtCategory | null>(null);
   const [isEditing, setIsEditing] = useState(false);
 
   // 獲取專案分類
-  const { data: categories = [], isLoading } = useQuery<any[]>({
+  const { data: categories = [], isLoading } = useQuery<DebtCategory[]>({
     queryKey: ["/api/categories/project"],
     enabled: open,
   });
 
-  const form = useForm({
+  const form = useForm<CategoryFormData>({
     resolver: zodResolver(categorySchema),
     defaultValues: {
       categoryName: "",
@@ -46,8 +49,8 @@ export function ProjectCategoryDialog({ open, onOpenChange }: ProjectCategoryDia
 
   // 創建/更新分類
   const saveCategoryMutation = useMutation({
-    mutationFn: async (data: any) => {
-      if (isEditing) {
+    mutationFn: async (data: CategoryFormData) => {
+      if (isEditing && selectedCategory) {
         return await apiRequest(`/api/categories/project/${selectedCategory.id}`, "PUT", data);
       } else {
         return await apiRequest("/api/categories/project", "POST", data);
@@ -63,7 +66,7 @@ export function ProjectCategoryDialog({ open, onOpenChange }: ProjectCategoryDia
       setSelectedCategory(null);
       setIsEditing(false);
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "操作失敗",
         description: error.message,
@@ -84,7 +87,7 @@ export function ProjectCategoryDialog({ open, onOpenChange }: ProjectCategoryDia
       });
       queryClient.invalidateQueries({ queryKey: ["/api/categories/project"] });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "刪除失敗",
         description: error.message,
@@ -96,7 +99,7 @@ export function ProjectCategoryDialog({ open, onOpenChange }: ProjectCategoryDia
   // 初始化預設分類
   const initializeMutation = useMutation({
     mutationFn: async () => {
-      return await apiRequest("POST", "/api/categories/project/initialize");
+      return await apiRequest("/api/categories/project/initialize", "POST");
     },
     onSuccess: () => {
       toast({
@@ -105,7 +108,7 @@ export function ProjectCategoryDialog({ open, onOpenChange }: ProjectCategoryDia
       });
       queryClient.invalidateQueries({ queryKey: ["/api/categories/project"] });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "初始化失敗",
         description: error.message,
@@ -114,11 +117,11 @@ export function ProjectCategoryDialog({ open, onOpenChange }: ProjectCategoryDia
     },
   });
 
-  const onSubmit = (data: any) => {
+  const onSubmit = (data: CategoryFormData) => {
     saveCategoryMutation.mutate(data);
   };
 
-  const handleEdit = (category: any) => {
+  const handleEdit = (category: DebtCategory) => {
     setSelectedCategory(category);
     setIsEditing(true);
     form.reset({
@@ -248,7 +251,7 @@ export function ProjectCategoryDialog({ open, onOpenChange }: ProjectCategoryDia
                   </div>
                 ) : (
                   <div className="space-y-2 max-h-96 overflow-y-auto">
-                    {categories.map((category: any) => (
+                    {categories.map((category: DebtCategory) => (
                       <div 
                         key={category.id} 
                         className="flex items-center justify-between p-3 border rounded-lg"

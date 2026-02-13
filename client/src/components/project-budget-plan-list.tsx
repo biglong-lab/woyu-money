@@ -54,7 +54,7 @@ export default function ProjectBudgetPlanList({
 
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-      {plans.map((plan: any) => {
+      {plans.map((plan: BudgetPlan) => {
         const budget = plan.calculatedTotal || 0;
         const spent = parseFloat(plan.actualSpent) || 0;
         const progress = budget > 0 ? (spent / budget) * 100 : 0;

@@ -11,10 +11,31 @@ import { eq, and, sql, ne, desc } from "drizzle-orm"
 
 // === 子分類付款狀態 ===
 
+/** 子分類付款狀態項目 */
+interface SubcategoryStatusItem {
+  subcategoryId: number
+  subcategoryName: string | null
+  currentMonth: {
+    totalDue: string
+    totalPaid: string
+    unpaidItems: number
+  }
+  accumulated: {
+    totalUnpaid: string
+    overdueItems: number
+  }
+  installments: {
+    totalInstallments: number
+    completedInstallments: number
+    nextDueDate: string | undefined
+  }
+  remainingAmount: string
+}
+
 export async function getSubcategoryStatus(
   parentCategoryId: number,
   projectId?: number
-): Promise<any[]> {
+): Promise<SubcategoryStatusItem[]> {
   const currentDate = new Date()
   const currentYear = currentDate.getFullYear()
   const currentMonth = currentDate.getMonth() + 1
@@ -119,7 +140,13 @@ export async function getSubcategoryPaymentPriority(subcategoryId: number): Prom
   return await db
     .select()
     .from(paymentItems)
-    .where(and(eq(paymentItems.categoryId, subcategoryId), eq(paymentItems.isDeleted, false), sql`status != 'paid'`))
+    .where(
+      and(
+        eq(paymentItems.categoryId, subcategoryId),
+        eq(paymentItems.isDeleted, false),
+        sql`status != 'paid'`
+      )
+    )
     .orderBy(
       sql`CASE
         WHEN status = 'overdue' THEN 1
@@ -180,7 +207,7 @@ export async function processSubcategoryPayment(
       paymentDate: paymentDate,
       paymentMethod: "subcategory_allocation",
       notes: `子分類統一付款分配 - ${item.itemName}`,
-    } as any)
+    })
 
     await db.insert(auditLogs).values({
       tableName: "payment_items",
@@ -341,7 +368,7 @@ export async function executeUnifiedPayment(
       paymentDate: new Date().toISOString().split("T")[0],
       paymentMethod: "unified_payment",
       notes: notes || `統一付款分配 - ${item.itemName}`,
-    } as any)
+    })
 
     await db.insert(auditLogs).values({
       tableName: "payment_items",
@@ -372,7 +399,26 @@ export async function executeUnifiedPayment(
 
 // === 專案統計 ===
 
-export async function getProjectsWithStats(): Promise<any[]> {
+/** 專案統計資料 */
+interface ProjectWithStats {
+  projectId: number
+  projectName: string
+  projectType: string | null
+  totalAmount: string
+  paidAmount: string
+  unpaidAmount: string
+  overdueAmount: string
+  completionRate: number
+  counts: {
+    total: number
+    paid: number
+    pending: number
+    partial: number
+    overdue: number
+  }
+}
+
+export async function getProjectsWithStats(): Promise<ProjectWithStats[]> {
   try {
     const projectStats = await db
       .select({

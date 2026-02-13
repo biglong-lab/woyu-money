@@ -7,9 +7,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Calculator, AlertTriangle, TrendingUp, Calendar } from "lucide-react";
 
+
+
 interface LoanCalculatorProps {
-  formData: any;
-  setFormData: (data: any) => void;
+  formData: Record<string, unknown>;
+  setFormData: (data: Record<string, unknown>) => void;
 }
 
 interface CalculationResults {
@@ -35,24 +37,24 @@ export function LoanCalculatorEnhanced({ formData, setFormData }: LoanCalculator
   // 計算期間（年）
   const calculateTermInYears = () => {
     if (!formData.startDate || !formData.endDate) return 0;
-    const start = new Date(formData.startDate);
-    const end = new Date(formData.endDate);
+    const start = new Date(formData.startDate as string);
+    const end = new Date(formData.endDate as string);
     return (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
   };
 
   // 主要計算函數
   const calculateLoanMetrics = () => {
-    const principal = parseFloat(formData.principalAmount) || 0;
-    const rate = parseFloat(formData.annualInterestRate) || 0;
+    const principal = parseFloat(formData.principalAmount as string) || 0;
+    const rate = parseFloat(formData.annualInterestRate as string) || 0;
     const years = calculateTermInYears();
-    const monthlyPayment = parseFloat(formData.installmentAmount) || 0;
+    const monthlyPayment = parseFloat(formData.installmentAmount as string) || 0;
 
     if (principal === 0) return null;
 
     const monthlyRate = rate / 100 / 12;
     const totalMonths = years * 12;
 
-    let calculatedResults: Partial<CalculationResults> = {};
+    const calculatedResults: Partial<CalculationResults> = {};
 
     // 根據不同的付款方式計算
     switch (formData.interestPaymentMethod) {
@@ -64,7 +66,7 @@ export function LoanCalculatorEnhanced({ formData, setFormData }: LoanCalculator
         calculatedResults.totalAmount = principal + calculatedResults.totalInterest;
         break;
 
-      case "annual":
+      case "annual": {
         // 年付息
         const annualInterest = principal * (rate / 100);
         calculatedResults.monthlyInterest = annualInterest / 12;
@@ -72,6 +74,7 @@ export function LoanCalculatorEnhanced({ formData, setFormData }: LoanCalculator
         calculatedResults.totalInterest = annualInterest * years;
         calculatedResults.totalAmount = principal + calculatedResults.totalInterest;
         break;
+      }
 
       default:
         // 本息攤還
@@ -94,8 +97,8 @@ export function LoanCalculatorEnhanced({ formData, setFormData }: LoanCalculator
 
   // 反向計算：根據月付金額推算年利率
   const calculateRateFromPayment = () => {
-    const principal = parseFloat(formData.principalAmount) || 0;
-    const monthlyPayment = parseFloat(formData.installmentAmount) || 0;
+    const principal = parseFloat(formData.principalAmount as string) || 0;
+    const monthlyPayment = parseFloat(formData.installmentAmount as string) || 0;
     const years = calculateTermInYears();
 
     if (principal === 0 || monthlyPayment === 0 || years === 0) return 0;
@@ -110,10 +113,10 @@ export function LoanCalculatorEnhanced({ formData, setFormData }: LoanCalculator
 
   // 自動計算缺失值
   const autoCalculate = () => {
-    const principal = parseFloat(formData.principalAmount) || 0;
-    const rate = parseFloat(formData.annualInterestRate) || 0;
+    const principal = parseFloat(formData.principalAmount as string) || 0;
+    const rate = parseFloat(formData.annualInterestRate as string) || 0;
     const years = calculateTermInYears();
-    const monthlyPayment = parseFloat(formData.installmentAmount) || 0;
+    const monthlyPayment = parseFloat(formData.installmentAmount as string) || 0;
 
     const hasValues = {
       principal: principal > 0,
@@ -126,7 +129,7 @@ export function LoanCalculatorEnhanced({ formData, setFormData }: LoanCalculator
 
     // 如果有至少2個已知值，嘗試計算缺失值
     if (valueCount >= 2) {
-      let updatedFormData = { ...formData };
+      const updatedFormData = { ...formData };
 
       // 如果缺少利率，從月付金額推算
       if (!hasValues.rate && hasValues.principal && hasValues.payment && hasValues.term) {
@@ -189,7 +192,7 @@ export function LoanCalculatorEnhanced({ formData, setFormData }: LoanCalculator
                 id="principalAmount"
                 type="number"
                 placeholder="請輸入本金"
-                value={formData.principalAmount || ""}
+                value={(formData.principalAmount as string) || ""}
                 onChange={(e) => setFormData({ ...formData, principalAmount: e.target.value })}
                 className={knownValues.principal ? "border-green-500" : ""}
               />
@@ -202,7 +205,7 @@ export function LoanCalculatorEnhanced({ formData, setFormData }: LoanCalculator
                 type="number"
                 step="0.01"
                 placeholder="請輸入年利率"
-                value={formData.annualInterestRate || ""}
+                value={(formData.annualInterestRate as string) || ""}
                 onChange={(e) => setFormData({ ...formData, annualInterestRate: e.target.value })}
                 className={knownValues.rate ? "border-green-500" : ""}
               />
@@ -213,7 +216,7 @@ export function LoanCalculatorEnhanced({ formData, setFormData }: LoanCalculator
               <Input
                 id="startDate"
                 type="date"
-                value={formData.startDate || ""}
+                value={(formData.startDate as string) || ""}
                 onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
                 className={knownValues.term ? "border-green-500" : ""}
               />
@@ -224,7 +227,7 @@ export function LoanCalculatorEnhanced({ formData, setFormData }: LoanCalculator
               <Input
                 id="endDate"
                 type="date"
-                value={formData.endDate || ""}
+                value={(formData.endDate as string) || ""}
                 onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
                 className={knownValues.term ? "border-green-500" : ""}
               />
@@ -234,8 +237,8 @@ export function LoanCalculatorEnhanced({ formData, setFormData }: LoanCalculator
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="interestPaymentMethod">利息給付方式</Label>
-              <Select 
-                value={formData.interestPaymentMethod} 
+              <Select
+                value={(formData.interestPaymentMethod as string) || undefined}
                 onValueChange={(value) => setFormData({ ...formData, interestPaymentMethod: value })}
               >
                 <SelectTrigger>
@@ -256,7 +259,7 @@ export function LoanCalculatorEnhanced({ formData, setFormData }: LoanCalculator
                 id="installmentAmount"
                 type="number"
                 placeholder="輸入或系統推算"
-                value={formData.installmentAmount || ""}
+                value={(formData.installmentAmount as string) || ""}
                 onChange={(e) => setFormData({ ...formData, installmentAmount: e.target.value })}
                 className={knownValues.payment ? "border-green-500" : "border-blue-300"}
               />

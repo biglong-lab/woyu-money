@@ -10,9 +10,90 @@ import {
 } from "@shared/schema"
 import { eq, and, sql, desc, gte, lte, lt, count, ne, or, isNull, isNotNull } from "drizzle-orm"
 
+// === 付款統計型別 ===
+
+/** 付款統計結果 */
+interface PaymentStatsResult {
+  totalPlanned: number
+  totalPaid: number
+  pendingItems: number
+  overdueItems: number
+}
+
+/** 月度付款趨勢 */
+interface MonthlyTrendRow {
+  month: string
+  paid: number
+}
+
+/** 分類金額統計 */
+interface CategoryAmountRow {
+  categoryName: string | null
+  totalAmount: number
+}
+
+/** 付款方式統計 */
+interface PaymentMethodRow {
+  name: string | null
+  count: number
+  total: number
+}
+
+/** 分頁付款項目篩選條件 */
+interface PaginatedFilters {
+  projectId?: number
+  status?: string
+  includeDeleted?: boolean
+  startDate?: string
+  endDate?: string
+}
+
+/** 分頁結果 */
+interface PaginatedResult<T> {
+  items: T[]
+  pagination: {
+    currentPage: number
+    pageSize: number
+    totalItems: number
+    totalPages: number
+    hasNextPage: boolean
+    hasPreviousPage: boolean
+  }
+}
+
+/** 日期範圍摘要 */
+interface PaymentSummaryRow {
+  status: string | null
+  count: number
+  totalAmount: string | null
+  paidAmount: string | null
+}
+
+/** 月度付款分析結果 */
+interface MonthlyPaymentAnalysisResult {
+  currentMonth: {
+    year: number
+    month: number
+    due: {
+      count: number
+      totalAmount: string
+      items: Record<string, unknown>[]
+    }
+    paid: {
+      count: number
+      totalAmount: string
+    }
+  }
+  overdue: {
+    count: number
+    totalAmount: string
+    items: Record<string, unknown>[]
+  }
+}
+
 // === 付款統計 ===
 
-export async function getPaymentHomeStats(): Promise<any> {
+export async function getPaymentHomeStats(): Promise<PaymentStatsResult> {
   const [stats] = await db
     .select({
       totalPlanned: sql<number>`COALESCE(SUM(CASE WHEN item_type = 'home' THEN total_amount::numeric ELSE 0 END), 0)`,
@@ -26,7 +107,7 @@ export async function getPaymentHomeStats(): Promise<any> {
   return stats || { totalPlanned: 0, totalPaid: 0, pendingItems: 0, overdueItems: 0 }
 }
 
-export async function getPaymentProjectStats(): Promise<any> {
+export async function getPaymentProjectStats(): Promise<PaymentStatsResult> {
   const [stats] = await db
     .select({
       totalPlanned: sql<number>`COALESCE(SUM(CASE WHEN item_type = 'project' THEN total_amount::numeric ELSE 0 END), 0)`,
@@ -40,7 +121,7 @@ export async function getPaymentProjectStats(): Promise<any> {
   return stats || { totalPlanned: 0, totalPaid: 0, pendingItems: 0, overdueItems: 0 }
 }
 
-export async function getMonthlyPaymentTrend(): Promise<any> {
+export async function getMonthlyPaymentTrend(): Promise<MonthlyTrendRow[]> {
   return await db
     .select({
       month: sql<string>`TO_CHAR(payment_date, 'YYYY-MM')`,
@@ -51,7 +132,7 @@ export async function getMonthlyPaymentTrend(): Promise<any> {
     .orderBy(sql`TO_CHAR(payment_date, 'YYYY-MM')`)
 }
 
-export async function getTopPaymentCategories(): Promise<any> {
+export async function getTopPaymentCategories(): Promise<CategoryAmountRow[]> {
   return await db
     .select({
       categoryName: debtCategories.categoryName,
@@ -65,7 +146,7 @@ export async function getTopPaymentCategories(): Promise<any> {
     .limit(5)
 }
 
-export async function getPaymentMethodsReport(): Promise<any> {
+export async function getPaymentMethodsReport(): Promise<PaymentMethodRow[]> {
   return await db
     .select({
       name: paymentRecords.paymentMethod,
@@ -77,17 +158,23 @@ export async function getPaymentMethodsReport(): Promise<any> {
     .orderBy(sql`COUNT(*) DESC`)
 }
 
-export async function getPaymentStatistics(_filters: any): Promise<any> {
+export async function getPaymentStatistics(
+  _filters: Record<string, unknown>
+): Promise<Record<string, unknown>> {
   return {}
 }
 
-export async function getPaymentOverview(): Promise<any> {
+export async function getPaymentOverview(): Promise<Record<string, unknown>> {
   return {}
 }
 
 // === 分頁查詢 ===
 
-export async function getPaginatedPaymentItems(page: number = 1, pageSize: number = 50, filters: any = {}): Promise<any> {
+export async function getPaginatedPaymentItems(
+  page: number = 1,
+  pageSize: number = 50,
+  filters: PaginatedFilters = {}
+): Promise<PaginatedResult<Record<string, unknown>>> {
   const offset = (page - 1) * pageSize
 
   const conditions = []
@@ -137,7 +224,10 @@ export async function getPaginatedPaymentItems(page: number = 1, pageSize: numbe
     .limit(pageSize)
     .offset(offset)
 
-  const [{ count: totalCount }] = await db.select({ count: count() }).from(paymentItems).where(whereClause)
+  const [{ count: totalCount }] = await db
+    .select({ count: count() })
+    .from(paymentItems)
+    .where(whereClause)
 
   return {
     items,
@@ -167,7 +257,7 @@ export async function bulkUpdatePaymentItems(
 
     await tx
       .update(paymentItems)
-      .set({ ...updates, updatedAt: new Date() } as any)
+      .set({ ...updates, updatedAt: new Date() } as Partial<typeof paymentItems.$inferInsert>)
       .where(sql`id = ANY(${itemIds})`)
 
     for (const oldItem of oldItems) {
@@ -187,7 +277,10 @@ export async function bulkUpdatePaymentItems(
 
 // === 日期範圍摘要 ===
 
-export async function getPaymentSummaryByDateRange(startDate: string, endDate: string): Promise<any> {
+export async function getPaymentSummaryByDateRange(
+  startDate: string,
+  endDate: string
+): Promise<PaymentSummaryRow[]> {
   return await db
     .select({
       status: paymentItems.status,
@@ -197,14 +290,21 @@ export async function getPaymentSummaryByDateRange(startDate: string, endDate: s
     })
     .from(paymentItems)
     .where(
-      and(gte(paymentItems.startDate, startDate), lte(paymentItems.startDate, endDate), eq(paymentItems.isDeleted, false))
+      and(
+        gte(paymentItems.startDate, startDate),
+        lte(paymentItems.startDate, endDate),
+        eq(paymentItems.isDeleted, false)
+      )
     )
     .groupBy(paymentItems.status)
 }
 
 // === 月度付款分析 ===
 
-export async function getMonthlyPaymentAnalysis(year: number, month: number): Promise<any> {
+export async function getMonthlyPaymentAnalysis(
+  year: number,
+  month: number
+): Promise<MonthlyPaymentAnalysisResult> {
   const currentMonthStart = `${year}-${month.toString().padStart(2, "0")}-01`
   const nextMonth = month === 12 ? 1 : month + 1
   const nextYear = month === 12 ? year + 1 : year
@@ -317,10 +417,12 @@ export async function getMonthlyPaymentAnalysis(year: number, month: number): Pr
 
 // === 逾期項目查詢 ===
 
-export async function getOverduePaymentItems(): Promise<any[]> {
+export async function getOverduePaymentItems(): Promise<Record<string, unknown>[]> {
   try {
     const today = new Date().toISOString().split("T")[0]
-    const currentMonthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split("T")[0]
+    const currentMonthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1)
+      .toISOString()
+      .split("T")[0]
 
     const result = await db
       .select({
@@ -391,7 +493,11 @@ export async function getOverduePaymentItems(): Promise<any[]> {
           ),
           or(
             and(isNotNull(paymentItems.endDate), lt(paymentItems.endDate, today)),
-            and(isNull(paymentItems.endDate), isNotNull(paymentItems.startDate), lt(paymentItems.startDate, today))
+            and(
+              isNull(paymentItems.endDate),
+              isNotNull(paymentItems.startDate),
+              lt(paymentItems.startDate, today)
+            )
           ),
           or(isNull(paymentItems.paidAmount), lt(paymentItems.paidAmount, paymentItems.totalAmount))
         )

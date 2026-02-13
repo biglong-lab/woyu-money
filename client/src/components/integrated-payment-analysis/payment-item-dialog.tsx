@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus } from "lucide-react";
 import { UseFormReturn } from "react-hook-form";
-import type { PaymentItem, PaymentProject } from "./types";
+import type { PaymentItem, PaymentProject, DebtCategory, InsertPaymentItem } from "@shared/schema";
 
 // ========================================
 // 新增/編輯付款項目對話框元件
@@ -25,9 +25,9 @@ interface PaymentItemDialogProps {
   /** 正在編輯的項目（null 表示新增模式） */
   editingItem: PaymentItem | null;
   /** 表單實例 */
-  form: UseFormReturn<any>;
+  form: UseFormReturn<InsertPaymentItem>;
   /** 表單提交處理 */
-  onSubmit: (data: any) => void;
+  onSubmit: (data: InsertPaymentItem) => void;
   /** 重置編輯狀態 */
   onResetEditing: () => void;
   /** 是否正在處理中 */
@@ -35,7 +35,7 @@ interface PaymentItemDialogProps {
   /** 專案列表 */
   projects: PaymentProject[];
   /** 分類列表 */
-  categories: any[];
+  categories: DebtCategory[];
 }
 
 /** 新增或編輯付款項目對話框 */
@@ -123,7 +123,7 @@ export function PaymentItemDialog({
                           <SelectValue placeholder="選擇分類" />
                         </SelectTrigger>
                         <SelectContent>
-                          {categories.map((category: any) => (
+                          {categories.map((category) => (
                             <SelectItem key={category.id} value={category.id.toString()}>
                               {category.categoryName}
                             </SelectItem>
@@ -227,7 +227,7 @@ export function PaymentItemDialog({
                   <FormItem>
                     <FormLabel>開始日期 *</FormLabel>
                     <FormControl>
-                      <Input type="date" {...field} />
+                      <Input type="date" {...field} value={field.value || ''} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -240,7 +240,7 @@ export function PaymentItemDialog({
                   <FormItem>
                     <FormLabel>結束日期</FormLabel>
                     <FormControl>
-                      <Input type="date" {...field} />
+                      <Input type="date" {...field} value={field.value || ''} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -256,7 +256,7 @@ export function PaymentItemDialog({
                 <FormItem>
                   <FormLabel>備註</FormLabel>
                   <FormControl>
-                    <Textarea placeholder="輸入備註資訊（選填）" {...field} />
+                    <Textarea placeholder="輸入備註資訊（選填）" {...field} value={field.value || ''} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

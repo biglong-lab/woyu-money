@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 
 /** 從 localStorage 載入持久化的篩選器狀態 */
-function loadFilterState(): Record<string, any> {
+function loadFilterState(): Partial<FilterState> {
   try {
     const saved = localStorage.getItem('paymentProjectFilters');
     return saved ? JSON.parse(saved) : {};

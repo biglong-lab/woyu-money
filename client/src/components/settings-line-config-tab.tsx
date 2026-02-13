@@ -21,15 +21,34 @@ const lineConfigSchema = z.object({
   isEnabled: z.boolean(),
 });
 
+type LineConfigFormData = z.infer<typeof lineConfigSchema>;
+
+interface LineConfig {
+  id?: number;
+  channelId?: string;
+  channelSecret?: string;
+  callbackUrl?: string;
+  isEnabled?: boolean;
+}
+
+interface GenerateCallbackResponse {
+  callbackUrl?: string;
+}
+
+interface TestConnectionResponse {
+  success: boolean;
+  message?: string;
+}
+
 export default function SettingsLineConfigTab() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: lineConfig } = useQuery<any>({
+  const { data: lineConfig } = useQuery<LineConfig>({
     queryKey: ["/api/line-config"],
   });
 
-  const lineConfigForm = useForm({
+  const lineConfigForm = useForm<LineConfigFormData>({
     resolver: zodResolver(lineConfigSchema),
     defaultValues: {
       channelId: "",
@@ -53,7 +72,7 @@ export default function SettingsLineConfigTab() {
 
   // 儲存 LINE 設定
   const saveLineConfigMutation = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: LineConfigFormData) => {
       if (lineConfig && lineConfig.id) {
         return await apiRequest("PUT", `/api/line-config/${lineConfig.id}`, data);
       } else {
@@ -82,7 +101,7 @@ export default function SettingsLineConfigTab() {
         const errorText = await response.text();
         throw new Error(`HTTP ${response.status}: ${errorText}`);
       }
-      return await response.json();
+      return await response.json() as GenerateCallbackResponse;
     },
     onSuccess: (data) => {
       if (data && data.callbackUrl) {
@@ -99,10 +118,10 @@ export default function SettingsLineConfigTab() {
 
   // 測試 LINE 連線
   const testLineConnectionMutation = useMutation({
-    mutationFn: async (data: any) => {
-      return await apiRequest("POST", "/api/line-config/test", data);
+    mutationFn: async (data: LineConfigFormData) => {
+      return await apiRequest("POST", "/api/line-config/test", data) as TestConnectionResponse;
     },
-    onSuccess: (result: any) => {
+    onSuccess: (result) => {
       toast({
         title: result.success ? "連線成功" : "連線失敗",
         description: result.message || (result.success ? "LINE API連線正常" : "LINE API連線失敗"),

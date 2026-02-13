@@ -41,6 +41,7 @@ import {
   type ExpenseFormData,
   type ExpenseFilter,
 } from "./types";
+import type { HouseholdExpense, DebtCategory } from "@shared/schema";
 
 // ============================================================
 // 支出記錄分頁 - 新增支出對話框 + 篩選器 + 支出表格
@@ -58,9 +59,9 @@ const PAYMENT_METHOD_OPTIONS = [
 
 interface ExpenseTabProps {
   /** 目前選取的分類 */
-  selectedCategory: any;
+  selectedCategory: DebtCategory;
   /** 已篩選的支出資料 */
-  filteredExpenses: any[];
+  filteredExpenses: HouseholdExpense[];
   /** 是否載入中 */
   isLoadingExpenses: boolean;
   /** 支出對話框是否開啟 */
@@ -286,7 +287,7 @@ export function ExpenseTab({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredExpenses.map((expense: any) => (
+                  {filteredExpenses.map((expense) => (
                     <TableRow key={expense.id}>
                       <TableCell>
                         {new Date(expense.date).toLocaleDateString()}

@@ -13,12 +13,19 @@ import { eq, and, sql, desc } from "drizzle-orm"
 // === 家用預算 ===
 
 export async function getHouseholdBudget(month: string): Promise<HouseholdBudget | undefined> {
-  const [budget] = await db.select().from(householdBudgets).where(eq(householdBudgets.month, month as any))
+  // month 欄位為 integer，需要轉換
+  const monthNum = parseInt(month, 10)
+  const [budget] = await db
+    .select()
+    .from(householdBudgets)
+    .where(eq(householdBudgets.month, monthNum))
   return budget
 }
 
-export async function setHouseholdBudget(budgetData: InsertHouseholdBudget): Promise<HouseholdBudget> {
-  const existing = await getHouseholdBudget(budgetData.month as any)
+export async function setHouseholdBudget(
+  budgetData: InsertHouseholdBudget
+): Promise<HouseholdBudget> {
+  const existing = await getHouseholdBudget(String(budgetData.month))
 
   if (existing) {
     const [updated] = await db
@@ -27,7 +34,7 @@ export async function setHouseholdBudget(budgetData: InsertHouseholdBudget): Pro
         budgetAmount: budgetData.budgetAmount,
         updatedAt: new Date(),
       })
-      .where(eq(householdBudgets.month, budgetData.month as any))
+      .where(eq(householdBudgets.month, budgetData.month))
       .returning()
     return updated
   } else {
@@ -36,7 +43,15 @@ export async function setHouseholdBudget(budgetData: InsertHouseholdBudget): Pro
   }
 }
 
-export async function getHouseholdBudgets(month: string): Promise<any[]> {
+/** 家用預算查詢結果 */
+interface HouseholdBudgetSummary {
+  id: number
+  categoryId: number | null
+  budgetAmount: string
+  month: number
+}
+
+export async function getHouseholdBudgets(month: string): Promise<HouseholdBudgetSummary[]> {
   const budgets = await db
     .select({
       id: householdBudgets.id,
@@ -45,17 +60,24 @@ export async function getHouseholdBudgets(month: string): Promise<any[]> {
       month: householdBudgets.month,
     })
     .from(householdBudgets)
-    .where(eq(householdBudgets.month, month as any))
+    .where(eq(householdBudgets.month, parseInt(month, 10)))
 
   return budgets
 }
 
-export async function createOrUpdateHouseholdBudget(budgetData: InsertHouseholdBudget): Promise<HouseholdBudget> {
+export async function createOrUpdateHouseholdBudget(
+  budgetData: InsertHouseholdBudget
+): Promise<HouseholdBudget> {
   if (budgetData.categoryId) {
     const existing = await db
       .select()
       .from(householdBudgets)
-      .where(and(eq(householdBudgets.categoryId, budgetData.categoryId), eq(householdBudgets.month, budgetData.month)))
+      .where(
+        and(
+          eq(householdBudgets.categoryId, budgetData.categoryId),
+          eq(householdBudgets.month, budgetData.month)
+        )
+      )
       .limit(1)
 
     if (existing.length > 0) {
@@ -66,7 +88,10 @@ export async function createOrUpdateHouseholdBudget(budgetData: InsertHouseholdB
           updatedAt: new Date(),
         })
         .where(
-          and(eq(householdBudgets.categoryId, budgetData.categoryId), eq(householdBudgets.month, budgetData.month))
+          and(
+            eq(householdBudgets.categoryId, budgetData.categoryId),
+            eq(householdBudgets.month, budgetData.month)
+          )
         )
         .returning()
       return updated
@@ -79,12 +104,19 @@ export async function createOrUpdateHouseholdBudget(budgetData: InsertHouseholdB
 
 // === 家用支出 ===
 
+/** 家用支出篩選條件 */
+interface HouseholdExpenseFilters {
+  year?: string
+  month?: string
+  categoryId?: number
+}
+
 export async function getHouseholdExpenses(
-  filters?: any,
+  filters?: HouseholdExpenseFilters,
   page?: number,
   limit?: number
 ): Promise<HouseholdExpense[]> {
-  let conditions = []
+  const conditions = []
 
   if (filters?.year && filters?.month) {
     const year = filters.year
@@ -109,21 +141,34 @@ export async function getHouseholdExpenses(
     conditions.push(eq(householdExpenses.categoryId, filters.categoryId))
   }
 
-  let query: any = db.select().from(householdExpenses)
-
-  if (conditions.length > 0) {
-    query = query.where(conditions.length === 1 ? conditions[0] : and(...conditions))
-  }
+  const whereClause =
+    conditions.length > 0
+      ? conditions.length === 1
+        ? conditions[0]
+        : and(...conditions)
+      : undefined
 
   if (page && limit) {
     const offset = (page - 1) * limit
-    query = query.limit(limit).offset(offset)
+    return await db
+      .select()
+      .from(householdExpenses)
+      .where(whereClause)
+      .orderBy(desc(householdExpenses.date), desc(householdExpenses.createdAt))
+      .limit(limit)
+      .offset(offset)
   }
 
-  return await query.orderBy(desc(householdExpenses.date), desc(householdExpenses.createdAt))
+  return await db
+    .select()
+    .from(householdExpenses)
+    .where(whereClause)
+    .orderBy(desc(householdExpenses.date), desc(householdExpenses.createdAt))
 }
 
-export async function createHouseholdExpense(expenseData: InsertHouseholdExpense): Promise<HouseholdExpense> {
+export async function createHouseholdExpense(
+  expenseData: InsertHouseholdExpense
+): Promise<HouseholdExpense> {
   const [expense] = await db.insert(householdExpenses).values(expenseData).returning()
   return expense
 }
@@ -146,9 +191,17 @@ export async function deleteHouseholdExpense(id: number): Promise<void> {
 
 // === 家用分類預算 ===
 
-export async function getHouseholdCategoryBudgets(filters?: any): Promise<HouseholdBudget[]> {
-  let query: any = db.select().from(householdBudgets)
+/** 家用分類預算篩選條件 */
+interface HouseholdCategoryBudgetFilters {
+  year?: number
+  month?: number
+  categoryId?: number
+  isActive?: boolean
+}
 
+export async function getHouseholdCategoryBudgets(
+  filters?: HouseholdCategoryBudgetFilters
+): Promise<HouseholdBudget[]> {
   const conditions = []
   if (filters?.year) {
     conditions.push(eq(householdBudgets.year, filters.year))
@@ -163,14 +216,23 @@ export async function getHouseholdCategoryBudgets(filters?: any): Promise<Househ
     conditions.push(eq(householdBudgets.isActive, filters.isActive))
   }
 
-  if (conditions.length > 0) {
-    query = query.where(conditions.length === 1 ? conditions[0] : and(...conditions))
-  }
+  const whereClause =
+    conditions.length > 0
+      ? conditions.length === 1
+        ? conditions[0]
+        : and(...conditions)
+      : undefined
 
-  return await query.orderBy(desc(householdBudgets.year), desc(householdBudgets.month))
+  return await db
+    .select()
+    .from(householdBudgets)
+    .where(whereClause)
+    .orderBy(desc(householdBudgets.year), desc(householdBudgets.month))
 }
 
-export async function createHouseholdBudget(budgetData: InsertHouseholdBudget): Promise<HouseholdBudget> {
+export async function createHouseholdBudget(
+  budgetData: InsertHouseholdBudget
+): Promise<HouseholdBudget> {
   if (!budgetData.categoryId || !budgetData.year || !budgetData.month) {
     throw new Error("categoryId, year and month are required")
   }
@@ -251,11 +313,20 @@ export async function deleteHouseholdBudget(id: number): Promise<void> {
 
 // === 家用分類統計 ===
 
+/** 家用分類統計結果 */
+interface HouseholdCategoryStatsResult {
+  currentBudget: string
+  totalExpenses: string
+  remainingBudget: string
+  expenseCount: number
+  expenses: HouseholdExpense[]
+}
+
 export async function getHouseholdCategoryStats(
   categoryId: number,
   year?: string,
   month?: string
-): Promise<any> {
+): Promise<HouseholdCategoryStatsResult> {
   const currentYear = year ? parseInt(year) : new Date().getFullYear()
   const currentMonth = month ? parseInt(month) : new Date().getMonth() + 1
 
@@ -279,9 +350,17 @@ export async function getHouseholdCategoryStats(
   const expenses = await db
     .select()
     .from(householdExpenses)
-    .where(and(eq(householdExpenses.categoryId, categoryId), sql`date >= ${startDate} AND date < ${endDate}`))
+    .where(
+      and(
+        eq(householdExpenses.categoryId, categoryId),
+        sql`date >= ${startDate} AND date < ${endDate}`
+      )
+    )
 
-  const totalExpenses = expenses.reduce((sum, expense) => sum + parseFloat(expense.amount || "0"), 0)
+  const totalExpenses = expenses.reduce(
+    (sum, expense) => sum + parseFloat(expense.amount || "0"),
+    0
+  )
 
   return {
     currentBudget: budget?.budgetAmount || "0",
@@ -294,7 +373,16 @@ export async function getHouseholdCategoryStats(
   }
 }
 
-export async function getHouseholdStats(): Promise<any> {
+/** 家用統計結果 */
+interface HouseholdStatsResult {
+  budget: string
+  totalExpenses: string
+  remaining: string
+  expenseCount: number
+  categoryBreakdown: HouseholdExpense[]
+}
+
+export async function getHouseholdStats(): Promise<HouseholdStatsResult> {
   const currentMonth = new Date().toISOString().slice(0, 7)
 
   const budget = await getHouseholdBudget(currentMonth)
@@ -310,7 +398,10 @@ export async function getHouseholdStats(): Promise<any> {
     .from(householdExpenses)
     .where(sql`date >= ${startDate} AND date < ${endDate}`)
 
-  const totalExpenses = monthlyExpenses.reduce((sum, expense) => sum + parseFloat(expense.amount || "0"), 0)
+  const totalExpenses = monthlyExpenses.reduce(
+    (sum, expense) => sum + parseFloat(expense.amount || "0"),
+    0
+  )
 
   const budgetAmount = budget?.budgetAmount ? parseFloat(budget.budgetAmount) : 0
 
@@ -325,7 +416,17 @@ export async function getHouseholdStats(): Promise<any> {
 
 // === 年度預算 ===
 
-export async function getYearlyBudgets(year: number): Promise<any[]> {
+/** 年度預算查詢結果 */
+interface YearlyBudgetRow {
+  id: number
+  categoryId: number | null
+  year: number
+  month: number
+  budgetAmount: string
+  categoryName: string | null
+}
+
+export async function getYearlyBudgets(year: number): Promise<YearlyBudgetRow[]> {
   const budgets = await db
     .select({
       id: householdBudgets.id,
@@ -343,7 +444,17 @@ export async function getYearlyBudgets(year: number): Promise<any[]> {
   return budgets
 }
 
-export async function createOrUpdateYearlyBudget(budgetData: any): Promise<HouseholdBudget> {
+/** 年度預算建立或更新資料 */
+interface YearlyBudgetData {
+  categoryId: number
+  year: number
+  month: number
+  budgetAmount: string | number
+}
+
+export async function createOrUpdateYearlyBudget(
+  budgetData: YearlyBudgetData
+): Promise<HouseholdBudget> {
   const { categoryId, year, month, budgetAmount } = budgetData
 
   const [existingBudget] = await db
@@ -383,7 +494,7 @@ export async function createOrUpdateYearlyBudget(budgetData: any): Promise<House
   }
 }
 
-export async function getMonthlyBudgets(year: number, month: number): Promise<any[]> {
+export async function getMonthlyBudgets(year: number, month: number): Promise<YearlyBudgetRow[]> {
   const budgets = await db
     .select({
       id: householdBudgets.id,

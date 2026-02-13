@@ -32,62 +32,118 @@ import {
 
 import { DailyRevenueDialog } from "@/components/daily-revenue-dialog";
 
+// 收入統計概覽
+interface RevenueStats {
+  totalRevenue: number
+  recordCount: number
+  avgDaily: number
+}
+
+// 專案收入分布
+interface ProjectRevenue {
+  projectId: number
+  projectName: string
+  totalRevenue: number
+  recordCount: number
+}
+
+// 專案收入餅圖資料
+interface ProjectChartEntry extends ProjectRevenue {
+  fill: string
+}
+
+// 每日收入趨勢
+interface DailyTrendItem {
+  date: string
+  totalRevenue: number
+}
+
+// 月度收入趨勢
+interface MonthlyTrendItem {
+  month: string
+  totalRevenue: number
+}
+
+// 年度比較資料
+interface YearlyComparisonItem {
+  year: number
+  month: number
+  totalRevenue: number
+}
+
+// 每日收款記錄
+interface DailyRevenueRecord {
+  id: number
+  description: string | null
+  date: string
+  amount: string
+}
+
+// 處理後的年度資料
+interface ProcessedYearlyEntry {
+  month: string
+  [yearKey: string]: string | number
+}
+
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D'];
 
 export default function RevenueReports() {
   const [selectedTab, setSelectedTab] = useState("overview");
 
   // 每日收入統計
-  const { data: revenueStats } = useQuery<any>({
+  const { data: revenueStats } = useQuery<RevenueStats>({
     queryKey: ["/api/revenue/reports/stats"],
   });
 
   // 專案收入分布
-  const { data: projectRevenues = [] } = useQuery<any[]>({
+  const { data: projectRevenues = [] } = useQuery<ProjectRevenue[]>({
     queryKey: ["/api/revenue/reports/by-project"],
   });
 
   // 每日收入趨勢
-  const { data: dailyTrend = [] } = useQuery<any[]>({
+  const { data: dailyTrend = [] } = useQuery<DailyTrendItem[]>({
     queryKey: ["/api/revenue/reports/daily-trend"],
   });
 
   // 月度收入趨勢
-  const { data: monthlyTrend = [] } = useQuery<any[]>({
+  const { data: monthlyTrend = [] } = useQuery<MonthlyTrendItem[]>({
     queryKey: ["/api/revenue/reports/monthly-trend"],
   });
 
   // 年度同期比較
-  const { data: yearlyComparison = [] } = useQuery<any[]>({
+  const { data: yearlyComparison = [] } = useQuery<YearlyComparisonItem[]>({
     queryKey: ["/api/revenue/reports/yearly-comparison"],
   });
 
   // 每日收款記錄
-  const { data: dailyRevenues = [] } = useQuery<any[]>({
+  const { data: dailyRevenues = [] } = useQuery<DailyRevenueRecord[]>({
     queryKey: ["/api/daily-revenues"],
   });
 
   // 處理月度趨勢數據
-  const processedMonthlyTrend = monthlyTrend.map((item: any) => ({
+  const processedMonthlyTrend = monthlyTrend.map((item) => ({
     ...item,
     month: `${item.month.substring(0, 4)}年${item.month.substring(5, 7)}月`
   }));
 
   // 處理年度比較數據
-  const processedYearlyData = () => {
-    const grouped = yearlyComparison.reduce((acc: any, item: any) => {
-      const monthKey = `${item.month}月`;
-      if (!acc[monthKey]) {
-        acc[monthKey] = { month: monthKey };
-      }
-      acc[monthKey][`${item.year}年`] = item.totalRevenue;
-      return acc;
-    }, {});
+  const processedYearlyData = (): ProcessedYearlyEntry[] => {
+    const grouped = yearlyComparison.reduce(
+      (acc: Record<string, ProcessedYearlyEntry>, item) => {
+        const monthKey = `${item.month}月`;
+        if (!acc[monthKey]) {
+          acc[monthKey] = { month: monthKey };
+        }
+        acc[monthKey][`${item.year}年`] = item.totalRevenue;
+        return acc;
+      },
+      {}
+    );
     return Object.values(grouped);
   };
 
   // 準備專案收入餅圖數據
-  const projectChartData = projectRevenues.map((project: any, index: number) => ({
+  const projectChartData: ProjectChartEntry[] = projectRevenues.map((project, index) => ({
     ...project,
     fill: COLORS[index % COLORS.length]
   }));
@@ -197,11 +253,11 @@ export default function RevenueReports() {
                           cy="50%"
                           outerRadius={80}
                           dataKey="totalRevenue"
-                          label={({ projectName, percent }: any) => 
+                          label={({ projectName, percent }: { projectName: string; percent: number }) =>
                             `${projectName} ${(percent * 100).toFixed(0)}%`
                           }
                         >
-                          {projectChartData.map((entry: any, index: number) => (
+                          {projectChartData.map((entry, index) => (
                             <Cell key={`cell-${index}`} fill={entry.fill} />
                           ))}
                         </Pie>
@@ -224,7 +280,7 @@ export default function RevenueReports() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
-                    {dailyRevenues.slice(0, 10).map((revenue: any) => (
+                    {dailyRevenues.slice(0, 10).map((revenue) => (
                       <div key={revenue.id} className="flex items-center justify-between p-2 border rounded">
                         <div>
                           <div className="font-medium">{revenue.description || '收款記錄'}</div>
@@ -354,7 +410,7 @@ export default function RevenueReports() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  {projectRevenues.map((project: any, index: number) => (
+                  {projectRevenues.map((project, index) => (
                     <div key={project.projectId} className="flex items-center justify-between p-3 border rounded-lg">
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold">

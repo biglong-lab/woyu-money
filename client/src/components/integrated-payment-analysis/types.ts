@@ -66,8 +66,8 @@ export interface AuditLog {
   tableName: string;
   recordId: number;
   action: string;
-  oldValues: any;
-  newValues: any;
+  oldValues: Record<string, unknown>;
+  newValues: Record<string, unknown>;
   changedFields: string[];
   userId?: number;
   userInfo?: string;

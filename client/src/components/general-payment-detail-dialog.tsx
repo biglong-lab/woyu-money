@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Clock, ChevronUp, ChevronDown, RefreshCw } from "lucide-react";
 import type { PaymentItem } from "./general-payment-types";
+import type { AuditLog } from "@shared/schema";
 
 export interface GeneralPaymentDetailDialogProps {
   isOpen: boolean;
@@ -22,7 +23,7 @@ export function GeneralPaymentDetailDialog({
   const [showAuditHistory, setShowAuditHistory] = useState(false);
 
   // 獲取審計日誌
-  const { data: auditLogs = [], isLoading: isLoadingAuditLogs } = useQuery({
+  const { data: auditLogs = [], isLoading: isLoadingAuditLogs } = useQuery<AuditLog[]>({
     queryKey: [`/api/payment/items/${detailItem?.id}/audit-logs`],
     enabled: !!detailItem && showAuditHistory,
   });
@@ -181,7 +182,7 @@ function SourceTrackingSection({ detailItem }: { detailItem: PaymentItem }) {
 }
 
 // 審計歷史列表
-function AuditHistoryList({ auditLogs, isLoading }: { auditLogs: any; isLoading: boolean }) {
+function AuditHistoryList({ auditLogs, isLoading }: { auditLogs: AuditLog[]; isLoading: boolean }) {
   return (
     <div className="mt-3 space-y-2 max-h-60 overflow-y-auto">
       {isLoading ? (
@@ -189,12 +190,12 @@ function AuditHistoryList({ auditLogs, isLoading }: { auditLogs: any; isLoading:
           <RefreshCw className="w-4 h-4 animate-spin mr-2" />
           <span className="text-sm text-gray-500">載入中...</span>
         </div>
-      ) : !Array.isArray(auditLogs) || (auditLogs as any[]).length === 0 ? (
+      ) : auditLogs.length === 0 ? (
         <div className="text-center py-4 text-sm text-gray-500">
           暫無操作記錄
         </div>
       ) : (
-        (auditLogs as any[]).map((log: any) => (
+        auditLogs.map((log) => (
           <div key={log.id} className="border rounded-lg p-3 text-sm bg-gray-50 dark:bg-gray-800">
             <div className="flex items-center justify-between mb-1">
               <Badge variant={
@@ -210,7 +211,7 @@ function AuditHistoryList({ auditLogs, isLoading }: { auditLogs: any; isLoading:
                  log.action === "PERMANENT_DELETE" ? "永久刪除" : log.action}
               </Badge>
               <span className="text-xs text-gray-500">
-                {new Date(log.createdAt).toLocaleString('zh-TW')}
+                {log.createdAt ? new Date(log.createdAt).toLocaleString('zh-TW') : '未知時間'}
               </span>
             </div>
             <div className="text-gray-600 dark:text-gray-300">

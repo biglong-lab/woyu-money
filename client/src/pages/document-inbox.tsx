@@ -7,13 +7,40 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { Clock } from "lucide-react";
-import type { DocumentInbox } from "@shared/schema";
+import type { DocumentInbox, PaymentProject, PaymentItem } from "@shared/schema";
 
 import { DOCUMENT_TYPES, type InboxStats } from "@/components/document-inbox-types";
 import DocumentInboxUploadSection from "@/components/document-inbox-upload-section";
 import DocumentInboxDocumentList from "@/components/document-inbox-document-list";
 import DocumentInboxPreviewDialog from "@/components/document-inbox-preview-dialog";
 import DocumentInboxArchiveDialog from "@/components/document-inbox-archive-dialog";
+
+// 歸檔資料型別定義
+interface ArchiveToPaymentItemData {
+  projectId?: number;
+  categoryId?: number;
+  name: string;
+  amount: number;
+  dueDate?: string;
+  notes?: string;
+}
+
+interface ArchiveToPaymentRecordData {
+  paymentItemId: number;
+  amount: number;
+  paymentDate: string;
+  notes?: string;
+}
+
+interface ArchiveToInvoiceData {
+  invoiceNumber: string;
+  amount: number;
+  invoiceDate: string;
+  vendorName?: string;
+  notes?: string;
+}
+
+type ArchiveData = ArchiveToPaymentItemData | ArchiveToPaymentRecordData | ArchiveToInvoiceData;
 
 export default function DocumentInboxPage() {
   const { toast } = useToast();
@@ -46,11 +73,11 @@ export default function DocumentInboxPage() {
     refetchInterval: 10000,
   });
 
-  const { data: projects = [] } = useQuery<any[]>({
+  const { data: projects = [] } = useQuery<PaymentProject[]>({
     queryKey: ['/api/payment/projects'],
   });
 
-  const { data: paymentItemsData = [] } = useQuery<any[]>({
+  const { data: paymentItemsData = [] } = useQuery<PaymentItem[]>({
     queryKey: ['/api/payment/items', { includeAll: 'true' }],
     queryFn: async () => {
       const response = await fetch('/api/payment/items?includeAll=true', { credentials: 'include' });
@@ -78,7 +105,7 @@ export default function DocumentInboxPage() {
     onSuccess: () => {
       invalidateDocumentInboxQueries();
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({ title: "上傳失敗", description: error.message, variant: "destructive" });
     },
   });
@@ -117,7 +144,7 @@ export default function DocumentInboxPage() {
       invalidateDocumentInboxQueries();
       toast({ title: "重新辨識中", description: "請稍候..." });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({ title: "辨識失敗", description: error.message, variant: "destructive" });
     },
   });
@@ -137,7 +164,7 @@ export default function DocumentInboxPage() {
 
   // 歸檔
   const archiveMutation = useMutation({
-    mutationFn: async ({ id, type, data }: { id: number; type: string; data: any }) => {
+    mutationFn: async ({ id, type, data }: { id: number; type: string; data: ArchiveData }) => {
       return apiRequest('POST', `/api/document-inbox/${id}/archive-to-${type}`, data);
     },
     onSuccess: (_, variables) => {
@@ -155,7 +182,7 @@ export default function DocumentInboxPage() {
       setShowArchiveDialog(false);
       setSelectedDoc(null);
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({ title: "歸檔失敗", description: error.message, variant: "destructive" });
     },
   });
@@ -170,7 +197,7 @@ export default function DocumentInboxPage() {
       setSelectedDoc(updatedDoc);
       toast({ title: "備註已更新" });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({ title: "更新失敗", description: error.message, variant: "destructive" });
     },
   });
@@ -281,7 +308,7 @@ export default function DocumentInboxPage() {
         paymentItems={paymentItems}
         onArchive={(type, data) => {
           if (selectedDoc) {
-            archiveMutation.mutate({ id: selectedDoc.id, type, data });
+            archiveMutation.mutate({ id: selectedDoc.id, type, data: data as unknown as ArchiveData });
           }
         }}
         isPending={archiveMutation.isPending}

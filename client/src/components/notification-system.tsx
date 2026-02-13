@@ -22,7 +22,7 @@ interface Notification {
   read: boolean;
   createdAt: string;
   actionUrl?: string;
-  metadata?: any;
+  metadata?: Record<string, unknown>;
 }
 
 interface NotificationSettings {

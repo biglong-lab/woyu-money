@@ -3,14 +3,32 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Building2, Edit, Trash2, Eye, Settings, RefreshCw } from "lucide-react";
+import type { PaymentProject, RentalPriceTier } from "@shared/schema";
+
+/** 租約列表項目（對應 API GET /api/rental/contracts 回傳） */
+interface RentalContractListItem {
+  id: number;
+  projectId: number;
+  contractName: string;
+  startDate: string;
+  endDate: string;
+  totalYears: number;
+  baseAmount: string;
+  isActive: boolean | null;
+  notes: string | null;
+  projectName: string | null;
+  createdAt: Date | null;
+  currentMonthlyAmount?: number;
+  currentTier?: RentalPriceTier;
+}
 
 interface RentalContractListProps {
-  readonly contracts: any[];
-  readonly projects: any[];
-  readonly onViewDetails: (contract: any) => void;
-  readonly onEdit: (contract: any) => void;
+  readonly contracts: RentalContractListItem[];
+  readonly projects: PaymentProject[];
+  readonly onViewDetails: (contract: RentalContractListItem) => void;
+  readonly onEdit: (contract: RentalContractListItem) => void;
   readonly onDelete: (contractId: number) => void;
-  readonly onSmartAdjust: (contract: any) => void;
+  readonly onSmartAdjust: (contract: RentalContractListItem) => void;
   readonly onGeneratePayments: (contractId: number) => void;
   readonly isGenerating: boolean;
 }
@@ -40,8 +58,8 @@ export function RentalContractList({
               <p>請新增第一個租約合約</p>
             </div>
           ) : (
-            contracts.map((contract: any) => {
-              const project = projects.find((p: any) => p.id === contract.projectId);
+            contracts.map((contract) => {
+              const project = projects.find((p) => p.id === contract.projectId);
               const progress = contract.totalYears > 0 ?
                 ((new Date().getFullYear() - new Date(contract.startDate).getFullYear()) / contract.totalYears) * 100 : 0;
 
@@ -85,7 +103,7 @@ export function RentalContractList({
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 md:gap-4 text-xs md:text-sm text-gray-600">
                         <div>
                           <span className="font-medium">基礎金額：</span>
-                          NT${contract.baseAmount?.toLocaleString() || 0}
+                          NT${parseFloat(contract.baseAmount).toLocaleString()}
                         </div>
                         <div>
                           <span className="font-medium">當前階段：</span>
@@ -103,7 +121,10 @@ export function RentalContractList({
                     {/* 當月租金顯示 */}
                     <div className="flex flex-col sm:items-end sm:text-right mt-3 sm:mt-0 sm:ml-4">
                       <div className="text-lg md:text-2xl font-bold text-blue-600 mb-1">
-                        NT${contract.currentMonthlyAmount?.toLocaleString() || contract.baseAmount?.toLocaleString() || 0}
+                        NT${
+                          contract.currentMonthlyAmount?.toLocaleString() || 
+                          parseFloat(contract.baseAmount).toLocaleString()
+                        }
                       </div>
                       <div className="text-xs md:text-sm text-gray-500 mb-2">當月租金</div>
                     </div>

@@ -11,8 +11,9 @@ export type BudgetPlan = {
   totalBudget: string;
   actualSpent: string;
   status: string;
-  tags: any[];
+  tags: string[] | null;
   createdAt: string;
+  calculatedTotal?: number;
   items?: BudgetItem[];
 };
 

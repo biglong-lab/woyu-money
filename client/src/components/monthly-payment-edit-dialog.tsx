@@ -4,17 +4,17 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { UseFormReturn } from "react-hook-form";
+import { UseFormReturn, FieldValues } from "react-hook-form";
 import type { PaymentItem, PaymentProject, DebtCategory, FixedCategory } from "./monthly-payment-types";
 
 export interface MonthlyPaymentEditDialogProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
-  editForm: UseFormReturn<any>;
+  editForm: UseFormReturn<FieldValues>;
   editingItem: PaymentItem | null;
   isEditUnlocked: boolean;
   onToggleEditLock: () => void;
-  onSubmit: (data: any) => void;
+  onSubmit: (data: FieldValues) => void;
   isPending: boolean;
   projects: PaymentProject[];
   categories: DebtCategory[];

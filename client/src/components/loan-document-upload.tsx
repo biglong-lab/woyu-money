@@ -60,7 +60,7 @@ export function LoanDocumentUpload({ recordId }: LoanDocumentUploadProps) {
         description: "文件已成功上傳",
       });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       setIsUploading(false);
       toast({
         title: "錯誤",
@@ -91,7 +91,7 @@ export function LoanDocumentUpload({ recordId }: LoanDocumentUploadProps) {
         description: "文件已刪除",
       });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "錯誤",
         description: error.message || "文件刪除失敗",

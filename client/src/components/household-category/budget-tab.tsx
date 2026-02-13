@@ -36,6 +36,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Plus, Edit, Trash2, Target } from "lucide-react";
 import { formatCurrency, type BudgetFormData } from "./types";
+import type { HouseholdBudget, DebtCategory } from "@shared/schema";
 
 // ============================================================
 // 預算管理分頁 - 設定預算對話框 + 年月篩選 + 預算表格
@@ -43,9 +44,9 @@ import { formatCurrency, type BudgetFormData } from "./types";
 
 interface BudgetTabProps {
   /** 目前選取的分類 */
-  selectedCategory: any;
+  selectedCategory: DebtCategory;
   /** 預算資料陣列 */
-  budgets: any[];
+  budgets: HouseholdBudget[];
   /** 是否載入中 */
   isLoadingBudgets: boolean;
   /** 預算對話框是否開啟 */
@@ -254,9 +255,9 @@ export function BudgetTab({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {budgets.map((budget: any) => (
+                  {budgets.map((budget) => (
                     <TableRow key={budget.id}>
-                      <TableCell>{budget.month}</TableCell>
+                      <TableCell>{budget.year}/{budget.month}</TableCell>
                       <TableCell>
                         NT$ {formatCurrency(budget.budgetAmount)}
                       </TableCell>

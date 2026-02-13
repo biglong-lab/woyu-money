@@ -28,7 +28,6 @@ import LoanPaymentHistory from "@/components/loan-payment-history";
 import { LoanDocumentExport } from "@/components/loan-document-export";
 import {
   Edit,
-  AlertTriangle,
   FileText,
   CreditCard,
   Calculator,
@@ -144,7 +143,7 @@ export function LoanEnhancedDetailDialog({
           <LoanDocumentExport
             recordId={record.id}
             recordTitle={record.itemName}
-            recordData={record}
+            recordData={record as unknown as Parameters<typeof LoanDocumentExport>[0]['recordData']}
           />
           {record.status === "active" && (
             <>

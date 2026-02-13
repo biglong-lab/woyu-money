@@ -1,30 +1,44 @@
 // 完整的通知系統實作
-import { db } from "./db";
-import { sql } from "drizzle-orm";
+import { db } from "./db"
+import { sql } from "drizzle-orm"
 
 export interface NotificationData {
-  userId: number;
-  type: string;
-  title: string;
-  message: string;
-  priority?: string;
-  actionUrl?: string;
-  metadata?: Record<string, any>;
+  userId: number
+  type: string
+  title: string
+  message: string
+  priority?: string
+  actionUrl?: string
+  metadata?: Record<string, unknown>
 }
 
 export interface Notification {
-  id: number;
-  userId: number;
-  type: string;
-  title: string;
-  message: string;
-  priority: string;
-  isRead: boolean;
-  actionUrl?: string;
-  metadata: Record<string, any>;
-  createdAt: Date;
-  readAt?: Date;
-  expiresAt?: Date;
+  id: number
+  userId: number
+  type: string
+  title: string
+  message: string
+  priority: string
+  isRead: boolean
+  actionUrl?: string
+  metadata: Record<string, unknown>
+  createdAt: Date
+  readAt?: Date
+  expiresAt?: Date
+}
+
+// 通知設定資料結構
+export interface NotificationSettingsData {
+  emailEnabled: unknown
+  lineEnabled: unknown
+  browserEnabled: unknown
+  paymentDueReminder: unknown
+  paymentOverdueAlert: unknown
+  systemUpdates: unknown
+  weeklyReport: unknown
+  dailyDigestTime: unknown
+  weeklyReportDay: unknown
+  advanceWarningDays: unknown
 }
 
 export class NotificationSystem {
@@ -34,12 +48,12 @@ export class NotificationSystem {
       const result = await db.execute(sql`
         INSERT INTO notifications (user_id, type, title, message, priority, action_url, metadata)
         VALUES (${data.userId}, ${data.type}, ${data.title}, ${data.message}, 
-                ${data.priority || 'medium'}, ${data.actionUrl || null}, 
+                ${data.priority || "medium"}, ${data.actionUrl || null}, 
                 ${JSON.stringify(data.metadata || {})})
         RETURNING *
-      `);
-      
-      const row = result.rows[0];
+      `)
+
+      const row = result.rows[0]
       return {
         id: row.id as number,
         userId: row.user_id as number,
@@ -49,14 +63,14 @@ export class NotificationSystem {
         priority: row.priority as string,
         isRead: row.is_read as boolean,
         actionUrl: row.action_url as string,
-        metadata: typeof row.metadata === 'string' ? JSON.parse(row.metadata) : row.metadata,
+        metadata: typeof row.metadata === "string" ? JSON.parse(row.metadata) : row.metadata,
         createdAt: new Date(row.created_at as string),
         readAt: row.read_at ? new Date(row.read_at as string) : undefined,
-        expiresAt: row.expires_at ? new Date(row.expires_at as string) : undefined
-      };
+        expiresAt: row.expires_at ? new Date(row.expires_at as string) : undefined,
+      }
     } catch (error) {
-      console.error('Error creating notification:', error);
-      throw error;
+      console.error("Error creating notification:", error)
+      throw error
     }
   }
 
@@ -68,9 +82,9 @@ export class NotificationSystem {
         WHERE user_id = ${userId}
         ORDER BY created_at DESC
         LIMIT ${limit}
-      `);
-      
-      return result.rows.map(row => ({
+      `)
+
+      return result.rows.map((row) => ({
         id: row.id as number,
         userId: row.user_id as number,
         type: row.type as string,
@@ -79,14 +93,14 @@ export class NotificationSystem {
         priority: row.priority as string,
         isRead: row.is_read as boolean,
         actionUrl: row.action_url as string,
-        metadata: typeof row.metadata === 'string' ? JSON.parse(row.metadata) : row.metadata,
+        metadata: typeof row.metadata === "string" ? JSON.parse(row.metadata) : row.metadata,
         createdAt: new Date(row.created_at as string),
         readAt: row.read_at ? new Date(row.read_at as string) : undefined,
-        expiresAt: row.expires_at ? new Date(row.expires_at as string) : undefined
-      }));
+        expiresAt: row.expires_at ? new Date(row.expires_at as string) : undefined,
+      }))
     } catch (error) {
-      console.error('Error fetching notifications:', error);
-      return [];
+      console.error("Error fetching notifications:", error)
+      return []
     }
   }
 
@@ -97,11 +111,11 @@ export class NotificationSystem {
         UPDATE notifications 
         SET is_read = true, read_at = NOW()
         WHERE id = ${notificationId}
-      `);
-      return true;
+      `)
+      return true
     } catch (error) {
-      console.error('Error marking notification as read:', error);
-      return false;
+      console.error("Error marking notification as read:", error)
+      return false
     }
   }
 
@@ -112,11 +126,11 @@ export class NotificationSystem {
         UPDATE notifications 
         SET is_read = true, read_at = NOW()
         WHERE user_id = ${userId} AND is_read = false
-      `);
-      return true;
+      `)
+      return true
     } catch (error) {
-      console.error('Error marking all notifications as read:', error);
-      return false;
+      console.error("Error marking all notifications as read:", error)
+      return false
     }
   }
 
@@ -127,32 +141,32 @@ export class NotificationSystem {
         SELECT COUNT(*) as count 
         FROM notifications 
         WHERE user_id = ${userId} AND is_read = false
-      `);
-      
-      return result.rows[0]?.count as number || 0;
+      `)
+
+      return (result.rows[0]?.count as number) || 0
     } catch (error) {
-      console.error('Error getting unread count:', error);
-      return 0;
+      console.error("Error getting unread count:", error)
+      return 0
     }
   }
 
   // 獲取通知設定
-  async getNotificationSettings(userId: number): Promise<any> {
+  async getNotificationSettings(userId: number): Promise<NotificationSettingsData> {
     try {
       const result = await db.execute(sql`
         SELECT * FROM notification_settings 
         WHERE user_id = ${userId}
-      `);
-      
+      `)
+
       if (result.rows.length === 0) {
         // 創建預設設定
         await db.execute(sql`
           INSERT INTO notification_settings (user_id) VALUES (${userId})
-        `);
-        return this.getDefaultSettings();
+        `)
+        return this.getDefaultSettings()
       }
-      
-      const row = result.rows[0];
+
+      const row = result.rows[0]
       return {
         emailEnabled: row.email_enabled,
         lineEnabled: row.line_enabled,
@@ -163,16 +177,19 @@ export class NotificationSystem {
         weeklyReport: row.weekly_report,
         dailyDigestTime: row.daily_digest_time,
         weeklyReportDay: row.weekly_report_day,
-        advanceWarningDays: row.advance_warning_days
-      };
+        advanceWarningDays: row.advance_warning_days,
+      }
     } catch (error) {
-      console.error('Error fetching notification settings:', error);
-      return this.getDefaultSettings();
+      console.error("Error fetching notification settings:", error)
+      return this.getDefaultSettings()
     }
   }
 
   // 更新通知設定
-  async updateNotificationSettings(userId: number, settings: any): Promise<boolean> {
+  async updateNotificationSettings(
+    userId: number,
+    settings: NotificationSettingsData
+  ): Promise<boolean> {
     try {
       await db.execute(sql`
         UPDATE notification_settings SET
@@ -188,18 +205,18 @@ export class NotificationSystem {
           advance_warning_days = ${settings.advanceWarningDays},
           updated_at = NOW()
         WHERE user_id = ${userId}
-      `);
-      return true;
+      `)
+      return true
     } catch (error) {
-      console.error('Error updating notification settings:', error);
-      return false;
+      console.error("Error updating notification settings:", error)
+      return false
     }
   }
 
   // 生成付款提醒通知
   async generatePaymentReminders(): Promise<number> {
     try {
-      let createdCount = 0;
+      let createdCount = 0
 
       // 獲取一些付款項目進行測試通知生成
       const result = await db.execute(sql`
@@ -207,36 +224,32 @@ export class NotificationSystem {
         FROM payment_items 
         WHERE is_deleted = false 
         LIMIT 3
-      `);
-
-      console.log(`找到 ${result.rows.length} 個付款項目可生成通知`);
+      `)
 
       // 為用戶ID=1創建測試通知
       for (const row of result.rows) {
         await this.createNotification({
           userId: 1,
-          type: 'payment_reminder',
-          title: '自動付款提醒',
+          type: "payment_reminder",
+          title: "自動付款提醒",
           message: `項目 "${row.item_name}" 需要關注，金額 NT$ ${row.total_amount}`,
-          priority: 'medium',
-          metadata: { 
-            paymentId: row.id, 
+          priority: "medium",
+          metadata: {
+            paymentId: row.id,
             generatedAt: new Date().toISOString(),
-            autoGenerated: true
-          }
-        });
-        createdCount++;
+            autoGenerated: true,
+          },
+        })
+        createdCount++
       }
-
-      console.log(`成功生成 ${createdCount} 個付款提醒通知`);
-      return createdCount;
+      return createdCount
     } catch (error) {
-      console.error('Error generating payment reminders:', error);
-      throw error;
+      console.error("Error generating payment reminders:", error)
+      throw error
     }
   }
 
-  private getDefaultSettings() {
+  private getDefaultSettings(): NotificationSettingsData {
     return {
       emailEnabled: true,
       lineEnabled: false,
@@ -245,11 +258,11 @@ export class NotificationSystem {
       paymentOverdueAlert: true,
       systemUpdates: false,
       weeklyReport: true,
-      dailyDigestTime: '09:00',
-      weeklyReportDay: 'monday',
-      advanceWarningDays: 3
-    };
+      dailyDigestTime: "09:00",
+      weeklyReportDay: "monday",
+      advanceWarningDays: 3,
+    }
   }
 }
 
-export const notificationSystem = new NotificationSystem();
+export const notificationSystem = new NotificationSystem()

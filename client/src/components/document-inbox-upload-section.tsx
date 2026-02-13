@@ -53,7 +53,7 @@ export default function DocumentInboxUploadSection({
                 <Button
                   key={type.value}
                   variant={selectedType === type.value ? "default" : "outline"}
-                  onClick={() => onSelectedTypeChange(type.value as any)}
+                  onClick={() => onSelectedTypeChange(type.value as "bill" | "payment" | "invoice")}
                   className="flex items-center gap-2"
                   data-testid={`select-type-${type.value}`}
                 >

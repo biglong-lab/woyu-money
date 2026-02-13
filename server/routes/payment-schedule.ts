@@ -1,35 +1,43 @@
 import { Router } from "express"
-import { storage } from "../storage"
-import { paymentSchedules } from "@shared/schema"
-import { eq, desc } from "drizzle-orm"
-import { db } from "../db"
+import { storage, getAllPaymentSchedules, getPaymentSchedulesByItemId } from "../storage"
 import { generateSmartSchedule, type ScheduleItem } from "@shared/schedule-utils"
+import { asyncHandler, AppError } from "../middleware/error-handler"
+
+/** getPaymentRecords 回傳的付款記錄行（extends Record 以相容 storage 回傳型別） */
+interface PaymentRecordRow extends Record<string, unknown> {
+  id: number
+  itemId: number
+  amount: string
+  paymentDate: string
+  paymentMethod: string | null
+  notes: string
+}
 
 const router = Router()
 
 // 取得指定年月的付款排程
-router.get("/api/payment/schedule/:year/:month", async (req, res) => {
-  try {
+router.get(
+  "/api/payment/schedule/:year/:month",
+  asyncHandler(async (req, res) => {
     const year = parseInt(req.params.year)
     const month = parseInt(req.params.month)
 
     const schedules = await storage.getPaymentSchedules(year, month)
     res.json(schedules)
-  } catch (error: any) {
-    console.error("Error fetching payment schedules:", error)
-    res.status(500).json({ message: "Failed to fetch payment schedules" })
-  }
-})
+  })
+)
 
 // 建立付款排程
-router.post("/api/payment/schedule", async (req, res) => {
-  try {
+router.post(
+  "/api/payment/schedule",
+  asyncHandler(async (req, res) => {
     const { paymentItemId, scheduledDate, scheduledAmount, notes, createdBy } = req.body
 
     if (!paymentItemId || !scheduledDate || !scheduledAmount) {
-      return res.status(400).json({
-        message: "Missing required fields: paymentItemId, scheduledDate, scheduledAmount",
-      })
+      throw new AppError(
+        400,
+        "Missing required fields: paymentItemId, scheduledDate, scheduledAmount"
+      )
     }
 
     const schedule = await storage.createPaymentSchedule({
@@ -41,70 +49,60 @@ router.post("/api/payment/schedule", async (req, res) => {
     })
 
     res.status(201).json(schedule)
-  } catch (error: any) {
-    console.error("Error creating payment schedule:", error)
-    res.status(500).json({ message: "Failed to create payment schedule" })
-  }
-})
+  })
+)
 
 // 更新付款排程
-router.put("/api/payment/schedule/:id", async (req, res) => {
-  try {
+router.put(
+  "/api/payment/schedule/:id",
+  asyncHandler(async (req, res) => {
     const id = parseInt(req.params.id)
     const updateData = req.body
 
     const schedule = await storage.updatePaymentSchedule(id, updateData)
     res.json(schedule)
-  } catch (error: any) {
-    console.error("Error updating payment schedule:", error)
-    res.status(500).json({ message: "Failed to update payment schedule" })
-  }
-})
+  })
+)
 
 // 刪除付款排程
-router.delete("/api/payment/schedule/:id", async (req, res) => {
-  try {
+router.delete(
+  "/api/payment/schedule/:id",
+  asyncHandler(async (req, res) => {
     const id = parseInt(req.params.id)
     await storage.deletePaymentSchedule(id)
     res.status(204).send()
-  } catch (error: any) {
-    console.error("Error deleting payment schedule:", error)
-    res.status(500).json({ message: "Failed to delete payment schedule" })
-  }
-})
+  })
+)
 
 // 取得逾期排程
-router.get("/api/payment/overdue", async (req, res) => {
-  try {
+router.get(
+  "/api/payment/overdue",
+  asyncHandler(async (req, res) => {
     const schedules = await storage.getOverdueSchedules()
     res.json(schedules)
-  } catch (error: any) {
-    console.error("Error fetching overdue schedules:", error)
-    res.status(500).json({ message: "Failed to fetch overdue schedules" })
-  }
-})
+  })
+)
 
 // 重新排程付款
-router.post("/api/payment/reschedule/:id", async (req, res) => {
-  try {
+router.post(
+  "/api/payment/reschedule/:id",
+  asyncHandler(async (req, res) => {
     const id = parseInt(req.params.id)
     const { newDate, notes } = req.body
 
     if (!newDate) {
-      return res.status(400).json({ message: "Missing required field: newDate" })
+      throw new AppError(400, "Missing required field: newDate")
     }
 
     const schedule = await storage.reschedulePayment(id, newDate, notes)
     res.json(schedule)
-  } catch (error: any) {
-    console.error("Error rescheduling payment:", error)
-    res.status(500).json({ message: "Failed to reschedule payment" })
-  }
-})
+  })
+)
 
 // 取得指定年月的排程統計
-router.get("/api/payment/schedule/stats/:year/:month", async (req, res) => {
-  try {
+router.get(
+  "/api/payment/schedule/stats/:year/:month",
+  asyncHandler(async (req, res) => {
     const year = parseInt(req.params.year)
     const month = parseInt(req.params.month)
 
@@ -122,10 +120,7 @@ router.get("/api/payment/schedule/stats/:year/:month", async (req, res) => {
     })
 
     // 計算總統計
-    const totalAmount = schedules.reduce(
-      (sum, s) => sum + parseFloat(s.scheduledAmount),
-      0
-    )
+    const totalAmount = schedules.reduce((sum, s) => sum + parseFloat(s.scheduledAmount), 0)
     const totalCount = schedules.length
     const overdueCount = schedules.filter((s) => s.isOverdue).length
 
@@ -137,15 +132,13 @@ router.get("/api/payment/schedule/stats/:year/:month", async (req, res) => {
       overdueCount,
       dailyStats,
     })
-  } catch (error: any) {
-    console.error("Error fetching payment schedule stats:", error)
-    res.status(500).json({ message: "Failed to fetch payment schedule stats" })
-  }
-})
+  })
+)
 
 // 取得指定年月未排程的付款項目
-router.get("/api/payment/schedule/items/:year/:month", async (req, res) => {
-  try {
+router.get(
+  "/api/payment/schedule/items/:year/:month",
+  asyncHandler(async (req, res) => {
     const year = parseInt(req.params.year)
     const month = parseInt(req.params.month)
 
@@ -153,43 +146,36 @@ router.get("/api/payment/schedule/items/:year/:month", async (req, res) => {
     const unscheduledItems = await storage.getUnscheduledPaymentItems(year, month)
 
     res.json(unscheduledItems)
-  } catch (error: any) {
-    console.error("Error fetching unscheduled payment items:", error)
-    res.status(500).json({ message: "Failed to fetch unscheduled payment items" })
-  }
-})
+  })
+)
 
 // 查詢所有逾期項目（包含本月之前的）
-router.get("/api/payment/items/overdue", async (req, res) => {
-  try {
+router.get(
+  "/api/payment/items/overdue",
+  asyncHandler(async (req, res) => {
     const overdueItems = await storage.getOverduePaymentItems()
 
     res.json(overdueItems)
-  } catch (error: any) {
-    console.error("查詢逾期項目時發生錯誤:", error)
-    res.status(500).json({ message: "查詢逾期項目失敗" })
-  }
-})
+  })
+)
 
 // 整合項目數據API - 包含付款記錄、所有排程記錄的完整信息
-router.get("/api/payment/items/integrated", async (req, res) => {
-  try {
+router.get(
+  "/api/payment/items/integrated",
+  asyncHandler(async (req, res) => {
     const { year, month } = req.query
 
     // 獲取所有付款項目
     const items = await storage.getPaymentItems({}, undefined, 10000)
 
     // 獲取所有付款記錄
-    const records = await storage.getPaymentRecords({})
+    const records = (await storage.getPaymentRecords({})) as PaymentRecordRow[]
 
     // 獲取所有排程記錄（不限月份，確保跨月追蹤）
-    const allSchedules = await db
-      .select()
-      .from(paymentSchedules)
-      .orderBy(desc(paymentSchedules.scheduledDate))
+    const allSchedules = await getAllPaymentSchedules()
 
     // 獲取當月排程記錄（用於計算當月排程金額）
-    let monthSchedules: any[] = []
+    let monthSchedules: Awaited<ReturnType<typeof storage.getPaymentSchedules>> = []
     if (year && month) {
       monthSchedules = await storage.getPaymentSchedules(
         parseInt(year as string),
@@ -201,20 +187,13 @@ router.get("/api/payment/items/integrated", async (req, res) => {
     const integratedItems = items.map((item) => {
       // 計算該項目的實際已付金額
       const itemRecords = records.filter((r) => r.itemId === item.id)
-      const actualPaid = itemRecords.reduce(
-        (sum, r) => sum + parseFloat(r.amount || "0"),
-        0
-      )
+      const actualPaid = itemRecords.reduce((sum, r) => sum + parseFloat(r.amount || "0"), 0)
 
       // 獲取該項目的所有排程記錄
-      const allItemSchedules = allSchedules.filter(
-        (s) => s.paymentItemId === item.id
-      )
+      const allItemSchedules = allSchedules.filter((s) => s.paymentItemId === item.id)
 
       // 計算當月的排程計劃金額
-      const monthItemSchedules = monthSchedules.filter(
-        (s) => s.paymentItemId === item.id
-      )
+      const monthItemSchedules = monthSchedules.filter((s) => s.paymentItemId === item.id)
       const scheduledTotal = monthItemSchedules.reduce(
         (sum, s) => sum + parseFloat(s.scheduledAmount || "0"),
         0
@@ -228,9 +207,7 @@ router.get("/api/payment/items/integrated", async (req, res) => {
       const today = new Date()
       const hasOverdueSchedule = allItemSchedules.some((s) => {
         const scheduleDate = new Date(s.scheduledDate)
-        return (
-          scheduleDate < today && s.status !== "completed" && !s.isOverdue
-        )
+        return scheduleDate < today && s.status !== "completed" && !s.isOverdue
       })
 
       return {
@@ -248,39 +225,29 @@ router.get("/api/payment/items/integrated", async (req, res) => {
     })
 
     res.json(integratedItems)
-  } catch (error: any) {
-    console.error("Error fetching integrated payment items:", error)
-    res.status(500).json({ message: "Failed to fetch integrated payment items" })
-  }
-})
+  })
+)
 
 // 獲取項目的所有排程歷史記錄
-router.get("/api/payment/items/:itemId/schedules", async (req, res) => {
-  try {
+router.get(
+  "/api/payment/items/:itemId/schedules",
+  asyncHandler(async (req, res) => {
     const itemId = parseInt(req.params.itemId)
 
-    const allSchedules = await db
-      .select()
-      .from(paymentSchedules)
-      .where(eq(paymentSchedules.paymentItemId, itemId))
-      .orderBy(desc(paymentSchedules.scheduledDate))
+    const allSchedules = await getPaymentSchedulesByItemId(itemId)
 
     res.json(allSchedules)
-  } catch (error: any) {
-    console.error("Error fetching item schedules:", error)
-    res.status(500).json({ message: "Failed to fetch item schedules" })
-  }
-})
+  })
+)
 
 // 智慧排程建議 API
-router.post("/api/payment/schedule/smart-suggest", async (req, res) => {
-  try {
+router.post(
+  "/api/payment/schedule/smart-suggest",
+  asyncHandler(async (req, res) => {
     const { year, month, budget } = req.body
 
     if (!year || !month || budget === undefined) {
-      return res.status(400).json({
-        message: "需要提供 year、month、budget 參數",
-      })
+      throw new AppError(400, "需要提供 year、month、budget 參數")
     }
 
     const yearNum = parseInt(year)
@@ -297,7 +264,7 @@ router.post("/api/payment/schedule/smart-suggest", async (req, res) => {
 
     // 篩選需要排程的項目
     // getPaymentItems 透過 SQL JOIN 回傳額外欄位（projectName 等），用擴展型別處理
-    type ItemWithJoin = typeof items[number] & { projectName?: string }
+    type ItemWithJoin = (typeof items)[number] & { projectName?: string }
     const scheduleItems: ScheduleItem[] = (items as ItemWithJoin[])
       .filter((item) => {
         if (item.isDeleted || item.status === "completed") return false
@@ -346,19 +313,17 @@ router.post("/api/payment/schedule/smart-suggest", async (req, res) => {
     const result = generateSmartSchedule(scheduleItems, budgetNum)
 
     res.json(result)
-  } catch (error: any) {
-    console.error("Error generating smart schedule:", error)
-    res.status(500).json({ message: "Failed to generate smart schedule" })
-  }
-})
+  })
+)
 
 // 批次重排逾期項目
-router.post("/api/payment/schedule/auto-reschedule", async (req, res) => {
-  try {
+router.post(
+  "/api/payment/schedule/auto-reschedule",
+  asyncHandler(async (req, res) => {
     const { targetYear, targetMonth } = req.body
 
     if (!targetYear || !targetMonth) {
-      return res.status(400).json({ message: "需要提供 targetYear、targetMonth 參數" })
+      throw new AppError(400, "需要提供 targetYear、targetMonth 參數")
     }
 
     // 取得所有逾期排程
@@ -382,7 +347,6 @@ router.post("/api/payment/schedule/auto-reschedule", async (req, res) => {
         rescheduledCount++
       } catch (err) {
         // 單筆失敗不中斷整批
-        console.error(`重排排程 ${schedule.id} 失敗:`, err)
       }
     }
 
@@ -391,10 +355,7 @@ router.post("/api/payment/schedule/auto-reschedule", async (req, res) => {
       rescheduled: rescheduledCount,
       total: overdueSchedules.length,
     })
-  } catch (error: any) {
-    console.error("Error auto-rescheduling:", error)
-    res.status(500).json({ message: "Failed to auto-reschedule" })
-  }
-})
+  })
+)
 
 export default router

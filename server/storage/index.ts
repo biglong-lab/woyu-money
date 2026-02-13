@@ -23,6 +23,11 @@ import * as lineConfigFns from "./line-config"
 import * as systemAdminFns from "./system-admin"
 import * as overdueItemsFns from "./overdue-items"
 import * as projectStatsFns from "./project-stats"
+import * as docInboxFns from "./document-inbox"
+import * as budgetFns from "./budget"
+import * as hrCostsFns from "./hr-costs"
+import * as invoiceFns from "./invoice"
+import * as financialReportsFns from "./financial-reports"
 
 // 重新匯出所有領域函式
 export * from "./users"
@@ -37,14 +42,15 @@ export * from "./notifications"
 export * from "./loans"
 export * from "./file-attachments"
 export * from "./helpers"
+export * from "./document-inbox"
+export * from "./budget"
+export * from "./hr-costs"
+export * from "./invoice"
+export * from "./financial-reports"
 
 // 管理功能模組選擇性匯出（避免與 statistics.ts、subcategory-payments.ts 的重複匯出衝突）
 // 智慧提醒
-export {
-  getSmartAlerts,
-  getSmartAlertStats,
-  dismissSmartAlert,
-} from "./smart-alerts"
+export { getSmartAlerts, getSmartAlertStats, dismissSmartAlert } from "./smart-alerts"
 
 // 進階搜尋
 export {
@@ -54,16 +60,10 @@ export {
 } from "./advanced-search"
 
 // 批量操作
-export {
-  batchUpdatePaymentItems,
-  bulkImportPaymentItems,
-} from "./batch-operations"
+export { batchUpdatePaymentItems, bulkImportPaymentItems } from "./batch-operations"
 
 // 報表生成
-export {
-  generateIntelligentReport,
-  exportReport,
-} from "./reports"
+export { generateIntelligentReport, exportReport } from "./reports"
 
 // LINE 設定
 export {
@@ -146,7 +146,7 @@ export type {
  * 待 routes.ts 拆分完成後即可移除。
  */
 export class DatabaseStorage {
-  sessionStore: any
+  sessionStore: InstanceType<ReturnType<typeof connectPg>>
 
   constructor() {
     const PostgresSessionStore = connectPg(session)
@@ -369,6 +369,70 @@ export class DatabaseStorage {
   createLineConfig = lineConfigFns.createLineConfig
   updateLineConfig = lineConfigFns.updateLineConfig
   testLineConnection = lineConfigFns.testLineConnection
+
+  // === 文件收件箱 ===
+  getDocumentInboxItems = docInboxFns.getDocumentInboxItems
+  getDocumentInboxItem = docInboxFns.getDocumentInboxItem
+  createDocumentInboxItem = docInboxFns.createDocumentInboxItem
+  updateDocumentInboxItem = docInboxFns.updateDocumentInboxItem
+  deleteDocumentInboxItem = docInboxFns.deleteDocumentInboxItem
+  getDocumentInboxStats = docInboxFns.getDocumentInboxStats
+  getUserDisplayName = docInboxFns.getUserDisplayName
+  updateDocumentAiResult = docInboxFns.updateDocumentAiResult
+  setDocumentProcessing = docInboxFns.setDocumentProcessing
+  setDocumentFailed = docInboxFns.setDocumentFailed
+  updateDocumentNotes = docInboxFns.updateDocumentNotes
+  archiveToPaymentItem = docInboxFns.archiveToPaymentItem
+  archiveToPaymentRecord = docInboxFns.archiveToPaymentRecord
+  archiveToInvoiceRecord = docInboxFns.archiveToInvoiceRecord
+
+  // === 預算管理 ===
+  getBudgetPlans = budgetFns.getBudgetPlans
+  getBudgetPlan = budgetFns.getBudgetPlan
+  createBudgetPlan = budgetFns.createBudgetPlan
+  updateBudgetPlan = budgetFns.updateBudgetPlan
+  deleteBudgetPlan = budgetFns.deleteBudgetPlan
+  getBudgetItemsByPlan = budgetFns.getBudgetItemsByPlan
+  getBudgetItems = budgetFns.getBudgetItems
+  getBudgetItem = budgetFns.getBudgetItem
+  createBudgetItem = budgetFns.createBudgetItem
+  updateBudgetItem = budgetFns.updateBudgetItem
+  softDeleteBudgetItem = budgetFns.softDeleteBudgetItem
+  updateBudgetPlanActualSpent = budgetFns.updateBudgetPlanActualSpent
+  convertBudgetItemToPayment = budgetFns.convertBudgetItemToPayment
+
+  // === 人事費管理 ===
+  getEmployees = hrCostsFns.getEmployees
+  getEmployee = hrCostsFns.getEmployee
+  createEmployee = hrCostsFns.createEmployee
+  updateEmployee = hrCostsFns.updateEmployee
+  softDeleteEmployee = hrCostsFns.softDeleteEmployee
+  getMonthlyHrCosts = hrCostsFns.getMonthlyHrCosts
+  createMonthlyHrCosts = hrCostsFns.createMonthlyHrCosts
+  deleteMonthlyHrCosts = hrCostsFns.deleteMonthlyHrCosts
+  updateMonthlyHrCost = hrCostsFns.updateMonthlyHrCost
+  getHrCostsByYear = hrCostsFns.getHrCostsByYear
+  getActiveEmployeeCount = hrCostsFns.getActiveEmployeeCount
+  getActiveEmployees = hrCostsFns.getActiveEmployees
+
+  // === 發票記錄 ===
+  getInvoiceRecords = invoiceFns.getInvoiceRecords
+  getInvoiceStats = invoiceFns.getInvoiceStats
+
+  // === 財務報表 ===
+  getIncomeStatement = financialReportsFns.getIncomeStatement
+  getBalanceSheet = financialReportsFns.getBalanceSheet
+  getCashFlowStatement = financialReportsFns.getCashFlowStatement
+  getHrCostReport = financialReportsFns.getHrCostReport
+  getHrCostMonthlyDetail = financialReportsFns.getHrCostMonthlyDetail
+  getBusinessTaxReport = financialReportsFns.getBusinessTaxReport
+  getSalaryWithholdingReport = financialReportsFns.getSalaryWithholdingReport
+  getSupplementaryHealthReport = financialReportsFns.getSupplementaryHealthReport
+
+  // === 付款記錄（擴充） ===
+  getPaymentRecordsCashFlow = paymentRecordFns.getPaymentRecordsCashFlow
+  getAllPaymentSchedules = paymentRecordFns.getAllPaymentSchedules
+  getPaymentSchedulesByItemId = paymentRecordFns.getPaymentSchedulesByItemId
 }
 
 // 單例實例 — 向後相容 routes.ts 的 storage.methodName() 呼叫模式
