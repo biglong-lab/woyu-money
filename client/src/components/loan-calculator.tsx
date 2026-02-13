@@ -40,6 +40,18 @@ interface CalculationResult {
   monthlyAccrual?: number;
 }
 
+interface LoanCalculateRequest {
+  principalAmount: string;
+  interestRate: string;
+  repaymentMode: string;
+  repaymentYears?: number;
+  graceMonths?: number;
+}
+
+interface AdviceResponse {
+  advice: string;
+}
+
 // Form schema for creating loan record
 const loanRecordFormSchema = z.object({
   itemName: z.string().min(1, "項目名稱必填"),
@@ -85,28 +97,28 @@ export default function LoanCalculator() {
     },
   });
 
-  const calculateMutation = useMutation({
-    mutationFn: async (data: any) => {
+  const calculateMutation = useMutation<CalculationResult, Error, LoanCalculateRequest>({
+    mutationFn: async (data) => {
       const response = await apiRequest("/api/loan-investment/calculate", "POST", data);
-      return response;
+      return response as CalculationResult;
     },
-    onSuccess: (result: any) => {
+    onSuccess: (result) => {
       setCalculation(result);
     }
   });
 
-  const adviceMutation = useMutation({
-    mutationFn: async (calculations: CalculationResult) => {
-      const response = await apiRequest("POST", "/api/loan-investment/advice", { calculations });
-      return response;
+  const adviceMutation = useMutation<AdviceResponse, Error, CalculationResult>({
+    mutationFn: async (calculations) => {
+      const response = await apiRequest("/api/loan-investment/advice", "POST", { calculations });
+      return response as AdviceResponse;
     },
-    onSuccess: (result: any) => {
+    onSuccess: (result) => {
       setAiAdvice(result.advice);
     }
   });
 
-  const createRecordMutation = useMutation({
-    mutationFn: async (data: LoanRecordFormData) => {
+  const createRecordMutation = useMutation<unknown, Error, LoanRecordFormData>({
+    mutationFn: async (data) => {
       // Include calculation data in the loan record
       const recordData = {
         ...data,
@@ -140,7 +152,7 @@ ${calculation?.totalPayment ? `總還款：NT$ ${calculation.totalPayment.toLoca
         description: "借貸紀錄已建立，包含完整計算資訊"
       });
     },
-    onError: (error: any) => {
+    onError: (error) => {
       toast({
         title: "錯誤",
         description: error.message,
@@ -154,7 +166,7 @@ ${calculation?.totalPayment ? `總還款：NT$ ${calculation.totalPayment.toLoca
       return;
     }
 
-    const data = {
+    const data: LoanCalculateRequest = {
       ...formData,
       repaymentYears: formData.repaymentYears ? parseInt(formData.repaymentYears) : undefined,
       graceMonths: formData.graceMonths ? parseInt(formData.graceMonths) : undefined

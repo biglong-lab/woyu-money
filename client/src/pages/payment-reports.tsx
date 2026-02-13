@@ -2,12 +2,12 @@ import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
 import { zhTW } from "date-fns/locale";
-import { 
-  BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, 
+import {
+  BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Legend
 } from "recharts";
-import { 
-  TrendingUp, TrendingDown, DollarSign, Calendar, 
+import {
+  TrendingUp, TrendingDown, DollarSign, Calendar,
   FileText, Download, Filter, Eye, Users, Target, BarChart3
 } from "lucide-react";
 
@@ -18,6 +18,46 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { apiRequest } from "@/lib/queryClient";
+import type { PaymentItem, PaymentProject, DebtCategory } from "@shared/schema";
+
+// API 回傳的付款項目（含 join 欄位）
+interface PaymentItemWithDetails extends PaymentItem {
+  categoryName?: string | null;
+  projectName?: string | null;
+  projectType?: string | null;
+  fixedCategoryName?: string | null;
+}
+
+// 專案分組統計
+interface ProjectBreakdownEntry {
+  name: string;
+  planned: number;
+  paid: number;
+  pending: number;
+  count: number;
+}
+
+// 月份趨勢數據
+interface MonthlyTrendEntry {
+  month: string;
+  planned: number;
+  paid: number;
+  pending: number;
+}
+
+// 分類統計
+interface CategoryStatEntry {
+  name: string;
+  value: number;
+}
+
+// 付款方式統計
+interface MethodStatEntry {
+  name: string;
+  amount: number;
+  count: number;
+  fill: string;
+}
 
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D'];
@@ -28,15 +68,15 @@ export default function PaymentReports() {
   const [selectedProject, setSelectedProject] = useState("all");
 
   // 查詢穩定的數據來源 - 統計報表需要所有數據，不使用分頁
-  const { data: paymentItems = [] } = useQuery<any[]>({
+  const { data: paymentItems = [] } = useQuery<PaymentItemWithDetails[]>({
     queryKey: ["/api/payment/items?includeAll=true"]
   });
 
-  const { data: projects = [] } = useQuery<any[]>({
+  const { data: projects = [] } = useQuery<PaymentProject[]>({
     queryKey: ["/api/payment/projects"]
   });
 
-  const { data: categories = [] } = useQuery<any[]>({
+  const { data: categories = [] } = useQuery<DebtCategory[]>({
     queryKey: ["/api/categories/project"]
   });
 
@@ -44,10 +84,10 @@ export default function PaymentReports() {
   const projectStats = React.useMemo(() => {
     if (!paymentItems.length) return { totalPlanned: 0, totalPaid: 0, totalPending: 0, completionRate: 0 };
     
-    const totalPlanned = paymentItems.reduce((sum: number, item: any) => sum + parseFloat(item.totalAmount || "0"), 0);
-    
+    const totalPlanned = paymentItems.reduce((sum: number, item: PaymentItemWithDetails) => sum + parseFloat(item.totalAmount || "0"), 0);
+
     // 已付金額計算：優先使用 paidAmount，若無則根據 status 判斷
-    const totalPaid = paymentItems.reduce((sum: number, item: any) => {
+    const totalPaid = paymentItems.reduce((sum: number, item: PaymentItemWithDetails) => {
       if (item.status === "paid") {
         // 如果狀態是已付款，使用 paidAmount 或 totalAmount
         return sum + parseFloat(item.paidAmount || item.totalAmount || "0");
@@ -66,10 +106,10 @@ export default function PaymentReports() {
 
   // 按專案分組統計
   const projectBreakdown = React.useMemo(() => {
-    const breakdown = paymentItems.reduce((acc: any, item: any) => {
+    const breakdown = paymentItems.reduce((acc: Record<number, ProjectBreakdownEntry>, item: PaymentItemWithDetails) => {
       const projectId = item.projectId || 0;
       // 從專案列表中找到對應的專案名稱
-      const project = projects.find((p: any) => p.id === projectId);
+      const project = projects.find((p: PaymentProject) => p.id === projectId);
       const projectName = project?.projectName || "未分類";
       
       if (!acc[projectId]) {
@@ -96,7 +136,7 @@ export default function PaymentReports() {
       return acc;
     }, {});
     
-    return Object.values(breakdown).map((project: any) => ({
+    return Object.values(breakdown).map((project: ProjectBreakdownEntry) => ({
       ...project,
       pending: project.planned - project.paid
     }));
@@ -116,7 +156,7 @@ export default function PaymentReports() {
 
   // 月份趨勢數據（基於付款項目的日期）
   const trendData = React.useMemo(() => {
-    const monthlyData = paymentItems.reduce((acc: any, item: any) => {
+    const monthlyData = paymentItems.reduce((acc: Record<string, MonthlyTrendEntry>, item: PaymentItemWithDetails) => {
       const date = new Date(item.startDate || new Date());
       const monthKey = format(date, 'yyyy-MM');
       const monthLabel = format(date, 'MM月', { locale: zhTW });
@@ -131,7 +171,7 @@ export default function PaymentReports() {
       return acc;
     }, {});
     
-    const sortedData = Object.values(monthlyData).map((item: any) => ({
+    const sortedData = Object.values(monthlyData).map((item: MonthlyTrendEntry) => ({
       ...item,
       pending: item.planned - item.paid
     }));
@@ -143,7 +183,7 @@ export default function PaymentReports() {
 
   // 分類分析數據
   const categoryData = React.useMemo(() => {
-    const categoryStats = paymentItems.reduce((acc: any, item: any) => {
+    const categoryStats = paymentItems.reduce((acc: Record<string, CategoryStatEntry>, item: PaymentItemWithDetails) => {
       const categoryName = item.categoryName || "未分類";
       
       if (!acc[categoryName]) {
@@ -162,7 +202,7 @@ export default function PaymentReports() {
 
   // 付款方式數據 - 基於付款記錄統計
   const methodData = React.useMemo(() => {
-    const methodStats = paymentItems.reduce((acc: any, item: any) => {
+    const methodStats = paymentItems.reduce((acc: Record<string, Omit<MethodStatEntry, "fill">>, item: PaymentItemWithDetails) => {
       const method = item.paymentType || "未知方式";
       
       if (!acc[method]) {
@@ -175,7 +215,7 @@ export default function PaymentReports() {
       return acc;
     }, {});
     
-    return Object.values(methodStats).length > 0 ? Object.values(methodStats).map((method: any) => ({
+    return Object.values(methodStats).length > 0 ? Object.values(methodStats).map((method: Omit<MethodStatEntry, "fill">) => ({
       ...method,
       fill: `hsl(${Math.random() * 360}, 60%, 55%)`
     })) : [
@@ -250,7 +290,7 @@ export default function PaymentReports() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">全部專案</SelectItem>
-                  {safeProjects.map((project: any) => (
+                  {safeProjects.map((project: PaymentProject) => (
                     <SelectItem key={project.id} value={project.id.toString()}>
                       {project.projectName}
                     </SelectItem>
@@ -444,7 +484,7 @@ export default function PaymentReports() {
                     fill="#8884d8"
                     dataKey="count"
                   >
-                    {methodData.map((entry: any, index: number) => (
+                    {methodData.map((entry: MethodStatEntry, index: number) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>
@@ -482,13 +522,13 @@ export default function PaymentReports() {
               </div>
               <div className="p-3 sm:p-4 border rounded-lg">
                 <div className="text-lg sm:text-2xl font-bold text-purple-600">
-                  {safePaymentMethods.reduce((sum: number, method: any) => sum + (method.count || 0), 0)}
+                  {safePaymentMethods.reduce((sum: number, method: MethodStatEntry) => sum + (method.count || 0), 0)}
                 </div>
                 <div className="text-xs sm:text-sm text-muted-foreground">總交易筆數</div>
               </div>
               <div className="p-3 sm:p-4 border rounded-lg">
                 <div className="text-lg sm:text-2xl font-bold text-orange-600">
-                  NT$ {totalPaid > 0 ? (totalPaid / Math.max(safePaymentMethods.reduce((sum: number, method: any) => sum + (method.count || 0), 0), 1)).toLocaleString() : 0}
+                  NT$ {totalPaid > 0 ? (totalPaid / Math.max(safePaymentMethods.reduce((sum: number, method: MethodStatEntry) => sum + (method.count || 0), 0), 1)).toLocaleString() : 0}
                 </div>
                 <div className="text-xs sm:text-sm text-muted-foreground">平均交易金額</div>
               </div>
@@ -520,7 +560,7 @@ export default function PaymentReports() {
                 </tr>
               </thead>
               <tbody>
-                {projectBreakdown.map((project: any, index: number) => {
+                {projectBreakdown.map((project: ProjectBreakdownEntry, index: number) => {
                   const planned = Number(project.planned || 0);
                   const paid = Number(project.paid || 0);
                   const pending = Number(project.pending || 0);

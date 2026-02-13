@@ -90,7 +90,7 @@ export default function ProjectSpecificItemsManagement() {
       setEditingItem(null);
       form.reset();
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "操作失敗",
         description: error.message || "請稍後再試",
@@ -111,7 +111,7 @@ export default function ProjectSpecificItemsManagement() {
         description: "專案專屬項目已刪除",
       });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "刪除失敗",
         description: error.message || "請稍後再試",

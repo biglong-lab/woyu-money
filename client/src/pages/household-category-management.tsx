@@ -10,6 +10,8 @@ import {
 } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import type { DebtCategory } from "../../../shared/schema/category";
+import type { HouseholdBudget, HouseholdExpense } from "../../../shared/schema/household";
 
 // 子元件與型別
 import {
@@ -40,8 +42,8 @@ export default function HouseholdCategoryManagement() {
   const queryClient = useQueryClient();
 
   // ---- 狀態 ----
-  const [selectedCategory, setSelectedCategory] = useState<any>(null);
-  const [editingCategory, setEditingCategory] = useState<any>(null);
+  const [selectedCategory, setSelectedCategory] = useState<DebtCategory | null>(null);
+  const [editingCategory, setEditingCategory] = useState<DebtCategory | null>(null);
   const [showCategoryDialog, setShowCategoryDialog] = useState(false);
   const [showBudgetDialog, setShowBudgetDialog] = useState(false);
   const [showExpenseDialog, setShowExpenseDialog] = useState(false);
@@ -59,13 +61,13 @@ export default function HouseholdCategoryManagement() {
 
   // ---- 資料查詢 ----
   const { data: categories = [], isLoading: isLoadingCategories } = useQuery<
-    any[]
+    DebtCategory[]
   >({
     queryKey: ["/api/categories/household"],
     staleTime: 5 * 60 * 1000,
   });
 
-  const { data: budgets = [], isLoading: isLoadingBudgets } = useQuery<any[]>({
+  const { data: budgets = [], isLoading: isLoadingBudgets } = useQuery<HouseholdBudget[]>({
     queryKey: [
       `/api/household/budgets?year=${selectedYear}&month=${selectedMonth}`,
     ],
@@ -73,7 +75,7 @@ export default function HouseholdCategoryManagement() {
   });
 
   const { data: expenses = [], isLoading: isLoadingExpenses } = useQuery<
-    any[]
+    HouseholdExpense[]
   >({
     queryKey: [
       `/api/household/expenses?categoryId=${selectedCategory?.id}&year=${selectedYear}&month=${selectedMonth}`,
@@ -130,7 +132,7 @@ export default function HouseholdCategoryManagement() {
       setShowCategoryDialog(false);
       categoryForm.reset();
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "錯誤",
         description: error.message,
@@ -151,7 +153,7 @@ export default function HouseholdCategoryManagement() {
       setShowCategoryDialog(false);
       categoryForm.reset();
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "錯誤",
         description: error.message,
@@ -170,7 +172,7 @@ export default function HouseholdCategoryManagement() {
       });
       setSelectedCategory(null);
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "錯誤",
         description: error.message,
@@ -190,7 +192,7 @@ export default function HouseholdCategoryManagement() {
       setShowBudgetDialog(false);
       budgetForm.reset();
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "錯誤",
         description: error.message,
@@ -210,7 +212,7 @@ export default function HouseholdCategoryManagement() {
       setShowExpenseDialog(false);
       expenseForm.reset();
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "錯誤",
         description: error.message,
@@ -238,7 +240,7 @@ export default function HouseholdCategoryManagement() {
     createExpenseMutation.mutate({ ...data, categoryId: selectedCategory.id });
   };
 
-  const handleEditCategory = (category: any) => {
+  const handleEditCategory = (category: DebtCategory) => {
     setEditingCategory(category);
     categoryForm.reset({
       categoryName: category.categoryName,
@@ -249,7 +251,7 @@ export default function HouseholdCategoryManagement() {
   };
 
   /** 篩選支出記錄 */
-  const filteredExpenses = expenses.filter((expense: any) => {
+  const filteredExpenses = expenses.filter((expense: HouseholdExpense) => {
     const searchMatch =
       !expenseFilter.search ||
       expense.description

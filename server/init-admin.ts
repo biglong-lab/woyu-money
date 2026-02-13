@@ -1,25 +1,36 @@
-import { db } from "./db";
-import { users } from "@shared/schema";
-import { eq } from "drizzle-orm";
-import { hashPassword } from "./auth";
+import { db } from "./db"
+import { users } from "@shared/schema"
+import { eq } from "drizzle-orm"
+import { hashPassword } from "./auth"
 
 async function initializeAdminUser() {
+  const adminUsername = process.env.ADMIN_USERNAME
+  const adminPassword = process.env.ADMIN_PASSWORD
+
+  if (!adminUsername || !adminPassword) {
+    console.error("請設定 ADMIN_USERNAME 和 ADMIN_PASSWORD 環境變數")
+    process.exit(1)
+  }
+
+  if (adminPassword.length < 8) {
+    console.error("管理員密碼至少需要 8 個字元")
+    process.exit(1)
+  }
+
   try {
-    console.log("正在初始化管理員帳戶...");
-    
     // Check if admin user already exists
-    const existingAdmin = await db.select().from(users).where(eq(users.username, "ru03bjo4f"));
-    
+    const existingAdmin = await db.select().from(users).where(eq(users.username, adminUsername))
+
     if (existingAdmin.length > 0) {
-      console.log("管理員帳戶已存在");
-      return;
+      console.log("管理員帳戶已存在，跳過建立")
+      return
     }
 
     // Create admin user with hashed password
-    const hashedPassword = await hashPassword("rh750920@@!!");
-    
+    const hashedPassword = await hashPassword(adminPassword)
+
     await db.insert(users).values({
-      username: "ru03bjo4f",
+      username: adminUsername,
       password: hashedPassword,
       email: "admin@system.local",
       fullName: "系統管理員",
@@ -27,22 +38,19 @@ async function initializeAdminUser() {
       isActive: true,
       createdAt: new Date(),
       updatedAt: new Date(),
-    });
+    })
 
-    console.log("管理員帳戶創建成功");
-    console.log("用戶名: ru03bjo4f");
-    console.log("密碼: rh750920@@!!");
-    
+    console.log("管理員帳戶建立成功")
   } catch (error) {
-    console.error("初始化管理員帳戶失敗:", error);
+    console.error("初始化管理員帳戶失敗:", error)
   } finally {
-    process.exit(0);
+    process.exit(0)
   }
 }
 
 // Run if called directly
 if (import.meta.url === `file://${process.argv[1]}`) {
-  initializeAdminUser();
+  initializeAdminUser()
 }
 
-export { initializeAdminUser };
+export { initializeAdminUser }

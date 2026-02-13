@@ -70,7 +70,7 @@ export function PaymentFileUpload({ paymentId, onUploadComplete }: PaymentFileUp
       queryClient.invalidateQueries({ queryKey: [`/api/payment/${paymentId}/files`] });
       onUploadComplete?.();
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "上傳失敗",
         description: error.message || "檔案上傳時發生錯誤",
@@ -91,7 +91,7 @@ export function PaymentFileUpload({ paymentId, onUploadComplete }: PaymentFileUp
       });
       queryClient.invalidateQueries({ queryKey: [`/api/payment/${paymentId}/files`] });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "刪除失敗",
         description: error.message || "刪除檔案時發生錯誤",

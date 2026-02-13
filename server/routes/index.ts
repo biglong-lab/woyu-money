@@ -32,10 +32,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // 設定通知路由
   setupNotificationRoutes(app)
 
-  // 靜態檔案服務
-  app.use("/uploads", express.static(uploadDir))
+  // 靜態檔案服務（需認證才能存取上傳的檔案）
+  app.use("/uploads", requireAuth, express.static(uploadDir))
   // 相容舊的 /objects 路徑（從 Replit Object Storage 遷移）
-  app.use("/objects", express.static(uploadDir))
+  app.use("/objects", requireAuth, express.static(uploadDir))
+
+  // 全域 API 認證保護（排除公開端點）
+  app.use("/api", (req, res, next) => {
+    // 公開端點白名單（不需要認證）
+    const publicPaths = [
+      "/api/login",
+      "/api/register",
+      "/api/logout",
+      "/api/user",
+      "/api/line/login",
+      "/api/line/callback",
+    ]
+    const isPublic = publicPaths.some((p) => req.path === p)
+    if (isPublic) return next()
+    return requireAuth(req, res, next)
+  })
 
   // 註冊所有領域路由
   app.use(authRoutes)

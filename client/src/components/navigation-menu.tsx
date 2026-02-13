@@ -26,7 +26,7 @@ import { cn } from "@/lib/utils";
 interface NavigationItem {
   path: string;
   label: string;
-  icon: any;
+  icon: React.ComponentType<{ className?: string }>;
   badge?: string;
 }
 
@@ -34,7 +34,7 @@ interface ModuleConfig {
   name: string;
   basePath: string;
   color: string;
-  icon: any;
+  icon: React.ComponentType<{ className?: string }>;
   items: NavigationItem[];
 }
 

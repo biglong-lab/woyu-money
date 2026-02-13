@@ -17,6 +17,7 @@ export type PaymentItem = {
   fixedCategoryId?: number;
   categoryId?: number;
   projectId?: number;
+  isDeleted?: boolean;
 };
 
 export type PaymentProject = {

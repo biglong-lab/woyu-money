@@ -11,17 +11,20 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { PlusIcon, MinusIcon, SaveIcon, XIcon } from "lucide-react";
-import type { DebtCategory } from "@shared/schema";
+import type { DebtCategory, InsertPaymentItem, PaymentItem } from "@shared/schema";
+import { insertPaymentItemSchema } from "@shared/schema";
+import { z } from "zod";
 
-// 本地定義缺失的型別
-type InsertDebt = any;
-type Vendor = { id: number; vendorName: string; [key: string]: any };
-const insertDebtSchema: any = {};
+// 廠商型別定義
+type Vendor = { 
+  id: number; 
+  vendorName: string;
+};
 
 interface TransactionFormProps {
   show?: boolean;
   onClose?: () => void;
-  editingDebt?: any;
+  editingDebt?: PaymentItem;
 }
 
 export default function TransactionForm({ show = true, onClose, editingDebt }: TransactionFormProps) {
@@ -36,31 +39,31 @@ export default function TransactionForm({ show = true, onClose, editingDebt }: T
     queryKey: ["/api/vendors"],
   });
 
-  const form = useForm<InsertDebt>({
-    resolver: zodResolver(insertDebtSchema),
+  const form = useForm<z.infer<typeof insertPaymentItemSchema>>({
+    resolver: zodResolver(insertPaymentItemSchema),
     defaultValues: editingDebt ? {
-      debtName: editingDebt.debtName || "",
+      itemName: editingDebt.itemName || "",
       totalAmount: editingDebt.totalAmount || "",
-      categoryId: editingDebt.categoryId || 0,
-      vendorId: editingDebt.vendorId || 0,
-      note: editingDebt.note || "",
+      categoryId: editingDebt.categoryId || undefined,
+      projectId: editingDebt.projectId || undefined,
+      notes: editingDebt.notes || "",
       paymentType: editingDebt.paymentType || "single",
-      installments: editingDebt.installments || 1,
-      firstDueDate: editingDebt.firstDueDate ? editingDebt.firstDueDate.split('T')[0] : new Date().toISOString().split('T')[0],
+      installmentCount: editingDebt.installmentCount || 1,
+      startDate: editingDebt.startDate ? editingDebt.startDate.split('T')[0] : new Date().toISOString().split('T')[0],
     } : {
-      debtName: "",
+      itemName: "",
       totalAmount: "",
-      categoryId: 0,
-      vendorId: 0,
-      note: "",
+      categoryId: undefined,
+      projectId: undefined,
+      notes: "",
       paymentType: "single",
-      installments: 1,
-      firstDueDate: new Date().toISOString().split('T')[0],
+      installmentCount: 1,
+      startDate: new Date().toISOString().split('T')[0],
     },
   });
 
   const createDebtMutation = useMutation({
-    mutationFn: async (data: InsertDebt) => {
+    mutationFn: async (data: InsertPaymentItem) => {
       if (editingDebt) {
         return await apiRequest("PUT", `/api/debts/${editingDebt.id}`, data);
       } else {
@@ -77,16 +80,16 @@ export default function TransactionForm({ show = true, onClose, editingDebt }: T
       });
       onClose?.();
     },
-    onError: () => {
+    onError: (error: Error) => {
       toast({
         title: "錯誤",
-        description: editingDebt ? "更新付款項目失敗" : "新增付款項目失敗",
+        description: error.message || (editingDebt ? "更新付款項目失敗" : "新增付款項目失敗"),
         variant: "destructive",
       });
     },
   });
 
-  const onSubmit = (data: InsertDebt) => {
+  const onSubmit = (data: InsertPaymentItem) => {
     createDebtMutation.mutate(data);
   };
 
@@ -134,7 +137,7 @@ export default function TransactionForm({ show = true, onClose, editingDebt }: T
 
             <FormField
               control={form.control}
-              name="debtName"
+              name="itemName"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>項目名稱</FormLabel>
@@ -195,7 +198,7 @@ export default function TransactionForm({ show = true, onClose, editingDebt }: T
 
             <FormField
               control={form.control}
-              name="vendorId"
+              name="projectId"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>廠商/歸屬</FormLabel>
@@ -220,7 +223,7 @@ export default function TransactionForm({ show = true, onClose, editingDebt }: T
 
             <FormField
               control={form.control}
-              name="note"
+              name="notes"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>備註</FormLabel>
@@ -230,6 +233,7 @@ export default function TransactionForm({ show = true, onClose, editingDebt }: T
                       placeholder="輸入備註..."
                       className="resize-none"
                       {...field}
+                      value={field.value || ""}
                     />
                   </FormControl>
                   <FormMessage />
@@ -239,7 +243,7 @@ export default function TransactionForm({ show = true, onClose, editingDebt }: T
 
             <FormField
               control={form.control}
-              name="firstDueDate"
+              name="startDate"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>到期日</FormLabel>
@@ -247,6 +251,7 @@ export default function TransactionForm({ show = true, onClose, editingDebt }: T
                     <Input
                       type="date"
                       {...field}
+                      value={field.value || ""}
                     />
                   </FormControl>
                   <FormMessage />

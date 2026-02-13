@@ -3,6 +3,7 @@
 
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
+import type { PaymentProject } from "@shared/schema";
 
 interface UsePaymentProjectQueriesParams {
   /** 統計模式，決定是否啟用現金流查詢 */
@@ -92,7 +93,7 @@ export function usePaymentProjectQueries(params: UsePaymentProjectQueriesParams)
   });
 
   // 專案列表查詢
-  const { data: projects } = useQuery<any[]>({
+  const { data: projects } = useQuery<PaymentProject[]>({
     queryKey: ["/api/payment/projects"],
     staleTime: 60000,
   });

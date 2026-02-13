@@ -4,32 +4,44 @@
  */
 
 import { db } from "../db"
-import {
-  paymentItems,
-  paymentProjects,
-  debtCategories,
-} from "@shared/schema"
+import { paymentItems, paymentProjects, debtCategories } from "@shared/schema"
 import { eq } from "drizzle-orm"
 
 /**
  * 進階搜尋付款項目
  * 支援多條件篩選，包含專案名稱、分類名稱等關聯資料
  */
-export async function advancedSearchPaymentItems(filters: any[]): Promise<any> {
+/** 搜尋篩選條件 */
+interface SearchFilter {
+  field: string
+  operator?: string
+  value?: string | number
+}
+
+/** 搜尋結果 */
+interface SearchResult<T> {
+  items: T[]
+  total: number
+}
+
+export async function advancedSearchPaymentItems(
+  filters: SearchFilter[]
+): Promise<SearchResult<Record<string, unknown>>> {
   try {
-    let query = db.select({
-      id: paymentItems.id,
-      itemName: paymentItems.itemName,
-      totalAmount: paymentItems.totalAmount,
-      status: paymentItems.status,
-      startDate: paymentItems.startDate,
-      projectName: paymentProjects.projectName,
-      categoryName: debtCategories.categoryName,
-    })
-    .from(paymentItems)
-    .leftJoin(paymentProjects, eq(paymentItems.projectId, paymentProjects.id))
-    .leftJoin(debtCategories, eq(paymentItems.categoryId, debtCategories.id))
-    .where(eq(paymentItems.isDeleted, false))
+    const query = db
+      .select({
+        id: paymentItems.id,
+        itemName: paymentItems.itemName,
+        totalAmount: paymentItems.totalAmount,
+        status: paymentItems.status,
+        startDate: paymentItems.startDate,
+        projectName: paymentProjects.projectName,
+        categoryName: debtCategories.categoryName,
+      })
+      .from(paymentItems)
+      .leftJoin(paymentProjects, eq(paymentItems.projectId, paymentProjects.id))
+      .leftJoin(debtCategories, eq(paymentItems.categoryId, debtCategories.id))
+      .where(eq(paymentItems.isDeleted, false))
 
     // 應用篩選條件
     for (const filter of filters) {
@@ -52,11 +64,11 @@ export async function advancedSearchPaymentItems(filters: any[]): Promise<any> {
  * 進階搜尋專案
  * 返回符合篩選條件的專案列表
  */
-export async function advancedSearchProjects(filters: any[]): Promise<any> {
+export async function advancedSearchProjects(
+  filters: SearchFilter[]
+): Promise<SearchResult<Record<string, unknown>>> {
   try {
-    const results = await db.select()
-      .from(paymentProjects)
-      .limit(50)
+    const results = await db.select().from(paymentProjects).limit(50)
     return { items: results, total: results.length }
   } catch (error) {
     console.error("搜尋專案失敗:", error)
@@ -68,11 +80,11 @@ export async function advancedSearchProjects(filters: any[]): Promise<any> {
  * 進階搜尋分類
  * 返回符合篩選條件的分類列表
  */
-export async function advancedSearchCategories(filters: any[]): Promise<any> {
+export async function advancedSearchCategories(
+  filters: SearchFilter[]
+): Promise<SearchResult<Record<string, unknown>>> {
   try {
-    const results = await db.select()
-      .from(debtCategories)
-      .limit(50)
+    const results = await db.select().from(debtCategories).limit(50)
     return { items: results, total: results.length }
   } catch (error) {
     console.error("搜尋分類失敗:", error)

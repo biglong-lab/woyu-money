@@ -8,7 +8,7 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { useLocation } from 'wouter';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, startOfWeek, endOfWeek } from 'date-fns';
-import { DragDropContext } from '@hello-pangea/dnd';
+import { DragDropContext, type DropResult } from '@hello-pangea/dnd';
 import { Button } from '@/components/ui/button';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -35,6 +35,18 @@ import { ScheduleCalendar } from '@/components/payment-schedule/schedule-calenda
 import { ItemListPanel } from '@/components/payment-schedule/item-list-panel';
 import { CreateScheduleDialog } from '@/components/payment-schedule/create-schedule-dialog';
 import { ItemDetailDialog } from '@/components/payment-schedule/item-detail-dialog';
+
+// API 回應型別
+interface ApiError {
+  message: string;
+  code?: string;
+}
+
+interface AutoRescheduleResponse {
+  message: string;
+  rescheduled: number;
+  total: number;
+}
 
 export default function PaymentScheduleOptimized() {
   // ========== 狀態 ==========
@@ -138,7 +150,7 @@ export default function PaymentScheduleOptimized() {
       setShowScheduleDialog(false);
       setSelectedItem(null);
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({ title: '錯誤', description: error.message || '建立付款計劃失敗', variant: 'destructive' });
     },
   });
@@ -151,21 +163,21 @@ export default function PaymentScheduleOptimized() {
       setSmartResult(data);
       setShowSmartSchedule(true);
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({ title: '錯誤', description: error.message || '智慧排程建議產生失敗', variant: 'destructive' });
     },
   });
 
-  const autoRescheduleMutation = useMutation({
+  const autoRescheduleMutation = useMutation<AutoRescheduleResponse, ApiError, { targetYear: number; targetMonth: number }>({
     mutationFn: async (data: { targetYear: number; targetMonth: number }) => {
-      return await apiRequest('POST', '/api/payment/schedule/auto-reschedule', data) as { message: string; rescheduled: number; total: number };
+      return await apiRequest('POST', '/api/payment/schedule/auto-reschedule', data) as AutoRescheduleResponse;
     },
     onSuccess: (data) => {
       toast({ title: '成功', description: data.message });
       queryClient.invalidateQueries({ queryKey: ['/api/payment/items/integrated'] });
       queryClient.invalidateQueries({ queryKey: ['/api/payment/schedule'] });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({ title: '錯誤', description: error.message || '自動重排失敗', variant: 'destructive' });
     },
   });
@@ -179,7 +191,7 @@ export default function PaymentScheduleOptimized() {
       queryClient.invalidateQueries({ queryKey: ['/api/payment/items/integrated'] });
       queryClient.invalidateQueries({ queryKey: ['/api/payment/schedule'] });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({ title: '錯誤', description: error.message || '重新排程失敗', variant: 'destructive' });
     },
   });
@@ -255,7 +267,7 @@ export default function PaymentScheduleOptimized() {
   };
 
   // ========== 拖放處理 ==========
-  const handleDragEnd = (result: any) => {
+  const handleDragEnd = (result: DropResult) => {
     if (!result.destination) return;
     const { source, destination, draggableId } = result;
 

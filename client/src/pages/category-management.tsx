@@ -16,6 +16,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
+import type { DebtCategory } from "@/../../shared/schema/category";
 
 const categorySchema = z.object({
   categoryName: z.string().min(1, "分類名稱為必填"),
@@ -26,32 +27,25 @@ const categorySchema = z.object({
   templateNotes: z.string().optional(),
 });
 
-type Category = {
+type CategoryFormData = z.infer<typeof categorySchema>;
+
+interface CategoryWithId extends CategoryFormData {
   id: number;
-  categoryName: string;
-  categoryType: string;
-  description?: string | null;
-  isDeleted: boolean;
-  isTemplate?: boolean;
-  accountInfo?: string | null;
-  templateNotes?: string | null;
-  createdAt: string;
-  updatedAt: string;
-};
+}
 
 export default function CategoryManagement() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [editingCategory, setEditingCategory] = useState<DebtCategory | null>(null);
   const [filterType, setFilterType] = useState<"all" | "project" | "household" | "template">("all");
   const [selectedTab, setSelectedTab] = useState<"list" | "templates">("list");
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const form = useForm({
+  const form = useForm<CategoryFormData>({
     resolver: zodResolver(categorySchema),
     defaultValues: {
       categoryName: "",
-      categoryType: "project" as "project" | "household",
+      categoryType: "project" as const,
       description: "",
       isTemplate: false,
       accountInfo: "",
@@ -60,14 +54,14 @@ export default function CategoryManagement() {
   });
 
   // 獲取所有分類
-  const { data: allCategories = [], isLoading } = useQuery<Category[]>({
+  const { data: allCategories = [], isLoading } = useQuery<DebtCategory[]>({
     queryKey: ["/api/categories/all"],
     queryFn: async () => {
       const [projectCategories, householdCategories] = await Promise.all([
         apiRequest("/api/categories/project", "GET"),
         apiRequest("/api/categories/household", "GET")
       ]);
-      return [...(projectCategories as any[]), ...(householdCategories as any[])];
+      return [...(projectCategories as DebtCategory[]), ...(householdCategories as DebtCategory[])];
     }
   });
 
@@ -84,7 +78,7 @@ export default function CategoryManagement() {
   const templateCategories = allCategories.filter(c => c.isTemplate);
 
   const createCategoryMutation = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: CategoryFormData) => {
       const endpoint = `/api/categories/${data.categoryType}`;
       return apiRequest(endpoint, "POST", data);
     },
@@ -97,7 +91,7 @@ export default function CategoryManagement() {
         description: "新分類已成功添加到系統中",
       });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "創建失敗",
         description: error.message || "無法創建分類，請稍後再試",
@@ -107,7 +101,7 @@ export default function CategoryManagement() {
   });
 
   const updateCategoryMutation = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: CategoryWithId) => {
       const endpoint = `/api/categories/${data.categoryType}/${data.id}`;
       return apiRequest(endpoint, "PUT", data);
     },
@@ -121,7 +115,7 @@ export default function CategoryManagement() {
         description: "分類資訊已成功更新",
       });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "更新失敗",
         description: error.message || "無法更新分類，請稍後再試",
@@ -131,7 +125,7 @@ export default function CategoryManagement() {
   });
 
   const deleteCategoryMutation = useMutation({
-    mutationFn: async (category: Category) => {
+    mutationFn: async (category: DebtCategory) => {
       const endpoint = `/api/categories/${category.categoryType}/${category.id}`;
       return apiRequest(endpoint, "DELETE");
     },
@@ -142,7 +136,7 @@ export default function CategoryManagement() {
         description: "分類已從系統中移除",
       });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "刪除失敗",
         description: error.message || "無法刪除分類，請稍後再試",
@@ -151,7 +145,7 @@ export default function CategoryManagement() {
     },
   });
 
-  const handleSubmit = (data: any) => {
+  const handleSubmit = (data: CategoryFormData) => {
     if (editingCategory) {
       updateCategoryMutation.mutate({ ...data, id: editingCategory.id });
     } else {
@@ -159,7 +153,7 @@ export default function CategoryManagement() {
     }
   };
 
-  const handleEdit = (category: Category) => {
+  const handleEdit = (category: DebtCategory) => {
     setEditingCategory(category);
     form.reset({
       categoryName: category.categoryName,
@@ -172,7 +166,7 @@ export default function CategoryManagement() {
     setIsDialogOpen(true);
   };
 
-  const handleDelete = (category: Category) => {
+  const handleDelete = (category: DebtCategory) => {
     if (confirm(`確定要刪除分類「${category.categoryName}」嗎？`)) {
       deleteCategoryMutation.mutate(category);
     }
@@ -267,7 +261,7 @@ export default function CategoryManagement() {
       </div>
 
       {/* 分類管理界面 */}
-      <Tabs value={selectedTab} onValueChange={(value: any) => setSelectedTab(value)}>
+      <Tabs value={selectedTab} onValueChange={(value) => setSelectedTab(value as "list" | "templates")}>
         <TabsList>
           <TabsTrigger value="list">分類列表</TabsTrigger>
           <TabsTrigger value="templates">固定項目模板</TabsTrigger>
@@ -277,7 +271,7 @@ export default function CategoryManagement() {
           {/* 過濾器 */}
           <div className="flex items-center space-x-4">
             <Filter className="h-4 w-4" />
-            <Select value={filterType} onValueChange={(value: any) => setFilterType(value)}>
+            <Select value={filterType} onValueChange={(value) => setFilterType(value as typeof filterType)}>
               <SelectTrigger className="w-48">
                 <SelectValue placeholder="選擇分類類型" />
               </SelectTrigger>

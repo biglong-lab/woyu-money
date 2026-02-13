@@ -11,8 +11,17 @@ import {
   type AuditLog,
   type InsertAuditLog,
 } from "@shared/schema"
-import { eq, and, sql, desc } from "drizzle-orm"
-import { getCachedCategoryType, createAuditLogAsync, createFixedCategorySubOptionAsync, calculateMonthsBetween, getMonthIndex } from "./helpers"
+import { eq, and, sql, desc, type SQL } from "drizzle-orm"
+import {
+  getCachedCategoryType,
+  createAuditLogAsync,
+  createFixedCategorySubOptionAsync,
+  calculateMonthsBetween,
+  getMonthIndex,
+} from "./helpers"
+
+/** Drizzle 原生插入型別（含 startDate 等必填欄位） */
+type PaymentItemInsert = typeof paymentItems.$inferInsert
 
 // === 審計日誌 ===
 
@@ -31,21 +40,32 @@ export async function createAuditLog(logData: InsertAuditLog): Promise<AuditLog>
 
 // === 付款項目 CRUD ===
 
-export async function getPaymentItems(filters?: any, page?: number, limit?: number): Promise<PaymentItem[]> {
+/** 付款項目篩選條件 */
+interface PaymentItemFilters {
+  projectId?: number | string
+  categoryId?: number | string
+  excludeRental?: boolean
+}
+
+export async function getPaymentItems(
+  filters?: PaymentItemFilters,
+  page?: number,
+  limit?: number
+): Promise<PaymentItem[]> {
   const offset = page && limit ? (page - 1) * limit : 0
   const queryLimit = limit || 5000
 
-  const conditions = ["pi.is_deleted = false"]
+  const conditions: SQL[] = [sql`pi.is_deleted = false`]
 
   if (filters?.projectId) {
-    conditions.push(`pi.project_id = ${filters.projectId}`)
+    conditions.push(sql`pi.project_id = ${Number(filters.projectId)}`)
   }
   if (filters?.categoryId) {
-    conditions.push(`pi.category_id = ${filters.categoryId}`)
+    conditions.push(sql`pi.category_id = ${Number(filters.categoryId)}`)
   }
 
   if (filters?.excludeRental) {
-    conditions.push(`(
+    conditions.push(sql`(
       pi.item_name NOT LIKE '%租約%' AND
       pi.item_name NOT LIKE '%租金%' AND
       pi.item_name NOT LIKE '%第%期/共%期%' AND
@@ -56,7 +76,7 @@ export async function getPaymentItems(filters?: any, page?: number, limit?: numb
     )`)
   }
 
-  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : ""
+  const whereClause = sql`WHERE ${sql.join(conditions, sql` AND `)}`
 
   const query = sql`
     SELECT
@@ -88,7 +108,7 @@ export async function getPaymentItems(filters?: any, page?: number, limit?: numb
     FROM payment_items pi
     LEFT JOIN debt_categories dc ON pi.category_id = dc.id
     LEFT JOIN payment_projects pp ON pi.project_id = pp.id
-    ${sql.raw(whereClause)}
+    ${whereClause}
     ORDER BY pi.start_date DESC
     LIMIT ${queryLimit} OFFSET ${offset}
   `
@@ -97,18 +117,18 @@ export async function getPaymentItems(filters?: any, page?: number, limit?: numb
   return result.rows as PaymentItem[]
 }
 
-export async function getPaymentItemsCount(filters?: any): Promise<number> {
-  const conditions = ["pi.is_deleted = false"]
+export async function getPaymentItemsCount(filters?: PaymentItemFilters): Promise<number> {
+  const conditions: SQL[] = [sql`pi.is_deleted = false`]
 
   if (filters?.projectId) {
-    conditions.push(`pi.project_id = ${filters.projectId}`)
+    conditions.push(sql`pi.project_id = ${Number(filters.projectId)}`)
   }
   if (filters?.categoryId) {
-    conditions.push(`pi.category_id = ${filters.categoryId}`)
+    conditions.push(sql`pi.category_id = ${Number(filters.categoryId)}`)
   }
 
   if (filters?.excludeRental) {
-    conditions.push(`(
+    conditions.push(sql`(
       pi.item_name NOT LIKE '%租約%' AND
       pi.item_name NOT LIKE '%租金%' AND
       pi.item_name NOT LIKE '%第%期/共%期%' AND
@@ -119,36 +139,38 @@ export async function getPaymentItemsCount(filters?: any): Promise<number> {
     )`)
   }
 
-  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : ""
+  const whereClause = sql`WHERE ${sql.join(conditions, sql` AND `)}`
 
   const query = sql`
     SELECT COUNT(*) as count
     FROM payment_items pi
     LEFT JOIN payment_projects pp ON pi.project_id = pp.id
-    ${sql.raw(whereClause)}
+    ${whereClause}
   `
 
   const result = await db.execute(query)
-  return parseInt((result.rows[0] as any)?.count || "0")
+  const row = result.rows[0] as Record<string, unknown> | undefined
+  return parseInt(String(row?.count ?? "0"))
 }
 
 export async function getPaymentItem(id: number): Promise<PaymentItem | undefined> {
-  const [item] = await db
-    .select()
-    .from(paymentItems)
-    .where(eq(paymentItems.id, id))
+  const [item] = await db.select().from(paymentItems).where(eq(paymentItems.id, id))
   return item
 }
 
 // 建立月付項目的輔助函式
-async function createMonthlyPaymentItems(itemData: InsertPaymentItem, userInfo: string): Promise<PaymentItem> {
+async function createMonthlyPaymentItems(
+  itemData: InsertPaymentItem,
+  userInfo: string
+): Promise<PaymentItem> {
   const startDate = new Date(itemData.startDate!)
   const endDate = new Date(itemData.endDate!)
-  const monthlyAmount = parseFloat(itemData.totalAmount) / calculateMonthsBetween(startDate, endDate)
+  const monthlyAmount =
+    parseFloat(itemData.totalAmount) / calculateMonthsBetween(startDate, endDate)
 
   const [parentItem] = await db
     .insert(paymentItems)
-    .values({ ...itemData, updatedAt: new Date() } as any)
+    .values({ ...itemData, updatedAt: new Date() } as PaymentItemInsert)
     .returning()
 
   const currentDate = new Date(startDate)
@@ -176,7 +198,10 @@ async function createMonthlyPaymentItems(itemData: InsertPaymentItem, userInfo: 
 }
 
 // 建立分期付款項目的輔助函式
-async function createInstallmentPaymentItems(itemData: InsertPaymentItem, userInfo: string): Promise<PaymentItem> {
+async function createInstallmentPaymentItems(
+  itemData: InsertPaymentItem,
+  userInfo: string
+): Promise<PaymentItem> {
   const startDate = new Date(itemData.startDate!)
   const endDate = new Date(itemData.endDate!)
   const totalAmount = parseFloat(itemData.totalAmount)
@@ -186,7 +211,7 @@ async function createInstallmentPaymentItems(itemData: InsertPaymentItem, userIn
 
   const [parentItem] = await db
     .insert(paymentItems)
-    .values({ ...itemData, updatedAt: new Date() } as any)
+    .values({ ...itemData, updatedAt: new Date() } as PaymentItemInsert)
     .returning()
 
   const currentDate = new Date(startDate)
@@ -213,8 +238,11 @@ async function createInstallmentPaymentItems(itemData: InsertPaymentItem, userIn
   return parentItem
 }
 
-export async function createPaymentItem(itemData: InsertPaymentItem, userInfo = "系統管理員"): Promise<PaymentItem> {
-  let cleanData = { ...itemData }
+export async function createPaymentItem(
+  itemData: InsertPaymentItem,
+  userInfo = "系統管理員"
+): Promise<PaymentItem> {
+  const cleanData = { ...itemData }
 
   if (!cleanData.fixedCategoryId || cleanData.fixedCategoryId === 0) {
     cleanData.fixedCategoryId = null
@@ -237,16 +265,18 @@ export async function createPaymentItem(itemData: InsertPaymentItem, userInfo = 
   } else {
     const [item] = await db
       .insert(paymentItems)
-      .values({ ...cleanData, updatedAt: new Date() } as any)
+      .values({ ...cleanData, updatedAt: new Date() } as PaymentItemInsert)
       .returning()
 
     if (cleanData.fixedCategoryId && cleanData.projectId && cleanData.itemName) {
       setImmediate(() => {
-        createFixedCategorySubOptionAsync(cleanData.fixedCategoryId!, cleanData.projectId!, cleanData.itemName).catch(
-          (error: any) => {
-            console.error("非同步創建固定分類子選項失敗:", error)
-          }
-        )
+        createFixedCategorySubOptionAsync(
+          cleanData.fixedCategoryId!,
+          cleanData.projectId!,
+          cleanData.itemName
+        ).catch((error: unknown) => {
+          console.error("非同步創建固定分類子選項失敗:", error)
+        })
       })
     }
 
@@ -260,7 +290,7 @@ export async function createPaymentItem(itemData: InsertPaymentItem, userInfo = 
         changedFields: [],
         userInfo,
         changeReason: "新建付款項目",
-      }).catch((error: any) => {
+      }).catch((error: unknown) => {
         console.error("非同步創建審計日誌失敗:", error)
       })
     })
@@ -292,7 +322,7 @@ export async function updatePaymentItem(
 
     const [updatedItem] = await db
       .update(paymentItems)
-      .set({ ...cleanedData, updatedAt: new Date() } as any)
+      .set({ ...cleanedData, updatedAt: new Date() } as Partial<PaymentItemInsert>)
       .where(eq(paymentItems.id, id))
       .returning()
 
@@ -306,7 +336,7 @@ export async function updatePaymentItem(
         changedFields: Object.keys(cleanedData),
         userInfo,
         changeReason: reason,
-      }).catch((error: any) => {
+      }).catch((error: unknown) => {
         console.error("非同步創建更新審計日誌失敗:", error)
       })
     })
@@ -318,7 +348,11 @@ export async function updatePaymentItem(
   }
 }
 
-export async function deletePaymentItem(id: number, userInfo = "系統管理員", reason = "刪除項目"): Promise<void> {
+export async function deletePaymentItem(
+  id: number,
+  userInfo = "系統管理員",
+  reason = "刪除項目"
+): Promise<void> {
   const oldItem = await getPaymentItem(id)
 
   const now = new Date()
@@ -369,7 +403,11 @@ export async function permanentlyDeletePaymentItem(
   })
 }
 
-export async function restorePaymentItem(id: number, userInfo = "系統管理員", reason = "恢復項目"): Promise<PaymentItem> {
+export async function restorePaymentItem(
+  id: number,
+  userInfo = "系統管理員",
+  reason = "恢復項目"
+): Promise<PaymentItem> {
   const oldItem = await getPaymentItem(id)
 
   const [item] = await db
@@ -396,7 +434,38 @@ export async function restorePaymentItem(id: number, userInfo = "系統管理員
   return item
 }
 
-export async function getDeletedPaymentItems(): Promise<any[]> {
+/** 已刪除付款項目（含關聯名稱） */
+interface DeletedPaymentItemRow extends Record<string, unknown> {
+  id: number
+  category_id: number | null
+  fixed_category_id: number | null
+  fixed_sub_option_id: number | null
+  project_id: number | null
+  item_name: string
+  total_amount: string
+  item_type: string | null
+  payment_type: string | null
+  recurring_interval: string | null
+  installment_count: number | null
+  installment_amount: string | null
+  start_date: string
+  end_date: string | null
+  paid_amount: string | null
+  status: string
+  priority: number | null
+  notes: string | null
+  tags: string | null
+  is_deleted: boolean
+  deleted_at: Date | null
+  created_at: Date
+  updated_at: Date
+  categoryName: string | null
+  projectName: string | null
+  projectType: string | null
+  fixedCategoryName: string | null
+}
+
+export async function getDeletedPaymentItems(): Promise<Record<string, unknown>[]> {
   const result = await db.execute(sql`
     SELECT
       pi.*,
@@ -412,33 +481,36 @@ export async function getDeletedPaymentItems(): Promise<any[]> {
     ORDER BY pi.deleted_at DESC
   `)
 
-  return result.rows.map((row: any) => ({
-    id: row.id,
-    categoryId: row.category_id,
-    fixedCategoryId: row.fixed_category_id,
-    fixedSubOptionId: row.fixed_sub_option_id,
-    projectId: row.project_id,
-    itemName: row.item_name,
-    totalAmount: row.total_amount,
-    itemType: row.item_type,
-    paymentType: row.payment_type,
-    recurringInterval: row.recurring_interval,
-    installmentCount: row.installment_count,
-    installmentAmount: row.installment_amount,
-    startDate: row.start_date,
-    endDate: row.end_date,
-    paidAmount: row.paid_amount,
-    status: row.status,
-    priority: row.priority,
-    notes: row.notes,
-    tags: row.tags,
-    isDeleted: row.is_deleted,
-    deletedAt: row.deleted_at,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-    categoryName: row.categoryName,
-    projectName: row.projectName,
-    projectType: row.projectType,
-    fixedCategoryName: row.fixedCategoryName,
-  }))
+  return result.rows.map((r: Record<string, unknown>) => {
+    const row = r as DeletedPaymentItemRow
+    return {
+      id: row.id,
+      categoryId: row.category_id,
+      fixedCategoryId: row.fixed_category_id,
+      fixedSubOptionId: row.fixed_sub_option_id,
+      projectId: row.project_id,
+      itemName: row.item_name,
+      totalAmount: row.total_amount,
+      itemType: row.item_type,
+      paymentType: row.payment_type,
+      recurringInterval: row.recurring_interval,
+      installmentCount: row.installment_count,
+      installmentAmount: row.installment_amount,
+      startDate: row.start_date,
+      endDate: row.end_date,
+      paidAmount: row.paid_amount,
+      status: row.status,
+      priority: row.priority,
+      notes: row.notes,
+      tags: row.tags,
+      isDeleted: row.is_deleted,
+      deletedAt: row.deleted_at,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      categoryName: row.categoryName,
+      projectName: row.projectName,
+      projectType: row.projectType,
+      fixedCategoryName: row.fixedCategoryName,
+    }
+  })
 }

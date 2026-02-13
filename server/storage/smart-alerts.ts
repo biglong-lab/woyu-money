@@ -19,9 +19,25 @@ const severityOrder: Record<string, number> = {
  * 產生智慧提醒列表
  * 包含：高風險借貸、即將到期、已逾期三種類型的提醒
  */
-export async function getSmartAlerts(): Promise<any[]> {
+/** 智慧提醒項目 */
+interface SmartAlertItem {
+  id: string
+  type: string
+  title: string
+  message: string
+  severity: string
+  entityId: number
+  entityType: string
+  amount: string
+  interestRate?: number
+  dueDate?: string | null
+  isRead: boolean
+  createdAt: string
+}
+
+export async function getSmartAlerts(): Promise<SmartAlertItem[]> {
   try {
-    const alerts: any[] = []
+    const alerts: SmartAlertItem[] = []
     const currentDate = new Date()
     const thirtyDaysFromNow = new Date()
     thirtyDaysFromNow.setDate(currentDate.getDate() + 30)
@@ -43,8 +59,7 @@ export async function getSmartAlerts(): Promise<any[]> {
         type: "risk",
         title: "高風險借貸提醒",
         message: `借貸項目「${loan.itemName}」年利率達${loan.annualInterestRate}%，建議優先處理`,
-        severity:
-          parseFloat(loan.annualInterestRate) >= 20 ? "critical" : "high",
+        severity: parseFloat(loan.annualInterestRate) >= 20 ? "critical" : "high",
         entityId: loan.id,
         entityType: "loan",
         amount: loan.principalAmount,
@@ -68,8 +83,7 @@ export async function getSmartAlerts(): Promise<any[]> {
 
     for (const loan of dueSoonLoans) {
       const daysUntilDue = Math.ceil(
-        (new Date(loan.endDate!).getTime() - currentDate.getTime()) /
-          (1000 * 60 * 60 * 24)
+        (new Date(loan.endDate!).getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24)
       )
       alerts.push({
         id: `due_${loan.id}`,
@@ -99,8 +113,7 @@ export async function getSmartAlerts(): Promise<any[]> {
 
     for (const loan of overdueLoans) {
       const daysOverdue = Math.ceil(
-        (currentDate.getTime() - new Date(loan.endDate!).getTime()) /
-          (1000 * 60 * 60 * 24)
+        (currentDate.getTime() - new Date(loan.endDate!).getTime()) / (1000 * 60 * 60 * 24)
       )
       alerts.push({
         id: `overdue_${loan.id}`,
@@ -119,12 +132,9 @@ export async function getSmartAlerts(): Promise<any[]> {
 
     // 按嚴重程度和建立日期排序
     return alerts.sort((a, b) => {
-      const severityDiff =
-        (severityOrder[b.severity] || 0) - (severityOrder[a.severity] || 0)
+      const severityDiff = (severityOrder[b.severity] || 0) - (severityOrder[a.severity] || 0)
       if (severityDiff !== 0) return severityDiff
-      return (
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      )
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     })
   } catch (error) {
     console.error("產生智慧提醒失敗:", error)
@@ -136,7 +146,16 @@ export async function getSmartAlerts(): Promise<any[]> {
  * 取得智慧提醒統計
  * 返回高風險借貸數、即將到期數、逾期數及相關金額
  */
-export async function getSmartAlertStats(): Promise<any> {
+/** 智慧提醒統計 */
+interface SmartAlertStatsResult {
+  totalAlerts: number
+  criticalAlerts: number
+  highRiskLoans: number
+  dueSoonAmount: string
+  overdueAmount: string
+}
+
+export async function getSmartAlertStats(): Promise<SmartAlertStatsResult> {
   try {
     const currentDate = new Date()
     const thirtyDaysFromNow = new Date()
@@ -204,9 +223,7 @@ export async function getSmartAlertStats(): Promise<any> {
       )
 
     const totalAlerts =
-      (highRiskCount[0]?.count || 0) +
-      (dueSoonCount[0]?.count || 0) +
-      (overdueCount[0]?.count || 0)
+      (highRiskCount[0]?.count || 0) + (dueSoonCount[0]?.count || 0) + (overdueCount[0]?.count || 0)
 
     const criticalAlerts = overdueCount[0]?.count || 0
 
@@ -230,7 +247,6 @@ export async function getSmartAlertStats(): Promise<any> {
 export async function dismissSmartAlert(alertId: string): Promise<void> {
   try {
     // 目前僅記錄，未來可擴充為持久化狀態
-    console.log(`Alert ${alertId} dismissed`)
   } catch (error) {
     console.error("關閉智慧提醒失敗:", error)
     throw error

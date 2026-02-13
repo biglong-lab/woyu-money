@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 // 優化的付款項目查詢Hook
 export function useOptimizedPaymentItems(params: {
@@ -89,7 +89,7 @@ export function useOptimizedStats(type: 'project' | 'projects' = 'project', enab
 
 // 預載查詢Hook - 用於提前載入可能需要的數據
 export function usePrefetchQueries() {
-  const queryClient = (useQuery as any).getQueryClient?.() || null;
+  const queryClient = useQueryClient();
   
   const prefetchCategories = () => {
     if (!queryClient) return;
@@ -119,7 +119,7 @@ export function usePrefetchQueries() {
 
 // 智能重新整理Hook - 根據頁面活躍度決定是否重新整理
 export function useSmartRefresh(queryKeys: string[], intervalMs = 30000) {
-  const queryClient = (useQuery as any).getQueryClient?.() || null;
+  const queryClient = useQueryClient();
   
   const refreshQueries = () => {
     if (!queryClient || document.hidden) return;

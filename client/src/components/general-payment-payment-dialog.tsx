@@ -6,16 +6,16 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { UseFormReturn } from "react-hook-form";
+import { UseFormReturn, FieldValues } from "react-hook-form";
 import { useToast } from "@/hooks/use-toast";
 import type { PaymentItem } from "./general-payment-types";
 
 export interface GeneralPaymentPaymentDialogProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
-  paymentForm: UseFormReturn<any>;
+  paymentForm: UseFormReturn<FieldValues>;
   paymentItem: PaymentItem | null;
-  onSubmit: (data: any, receiptFile: File | null) => void;
+  onSubmit: (data: FieldValues, receiptFile: File | null) => void;
   isPending: boolean;
 }
 
@@ -68,7 +68,7 @@ export function GeneralPaymentPaymentDialog({
     setReceiptPreview(null);
   };
 
-  const handleFormSubmit = (data: any) => {
+  const handleFormSubmit = (data: FieldValues) => {
     onSubmit(data, receiptFile);
     // 清除本地檔案狀態
     removeReceiptFile();

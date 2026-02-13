@@ -35,6 +35,23 @@ interface MenuPermissions {
   other?: boolean;
 }
 
+interface CreateUserData {
+  username: string;
+  password: string;
+  email: string;
+  fullName: string;
+  role: string;
+  menuPermissions: MenuPermissions;
+}
+
+interface UpdateUserData {
+  username: string;
+  email: string | null;
+  fullName: string | null;
+  role: string;
+  isActive: boolean;
+}
+
 const defaultPermissions: Record<string, MenuPermissions> = {
   admin: {
     payment: true,
@@ -90,7 +107,7 @@ export default function UserManagement() {
   });
 
   const createUserMutation = useMutation({
-    mutationFn: async (userData: any) => {
+    mutationFn: async (userData: CreateUserData) => {
       const response = await apiRequest("POST", "/api/admin/users", userData);
       return response;
     },
@@ -109,7 +126,7 @@ export default function UserManagement() {
         description: "用戶已創建",
       });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "錯誤",
         description: error.message || "創建用戶失敗",
@@ -119,7 +136,7 @@ export default function UserManagement() {
   });
 
   const updateUserMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: number; data: any }) => {
+    mutationFn: async ({ id, data }: { id: number; data: UpdateUserData }) => {
       const response = await apiRequest("PUT", `/api/admin/users/${id}`, data);
       return response;
     },
@@ -132,7 +149,7 @@ export default function UserManagement() {
         description: "用戶已更新",
       });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "錯誤",
         description: error.message || "更新用戶失敗",
@@ -155,7 +172,7 @@ export default function UserManagement() {
         description: "密碼已更新",
       });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "錯誤",
         description: error.message || "更新密碼失敗",
@@ -179,7 +196,7 @@ export default function UserManagement() {
         description: "權限已更新",
       });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "錯誤",
         description: error.message || "更新權限失敗",
@@ -200,7 +217,7 @@ export default function UserManagement() {
         description: "用戶已刪除",
       });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "錯誤",
         description: error.message || "刪除用戶失敗",

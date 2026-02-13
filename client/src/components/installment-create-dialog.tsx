@@ -1,6 +1,6 @@
 // 分期付款建立對話框元件
 
-import { UseFormReturn } from "react-hook-form";
+import { UseFormReturn, Control, FieldValues } from "react-hook-form";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,8 +13,8 @@ import type { PaymentCalculation } from "./installment-types";
 export interface InstallmentCreateDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  form: UseFormReturn<any>;
-  onSubmit: (data: any) => void;
+  form: UseFormReturn<FieldValues>;
+  onSubmit: (data: FieldValues) => void;
   isPending: boolean;
   paymentCalculation: PaymentCalculation;
   watchTotalAmount: string;
@@ -47,8 +47,8 @@ export default function InstallmentCreateDialog({
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             {/* 統一分類選擇組件 */}
             <CategorySelector
-              form={form}
-              onCategoryChange={(categoryData) => {
+              form={form as unknown as { control: Control<FieldValues>; watch: (name: string) => string; setValue: (name: string, value: string) => void; }}
+              onCategoryChange={() => {
                 // 分類變更回呼
               }}
             />

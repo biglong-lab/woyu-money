@@ -84,7 +84,7 @@ function ItemCard({
           : new Date(item.paymentType === "single" ? item.startDate : (item.endDate || item.startDate)) < new Date()
           ? "border-l-red-500 bg-red-50/50"
           : "border-l-blue-500"
-      } ${(item as any).isDeleted ? 'opacity-60' : ''} ${isSelected ? 'ring-2 ring-blue-500 bg-blue-50/20' : ''}`}
+      } ${((item as PaymentItem & { isDeleted?: boolean }).isDeleted ? 'opacity-60' : '')} ${isSelected ? 'ring-2 ring-blue-500 bg-blue-50/20' : ''}`}
     >
       <CardContent className="p-4">
         <div className="flex items-start justify-between">
@@ -274,7 +274,7 @@ function PaidItemCard({
         item.paymentType === "installment"
           ? "border-l-purple-500 bg-purple-50/30 ring-1 ring-purple-200"
           : "border-l-green-500 bg-green-50/50"
-      } ${(item as any).isDeleted ? 'opacity-60' : ''}`}
+      } ${((item as PaymentItem & { isDeleted?: boolean }).isDeleted ? 'opacity-60' : '')}`}
       onClick={() => onItemClick(item)}
     >
       <CardContent className="p-4">

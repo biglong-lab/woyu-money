@@ -40,6 +40,14 @@ interface ResponsiveChartProps {
   colorScheme?: "default" | "risk" | "performance";
 }
 
+// 定義借貸記錄型別
+interface LoanRecord {
+  recordType: string;
+  principalAmount: string | number;
+  annualInterestRate: string | number;
+  startDate: string | Date;
+}
+
 const COLORS = {
   default: ['#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#00ff00'],
   risk: ['#ef4444', '#f97316', '#eab308', '#22c55e', '#06b6d4'],
@@ -84,7 +92,7 @@ export function ResponsiveChart({
               />
               <YAxis fontSize={isMobile ? 10 : 12} />
               <Tooltip 
-                formatter={(value: any, name: string) => [
+                formatter={(value: number | string, name: string) => [
                   typeof value === 'number' ? `$${value.toLocaleString()}` : value,
                   name
                 ]}
@@ -103,7 +111,7 @@ export function ResponsiveChart({
                 cx="50%"
                 cy="50%"
                 labelLine={false}
-                label={isMobile ? false : ({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                label={isMobile ? false : ({ name, percent }: { name: string; percent: number }) => `${name}: ${(percent * 100).toFixed(0)}%`}
                 outerRadius={isMobile ? 45 : 60}
                 fill="#8884d8"
                 dataKey="value"
@@ -113,7 +121,7 @@ export function ResponsiveChart({
                 ))}
               </Pie>
               <Tooltip 
-                formatter={(value: any) => [
+                formatter={(value: number | string) => [
                   typeof value === 'number' ? `$${value.toLocaleString()}` : value
                 ]}
               />
@@ -135,7 +143,7 @@ export function ResponsiveChart({
               />
               <YAxis fontSize={isMobile ? 10 : 12} />
               <Tooltip 
-                formatter={(value: any) => [
+                formatter={(value: number | string) => [
                   typeof value === 'number' ? `$${value.toLocaleString()}` : value
                 ]}
               />
@@ -164,7 +172,7 @@ export function ResponsiveChart({
               />
               <YAxis fontSize={isMobile ? 10 : 12} />
               <Tooltip 
-                formatter={(value: any) => [
+                formatter={(value: number | string) => [
                   typeof value === 'number' ? `$${value.toLocaleString()}` : value
                 ]}
               />
@@ -220,7 +228,7 @@ export function ResponsiveChart({
   );
 }
 
-export function LoanAnalyticsCharts({ records }: { records: any[] }) {
+export function LoanAnalyticsCharts({ records }: { records: LoanRecord[] }) {
   const [chartType, setChartType] = useState<"overview" | "risk" | "timeline">("overview");
   const [isMobile, setIsMobile] = useState(false);
 
@@ -239,12 +247,12 @@ export function LoanAnalyticsCharts({ records }: { records: any[] }) {
     return [
       { 
         name: "借貸", 
-        value: loanData.reduce((sum, r) => sum + parseFloat(r.principalAmount || "0"), 0),
+        value: loanData.reduce((sum, r) => sum + parseFloat(r.principalAmount.toString()), 0),
         count: loanData.length
       },
       { 
         name: "投資", 
-        value: investmentData.reduce((sum, r) => sum + parseFloat(r.principalAmount || "0"), 0),
+        value: investmentData.reduce((sum, r) => sum + parseFloat(r.principalAmount.toString()), 0),
         count: investmentData.length
       }
     ];
@@ -259,8 +267,8 @@ export function LoanAnalyticsCharts({ records }: { records: any[] }) {
     };
 
     records.forEach(record => {
-      const rate = parseFloat(record.annualInterestRate || "0");
-      const amount = parseFloat(record.principalAmount || "0");
+      const rate = parseFloat(record.annualInterestRate.toString());
+      const amount = parseFloat(record.principalAmount.toString());
       
       if (rate < 8) {
         riskCategories["低風險 (<8%)"] += amount;
@@ -289,7 +297,7 @@ export function LoanAnalyticsCharts({ records }: { records: any[] }) {
       if (!monthlyData[monthKey]) {
         monthlyData[monthKey] = 0;
       }
-      monthlyData[monthKey] += parseFloat(record.principalAmount || "0");
+      monthlyData[monthKey] += parseFloat(record.principalAmount.toString());
     });
 
     return Object.entries(monthlyData)
@@ -354,7 +362,7 @@ export function LoanAnalyticsCharts({ records }: { records: any[] }) {
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h3 className="text-lg font-semibold">數據分析</h3>
-        <Select value={chartType} onValueChange={(value: any) => setChartType(value)}>
+        <Select value={chartType} onValueChange={(value: "overview" | "risk" | "timeline") => setChartType(value)}>
           <SelectTrigger className={`${isMobile ? 'w-full' : 'w-48'}`}>
             <SelectValue placeholder="選擇分析類型" />
           </SelectTrigger>

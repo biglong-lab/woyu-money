@@ -5,6 +5,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useToast } from "@/hooks/use-toast";
+import { z } from "zod";
+import type { DebtCategory, InsertPaymentItem, InsertPaymentProject } from "shared/schema";
 
 // 子組件匯入
 import {
@@ -25,6 +27,9 @@ import type { PaymentItem, PaymentProject } from "@/components/integrated-paymen
 // 職責：狀態管理、資料查詢、組合子組件
 // ========================================
 
+// 從 zod schema 推斷表單型別
+type PaymentItemFormData = z.infer<typeof paymentItemSchema>;
+
 export default function IntegratedPaymentAnalysisOptimized() {
   // 頁面狀態
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -36,7 +41,7 @@ export default function IntegratedPaymentAnalysisOptimized() {
   const [editingItem, setEditingItem] = useState<PaymentItem | null>(null);
   const [showDeletedItems, setShowDeletedItems] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedItems, setSelectedItems] = useState<number[]>([]);
+  const [selectedItems] = useState<number[]>([]);
   const [showBatchActions, setShowBatchActions] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -45,7 +50,7 @@ export default function IntegratedPaymentAnalysisOptimized() {
   // 表單設定
   // ========================================
 
-  const itemForm = useForm({
+  const itemForm = useForm<PaymentItemFormData>({
     resolver: zodResolver(paymentItemSchema),
     defaultValues: {
       categoryId: 0,
@@ -81,7 +86,7 @@ export default function IntegratedPaymentAnalysisOptimized() {
     queryKey: ["/api/payment/projects"],
   });
 
-  const { data: categories = [] } = useQuery<any[]>({
+  const { data: categories = [] } = useQuery<DebtCategory[]>({
     queryKey: ["/api/categories/project"],
   });
 
@@ -90,7 +95,7 @@ export default function IntegratedPaymentAnalysisOptimized() {
   // ========================================
 
   const createItemMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/payment/items", data),
+    mutationFn: (data: InsertPaymentItem) => apiRequest("POST", "/api/payment/items", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/payment/items"] });
       setIsItemDialogOpen(false);
@@ -101,7 +106,7 @@ export default function IntegratedPaymentAnalysisOptimized() {
   });
 
   const updateItemMutation = useMutation({
-    mutationFn: ({ id, data, reason }: { id: number; data: any; reason?: string }) =>
+    mutationFn: ({ id, data, reason }: { id: number; data: InsertPaymentItem; reason?: string }) =>
       apiRequest("PUT", `/api/payment/items/${id}`, { ...data, changeReason: reason }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/payment/items"] });
@@ -122,7 +127,7 @@ export default function IntegratedPaymentAnalysisOptimized() {
   });
 
   const createProjectMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/payment/projects", data),
+    mutationFn: (data: InsertPaymentProject) => apiRequest("POST", "/api/payment/projects", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/payment/projects"] });
       setIsProjectDialogOpen(false);
@@ -226,15 +231,21 @@ export default function IntegratedPaymentAnalysisOptimized() {
   // ========================================
 
   /** 表單提交處理 */
-  const handleSubmit = (data: any) => {
-    const formData = {
-      ...data,
+  const handleSubmit = (data: PaymentItemFormData) => {
+    const formData: InsertPaymentItem = {
       categoryId: parseInt(data.categoryId.toString()),
       projectId: parseInt(data.projectId.toString()),
+      itemName: data.itemName,
+      totalAmount: data.totalAmount,
+      paymentType: data.paymentType,
+      startDate: data.startDate,
+      endDate: data.endDate || undefined,
+      priority: data.priority,
+      notes: data.notes || undefined,
       installmentCount:
         data.paymentType === 'installment'
-          ? parseInt(data.installmentCount?.toString() || '1')
-          : null,
+          ? parseInt((data.installmentCount || 1).toString())
+          : undefined,
     };
 
     if (editingItem) {
@@ -256,7 +267,7 @@ export default function IntegratedPaymentAnalysisOptimized() {
       projectId: item.projectId || 0,
       itemName: item.itemName,
       totalAmount: item.totalAmount,
-      paymentType: item.paymentType as any,
+      paymentType: item.paymentType as "single" | "recurring" | "installment",
       startDate: item.startDate,
       endDate: item.endDate || "",
       priority: item.priority,
@@ -297,19 +308,19 @@ export default function IntegratedPaymentAnalysisOptimized() {
             <ProjectDialog
               open={isProjectDialogOpen}
               onOpenChange={setIsProjectDialogOpen}
-              form={projectForm}
-              onSubmit={(data) => createProjectMutation.mutate(data)}
+              form={projectForm as unknown as Parameters<typeof ProjectDialog>[0]['form']}
+              onSubmit={(data) => createProjectMutation.mutate(data as InsertPaymentProject)}
               isPending={createProjectMutation.isPending}
             />
             <PaymentItemDialog
               open={isItemDialogOpen}
               onOpenChange={setIsItemDialogOpen}
-              editingItem={editingItem}
-              form={itemForm}
-              onSubmit={handleSubmit}
+              editingItem={editingItem as unknown as Parameters<typeof PaymentItemDialog>[0]['editingItem']}
+              form={itemForm as unknown as Parameters<typeof PaymentItemDialog>[0]['form']}
+              onSubmit={(data) => handleSubmit(data as PaymentItemFormData)}
               onResetEditing={handleResetEditing}
               isPending={createItemMutation.isPending || updateItemMutation.isPending}
-              projects={projects}
+              projects={projects as unknown as Parameters<typeof PaymentItemDialog>[0]['projects']}
               categories={categories}
             />
           </div>

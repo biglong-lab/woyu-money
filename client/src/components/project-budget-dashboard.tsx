@@ -5,8 +5,28 @@ import { Progress } from "@/components/ui/progress";
 import { Clock, Check } from "lucide-react";
 import { formatCurrency } from "./project-budget-utils";
 
+
+export interface PlanSummary {
+  summary: {
+    totalBudget: string | number;
+    totalPlanned: string | number;
+    totalActual: string | number;
+    variance: number;
+    utilizationRate: string | number;
+    conversionRate: string | number;
+    convertedCount: number;
+    itemCount: number;
+    pendingCount: number;
+    byPaymentType: {
+      single: number;
+      installment: number;
+      monthly: number;
+    };
+  };
+}
+
 export interface ProjectBudgetDashboardProps {
-  planSummary: any | null;
+  planSummary: PlanSummary | null;
 }
 
 export default function ProjectBudgetDashboard({
@@ -30,7 +50,7 @@ export default function ProjectBudgetDashboard({
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">
-            {formatCurrency(planSummary.summary.totalBudget)}
+            {formatCurrency(String(planSummary.summary.totalBudget))}
           </div>
         </CardContent>
       </Card>
@@ -40,10 +60,10 @@ export default function ProjectBudgetDashboard({
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">
-            {formatCurrency(planSummary.summary.totalPlanned)}
+            {formatCurrency(String(planSummary.summary.totalPlanned))}
           </div>
           <p className="text-sm text-gray-500">
-            使用率: {planSummary.summary.utilizationRate}%
+            使用率: {String(planSummary.summary.utilizationRate)}%
           </p>
         </CardContent>
       </Card>
@@ -53,7 +73,7 @@ export default function ProjectBudgetDashboard({
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">
-            {formatCurrency(planSummary.summary.totalActual)}
+            {formatCurrency(String(planSummary.summary.totalActual))}
           </div>
           <p
             className={`text-sm ${
@@ -61,7 +81,7 @@ export default function ProjectBudgetDashboard({
             }`}
           >
             差異: {planSummary.summary.variance >= 0 ? "+" : ""}
-            {formatCurrency(planSummary.summary.variance)}
+            {formatCurrency(String(planSummary.summary.variance))}
           </p>
         </CardContent>
       </Card>
@@ -71,7 +91,7 @@ export default function ProjectBudgetDashboard({
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">
-            {planSummary.summary.conversionRate}%
+            {String(planSummary.summary.conversionRate)}%
           </div>
           <p className="text-sm text-gray-500">
             {planSummary.summary.convertedCount} / {planSummary.summary.itemCount} 項目
@@ -88,10 +108,10 @@ export default function ProjectBudgetDashboard({
             <div>
               <div className="flex justify-between text-sm mb-1">
                 <span>已規劃</span>
-                <span>{planSummary.summary.utilizationRate}%</span>
+                <span>{String(planSummary.summary.utilizationRate)}%</span>
               </div>
               <Progress
-                value={parseFloat(planSummary.summary.utilizationRate)}
+                value={parseFloat(String(planSummary.summary.utilizationRate))}
                 className="h-3"
               />
             </div>

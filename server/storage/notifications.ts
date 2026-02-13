@@ -11,76 +11,79 @@ import { eq, desc, and, sql } from "drizzle-orm"
 
 export async function createNotification(notification: InsertNotification): Promise<Notification> {
   try {
-    const [result] = await db
-      .insert(notifications)
-      .values(notification)
-      .returning();
-    
-    return result;
+    const [result] = await db.insert(notifications).values(notification).returning()
+
+    return result
   } catch (error) {
-    console.error('Error creating notification:', error);
-    throw error;
+    console.error("Error creating notification:", error)
+    throw error
   }
 }
 
-export async function getUserNotifications(userId: number, limit: number = 50): Promise<Notification[]> {
+export async function getUserNotifications(
+  userId: number,
+  limit: number = 50
+): Promise<Notification[]> {
   try {
     const results = await db
       .select()
       .from(notifications)
       .where(eq(notifications.userId, userId))
       .orderBy(desc(notifications.createdAt))
-      .limit(limit);
-    
-    return results;
+      .limit(limit)
+
+    return results
   } catch (error) {
-    console.error('Error fetching user notifications:', error);
-    throw error;
+    console.error("Error fetching user notifications:", error)
+    throw error
   }
 }
 
-export async function getNewNotifications(userId: number, lastCheck?: string): Promise<Notification[]> {
+export async function getNewNotifications(
+  userId: number,
+  lastCheck?: string
+): Promise<Notification[]> {
   try {
-    let query: any = db
+    if (lastCheck) {
+      const results = await db
+        .select()
+        .from(notifications)
+        .where(
+          and(eq(notifications.userId, userId), sql`${notifications.createdAt} > ${lastCheck}`)
+        )
+        .orderBy(desc(notifications.createdAt))
+        .limit(20)
+      return results
+    }
+
+    const results = await db
       .select()
       .from(notifications)
       .where(eq(notifications.userId, userId))
-      .orderBy(desc(notifications.createdAt));
-
-    if (lastCheck) {
-      query = db
-        .select()
-        .from(notifications)
-        .where(and(
-          eq(notifications.userId, userId),
-          sql`${notifications.createdAt} > ${lastCheck}`
-        ))
-        .orderBy(desc(notifications.createdAt));
-    }
-
-    const results = await query.limit(20);
-    return results;
+      .orderBy(desc(notifications.createdAt))
+      .limit(20)
+    return results
   } catch (error) {
-    console.error('Error fetching new notifications:', error);
-    throw error;
+    console.error("Error fetching new notifications:", error)
+    throw error
   }
 }
 
-export async function markNotificationAsRead(userId: number, notificationId: string): Promise<void> {
+export async function markNotificationAsRead(
+  userId: number,
+  notificationId: string
+): Promise<void> {
   try {
     await db
       .update(notifications)
-      .set({ 
-        isRead: true, 
-        readAt: new Date() 
+      .set({
+        isRead: true,
+        readAt: new Date(),
       })
-      .where(and(
-        eq(notifications.id, parseInt(notificationId)),
-        eq(notifications.userId, userId)
-      ));
+      .where(and(eq(notifications.id, parseInt(notificationId)), eq(notifications.userId, userId)))
   } catch (error) {
-    console.error('Error marking notification as read:', error);
-    throw error;
+    console.error("Error marking notification as read:", error)
+    throw error
   }
 }
 
@@ -88,17 +91,14 @@ export async function markAllNotificationsAsRead(userId: number): Promise<void> 
   try {
     await db
       .update(notifications)
-      .set({ 
-        isRead: true, 
-        readAt: new Date() 
+      .set({
+        isRead: true,
+        readAt: new Date(),
       })
-      .where(and(
-        eq(notifications.userId, userId),
-        eq(notifications.isRead, false)
-      ));
+      .where(and(eq(notifications.userId, userId), eq(notifications.isRead, false)))
   } catch (error) {
-    console.error('Error marking all notifications as read:', error);
-    throw error;
+    console.error("Error marking all notifications as read:", error)
+    throw error
   }
 }
 
@@ -106,51 +106,53 @@ export async function deleteNotification(userId: number, notificationId: string)
   try {
     await db
       .delete(notifications)
-      .where(and(
-        eq(notifications.id, parseInt(notificationId)),
-        eq(notifications.userId, userId)
-      ));
+      .where(and(eq(notifications.id, parseInt(notificationId)), eq(notifications.userId, userId)))
   } catch (error) {
-    console.error('Error deleting notification:', error);
-    throw error;
+    console.error("Error deleting notification:", error)
+    throw error
   }
 }
 
-export async function getNotificationSettings(userId: number): Promise<NotificationSettings | null> {
+export async function getNotificationSettings(
+  userId: number
+): Promise<NotificationSettings | null> {
   try {
     const [result] = await db
       .select()
       .from(notificationSettings)
-      .where(eq(notificationSettings.userId, userId));
-    
-    return result || null;
+      .where(eq(notificationSettings.userId, userId))
+
+    return result || null
   } catch (error) {
-    console.error('Error fetching notification settings:', error);
-    throw error;
+    console.error("Error fetching notification settings:", error)
+    throw error
   }
 }
 
-export async function updateNotificationSettings(userId: number, settings: Partial<InsertNotificationSettings>): Promise<NotificationSettings> {
+export async function updateNotificationSettings(
+  userId: number,
+  settings: Partial<InsertNotificationSettings>
+): Promise<NotificationSettings> {
   try {
     const [result] = await db
       .update(notificationSettings)
       .set({ ...settings, updatedAt: new Date() })
       .where(eq(notificationSettings.userId, userId))
-      .returning();
-    
+      .returning()
+
     if (!result) {
       // 如果不存在，創建新的設定
       const [newSettings] = await db
         .insert(notificationSettings)
         .values({ userId, ...settings })
-        .returning();
-      return newSettings;
+        .returning()
+      return newSettings
     }
-    
-    return result;
+
+    return result
   } catch (error) {
-    console.error('Error updating notification settings:', error);
-    throw error;
+    console.error("Error updating notification settings:", error)
+    throw error
   }
 }
 
@@ -159,18 +161,18 @@ export async function updateNotificationSettings(userId: number, settings: Parti
  */
 export async function generatePaymentReminders(): Promise<number> {
   try {
-    let createdCount = 0;
+    let createdCount = 0
 
     // 獲取一些付款項目進行測試通知生成
     const paymentItems = await db
       .select({
         id: sql<number>`id`,
         itemName: sql<string>`item_name`,
-        totalAmount: sql<string>`total_amount`
+        totalAmount: sql<string>`total_amount`,
       })
       .from(sql`payment_items`)
       .where(sql`is_deleted = false`)
-      .limit(3);
+      .limit(3)
 
     // console.log(`找到 ${paymentItems.length} 個付款項目可生成通知`);
 
@@ -178,31 +180,39 @@ export async function generatePaymentReminders(): Promise<number> {
     for (const payment of paymentItems) {
       await createNotification({
         userId: 1,
-        type: 'payment_reminder',
-        title: '自動付款提醒',
+        type: "payment_reminder",
+        title: "自動付款提醒",
         message: `項目 "${payment.itemName}" 需要關注，金額 NT$ ${payment.totalAmount}`,
-        priority: 'medium',
-        metadata: { 
-          paymentId: payment.id, 
+        priority: "medium",
+        metadata: {
+          paymentId: payment.id,
           generatedAt: new Date().toISOString(),
-          autoGenerated: true
-        }
-      });
-      createdCount++;
+          autoGenerated: true,
+        },
+      })
+      createdCount++
     }
 
     // console.log(`成功生成 ${createdCount} 個付款提醒通知`);
-    return createdCount;
+    return createdCount
   } catch (error) {
-    console.error('Error generating payment reminders:', error);
-    throw error;
+    console.error("Error generating payment reminders:", error)
+    throw error
   }
 }
 
 /**
  * 通知調度器支援方法 - 簡化版本
  */
-export async function getUsersWithLineNotificationEnabled(): Promise<any[]> {
+/** 啟用 LINE 通知的使用者 */
+interface LineNotificationUser {
+  id: unknown
+  username: unknown
+  lineUserId: unknown
+  email: unknown
+}
+
+export async function getUsersWithLineNotificationEnabled(): Promise<LineNotificationUser[]> {
   try {
     // 使用原始SQL查詢避免複雜的JOIN操作
     const result = await db.execute(sql`
@@ -212,21 +222,28 @@ export async function getUsersWithLineNotificationEnabled(): Promise<any[]> {
       WHERE u.is_active = true 
       AND ns.line_enabled = true 
       AND u.line_user_id IS NOT NULL
-    `);
-    
-    return result.rows.map(row => ({
+    `)
+
+    return result.rows.map((row) => ({
       id: row.id,
       username: row.username,
       lineUserId: row.line_user_id,
-      email: row.email
-    }));
+      email: row.email,
+    }))
   } catch (error) {
-    console.error('Error fetching users with LINE notification enabled:', error);
-    return [];
+    console.error("Error fetching users with LINE notification enabled:", error)
+    return []
   }
 }
 
-export async function getUsersWithEmailNotificationEnabled(): Promise<any[]> {
+/** 啟用 Email 通知的使用者 */
+interface EmailNotificationUser {
+  id: unknown
+  username: unknown
+  email: unknown
+}
+
+export async function getUsersWithEmailNotificationEnabled(): Promise<EmailNotificationUser[]> {
   try {
     // 使用原始SQL查詢避免複雜的JOIN操作
     const result = await db.execute(sql`
@@ -236,16 +253,16 @@ export async function getUsersWithEmailNotificationEnabled(): Promise<any[]> {
       WHERE u.is_active = true 
       AND ns.email_enabled = true 
       AND u.email IS NOT NULL
-    `);
-    
-    return result.rows.map(row => ({
+    `)
+
+    return result.rows.map((row) => ({
       id: row.id,
       username: row.username,
-      email: row.email
-    }));
+      email: row.email,
+    }))
   } catch (error) {
-    console.error('Error fetching users with EMAIL notification enabled:', error);
-    return [];
+    console.error("Error fetching users with EMAIL notification enabled:", error)
+    return []
   }
 }
 
@@ -254,18 +271,20 @@ export async function getUserCriticalNotifications(userId: number): Promise<Noti
     const results = await db
       .select()
       .from(notifications)
-      .where(and(
-        eq(notifications.userId, userId),
-        eq(notifications.priority, 'critical'),
-        eq(notifications.isRead, false)
-      ))
+      .where(
+        and(
+          eq(notifications.userId, userId),
+          eq(notifications.priority, "critical"),
+          eq(notifications.isRead, false)
+        )
+      )
       .orderBy(desc(notifications.createdAt))
-      .limit(10);
-    
-    return results;
+      .limit(10)
+
+    return results
   } catch (error) {
-    console.error('Error fetching critical notifications:', error);
-    return [];
+    console.error("Error fetching critical notifications:", error)
+    return []
   }
 }
 
@@ -274,16 +293,13 @@ export async function getUserUnreadNotifications(userId: number): Promise<Notifi
     const results = await db
       .select()
       .from(notifications)
-      .where(and(
-        eq(notifications.userId, userId),
-        eq(notifications.isRead, false)
-      ))
+      .where(and(eq(notifications.userId, userId), eq(notifications.isRead, false)))
       .orderBy(desc(notifications.createdAt))
-      .limit(20);
-    
-    return results;
+      .limit(20)
+
+    return results
   } catch (error) {
-    console.error('Error fetching unread notifications:', error);
-    return [];
+    console.error("Error fetching unread notifications:", error)
+    return []
   }
 }

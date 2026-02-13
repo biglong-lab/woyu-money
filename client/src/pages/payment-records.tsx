@@ -1,276 +1,355 @@
-import { useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { useLocation } from "wouter";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { Receipt, Calendar, Building2, Target, DollarSign, Filter, Search, Eye, FileText, Download, Image } from "lucide-react";
-import { apiRequest } from "@/lib/queryClient";
-import { PaymentItemDetails } from "@/components/payment-item-details";
+import { useState, useEffect } from "react"
+import { useQuery } from "@tanstack/react-query"
+import { useLocation } from "wouter"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Input } from "@/components/ui/input"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog"
+import {
+  Receipt,
+  Calendar,
+  Building2,
+  Target,
+  DollarSign,
+  Filter,
+  Search,
+  Eye,
+  FileText,
+  Download,
+  Image,
+} from "lucide-react"
+import { apiRequest } from "@/lib/queryClient"
+import { PaymentItemDetails } from "@/components/payment-item-details"
+import type { PaymentItem } from "@shared/schema"
+
+// 專案篩選選項
+interface ProjectOption {
+  id: number
+  projectName: string
+}
+
+// 分類篩選選項
+interface CategoryOption {
+  id: number
+  categoryName: string
+}
+
+// 合併後的分類（含來源標記）
+interface MergedCategory extends CategoryOption {
+  categoryType: string
+  source: string
+}
+
+// 付款項目基本資訊（用於詳情顯示）
+interface PaymentItemBasic {
+  id: number
+  itemName: string
+  totalAmount: string
+  projectName?: string
+  categoryName?: string
+  itemType: string
+  notes?: string | null
+}
 
 interface PaymentRecordWithDetails {
-  id: number;
-  itemId: number;
-  amount: string;
-  paymentDate: string;
-  paymentMethod: string;
-  notes: string;
-  receiptImageUrl: string;
-  itemName: string;
-  itemType: string;
-  projectName: string;
-  categoryName: string;
-  totalAmount: string;
+  id: number
+  itemId: number
+  amount: string
+  paymentDate: string
+  paymentMethod: string
+  notes: string
+  receiptImageUrl: string
+  itemName: string
+  itemType: string
+  projectName: string
+  categoryName: string
+  totalAmount: string
 }
 
 // 付款方式中文對照表
 const getPaymentMethodText = (method: string) => {
   const methodMap: { [key: string]: string } = {
-    'bank_transfer': '銀行轉帳',
-    'cash': '現金',
-    'credit_card': '信用卡',
-    'digital_payment': '數位支付',
-    'check': '支票',
-    'other': '其他'
-  };
-  return methodMap[method] || method || '未知方式';
-};
+    bank_transfer: "銀行轉帳",
+    cash: "現金",
+    credit_card: "信用卡",
+    digital_payment: "數位支付",
+    check: "支票",
+    other: "其他",
+  }
+  return methodMap[method] || method || "未知方式"
+}
 
 export default function PaymentRecords() {
-  const [location] = useLocation();
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedProject, setSelectedProject] = useState<string>("all");
-  const [selectedCategory, setSelectedCategory] = useState<string>("all");
-  const [selectedMethod, setSelectedMethod] = useState<string>("all");
-  const [selectedItem, setSelectedItem] = useState<any>(null);
-  const [dateRange, setDateRange] = useState<string>("all");
-  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
-  const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
-  const [startDate, setStartDate] = useState<string>("");
-  const [endDate, setEndDate] = useState<string>("");
-  const [showDownloadDialog, setShowDownloadDialog] = useState(false);
+  const [location] = useLocation()
+  const [searchTerm, setSearchTerm] = useState("")
+  const [selectedProject, setSelectedProject] = useState<string>("all")
+  const [selectedCategory, setSelectedCategory] = useState<string>("all")
+  const [selectedMethod, setSelectedMethod] = useState<string>("all")
+  const [selectedItem, setSelectedItem] = useState<PaymentItem | PaymentItemBasic | null>(null)
+  const [dateRange, setDateRange] = useState<string>("all")
+  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear())
+  const [selectedMonth, setSelectedMonth] = useState<number | null>(null)
+  const [startDate, setStartDate] = useState<string>("")
+  const [endDate, setEndDate] = useState<string>("")
+  const [showDownloadDialog, setShowDownloadDialog] = useState(false)
   const [downloadOptions, setDownloadOptions] = useState({
     includeReceipts: false,
-    format: 'excel' as 'excel' | 'csv',
-    dateFrom: '',
-    dateTo: '',
-    projectFilter: 'all',
-    categoryFilter: 'all'
-  });
-  const [previewImage, setPreviewImage] = useState<string | null>(null);
+    format: "excel" as "excel" | "csv",
+    dateFrom: "",
+    dateTo: "",
+    projectFilter: "all",
+    categoryFilter: "all",
+  })
+  const [previewImage, setPreviewImage] = useState<string | null>(null)
 
   // Handle URL parameters for filtering
   useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const filter = urlParams.get('filter');
-    
-    if (filter === 'current-month-paid') {
-      setDateRange('current-month');
+    const urlParams = new URLSearchParams(window.location.search)
+    const filter = urlParams.get("filter")
+
+    if (filter === "current-month-paid") {
+      setDateRange("current-month")
     }
-  }, [location]);
+  }, [location])
 
   // 查詢付款記錄
-  const { data: paymentRecords = [], isLoading, refetch: refetchRecords } = useQuery<PaymentRecordWithDetails[]>({
+  const {
+    data: paymentRecords = [],
+    isLoading,
+    refetch: refetchRecords,
+  } = useQuery<PaymentRecordWithDetails[]>({
     queryKey: ["/api/payment/records"],
     refetchOnWindowFocus: false,
     staleTime: 0, // 移除緩存，立即更新
     refetchInterval: false,
     refetchOnMount: true, // 允許重新掛載時更新
-  });
+  })
 
   // 查詢專案列表
-  const { data: projects = [] } = useQuery<Array<{ id: number; projectName: string }>>({
+  const { data: projects = [] } = useQuery<ProjectOption[]>({
     queryKey: ["/api/payment/projects"],
-  });
+  })
 
   // 查詢所有分類列表（固定分類和專案分類）
-  const { data: projectCategories = [] } = useQuery<Array<{ id: number; categoryName: string }>>({
+  const { data: projectCategories = [] } = useQuery<CategoryOption[]>({
     queryKey: ["/api/categories/project"],
-  });
+  })
 
-  const { data: fixedCategories = [] } = useQuery<Array<{ id: number; categoryName: string }>>({
+  const { data: fixedCategories = [] } = useQuery<CategoryOption[]>({
     queryKey: ["/api/fixed-categories"],
-  });
+  })
 
   // 合併所有分類
-  const allCategories = [
-    ...fixedCategories.map((cat: any) => ({ ...cat, categoryType: 'fixed', source: '家用分類' })),
-    ...projectCategories.map((cat: any) => ({ ...cat, categoryType: 'project', source: '專案分類' }))
-  ];
+  const allCategories: MergedCategory[] = [
+    ...fixedCategories.map((cat) => ({ ...cat, categoryType: "fixed", source: "家用分類" })),
+    ...projectCategories.map((cat) => ({
+      ...cat,
+      categoryType: "project",
+      source: "專案分類",
+    })),
+  ]
 
   // 查詢付款項目（用於詳情顯示）
-  const { data: paymentItemsResponse } = useQuery<{ items: Array<any> }>({
+  const { data: paymentItemsResponse } = useQuery<{ items: PaymentItem[] }>({
     queryKey: ["/api/payment/items"],
-  });
-  
-  const paymentItems = paymentItemsResponse?.items || [];
+  })
+
+  const paymentItems: PaymentItem[] = paymentItemsResponse?.items || []
 
   // 過濾記錄
-  const filteredRecords = paymentRecords.filter((record: PaymentRecordWithDetails) => {
-    const matchesSearch = !searchTerm || 
-      record.itemName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      record.notes?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      record.projectName?.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesProject = selectedProject === "all" || 
-      record.projectName === projects.find((p: any) => p.id.toString() === selectedProject)?.projectName;
-    
-    const matchesCategory = selectedCategory === "all" || 
-      record.categoryName === allCategories.find((c: any) => c.id.toString() === selectedCategory)?.categoryName;
-    
-    const matchesMethod = selectedMethod === "all" || record.paymentMethod === selectedMethod;
+  const filteredRecords = paymentRecords
+    .filter((record: PaymentRecordWithDetails) => {
+      const matchesSearch =
+        !searchTerm ||
+        record.itemName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        record.notes?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        record.projectName?.toLowerCase().includes(searchTerm.toLowerCase())
 
-    // 日期範圍過濾
-    let matchesDate = true;
-    const recordDate = new Date(record.paymentDate);
-    
-    // 年份篩選
-    if (selectedYear && recordDate.getFullYear() !== selectedYear) {
-      matchesDate = false;
-    }
-    
-    // 月份篩選
-    if (selectedMonth !== null && recordDate.getMonth() !== selectedMonth) {
-      matchesDate = false;
-    }
-    
-    // 自訂日期範圍篩選
-    if (startDate && recordDate < new Date(startDate)) {
-      matchesDate = false;
-    }
-    if (endDate && recordDate > new Date(endDate)) {
-      matchesDate = false;
-    }
-    
-    // 預設時間範圍篩選
-    if (dateRange !== "all" && !startDate && !endDate) {
-      const today = new Date();
-      
-      switch (dateRange) {
-        case "today":
-          matchesDate = recordDate.toDateString() === today.toDateString();
-          break;
-        case "week":
-          const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
-          matchesDate = recordDate >= weekAgo;
-          break;
-        case "month":
-          const monthAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
-          matchesDate = recordDate >= monthAgo;
-          break;
-        case "quarter":
-          const quarterAgo = new Date(today.getTime() - 90 * 24 * 60 * 60 * 1000);
-          matchesDate = recordDate >= quarterAgo;
-          break;
-        case "current-month":
-          const currentMonth = today.getMonth();
-          const currentYear = today.getFullYear();
-          matchesDate = recordDate.getMonth() === currentMonth && recordDate.getFullYear() === currentYear;
-          break;
+      const matchesProject =
+        selectedProject === "all" ||
+        record.projectName ===
+          projects.find((p) => p.id.toString() === selectedProject)?.projectName
+
+      const matchesCategory =
+        selectedCategory === "all" ||
+        record.categoryName ===
+          allCategories.find((c) => c.id.toString() === selectedCategory)?.categoryName
+
+      const matchesMethod = selectedMethod === "all" || record.paymentMethod === selectedMethod
+
+      // 日期範圍過濾
+      let matchesDate = true
+      const recordDate = new Date(record.paymentDate)
+
+      // 年份篩選
+      if (selectedYear && recordDate.getFullYear() !== selectedYear) {
+        matchesDate = false
       }
-    }
 
-    return matchesSearch && matchesProject && matchesCategory && matchesMethod && matchesDate;
-  }).sort((a, b) => {
-    const today = new Date();
-    const thirtyDaysAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
-    
-    const aDate = new Date(a.paymentDate);
-    const bDate = new Date(b.paymentDate);
-    
-    const aIsRecent = aDate >= thirtyDaysAgo;
-    const bIsRecent = bDate >= thirtyDaysAgo;
-    
-    // 優先顯示近30天的記錄
-    if (aIsRecent && !bIsRecent) return -1;
-    if (!aIsRecent && bIsRecent) return 1;
-    
-    // 相同優先級內按日期倒序排列
-    return bDate.getTime() - aDate.getTime();
-  });
+      // 月份篩選
+      if (selectedMonth !== null && recordDate.getMonth() !== selectedMonth) {
+        matchesDate = false
+      }
+
+      // 自訂日期範圍篩選
+      if (startDate && recordDate < new Date(startDate)) {
+        matchesDate = false
+      }
+      if (endDate && recordDate > new Date(endDate)) {
+        matchesDate = false
+      }
+
+      // 預設時間範圍篩選
+      if (dateRange !== "all" && !startDate && !endDate) {
+        const today = new Date()
+
+        switch (dateRange) {
+          case "today":
+            matchesDate = recordDate.toDateString() === today.toDateString()
+            break
+          case "week": {
+            const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000)
+            matchesDate = recordDate >= weekAgo
+            break
+          }
+          case "month": {
+            const monthAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000)
+            matchesDate = recordDate >= monthAgo
+            break
+          }
+          case "quarter": {
+            const quarterAgo = new Date(today.getTime() - 90 * 24 * 60 * 60 * 1000)
+            matchesDate = recordDate >= quarterAgo
+            break
+          }
+          case "current-month": {
+            const currentMonth = today.getMonth()
+            const currentYear = today.getFullYear()
+            matchesDate =
+              recordDate.getMonth() === currentMonth && recordDate.getFullYear() === currentYear
+            break
+          }
+        }
+      }
+
+      return matchesSearch && matchesProject && matchesCategory && matchesMethod && matchesDate
+    })
+    .sort((a, b) => {
+      const today = new Date()
+      const thirtyDaysAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000)
+
+      const aDate = new Date(a.paymentDate)
+      const bDate = new Date(b.paymentDate)
+
+      const aIsRecent = aDate >= thirtyDaysAgo
+      const bIsRecent = bDate >= thirtyDaysAgo
+
+      // 優先顯示近30天的記錄
+      if (aIsRecent && !bIsRecent) return -1
+      if (!aIsRecent && bIsRecent) return 1
+
+      // 相同優先級內按日期倒序排列
+      return bDate.getTime() - aDate.getTime()
+    })
 
   // 統計數據
-  const totalAmount = filteredRecords.reduce((sum, record) => sum + parseFloat(record.amount), 0);
-  const totalRecords = filteredRecords.length;
-  
+  const totalAmount = filteredRecords.reduce((sum, record) => sum + parseFloat(record.amount), 0)
+  const totalRecords = filteredRecords.length
+
   // 付款方式統計
-  const methodCounts = filteredRecords.reduce((acc, record) => {
-    const method = record.paymentMethod || "未知";
-    acc[method] = (acc[method] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
+  const methodCounts = filteredRecords.reduce(
+    (acc, record) => {
+      const method = record.paymentMethod || "未知"
+      acc[method] = (acc[method] || 0) + 1
+      return acc
+    },
+    {} as Record<string, number>
+  )
 
   // 處理查看項目詳情
   const handleViewItemDetails = (record: PaymentRecordWithDetails) => {
-    const items = paymentItems as any[];
-    const item = items.find((item: any) => item.id === record.itemId);
-    if (item) {
-      setSelectedItem(item);
+    const foundItem = paymentItems.find((pi) => pi.id === record.itemId)
+    if (foundItem) {
+      setSelectedItem(foundItem)
     } else {
-      console.log('找不到對應的付款項目，itemId:', record.itemId);
       // 如果找不到詳細項目，創建一個基本的項目對象用於顯示
-      const basicItem = {
+      const basicItem: PaymentItemBasic = {
         id: record.itemId,
         itemName: record.itemName,
         totalAmount: record.totalAmount,
         projectName: record.projectName,
         categoryName: record.categoryName,
         itemType: record.itemType,
-        notes: record.notes
-      };
-      setSelectedItem(basicItem);
+        notes: record.notes,
+      }
+      setSelectedItem(basicItem)
     }
-  };
+  }
 
   // 處理檔案下載
   const handleDownload = async () => {
     try {
-      const params = new URLSearchParams();
-      
-      // 設定篩選參數
-      if (downloadOptions.dateFrom) params.append('dateFrom', downloadOptions.dateFrom);
-      if (downloadOptions.dateTo) params.append('dateTo', downloadOptions.dateTo);
-      if (downloadOptions.projectFilter !== 'all') params.append('projectId', downloadOptions.projectFilter);
-      if (downloadOptions.categoryFilter !== 'all') params.append('categoryId', downloadOptions.categoryFilter);
-      if (downloadOptions.includeReceipts) params.append('includeReceipts', 'true');
-      params.append('format', downloadOptions.format);
+      const params = new URLSearchParams()
 
-      const response = await fetch(`/api/payment/records/export?${params.toString()}`);
-      
+      // 設定篩選參數
+      if (downloadOptions.dateFrom) params.append("dateFrom", downloadOptions.dateFrom)
+      if (downloadOptions.dateTo) params.append("dateTo", downloadOptions.dateTo)
+      if (downloadOptions.projectFilter !== "all")
+        params.append("projectId", downloadOptions.projectFilter)
+      if (downloadOptions.categoryFilter !== "all")
+        params.append("categoryId", downloadOptions.categoryFilter)
+      if (downloadOptions.includeReceipts) params.append("includeReceipts", "true")
+      params.append("format", downloadOptions.format)
+
+      const response = await fetch(`/api/payment/records/export?${params.toString()}`)
+
       if (!response.ok) {
-        throw new Error('匯出失敗');
+        throw new Error("匯出失敗")
       }
 
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.style.display = 'none';
-      a.href = url;
-      
-      const filename = `付款記錄_${downloadOptions.dateFrom || '全部'}_${downloadOptions.dateTo || '至今'}.${downloadOptions.format === 'excel' ? 'xlsx' : 'csv'}`;
-      a.download = filename;
-      
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-      
-      setShowDownloadDialog(false);
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.style.display = "none"
+      a.href = url
+
+      const filename = `付款記錄_${downloadOptions.dateFrom || "全部"}_${downloadOptions.dateTo || "至今"}.${downloadOptions.format === "excel" ? "xlsx" : "csv"}`
+      a.download = filename
+
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+
+      setShowDownloadDialog(false)
     } catch (error) {
-      console.error('下載失敗:', error);
-      alert('檔案下載失敗，請稍後再試');
+      console.error("下載失敗:", error)
+      alert("檔案下載失敗，請稍後再試")
     }
-  };
+  }
 
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
       </div>
-    );
+    )
   }
 
   return (
@@ -314,7 +393,7 @@ export default function PaymentRecords() {
           <CardContent>
             <div className="text-sm">
               {Object.entries(methodCounts)
-                .sort(([,a], [,b]) => (b as number) - (a as number))
+                .sort(([, a], [, b]) => (b as number) - (a as number))
                 .slice(0, 2)
                 .map(([method, count]) => (
                   <div key={method} className="flex justify-between">
@@ -371,14 +450,14 @@ export default function PaymentRecords() {
                   className="pl-10"
                 />
               </div>
-              
+
               <Select value={selectedProject} onValueChange={setSelectedProject}>
                 <SelectTrigger>
                   <SelectValue placeholder="選擇專案" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">所有專案</SelectItem>
-                  {(projects as any[]).map((project: any) => (
+                  {projects.map((project) => (
                     <SelectItem key={project.id} value={project.id.toString()}>
                       {project.projectName}
                     </SelectItem>
@@ -392,8 +471,11 @@ export default function PaymentRecords() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">所有分類</SelectItem>
-                  {allCategories.map((category: any) => (
-                    <SelectItem key={`${category.categoryType}-${category.id}`} value={category.id.toString()}>
+                  {allCategories.map((category) => (
+                    <SelectItem
+                      key={`${category.categoryType}-${category.id}`}
+                      value={category.id.toString()}
+                    >
                       <div className="flex items-center justify-between w-full">
                         <span>{category.categoryName}</span>
                         <span className="text-xs text-gray-500 ml-2">{category.source}</span>
@@ -432,18 +514,18 @@ export default function PaymentRecords() {
                 </SelectContent>
               </Select>
 
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={() => {
-                  setSearchTerm("");
-                  setSelectedProject("all");
-                  setSelectedCategory("all");
-                  setSelectedMethod("all");
-                  setDateRange("all");
-                  setSelectedYear(new Date().getFullYear());
-                  setSelectedMonth(null);
-                  setStartDate("");
-                  setEndDate("");
+                  setSearchTerm("")
+                  setSelectedProject("all")
+                  setSelectedCategory("all")
+                  setSelectedMethod("all")
+                  setDateRange("all")
+                  setSelectedYear(new Date().getFullYear())
+                  setSelectedMonth(null)
+                  setStartDate("")
+                  setEndDate("")
                 }}
               >
                 清除篩選
@@ -454,18 +536,21 @@ export default function PaymentRecords() {
             <div className="grid gap-3 sm:gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 items-end">
               <div className="flex flex-col space-y-1">
                 <label className="text-sm font-medium">年份</label>
-                <Select value={selectedYear.toString()} onValueChange={(value) => setSelectedYear(parseInt(value))}>
+                <Select
+                  value={selectedYear.toString()}
+                  onValueChange={(value) => setSelectedYear(parseInt(value))}
+                >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     {Array.from({ length: 10 }, (_, i) => {
-                      const year = new Date().getFullYear() - 5 + i;
+                      const year = new Date().getFullYear() - 5 + i
                       return (
                         <SelectItem key={year} value={year.toString()}>
                           {year}年
                         </SelectItem>
-                      );
+                      )
                     })}
                   </SelectContent>
                 </Select>
@@ -473,7 +558,12 @@ export default function PaymentRecords() {
 
               <div className="flex flex-col space-y-1">
                 <label className="text-sm font-medium">月份</label>
-                <Select value={selectedMonth?.toString() || "all"} onValueChange={(value) => setSelectedMonth(value === "all" ? null : parseInt(value))}>
+                <Select
+                  value={selectedMonth?.toString() || "all"}
+                  onValueChange={(value) =>
+                    setSelectedMonth(value === "all" ? null : parseInt(value))
+                  }
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="選擇月份" />
                   </SelectTrigger>
@@ -499,14 +589,10 @@ export default function PaymentRecords() {
 
               <div className="flex flex-col space-y-1">
                 <label className="text-sm font-medium">結束日期</label>
-                <Input
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                />
+                <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
               </div>
 
-              <Button 
+              <Button
                 variant="default"
                 onClick={() => setShowDownloadDialog(true)}
                 className="flex items-center gap-2"
@@ -518,7 +604,9 @@ export default function PaymentRecords() {
               <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 col-span-2 sm:col-span-3 lg:col-span-2">
                 <p className="text-xs text-blue-700">
                   <span className="font-medium">💡 提示：</span>
-                  <span className="hidden sm:inline">可同時使用年月篩選和自訂日期範圍進行精確查詢</span>
+                  <span className="hidden sm:inline">
+                    可同時使用年月篩選和自訂日期範圍進行精確查詢
+                  </span>
                   <span className="sm:hidden">使用篩選精確查詢</span>
                 </p>
               </div>
@@ -540,24 +628,34 @@ export default function PaymentRecords() {
             {filteredRecords.length === 0 ? (
               <div className="text-center py-8 sm:py-12 text-gray-500">
                 <Receipt className="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-3 sm:mb-4 text-gray-300" />
-                <p className="text-base sm:text-lg font-medium mb-1 sm:mb-2">無符合條件的付款記錄</p>
+                <p className="text-base sm:text-lg font-medium mb-1 sm:mb-2">
+                  無符合條件的付款記錄
+                </p>
                 <p className="text-sm">請調整篩選條件或搜尋關鍵字</p>
               </div>
             ) : (
               filteredRecords.map((record: PaymentRecordWithDetails) => (
-                <div key={record.id} className="border rounded-lg p-3 sm:p-4 hover:bg-gray-50 transition-colors">
+                <div
+                  key={record.id}
+                  className="border rounded-lg p-3 sm:p-4 hover:bg-gray-50 transition-colors"
+                >
                   {/* 響應式記錄卡片 */}
                   <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3">
                     <div className="flex-1 min-w-0">
                       <div className="flex flex-wrap items-center gap-2 mb-2">
-                        <h3 className="font-medium text-base sm:text-lg truncate">{record.itemName}</h3>
+                        <h3 className="font-medium text-base sm:text-lg truncate">
+                          {record.itemName}
+                        </h3>
                         <Badge variant="secondary" className="text-xs flex-shrink-0">
                           {getPaymentMethodText(record.paymentMethod)}
                         </Badge>
                         {record.receiptImageUrl && (
                           <Dialog>
                             <DialogTrigger asChild>
-                              <Badge variant="outline" className="text-xs cursor-pointer hover:bg-gray-100">
+                              <Badge
+                                variant="outline"
+                                className="text-xs cursor-pointer hover:bg-gray-100"
+                              >
                                 <Image className="w-3 h-3 mr-1" />
                                 查看收據
                               </Badge>
@@ -567,12 +665,13 @@ export default function PaymentRecords() {
                                 <DialogTitle>付款收據圖片</DialogTitle>
                               </DialogHeader>
                               <div className="flex justify-center">
-                                <img 
-                                  src={record.receiptImageUrl} 
-                                  alt="付款收據" 
+                                <img
+                                  src={record.receiptImageUrl}
+                                  alt="付款收據"
                                   className="max-w-full max-h-96 object-contain rounded-lg border"
                                   onError={(e) => {
-                                    e.currentTarget.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjNmNGY2Ii8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzk5YTNhZiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPuWcluePh+eEoeazleaaguWFpTwvdGV4dD48L3N2Zz4=';
+                                    e.currentTarget.src =
+                                      "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjNmNGY2Ii8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzk5YTNhZiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPuWcluePh+eEoeazleaaguWFpTwvdGV4dD48L3N2Zz4="
                                   }}
                                 />
                               </div>
@@ -580,7 +679,7 @@ export default function PaymentRecords() {
                           </Dialog>
                         )}
                       </div>
-                      
+
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4 text-xs sm:text-sm text-gray-600 mb-2">
                         <div className="flex items-center gap-1 truncate">
                           <Building2 className="w-3 h-3 flex-shrink-0" />
@@ -592,21 +691,28 @@ export default function PaymentRecords() {
                         </div>
                         <div className="flex items-center gap-1">
                           <Calendar className="w-3 h-3 flex-shrink-0" />
-                          <span>{new Date(record.paymentDate).toLocaleDateString('zh-TW')}</span>
+                          <span>{new Date(record.paymentDate).toLocaleDateString("zh-TW")}</span>
                         </div>
                         <div className="flex items-center gap-1 hidden sm:flex">
                           <FileText className="w-3 h-3 flex-shrink-0" />
-                          <span>{record.itemType === 'project' ? '專案項目' : record.itemType === 'home' ? '家用項目' : '一般項目'}</span>
+                          <span>
+                            {record.itemType === "project"
+                              ? "專案項目"
+                              : record.itemType === "home"
+                                ? "家用項目"
+                                : "一般項目"}
+                          </span>
                         </div>
                       </div>
 
                       {record.notes && (
                         <div className="text-sm text-gray-600 bg-gray-100 p-2 rounded mt-2">
-                          <strong>備註：</strong>{record.notes}
+                          <strong>備註：</strong>
+                          {record.notes}
                         </div>
                       )}
                     </div>
-                    
+
                     {/* 金額和操作按鈕 */}
                     <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-start gap-2 sm:ml-4">
                       <div className="text-xl sm:text-2xl font-bold text-green-600">
@@ -633,7 +739,7 @@ export default function PaymentRecords() {
 
       {/* 項目詳情對話框 */}
       <PaymentItemDetails
-        item={selectedItem}
+        item={selectedItem as Parameters<typeof PaymentItemDetails>[0]['item']}
         open={!!selectedItem}
         onOpenChange={(open) => !open && setSelectedItem(null)}
       />
@@ -643,17 +749,17 @@ export default function PaymentRecords() {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>匯出付款記錄</DialogTitle>
-            <DialogDescription>
-              設定匯出選項，產生付款記錄檔案
-            </DialogDescription>
+            <DialogDescription>設定匯出選項，產生付款記錄檔案</DialogDescription>
           </DialogHeader>
-          
+
           <div className="space-y-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">匯出格式</label>
-              <Select 
-                value={downloadOptions.format} 
-                onValueChange={(value) => setDownloadOptions(prev => ({ ...prev, format: value as 'excel' | 'csv' }))}
+              <Select
+                value={downloadOptions.format}
+                onValueChange={(value) =>
+                  setDownloadOptions((prev) => ({ ...prev, format: value as "excel" | "csv" }))
+                }
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -671,7 +777,9 @@ export default function PaymentRecords() {
                 <Input
                   type="date"
                   value={downloadOptions.dateFrom}
-                  onChange={(e) => setDownloadOptions(prev => ({ ...prev, dateFrom: e.target.value }))}
+                  onChange={(e) =>
+                    setDownloadOptions((prev) => ({ ...prev, dateFrom: e.target.value }))
+                  }
                 />
               </div>
               <div className="space-y-2">
@@ -679,23 +787,27 @@ export default function PaymentRecords() {
                 <Input
                   type="date"
                   value={downloadOptions.dateTo}
-                  onChange={(e) => setDownloadOptions(prev => ({ ...prev, dateTo: e.target.value }))}
+                  onChange={(e) =>
+                    setDownloadOptions((prev) => ({ ...prev, dateTo: e.target.value }))
+                  }
                 />
               </div>
             </div>
 
             <div className="space-y-2">
               <label className="text-sm font-medium">專案篩選</label>
-              <Select 
-                value={downloadOptions.projectFilter} 
-                onValueChange={(value) => setDownloadOptions(prev => ({ ...prev, projectFilter: value }))}
+              <Select
+                value={downloadOptions.projectFilter}
+                onValueChange={(value) =>
+                  setDownloadOptions((prev) => ({ ...prev, projectFilter: value }))
+                }
               >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">所有專案</SelectItem>
-                  {(projects as any[]).map((project: any) => (
+                  {projects.map((project) => (
                     <SelectItem key={project.id} value={project.id.toString()}>
                       {project.projectName}
                     </SelectItem>
@@ -706,17 +818,22 @@ export default function PaymentRecords() {
 
             <div className="space-y-2">
               <label className="text-sm font-medium">分類篩選</label>
-              <Select 
-                value={downloadOptions.categoryFilter} 
-                onValueChange={(value) => setDownloadOptions(prev => ({ ...prev, categoryFilter: value }))}
+              <Select
+                value={downloadOptions.categoryFilter}
+                onValueChange={(value) =>
+                  setDownloadOptions((prev) => ({ ...prev, categoryFilter: value }))
+                }
               >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">所有分類</SelectItem>
-                  {allCategories.map((category: any) => (
-                    <SelectItem key={`${category.categoryType}-${category.id}`} value={category.id.toString()}>
+                  {allCategories.map((category) => (
+                    <SelectItem
+                      key={`${category.categoryType}-${category.id}`}
+                      value={category.id.toString()}
+                    >
                       <div className="flex items-center justify-between w-full">
                         <span>{category.categoryName}</span>
                         <span className="text-xs text-gray-500 ml-2">{category.source}</span>
@@ -732,7 +849,9 @@ export default function PaymentRecords() {
                 type="checkbox"
                 id="includeReceipts"
                 checked={downloadOptions.includeReceipts}
-                onChange={(e) => setDownloadOptions(prev => ({ ...prev, includeReceipts: e.target.checked }))}
+                onChange={(e) =>
+                  setDownloadOptions((prev) => ({ ...prev, includeReceipts: e.target.checked }))
+                }
                 className="rounded border-gray-300"
               />
               <label htmlFor="includeReceipts" className="text-sm font-medium">
@@ -760,5 +879,5 @@ export default function PaymentRecords() {
         </DialogContent>
       </Dialog>
     </div>
-  );
+  )
 }

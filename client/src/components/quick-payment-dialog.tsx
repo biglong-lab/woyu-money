@@ -37,11 +37,36 @@ interface QuickPaymentDialogProps {
 
 type Step = "search" | "confirm" | "done";
 
+// 付款項目型別（包含 JOIN 欄位）
+interface PaymentItemWithDetails {
+  id: number;
+  itemName: string;
+  totalAmount: string;
+  paidAmount: string;
+  status: string;
+  isDeleted: boolean;
+  projectName?: string;
+  categoryName?: string;
+}
+
+// API 回應型別
+interface PaymentItemsResponse {
+  items?: PaymentItemWithDetails[];
+}
+
+// 付款表單資料
+interface PaymentFormData {
+  itemId: number;
+  amountPaid: string;
+  paymentDate: string;
+  paymentMethod: string;
+}
+
 export function QuickPaymentDialog({ open, onOpenChange }: QuickPaymentDialogProps) {
   const { toast } = useToast();
   const [step, setStep] = useState<Step>("search");
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedItem, setSelectedItem] = useState<any>(null);
+  const [selectedItem, setSelectedItem] = useState<PaymentItemWithDetails | null>(null);
   const [amount, setAmount] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("bank_transfer");
   const [paymentDate, setPaymentDate] = useState(
@@ -49,7 +74,7 @@ export function QuickPaymentDialog({ open, onOpenChange }: QuickPaymentDialogPro
   );
 
   // 查詢所有付款項目（使用 includeAll 取得完整陣列）
-  const { data: paymentItemsData, isLoading } = useQuery<{ items?: any[] } | any[]>({
+  const { data: paymentItemsData, isLoading } = useQuery<PaymentItemsResponse | PaymentItemWithDetails[]>({
     queryKey: ["/api/payment/items?includeAll=true"],
     enabled: open,
   });
@@ -61,7 +86,7 @@ export function QuickPaymentDialog({ open, onOpenChange }: QuickPaymentDialogPro
 
   // 篩選待付款項目
   const filteredItems = useMemo(() => {
-    const pendingItems = paymentItems.filter((item: any) => {
+    const pendingItems = paymentItems.filter((item: PaymentItemWithDetails) => {
       const paid = parseFloat(item.paidAmount || "0");
       const total = parseFloat(item.totalAmount || "0");
       return paid < total && item.status !== "completed" && !item.isDeleted;
@@ -70,7 +95,7 @@ export function QuickPaymentDialog({ open, onOpenChange }: QuickPaymentDialogPro
     if (!searchQuery.trim()) return pendingItems.slice(0, 10);
 
     const query = searchQuery.toLowerCase();
-    return pendingItems.filter((item: any) =>
+    return pendingItems.filter((item: PaymentItemWithDetails) =>
       item.itemName?.toLowerCase().includes(query) ||
       item.projectName?.toLowerCase().includes(query) ||
       item.categoryName?.toLowerCase().includes(query)
@@ -78,13 +103,8 @@ export function QuickPaymentDialog({ open, onOpenChange }: QuickPaymentDialogPro
   }, [paymentItems, searchQuery]);
 
   // 建立付款記錄
-  const paymentMutation = useMutation({
-    mutationFn: async (data: {
-      itemId: number;
-      amountPaid: string;
-      paymentDate: string;
-      paymentMethod: string;
-    }) => {
+  const paymentMutation = useMutation<unknown, Error, PaymentFormData>({
+    mutationFn: async (data: PaymentFormData) => {
       return apiRequest("POST", "/api/payment/records", {
         itemId: data.itemId,
         amountPaid: data.amountPaid,
@@ -107,7 +127,7 @@ export function QuickPaymentDialog({ open, onOpenChange }: QuickPaymentDialogPro
     },
   });
 
-  const handleSelectItem = (item: any) => {
+  const handleSelectItem = (item: PaymentItemWithDetails) => {
     setSelectedItem(item);
     const remaining = parseFloat(item.totalAmount || "0") - parseFloat(item.paidAmount || "0");
     setAmount(remaining.toString());
@@ -134,8 +154,8 @@ export function QuickPaymentDialog({ open, onOpenChange }: QuickPaymentDialogPro
     onOpenChange(false);
   };
 
-  const formatCurrency = (value: any) => {
-    const num = parseFloat(value || "0");
+  const formatCurrency = (value: string | number) => {
+    const num = parseFloat(value?.toString() || "0");
     return isNaN(num) ? "0" : num.toLocaleString();
   };
 
@@ -191,7 +211,7 @@ export function QuickPaymentDialog({ open, onOpenChange }: QuickPaymentDialogPro
                   <span className="ml-2 text-gray-500">載入中...</span>
                 </div>
               ) : filteredItems.length > 0 ? (
-                filteredItems.map((item: any) => {
+                filteredItems.map((item: PaymentItemWithDetails) => {
                   const remaining =
                     parseFloat(item.totalAmount || "0") -
                     parseFloat(item.paidAmount || "0");

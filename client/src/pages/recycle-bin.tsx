@@ -31,24 +31,30 @@ interface AuditLog {
   tableName: string;
   recordId: number;
   action: string;
-  oldValues: any;
-  newValues: any;
+  oldValues: Record<string, unknown> | null;
+  newValues: Record<string, unknown> | null;
   changedFields: string[];
   userInfo: string;
   changeReason: string;
   createdAt: string;
 }
 
+interface PaymentItemWithProject extends PaymentItem {
+  projectName?: string;
+  categoryName?: string;
+  fixedCategoryName?: string;
+}
+
 export default function RecycleBin() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [expandedItem, setExpandedItem] = useState<number | null>(null);
-  const [selectedItem, setSelectedItem] = useState<PaymentItem | null>(null);
+  const [selectedItem, setSelectedItem] = useState<PaymentItemWithProject | null>(null);
   const [isRestoreDialogOpen, setIsRestoreDialogOpen] = useState(false);
   const [isPermanentDeleteDialogOpen, setIsPermanentDeleteDialogOpen] = useState(false);
   const [isHistoryDialogOpen, setIsHistoryDialogOpen] = useState(false);
 
-  const { data: deletedItems = [], isLoading } = useQuery<PaymentItem[]>({
+  const { data: deletedItems = [], isLoading } = useQuery<PaymentItemWithProject[]>({
     queryKey: ["/api/payment/items/deleted"],
   });
 
@@ -73,7 +79,7 @@ export default function RecycleBin() {
       setIsRestoreDialogOpen(false);
       setSelectedItem(null);
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "恢復失敗",
         description: error.message || "無法恢復項目，請稍後再試。",
@@ -97,7 +103,7 @@ export default function RecycleBin() {
       setIsPermanentDeleteDialogOpen(false);
       setSelectedItem(null);
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "刪除失敗",
         description: error.message || "無法永久刪除項目，請稍後再試。",
@@ -106,17 +112,17 @@ export default function RecycleBin() {
     },
   });
 
-  const handleRestore = (item: PaymentItem) => {
+  const handleRestore = (item: PaymentItemWithProject) => {
     setSelectedItem(item);
     setIsRestoreDialogOpen(true);
   };
 
-  const handlePermanentDelete = (item: PaymentItem) => {
+  const handlePermanentDelete = (item: PaymentItemWithProject) => {
     setSelectedItem(item);
     setIsPermanentDeleteDialogOpen(true);
   };
 
-  const handleViewHistory = (item: PaymentItem) => {
+  const handleViewHistory = (item: PaymentItemWithProject) => {
     setSelectedItem(item);
     setIsHistoryDialogOpen(true);
   };
@@ -201,7 +207,7 @@ export default function RecycleBin() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {deletedItems.map((item: any) => (
+                    {deletedItems.map((item: PaymentItemWithProject) => (
                       <Fragment key={item.id}>
                         <TableRow className="hover:bg-muted/50" data-testid={`row-deleted-item-${item.id}`}>
                           <TableCell>
@@ -347,7 +353,7 @@ export default function RecycleBin() {
                 </span>
                 <span className="flex items-center gap-1">
                   <FolderOpen className="w-4 h-4" />
-                  {(selectedItem as any)?.projectName || "無專案"}
+                  {selectedItem?.projectName || "無專案"}
                 </span>
               </div>
             </div>

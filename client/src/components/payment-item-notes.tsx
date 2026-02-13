@@ -44,6 +44,10 @@ interface PaymentItemNotesProps {
   itemName: string;
 }
 
+interface UploadResponse {
+  imagePaths?: string[];
+}
+
 export default function PaymentItemNotes({ itemId, itemName }: PaymentItemNotesProps) {
   const { toast } = useToast();
   const [isAddingNote, setIsAddingNote] = useState(false);
@@ -85,7 +89,7 @@ export default function PaymentItemNotes({ itemId, itemName }: PaymentItemNotesP
         description: "備註記錄已成功新增",
       });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       console.error("Create note error:", error);
       toast({
         title: "新增失敗",
@@ -110,7 +114,7 @@ export default function PaymentItemNotes({ itemId, itemName }: PaymentItemNotesP
         description: "備註記錄已成功更新",
       });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       console.error("Update note error:", error);
       toast({
         title: "更新失敗",
@@ -133,7 +137,7 @@ export default function PaymentItemNotes({ itemId, itemName }: PaymentItemNotesP
         description: "備註記錄已成功刪除",
       });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       console.error("Delete note error:", error);
       toast({
         title: "刪除失敗",
@@ -153,7 +157,7 @@ export default function PaymentItemNotes({ itemId, itemName }: PaymentItemNotesP
         method: "POST",
         body: formData,
       });
-      const data = await response.json();
+      const data = await response.json() as UploadResponse;
       
       if (data.imagePaths && data.imagePaths.length > 0) {
         form.setValue('attachmentUrl', data.imagePaths[0]);
@@ -166,10 +170,11 @@ export default function PaymentItemNotes({ itemId, itemName }: PaymentItemNotesP
           description: `檔案 ${file.name} 已成功上傳`,
         });
       }
-    } catch (error: any) {
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "檔案上傳時發生錯誤";
       toast({
         title: "檔案上傳失敗",
-        description: error.message || "檔案上傳時發生錯誤",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {

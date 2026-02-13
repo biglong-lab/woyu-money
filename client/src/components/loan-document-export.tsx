@@ -7,11 +7,17 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { useQuery } from "@tanstack/react-query";
 import { Download, FileText, BarChart3, Calendar, DollarSign } from "lucide-react";
 import { format } from "date-fns";
+import type { LoanInvestmentRecord, LoanPaymentHistory } from "@shared/schema";
+
+interface PaymentStats {
+  totalPayments: string;
+  paymentCount: number;
+}
 
 interface LoanDocumentExportProps {
   recordId: number;
   recordTitle: string;
-  recordData: any;
+  recordData: LoanInvestmentRecord;
 }
 
 export function LoanDocumentExport({ recordId, recordTitle, recordData }: LoanDocumentExportProps) {
@@ -19,12 +25,12 @@ export function LoanDocumentExport({ recordId, recordTitle, recordData }: LoanDo
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
 
   // Fetch payment history for the record
-  const { data: payments = [] } = useQuery<any[]>({
+  const { data: payments = [] } = useQuery<LoanPaymentHistory[]>({
     queryKey: [`/api/loan-investment/records/${recordId}/payments`],
   });
 
   // Fetch payment statistics
-  const { data: paymentStats = {} as any } = useQuery<any>({
+  const { data: paymentStats = { totalPayments: "0", paymentCount: 0 } } = useQuery<PaymentStats>({
     queryKey: [`/api/loan-investment/records/${recordId}/payment-stats`],
   });
 
@@ -232,14 +238,14 @@ export function LoanDocumentExport({ recordId, recordTitle, recordData }: LoanDo
         <div class="summary-box">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                 <span><strong>總還款進度：${progressPercentage}%</strong></span>
-                <span><strong>已付金額：${formatCurrency(paymentStats.totalPayments || 0)}</strong></span>
+                <span><strong>已付金額：${formatCurrency(paymentStats.totalPayments)}</strong></span>
             </div>
             <div class="progress-bar">
                 <div class="progress-fill" style="width: ${progressPercentage}%"></div>
             </div>
             <div style="display: flex; justify-content: space-between; margin-top: 10px;">
-                <span>剩餘金額：${formatCurrency(parseFloat(recordData.principalAmount) - parseFloat(paymentStats.totalPayments || 0))}</span>
-                <span>還款筆數：${paymentStats.paymentCount || 0} 筆</span>
+                <span>剩餘金額：${formatCurrency(parseFloat(recordData.principalAmount) - parseFloat(paymentStats.totalPayments))}</span>
+                <span>還款筆數：${paymentStats.paymentCount} 筆</span>
             </div>
         </div>
     </div>
@@ -259,7 +265,7 @@ export function LoanDocumentExport({ recordId, recordTitle, recordData }: LoanDo
                 </tr>
             </thead>
             <tbody>
-                ${payments.map((payment: any) => `
+                ${payments.map((payment: LoanPaymentHistory) => `
                     <tr>
                         <td>${format(new Date(payment.paymentDate), 'yyyy/MM/dd')}</td>
                         <td>${formatCurrency(payment.amount)}</td>

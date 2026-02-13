@@ -38,19 +38,63 @@ export interface PriceTier {
   monthlyAmount: number;
 }
 
+// 智慧調整表單 Schema
+export const smartAdjustSchema = z.object({
+  adjustmentType: z.enum(["percentage", "fixed"]),
+  adjustmentValue: z.number(),
+  effectiveDate: z.string(),
+  reason: z.string().optional(),
+});
+
+export type SmartAdjustForm = z.infer<typeof smartAdjustSchema>;
+
+// 智慧調整預覽結果（寬鬆型別，與主頁面相容）
+export interface AdjustmentPreview {
+  affectedItems: number;
+  totalAdjustment?: number;
+  currentAmount?: number;
+  newAmount?: number;
+  effectiveDate?: string;
+}
+
+// 租約相關的基礎型別（最小必要欄位）
+export interface RentalContractBase {
+  id: number;
+  contractName: string;
+  projectId?: number;
+  startDate?: string;
+  endDate?: string;
+  totalYears?: number;
+  baseAmount?: string | number;
+  isActive?: boolean | null;
+  notes?: string | null;
+  hasBufferPeriod?: boolean | null;
+  bufferMonths?: number | null;
+  bufferIncludedInTerm?: boolean | null;
+}
+
+// 專案基礎型別
+export interface ProjectBase {
+  id: number;
+  projectName: string;
+  projectType?: string;
+  description?: string | null;
+  isActive?: boolean | null;
+}
+
 // ==========================================
 // 建立/編輯租約對話框
 // ==========================================
 interface RentalContractDialogProps {
   readonly isOpen: boolean;
   readonly onOpenChange: (open: boolean) => void;
-  readonly editingContract: any | null;
+  readonly editingContract: RentalContractBase | null;
   readonly form: UseFormReturn<RentalContractForm>;
-  readonly projects: any[];
+  readonly projects: ProjectBase[];
   readonly priceTiers: PriceTier[];
   readonly onAddPriceTier: () => void;
   readonly onRemovePriceTier: (index: number) => void;
-  readonly onUpdatePriceTier: (index: number, field: string, value: any) => void;
+  readonly onUpdatePriceTier: (index: number, field: keyof PriceTier, value: number) => void;
   readonly onSubmit: (data: RentalContractForm) => void;
   readonly isSubmitting: boolean;
 }
@@ -99,7 +143,7 @@ export function RentalContractDialog({
                   <SelectValue placeholder="選擇專案" />
                 </SelectTrigger>
                 <SelectContent>
-                  {projects.map((project: any) => (
+                  {projects.map((project) => (
                     <SelectItem key={project.id} value={project.id.toString()}>
                       {project.projectName}
                     </SelectItem>
@@ -327,9 +371,14 @@ export function RentalContractDialog({
 interface SmartAdjustDialogProps {
   readonly isOpen: boolean;
   readonly onOpenChange: (open: boolean) => void;
-  readonly selectedContract: any | null;
-  readonly adjustForm: UseFormReturn<any>;
-  readonly adjustmentPreview: any | null;
+  readonly selectedContract: RentalContractBase | null;
+  readonly adjustForm: UseFormReturn<{
+    adjustmentType: string;
+    adjustmentValue: number;
+    effectiveDate: string;
+    reason: string;
+  }>;
+  readonly adjustmentPreview: AdjustmentPreview | null;
   readonly onPreview: () => void;
   readonly onConfirm: () => void;
   readonly isSubmitting: boolean;
@@ -428,7 +477,7 @@ export function SmartAdjustDialog({
               <AlertTitle>預覽結果</AlertTitle>
               <AlertDescription>
                 <span className="block">將調整 {adjustmentPreview.affectedItems} 個未來付款項目</span>
-                <span className="block">調整總金額：NT${adjustmentPreview.totalAdjustment?.toLocaleString() || 0}</span>
+                <span className="block">調整總金額：NT${(adjustmentPreview.totalAdjustment ?? 0).toLocaleString()}</span>
               </AlertDescription>
             </Alert>
           )}

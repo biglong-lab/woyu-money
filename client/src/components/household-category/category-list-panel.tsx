@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Edit, Trash2, BarChart3 } from "lucide-react";
+import type { DebtCategory } from "../../../../shared/schema/category";
 
 // ============================================================
 // 分類列表面板 - 顯示左側可選取的分類清單
@@ -8,15 +9,15 @@ import { Edit, Trash2, BarChart3 } from "lucide-react";
 
 interface CategoryListPanelProps {
   /** 分類資料陣列 */
-  categories: any[];
+  categories: DebtCategory[];
   /** 是否載入中 */
   isLoading: boolean;
   /** 目前選取的分類 */
-  selectedCategory: any;
+  selectedCategory: DebtCategory | null;
   /** 選取分類的回呼 */
-  onSelectCategory: (category: any) => void;
+  onSelectCategory: (category: DebtCategory) => void;
   /** 編輯分類的回呼 */
-  onEditCategory: (category: any) => void;
+  onEditCategory: (category: DebtCategory) => void;
   /** 刪除分類的回呼 */
   onDeleteCategory: (id: number) => void;
 }
@@ -44,7 +45,7 @@ export function CategoryListPanel({
           ) : categories.length === 0 ? (
             <div className="text-center py-4 text-gray-500">暫無分類</div>
           ) : (
-            categories.map((category: any) => (
+            categories.map((category) => (
               <div
                 key={category.id}
                 className={`p-3 rounded-lg border cursor-pointer transition-colors ${

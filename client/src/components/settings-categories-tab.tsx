@@ -17,11 +17,14 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Category } from "@/components/settings-types";
+import type { DebtCategory } from "@shared/schema";
 
 const categorySchema = z.object({
   categoryName: z.string().min(1, "分類名稱不能為空"),
   description: z.string().optional(),
 });
+
+type CategoryFormData = z.infer<typeof categorySchema>;
 
 export default function SettingsCategoriesTab() {
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
@@ -29,11 +32,11 @@ export default function SettingsCategoriesTab() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: categories = [], isLoading: categoriesLoading } = useQuery<any[]>({
+  const { data: categories = [], isLoading: categoriesLoading } = useQuery<DebtCategory[]>({
     queryKey: ["/api/categories"],
   });
 
-  const categoryForm = useForm({
+  const categoryForm = useForm<CategoryFormData>({
     resolver: zodResolver(categorySchema),
     defaultValues: {
       categoryName: editingCategory?.categoryName || "",
@@ -43,7 +46,7 @@ export default function SettingsCategoriesTab() {
 
   // 新增分類
   const createCategoryMutation = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: CategoryFormData) => {
       return await apiRequest("POST", "/api/categories", data);
     },
     onSuccess: () => {
@@ -60,7 +63,7 @@ export default function SettingsCategoriesTab() {
 
   // 更新分類
   const updateCategoryMutation = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: CategoryFormData) => {
       return await apiRequest("PUT", `/api/categories/${editingCategory?.id}`, data);
     },
     onSuccess: () => {
@@ -132,7 +135,7 @@ export default function SettingsCategoriesTab() {
                 <Loader2 className="w-6 h-6 animate-spin" />
               </div>
             ) : (
-              categories.map((category: Category) => (
+              categories.map((category) => (
                 <div key={category.id} className="flex items-center justify-between p-4 border rounded-lg">
                   <div className="flex-1">
                     <h3 className="font-medium">{category.categoryName}</h3>
@@ -140,9 +143,6 @@ export default function SettingsCategoriesTab() {
                       <p className="text-sm text-muted-foreground">{category.description}</p>
                     )}
                     <div className="flex items-center gap-2 mt-2">
-                      <Badge variant="secondary">
-                        使用次數: {category.usageCount || 0}
-                      </Badge>
                       {category.isDeleted && (
                         <Badge variant="destructive">已刪除</Badge>
                       )}
@@ -152,7 +152,7 @@ export default function SettingsCategoriesTab() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => handleEditCategory(category)}
+                      onClick={() => handleEditCategory(category as Category)}
                     >
                       <Edit className="w-4 h-4" />
                     </Button>

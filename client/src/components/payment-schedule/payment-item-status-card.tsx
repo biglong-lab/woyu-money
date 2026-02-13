@@ -54,7 +54,7 @@ export function PaymentItemStatusCard({ item, status, onViewDetail }: PaymentIte
               {item.categoryName && <span>🏷️ {item.categoryName}</span>}
             </div>
           </div>
-          <Badge variant={config.badge as any} className="ml-2">{config.label}</Badge>
+          <Badge variant={config.badge as "default" | "destructive" | "secondary"} className="ml-2">{config.label}</Badge>
         </div>
       </CardHeader>
       <CardContent className="space-y-3">

@@ -6,15 +6,15 @@ import { receiptUpload } from "./upload-config"
 
 const router = Router()
 
-// 一般檔案上傳端點（收據）
-router.post("/api/upload", receiptUpload.single("file"), async (req, res) => {
+// 一般檔案上傳端點（收據）— 需認證
+router.post("/api/upload", requireAuth, receiptUpload.single("file"), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ message: "No file uploaded" })
     }
     const fileUrl = `/uploads/receipts/${req.file.filename}`
     res.json({ url: fileUrl })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error uploading file:", error)
     res.status(500).json({ message: "Failed to upload file" })
   }
@@ -24,7 +24,7 @@ router.post("/api/upload", receiptUpload.single("file"), async (req, res) => {
 router.put("/api/user/profile", requireAuth, async (req, res) => {
   try {
     const { fullName, email } = req.body
-    const userId = (req.user as any)!.id
+    const userId = req.user!.id
 
     const updatedUser = await storage.updateUser(userId, {
       fullName,
@@ -41,7 +41,7 @@ router.put("/api/user/profile", requireAuth, async (req, res) => {
       lineDisplayName: updatedUser.lineDisplayName,
       authProvider: updatedUser.authProvider,
     })
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Profile update error:", error)
     res.status(500).json({ message: "個人資料更新失敗" })
   }
@@ -51,7 +51,7 @@ router.put("/api/user/profile", requireAuth, async (req, res) => {
 router.put("/api/user/password", requireAuth, async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body
-    const user = req.user! as any
+    const user = req.user!
 
     if (user.password) {
       const isCurrentPasswordValid = await comparePasswords(currentPassword, user.password)
@@ -67,7 +67,7 @@ router.put("/api/user/password", requireAuth, async (req, res) => {
     })
 
     res.json({ message: "密碼更新成功" })
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Password update error:", error)
     res.status(500).json({ message: "密碼更新失敗" })
   }

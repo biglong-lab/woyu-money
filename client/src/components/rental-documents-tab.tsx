@@ -10,17 +10,46 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Upload, Download, Trash2, Eye, FileText, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+// 租約簡要型別（僅使用到的欄位）
+interface RentalContractInfo {
+  readonly id: number;
+  readonly contractName: string;
+  readonly projectId: number;
+  readonly isActive?: boolean | null;
+}
+
+// 專案簡要型別（僅使用到的欄位）
+interface ProjectInfo {
+  readonly id: number;
+  readonly projectName: string;
+}
+
+// 文件顯示型別（對應 API 返回 + UI 使用的欄位）
+interface DocumentDisplayItem {
+  readonly id: number;
+  readonly contractId: number;
+  readonly fileName: string;
+  readonly documentType?: string;
+  readonly mimeType?: string;
+  readonly version: string;
+  readonly uploadDate?: string;
+  readonly uploadedAt?: Date | null;
+  readonly fileSize?: number | string;
+  readonly uploadedBy?: string | null;
+  readonly description?: string;
+  readonly notes?: string | null;
+}
 
 // ==========================================
 // 合約文件 Tab
 // ==========================================
 interface RentalDocumentsTabProps {
-  readonly contracts: any[];
-  readonly projects: any[];
-  readonly selectedContract: any | null;
-  readonly onSelectContract: (contract: any | null) => void;
-  readonly documents: any[];
-  readonly onDocumentDownload: (document: any) => void;
+  readonly contracts: RentalContractInfo[];
+  readonly projects: ProjectInfo[];
+  readonly selectedContract: RentalContractInfo | null;
+  readonly onSelectContract: (contract: RentalContractInfo | null) => void;
+  readonly documents: DocumentDisplayItem[];
+  readonly onDocumentDownload: (document: DocumentDisplayItem) => void;
   readonly onDocumentDelete: (documentId: number) => void;
   readonly isDocumentDialogOpen: boolean;
   readonly onDocumentDialogOpenChange: (open: boolean) => void;
@@ -41,7 +70,7 @@ export function RentalDocumentsTab({
   onUploadDocument,
   isUploading,
 }: RentalDocumentsTabProps) {
-  const [viewingDocument, setViewingDocument] = useState<any>(null);
+  const [viewingDocument, setViewingDocument] = useState<DocumentDisplayItem | null>(null);
   const [isDocumentViewOpen, setIsDocumentViewOpen] = useState(false);
 
   return (
@@ -66,7 +95,7 @@ export function RentalDocumentsTab({
             <Select
               value={selectedContract?.id?.toString() || ""}
               onValueChange={(value) => {
-                const contract = contracts?.find((c: any) => c.id.toString() === value);
+                const contract = contracts?.find((c: RentalContractInfo) => c.id.toString() === value);
                 onSelectContract(contract || null);
               }}
             >
@@ -74,8 +103,8 @@ export function RentalDocumentsTab({
                 <SelectValue placeholder="請選擇要管理文件的租約" />
               </SelectTrigger>
               <SelectContent>
-                {contracts?.map((contract: any) => {
-                  const project = projects?.find((p: any) => p.id === contract.projectId);
+                {contracts?.map((contract: RentalContractInfo) => {
+                  const project = projects?.find((p: ProjectInfo) => p.id === contract.projectId);
                   return (
                     <SelectItem key={contract.id} value={contract.id.toString()}>
                       <div className="flex flex-col">
@@ -104,7 +133,7 @@ export function RentalDocumentsTab({
                   <div>
                     <h3 className="font-semibold text-blue-900">{selectedContract.contractName}</h3>
                     <p className="text-sm text-blue-700">
-                      專案：{projects?.find((p: any) => p.id === selectedContract.projectId)?.projectName || "未知專案"}
+                      專案：{projects?.find((p: ProjectInfo) => p.id === selectedContract.projectId)?.projectName || "未知專案"}
                     </p>
                   </div>
                   <div className="text-right text-sm text-blue-600">
@@ -130,11 +159,11 @@ export function RentalDocumentsTab({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {documents.map((doc: any) => (
+                    {documents.map((doc: DocumentDisplayItem) => (
                       <TableRow key={doc.id}>
                         <TableCell className="font-medium">{doc.fileName}</TableCell>
                         <TableCell>{doc.documentType}</TableCell>
-                        <TableCell>{new Date(doc.uploadDate).toLocaleDateString('zh-TW')}</TableCell>
+                        <TableCell>{doc.uploadDate ? new Date(doc.uploadDate).toLocaleDateString('zh-TW') : '-'}</TableCell>
                         <TableCell>{doc.version}</TableCell>
                         <TableCell>
                           <div className="flex gap-2">
@@ -321,8 +350,8 @@ function DocumentUploadDialog({
 interface DocumentViewDialogProps {
   readonly isOpen: boolean;
   readonly onOpenChange: (open: boolean) => void;
-  readonly document: any | null;
-  readonly onDownload: (document: any) => void;
+  readonly document: DocumentDisplayItem | null;
+  readonly onDownload: (document: DocumentDisplayItem) => void;
   readonly onDelete: (documentId: number) => void;
 }
 
@@ -370,7 +399,7 @@ function DocumentViewDialog({
                 </div>
                 <div>
                   <Label className="text-sm font-medium text-gray-500">上傳日期</Label>
-                  <p className="text-base">{new Date(doc.uploadDate).toLocaleDateString('zh-TW')}</p>
+                  <p className="text-base">{doc.uploadDate ? new Date(doc.uploadDate).toLocaleDateString('zh-TW') : '-'}</p>
                 </div>
                 <div>
                   <Label className="text-sm font-medium text-gray-500">文件大小</Label>
@@ -449,7 +478,7 @@ function DocumentViewDialog({
                   <div>
                     <p className="font-medium text-blue-900">當前版本 {doc.version || 'v1.0'}</p>
                     <p className="text-sm text-blue-700">
-                      上傳於 {new Date(doc.uploadDate).toLocaleDateString('zh-TW')}
+                      上傳於 {doc.uploadDate ? new Date(doc.uploadDate).toLocaleDateString('zh-TW') : '-'}
                     </p>
                   </div>
                   <Badge className="bg-blue-100 text-blue-800">最新</Badge>

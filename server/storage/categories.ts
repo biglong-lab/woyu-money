@@ -35,7 +35,15 @@ export async function getProjectCategories(): Promise<DebtCategory[]> {
     .orderBy(debtCategories.categoryName)
 }
 
-export async function getHouseholdCategories(): Promise<any[]> {
+/** 家用分類（含預算與支出統計） */
+interface HouseholdCategoryWithStats {
+  id: number
+  categoryName: string | null
+  budget: number
+  spent: number
+}
+
+export async function getHouseholdCategories(): Promise<HouseholdCategoryWithStats[]> {
   const categories = await db
     .select()
     .from(debtCategories)
@@ -60,7 +68,12 @@ export async function getHouseholdCategories(): Promise<any[]> {
   const expenses = await db
     .select()
     .from(householdExpenses)
-    .where(and(gte(householdExpenses.date, currentMonthStart), lt(householdExpenses.date, nextMonthString)))
+    .where(
+      and(
+        gte(householdExpenses.date, currentMonthStart),
+        lt(householdExpenses.date, nextMonthString)
+      )
+    )
 
   return categories.map((category) => {
     const categoryBudget = budgets.find((b) => b.categoryId === category.id)
@@ -83,7 +96,10 @@ export async function createCategory(categoryData: InsertDebtCategory): Promise<
   return category
 }
 
-export async function updateCategory(id: number, categoryData: InsertDebtCategory): Promise<DebtCategory> {
+export async function updateCategory(
+  id: number,
+  categoryData: InsertDebtCategory
+): Promise<DebtCategory> {
   const [category] = await db
     .update(debtCategories)
     .set(categoryData)
@@ -105,7 +121,27 @@ export async function getCategoryUsageCount(categoryId: number): Promise<number>
   return result?.count || 0
 }
 
-export async function getCategoryStats(type: "project" | "household"): Promise<any[]> {
+/** 分類統計結果 */
+interface CategoryStatsItem {
+  categoryId: number
+  categoryName: string | null
+  totalAmount: string
+  paidAmount: string
+  unpaidAmount: string
+  overdueAmount: string
+  overdueCount: number
+  totalCount: number
+  paidCount: number
+  paymentTypes: {
+    single: number
+    installment: number
+    monthly: number
+  }
+}
+
+export async function getCategoryStats(
+  type: "project" | "household"
+): Promise<CategoryStatsItem[]> {
   try {
     const stats = await db
       .select({
@@ -154,7 +190,11 @@ export async function getCategoryStats(type: "project" | "household"): Promise<a
 
 export async function getDebtCategories(): Promise<DebtCategory[]> {
   try {
-    return await db.select().from(debtCategories).where(eq(debtCategories.isDeleted, false)).orderBy(debtCategories.categoryName)
+    return await db
+      .select()
+      .from(debtCategories)
+      .where(eq(debtCategories.isDeleted, false))
+      .orderBy(debtCategories.categoryName)
   } catch (error) {
     console.error("Error fetching debt categories:", error)
     throw error
@@ -171,7 +211,10 @@ export async function createDebtCategory(categoryData: InsertDebtCategory): Prom
   }
 }
 
-export async function updateDebtCategory(id: number, categoryData: Partial<InsertDebtCategory>): Promise<DebtCategory> {
+export async function updateDebtCategory(
+  id: number,
+  categoryData: Partial<InsertDebtCategory>
+): Promise<DebtCategory> {
   try {
     const [category] = await db
       .update(debtCategories)
@@ -187,7 +230,10 @@ export async function updateDebtCategory(id: number, categoryData: Partial<Inser
 
 export async function deleteDebtCategory(id: number): Promise<void> {
   try {
-    await db.update(debtCategories).set({ isDeleted: true, updatedAt: new Date() }).where(eq(debtCategories.id, id))
+    await db
+      .update(debtCategories)
+      .set({ isDeleted: true, updatedAt: new Date() })
+      .where(eq(debtCategories.id, id))
   } catch (error) {
     console.error("Error deleting debt category:", error)
     throw error
@@ -196,7 +242,18 @@ export async function deleteDebtCategory(id: number): Promise<void> {
 
 // === 家用分類管理 ===
 
-export async function createHouseholdCategory(categoryData: any): Promise<any> {
+/** 家用分類輸入資料 */
+interface HouseholdCategoryInput {
+  categoryName: string
+  level?: number
+  parentId?: number | null
+  color?: string
+  icon?: string
+}
+
+export async function createHouseholdCategory(
+  categoryData: HouseholdCategoryInput
+): Promise<Record<string, unknown>> {
   try {
     const result = await db.execute(sql`
       INSERT INTO household_categories (category_name, level, parent_id, color, icon, is_active)
@@ -210,7 +267,10 @@ export async function createHouseholdCategory(categoryData: any): Promise<any> {
   }
 }
 
-export async function updateHouseholdCategory(id: number, categoryData: any): Promise<any> {
+export async function updateHouseholdCategory(
+  id: number,
+  categoryData: HouseholdCategoryInput
+): Promise<Record<string, unknown>> {
   try {
     const result = await db.execute(sql`
       UPDATE household_categories
@@ -249,12 +309,17 @@ export async function getPaymentProjects(): Promise<PaymentProject[]> {
   return await db.select().from(paymentProjects).where(eq(paymentProjects.isDeleted, false))
 }
 
-export async function createPaymentProject(projectData: InsertPaymentProject): Promise<PaymentProject> {
+export async function createPaymentProject(
+  projectData: InsertPaymentProject
+): Promise<PaymentProject> {
   const [project] = await db.insert(paymentProjects).values(projectData).returning()
   return project
 }
 
-export async function updatePaymentProject(id: number, projectData: InsertPaymentProject): Promise<PaymentProject> {
+export async function updatePaymentProject(
+  id: number,
+  projectData: InsertPaymentProject
+): Promise<PaymentProject> {
   const [project] = await db
     .update(paymentProjects)
     .set(projectData)
@@ -270,7 +335,10 @@ export async function deletePaymentProject(id: number): Promise<void> {
     .where(and(eq(paymentItems.projectId, id), eq(paymentItems.isDeleted, false)))
 
   if (itemCount.count > 0) {
-    await db.update(paymentProjects).set({ isDeleted: true, updatedAt: new Date() }).where(eq(paymentProjects.id, id))
+    await db
+      .update(paymentProjects)
+      .set({ isDeleted: true, updatedAt: new Date() })
+      .where(eq(paymentProjects.id, id))
   } else {
     await db.delete(paymentProjects).where(eq(paymentProjects.id, id))
   }
@@ -291,13 +359,22 @@ export async function getFixedCategories(): Promise<FixedCategory[]> {
   }
 }
 
-export async function createFixedCategory(categoryData: InsertFixedCategory): Promise<FixedCategory> {
+export async function createFixedCategory(
+  categoryData: InsertFixedCategory
+): Promise<FixedCategory> {
   const [category] = await db.insert(fixedCategories).values(categoryData).returning()
   return category
 }
 
-export async function updateFixedCategory(id: number, categoryData: Partial<InsertFixedCategory>): Promise<FixedCategory> {
-  const [category] = await db.update(fixedCategories).set(categoryData).where(eq(fixedCategories.id, id)).returning()
+export async function updateFixedCategory(
+  id: number,
+  categoryData: Partial<InsertFixedCategory>
+): Promise<FixedCategory> {
+  const [category] = await db
+    .update(fixedCategories)
+    .set(categoryData)
+    .where(eq(fixedCategories.id, id))
+    .returning()
   return category
 }
 

@@ -7,22 +7,70 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
-import { Calendar, Building2, Eye, TrendingUp, AlertTriangle, CheckCircle, Clock, FileText } from "lucide-react";
+import { Calendar, Eye, TrendingUp, AlertTriangle, CheckCircle, Clock, FileText } from "lucide-react";
 import { Link } from "wouter";
+import type { PaymentProject, RentalPriceTier } from "@shared/schema";
+
+/** 租約列表項目（對應 API GET /api/rental/contracts 回傳） */
+interface RentalContractListItem {
+  id: number;
+  projectId: number;
+  contractName: string;
+  startDate: string;
+  endDate: string;
+  totalYears: number;
+  baseAmount: string;
+  isActive: boolean | null;
+  notes: string | null;
+  projectName: string | null;
+  createdAt: Date | null;
+}
+
+/** 租約詳情（對應 API GET /api/rental/contracts/:id 回傳） */
+interface RentalContractDetail extends RentalContractListItem {
+  hasBufferPeriod: boolean | null;
+  bufferMonths: number | null;
+  bufferIncludedInTerm: boolean | null;
+  payeeName: string | null;
+  payeeUnit: string | null;
+  bankCode: string | null;
+  accountNumber: string | null;
+  contractPaymentDay: number | null;
+  updatedAt: Date | null;
+  priceTiers: RentalPriceTier[];
+}
+
+/** 租約付款明細（對應 API GET /api/rental/contracts/:id/payments 回傳） */
+interface ContractPaymentItem {
+  id: number;
+  itemName: string;
+  totalAmount: string;
+  paidAmount: string | null;
+  startDate: string;
+  endDate: string | null;
+  status: string | null;
+  notes: string | null;
+  projectId: number | null;
+  categoryId: number | null;
+  createdAt: Date | null;
+  updatedAt: Date | null;
+  projectName: string | null;
+  categoryName: string | null;
+}
 
 interface RentalContractDetailsDialogProps {
   readonly isOpen: boolean;
   readonly onOpenChange: (open: boolean) => void;
-  readonly viewingContract: any | null;
-  readonly viewingContractDetails: any | null;
+  readonly viewingContract: RentalContractListItem | null;
+  readonly viewingContractDetails: RentalContractDetail | null;
   readonly isLoading: boolean;
-  readonly projects: any[];
-  readonly contractPaymentItems: any[];
+  readonly projects: PaymentProject[];
+  readonly contractPaymentItems: ContractPaymentItem[];
   readonly contractDetailsTab: string;
   readonly onContractDetailsTabChange: (tab: string) => void;
   readonly monthlyPaymentYear: number;
   readonly onMonthlyPaymentYearChange: (year: number) => void;
-  readonly onEditContract: (contract: any) => void;
+  readonly onEditContract: (contract: RentalContractListItem) => void;
 }
 
 // 租約詳情對話框
@@ -87,7 +135,7 @@ export function RentalContractDetailsDialog({
           </Button>
           <Button onClick={() => {
             onOpenChange(false);
-            onEditContract(viewingContract);
+            if (viewingContract) onEditContract(viewingContract);
           }}>
             編輯租約
           </Button>
@@ -104,8 +152,8 @@ function ContractDetailsTab({
   details,
   projects,
 }: {
-  readonly details: any;
-  readonly projects: any[];
+  readonly details: RentalContractDetail;
+  readonly projects: PaymentProject[];
 }) {
   return (
     <div className="space-y-6">
@@ -120,7 +168,7 @@ function ContractDetailsTab({
               <strong>租約名稱：</strong>{details.contractName}
             </div>
             <div>
-              <strong>專案：</strong>{projects?.find((p: any) => p.id === details.projectId)?.projectName || "未知"}
+              <strong>專案：</strong>{projects?.find((p) => p.id === details.projectId)?.projectName || "未知"}
             </div>
             <div>
               <strong>合約期間：</strong>
@@ -130,7 +178,7 @@ function ContractDetailsTab({
               <strong>總年數：</strong>{details.totalYears || 0}年
             </div>
             <div>
-              <strong>基礎金額：</strong>NT${parseFloat(details.baseAmount || 0).toLocaleString()}
+              <strong>基礎金額：</strong>NT${parseFloat(String(details.baseAmount || 0)).toLocaleString()}
             </div>
             {details.hasBufferPeriod && (
               <div className="bg-blue-50 p-3 rounded">
@@ -222,12 +270,12 @@ function ContractDetailsTab({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {details.priceTiers.map((tier: any, index: number) => (
+                  {details.priceTiers.map((tier: RentalPriceTier, index: number) => (
                     <TableRow key={index}>
                       <TableCell>第 {index + 1} 階層</TableCell>
                       <TableCell>第 {tier.yearStart} - {tier.yearEnd} 年</TableCell>
-                      <TableCell>NT${parseFloat(tier.monthlyAmount || 0).toLocaleString()}</TableCell>
-                      <TableCell>NT${(parseFloat(tier.monthlyAmount || 0) * 12).toLocaleString()}</TableCell>
+                      <TableCell>NT${parseFloat(String(tier.monthlyAmount || 0)).toLocaleString()}</TableCell>
+                      <TableCell>NT${(parseFloat(String(tier.monthlyAmount || 0)) * 12).toLocaleString()}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -304,8 +352,8 @@ function ContractMonthlyPaymentsTab({
   monthlyPaymentYear,
   onMonthlyPaymentYearChange,
 }: {
-  readonly details: any;
-  readonly contractPaymentItems: any[];
+  readonly details: RentalContractDetail;
+  readonly contractPaymentItems: ContractPaymentItem[];
   readonly monthlyPaymentYear: number;
   readonly onMonthlyPaymentYearChange: (year: number) => void;
 }) {
@@ -362,7 +410,7 @@ function ContractMonthlyPaymentsTab({
               const month = index + 1;
               const monthName = `${month}月`;
 
-              const monthlyPayments = contractPaymentItems.filter((item: any) => {
+              const monthlyPayments = contractPaymentItems.filter((item) => {
                 if (!item.startDate) return false;
                 const itemDate = new Date(item.startDate);
                 return itemDate.getFullYear() === monthlyPaymentYear &&
@@ -373,10 +421,10 @@ function ContractMonthlyPaymentsTab({
               let paymentStatus = 'not-due';
 
               if (monthlyPayments.length > 0) {
-                const totalAmount = monthlyPayments.reduce((sum: number, item: any) =>
+                const totalAmount = monthlyPayments.reduce((sum: number, item: ContractPaymentItem) =>
                   sum + (parseFloat(item.totalAmount) || 0), 0);
-                const paidAmount = monthlyPayments.reduce((sum: number, item: any) =>
-                  sum + (parseFloat(item.paidAmount) || 0), 0);
+                const paidAmount = monthlyPayments.reduce((sum: number, item: ContractPaymentItem) =>
+                  sum + (parseFloat(item.paidAmount || "0") || 0), 0);
 
                 if (paidAmount >= totalAmount) {
                   paymentStatus = 'paid';
@@ -408,7 +456,7 @@ function ContractMonthlyPaymentsTab({
                   </div>
                   {monthlyPayments.length > 0 && (
                     <div className="text-xs mt-1">
-                      NT${monthlyPayments.reduce((sum: number, item: any) =>
+                      NT${monthlyPayments.reduce((sum: number, item: ContractPaymentItem) =>
                         sum + (parseFloat(item.totalAmount) || 0), 0).toLocaleString()}
                     </div>
                   )}
@@ -462,23 +510,23 @@ function YearlyStatsSummary({
   contractPaymentItems,
   monthlyPaymentYear,
 }: {
-  readonly contractPaymentItems: any[];
+  readonly contractPaymentItems: ContractPaymentItem[];
   readonly monthlyPaymentYear: number;
 }) {
-  const yearPayments = contractPaymentItems.filter((item: any) => {
+  const yearPayments = contractPaymentItems.filter((item) => {
     if (!item.startDate) return false;
     const itemDate = new Date(item.startDate);
     return itemDate.getFullYear() === monthlyPaymentYear;
   });
 
-  const totalAmount = yearPayments.reduce((sum: number, item: any) =>
+  const totalAmount = yearPayments.reduce((sum: number, item: ContractPaymentItem) =>
     sum + (parseFloat(item.totalAmount) || 0), 0);
-  const paidAmount = yearPayments.reduce((sum: number, item: any) =>
-    sum + (parseFloat(item.paidAmount) || 0), 0);
+  const paidAmount = yearPayments.reduce((sum: number, item: ContractPaymentItem) =>
+    sum + (parseFloat(item.paidAmount || "0") || 0), 0);
   const unpaidAmount = totalAmount - paidAmount;
   const completionRate = totalAmount > 0 ? (paidAmount / totalAmount) * 100 : 0;
-  const paidCount = yearPayments.filter((item: any) =>
-    parseFloat(item.paidAmount || 0) >= parseFloat(item.totalAmount || 0)).length;
+  const paidCount = yearPayments.filter((item) =>
+    parseFloat(item.paidAmount || "0") >= parseFloat(item.totalAmount || "0")).length;
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -522,23 +570,23 @@ function YearlyStatsSummary({
 function ContractPaymentProgress({
   contractPaymentItems,
 }: {
-  readonly contractPaymentItems: any[];
+  readonly contractPaymentItems: ContractPaymentItem[];
 }) {
   const allPayments = contractPaymentItems || [];
   const totalCount = allPayments.length;
-  const paidCount = allPayments.filter((item: any) =>
-    parseFloat(item.paidAmount || 0) >= parseFloat(item.totalAmount || 0)).length;
-  const partialCount = allPayments.filter((item: any) => {
-    const paid = parseFloat(item.paidAmount || 0);
-    const total = parseFloat(item.totalAmount || 0);
+  const paidCount = allPayments.filter((item) =>
+    parseFloat(item.paidAmount || "0") >= parseFloat(item.totalAmount || "0")).length;
+  const partialCount = allPayments.filter((item) => {
+    const paid = parseFloat(item.paidAmount || "0");
+    const total = parseFloat(item.totalAmount || "0");
     return paid > 0 && paid < total;
   }).length;
   const unpaidCount = totalCount - paidCount - partialCount;
 
-  const totalAmount = allPayments.reduce((sum: number, item: any) =>
+  const totalAmount = allPayments.reduce((sum: number, item: ContractPaymentItem) =>
     sum + (parseFloat(item.totalAmount) || 0), 0);
-  const paidAmount = allPayments.reduce((sum: number, item: any) =>
-    sum + (parseFloat(item.paidAmount) || 0), 0);
+  const paidAmount = allPayments.reduce((sum: number, item: ContractPaymentItem) =>
+    sum + (parseFloat(item.paidAmount || "0") || 0), 0);
   const progress = totalAmount > 0 ? (paidAmount / totalAmount) * 100 : 0;
 
   return (
@@ -601,14 +649,14 @@ function ContractPaymentTable({
   contractPaymentItems,
   monthlyPaymentYear,
 }: {
-  readonly contractPaymentItems: any[];
+  readonly contractPaymentItems: ContractPaymentItem[];
   readonly monthlyPaymentYear: number;
 }) {
-  const yearPayments = contractPaymentItems.filter((item: any) => {
+  const yearPayments = contractPaymentItems.filter((item) => {
     if (!item.startDate) return false;
     const itemDate = new Date(item.startDate);
     return itemDate.getFullYear() === monthlyPaymentYear;
-  }).sort((a: any, b: any) => {
+  }).sort((a, b) => {
     return new Date(a.startDate).getTime() - new Date(b.startDate).getTime();
   });
 
@@ -640,9 +688,9 @@ function ContractPaymentTable({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {yearPayments.map((item: any) => {
-                  const paid = parseFloat(item.paidAmount || 0);
-                  const total = parseFloat(item.totalAmount || 0);
+                {yearPayments.map((item) => {
+                  const paid = parseFloat(item.paidAmount || "0");
+                  const total = parseFloat(item.totalAmount || "0");
                   const isPaid = paid >= total;
                   const isPartial = paid > 0 && paid < total;
                   const itemDate = new Date(item.startDate);

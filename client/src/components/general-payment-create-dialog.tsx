@@ -5,14 +5,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Plus, FileSpreadsheet } from "lucide-react";
-import { UseFormReturn } from "react-hook-form";
+import { UseFormReturn, Control, FieldValues } from "react-hook-form";
 import CategorySelector from "@/components/category-selector";
 
 export interface GeneralPaymentCreateDialogProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
-  createForm: UseFormReturn<any>;
-  onSubmit: (data: any) => void;
+  createForm: UseFormReturn<FieldValues>;
+  onSubmit: (data: FieldValues) => void;
   isPending: boolean;
   onBatchImportOpen: () => void;
 }
@@ -44,8 +44,9 @@ export function GeneralPaymentCreateDialog({
           <Form {...createForm}>
             <form onSubmit={createForm.handleSubmit(onSubmit)} className="space-y-4">
               {/* 使用 CategorySelector 組件 */}
+              /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
               <CategorySelector
-                form={createForm}
+                form={createForm as unknown as { control: Control<FieldValues>; watch: (name: string) => string; setValue: (name: string, value: string) => void; }}
                 onCategoryChange={(categoryData) => {
                   // 處理分類變更
                   if (categoryData.itemName) {

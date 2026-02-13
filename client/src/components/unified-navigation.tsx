@@ -37,7 +37,7 @@ import {
 
 interface NavigationItem {
   path: string;
-  icon: any;
+  icon: React.ComponentType<{ className?: string }>;
   label: string;
   badge?: string;
   color: string;

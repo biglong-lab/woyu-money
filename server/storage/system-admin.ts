@@ -19,10 +19,7 @@ import { eq, sql, count } from "drizzle-orm"
  */
 export async function getAllUsers(): Promise<User[]> {
   try {
-    return await db
-      .select()
-      .from(users)
-      .orderBy(users.createdAt)
+    return await db.select().from(users).orderBy(users.createdAt)
   } catch (error) {
     console.error("取得使用者列表失敗:", error)
     throw error
@@ -86,7 +83,20 @@ export async function toggleUserStatus(userId: number): Promise<User> {
  * 取得系統統計資訊
  * 包含使用者、付款項目、專案、分類的統計
  */
-export async function getSystemStats(): Promise<any> {
+/** 系統統計結果 */
+interface SystemStatsResult {
+  users: Record<string, unknown>
+  payments: Record<string, unknown>
+  projects: Record<string, unknown>
+  categories: Record<string, unknown>
+  systemInfo: {
+    databaseConnections: number
+    lastBackup: null
+    systemVersion: string
+  }
+}
+
+export async function getSystemStats(): Promise<SystemStatsResult> {
   try {
     // 用戶統計
     const userStats = await db
@@ -157,8 +167,8 @@ export async function createBackup(): Promise<{ recordCount: number; fileSize: n
     const recordsCount = await db.select({ count: count() }).from(paymentRecords)
     const projectCount = await db.select({ count: count() }).from(paymentProjects)
 
-    const totalRecords = userCount[0].count + paymentCount[0].count +
-                        recordsCount[0].count + projectCount[0].count
+    const totalRecords =
+      userCount[0].count + paymentCount[0].count + recordsCount[0].count + projectCount[0].count
 
     const estimatedFileSize = totalRecords * 1024
 
@@ -190,7 +200,16 @@ export async function clearSystemCache(): Promise<number> {
  * 驗證資料完整性
  * 檢查孤立記錄、金額不一致、缺失參照、重複資料等
  */
-export async function validateDataIntegrity(): Promise<any> {
+/** 資料完整性驗證結果 */
+interface DataIntegrityResult {
+  orphanedRecords: number
+  inconsistentAmounts: number
+  missingReferences: number
+  duplicateEntries: number
+  dataIntegrityScore: number
+}
+
+export async function validateDataIntegrity(): Promise<DataIntegrityResult> {
   try {
     const validationResults = {
       orphanedRecords: 0,

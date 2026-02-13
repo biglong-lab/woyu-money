@@ -5,12 +5,42 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import type { PaymentItem, PaymentStats } from "./payment-project-types";
 
+// 現金流統計型別
+interface CashflowStats {
+  recordCount: number;
+  totalCashOutflow: number;
+}
+
+// 現金流項目型別
+interface CashflowItem {
+  recordId: number;
+  itemId: number;
+  itemName: string;
+  projectName: string;
+  categoryName?: string;
+  paymentDate: string;
+  amount: number;
+  totalAmount: number;
+  status: string;
+  paymentMethod?: string;
+  notes?: string;
+}
+
+// 現金流詳情型別
+interface CashflowDetails {
+  summary?: {
+    totalRecords: number;
+    totalAmount: number;
+  };
+  items: CashflowItem[];
+}
+
 export interface PaymentProjectStatsProps {
   stats: PaymentStats;
   filteredAndSortedItems: PaymentItem[];
   statisticsMode: 'expense' | 'cashflow';
-  cashflowStats: any;
-  cashflowDetails: any;
+  cashflowStats: CashflowStats | null;
+  cashflowDetails: CashflowDetails | null;
   cashflowDetailsLoading: boolean;
   selectedYear: number;
   selectedMonth: number;
@@ -211,7 +241,7 @@ export default function PaymentProjectStats({
               </div>
             ) : cashflowDetails.items && cashflowDetails.items.length > 0 ? (
               <div className="space-y-3 max-h-96 overflow-y-auto">
-                {cashflowDetails.items.map((item: any) => (
+                {cashflowDetails.items.map((item) => (
                   <div key={`${item.recordId}-${item.itemId}`} className="border rounded-lg p-3 bg-white hover:bg-gray-50 transition-colors">
                     <div className="flex items-start justify-between">
                       <div className="flex-1">

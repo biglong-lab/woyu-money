@@ -15,15 +15,21 @@ import {
   Search, ChevronDown, Check, Building2, Calendar, DollarSign
 } from "lucide-react";
 import { format } from "date-fns";
-import type { DocumentInbox } from "@shared/schema";
+import type { DocumentInbox, PaymentProject, PaymentItem as BasePaymentItem } from "@shared/schema";
+
+// 擴展 PaymentItem 型別以包含 JOIN 查詢返回的額外欄位
+interface ExtendedPaymentItem extends BasePaymentItem {
+  vendor?: string | null;
+  dueDate?: string | null;
+}
 
 export interface DocumentInboxArchiveDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   document: DocumentInbox | null;
-  projects: any[];
-  paymentItems: any[];
-  onArchive: (type: string, data: any) => void;
+  projects: PaymentProject[];
+  paymentItems: ExtendedPaymentItem[];
+  onArchive: (type: string, data: Record<string, unknown>) => void;
   isPending: boolean;
 }
 
@@ -37,7 +43,7 @@ export default function DocumentInboxArchiveDialog({
   isPending,
 }: DocumentInboxArchiveDialogProps) {
   const [archiveType, setArchiveType] = useState<string>('');
-  const [formData, setFormData] = useState<any>({});
+  const [formData, setFormData] = useState<Record<string, string | number>>({});
   const [selectedProjectFilter, setSelectedProjectFilter] = useState<string>('all');
   const [itemSearch, setItemSearch] = useState('');
   const [itemPickerOpen, setItemPickerOpen] = useState(false);
@@ -157,7 +163,7 @@ export default function DocumentInboxArchiveDialog({
               <div>
                 <Label>項目名稱</Label>
                 <Input
-                  value={formData.itemName}
+                  value={String(formData.itemName || '')}
                   onChange={(e) => setFormData({ ...formData, itemName: e.target.value })}
                   data-testid="input-item-name"
                 />
@@ -166,7 +172,7 @@ export default function DocumentInboxArchiveDialog({
                 <Label>金額</Label>
                 <Input
                   type="number"
-                  value={formData.totalAmount}
+                  value={String(formData.totalAmount || '')}
                   onChange={(e) => setFormData({ ...formData, totalAmount: e.target.value })}
                   data-testid="input-total-amount"
                 />
@@ -175,7 +181,7 @@ export default function DocumentInboxArchiveDialog({
                 <Label>到期日</Label>
                 <Input
                   type="date"
-                  value={formData.dueDate}
+                  value={String(formData.dueDate || '')}
                   onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
                   data-testid="input-due-date"
                 />
@@ -359,7 +365,7 @@ export default function DocumentInboxArchiveDialog({
                 <Label>本次付款金額</Label>
                 <Input
                   type="number"
-                  value={formData.amount}
+                  value={String(formData.amount || '')}
                   onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
                 />
               </div>
@@ -367,14 +373,14 @@ export default function DocumentInboxArchiveDialog({
                 <Label>付款日期</Label>
                 <Input
                   type="date"
-                  value={formData.paymentDate}
+                  value={String(formData.paymentDate || '')}
                   onChange={(e) => setFormData({ ...formData, paymentDate: e.target.value })}
                 />
               </div>
               <div>
                 <Label>付款方式</Label>
                 <Select
-                  value={formData.paymentMethod}
+                  value={String(formData.paymentMethod || '')}
                   onValueChange={(v) => setFormData({ ...formData, paymentMethod: v })}
                 >
                   <SelectTrigger>
@@ -397,7 +403,7 @@ export default function DocumentInboxArchiveDialog({
               <div>
                 <Label>發票號碼</Label>
                 <Input
-                  value={formData.invoiceNumber}
+                  value={String(formData.invoiceNumber || '')}
                   onChange={(e) => setFormData({ ...formData, invoiceNumber: e.target.value })}
                 />
               </div>
@@ -405,14 +411,14 @@ export default function DocumentInboxArchiveDialog({
                 <Label>發票日期</Label>
                 <Input
                   type="date"
-                  value={formData.invoiceDate}
+                  value={String(formData.invoiceDate || '')}
                   onChange={(e) => setFormData({ ...formData, invoiceDate: e.target.value })}
                 />
               </div>
               <div>
                 <Label>廠商名稱</Label>
                 <Input
-                  value={formData.vendorName}
+                  value={String(formData.vendorName || '')}
                   onChange={(e) => setFormData({ ...formData, vendorName: e.target.value })}
                 />
               </div>
@@ -420,21 +426,21 @@ export default function DocumentInboxArchiveDialog({
                 <Label>金額</Label>
                 <Input
                   type="number"
-                  value={formData.totalAmount}
+                  value={String(formData.totalAmount || '')}
                   onChange={(e) => setFormData({ ...formData, totalAmount: e.target.value })}
                 />
               </div>
               <div>
                 <Label>分類</Label>
                 <Input
-                  value={formData.category}
+                  value={String(formData.category || '')}
                   onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                 />
               </div>
               <div>
                 <Label>說明</Label>
                 <Textarea
-                  value={formData.description}
+                  value={String(formData.description || '')}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   rows={2}
                 />
@@ -454,7 +460,7 @@ export default function DocumentInboxArchiveDialog({
           <div>
             <Label>歸檔備註</Label>
             <Textarea
-              value={formData.notes}
+              value={String(formData.notes || '')}
               onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
               placeholder="可補充歸檔說明..."
               rows={2}

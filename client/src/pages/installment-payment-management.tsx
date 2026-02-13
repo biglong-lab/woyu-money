@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useForm } from "react-hook-form";
+import { useForm, type UseFormReturn, type FieldValues } from "react-hook-form";
 import { Calculator } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -17,11 +17,33 @@ import InstallmentDetailDialog from "@/components/installment-detail-dialog";
 
 // 型別與工具函式
 import type { PaymentItem, AnalyzedInstallmentItem } from "@/components/installment-types";
+import type { DebtCategory, PaymentProject, FixedCategory } from "@/../../shared/schema/category";
 import {
   analyzeInstallmentItem,
   calculateInstallmentStats,
   calculateInstallmentPayments,
 } from "@/components/installment-utils";
+
+// 表單資料型別定義
+interface CreateFormData {
+  itemName: string;
+  totalAmount: string;
+  installments: number;
+  categoryId: string;
+  projectId: string;
+  startDate: string;
+  notes: string;
+  fixedCategoryId: string;
+  categoryType: string;
+  paymentType: string;
+  extraFirstPayment: string;
+  extraLastPayment: string;
+  installmentMonths: string;
+}
+
+interface EditFormData {
+  notes: string;
+}
 
 export default function InstallmentPaymentManagement() {
   const { toast } = useToast();
@@ -51,15 +73,15 @@ export default function InstallmentPaymentManagement() {
     ? paymentItemsResponse
     : paymentItemsResponse?.items || [];
 
-  const { data: categories = [] } = useQuery<any[]>({
+  const { data: categories = [] } = useQuery<DebtCategory[]>({
     queryKey: ["/api/categories/project"],
   });
 
-  const { data: projects = [] } = useQuery<any[]>({
+  const { data: projects = [] } = useQuery<PaymentProject[]>({
     queryKey: ["/api/payment/projects"],
   });
 
-  const { data: fixedCategories = [] } = useQuery<any[]>({
+  const { data: fixedCategories = [] } = useQuery<FixedCategory[]>({
     queryKey: ["/api/fixed-categories"],
   });
 
@@ -101,7 +123,7 @@ export default function InstallmentPaymentManagement() {
         return true;
       })
       .sort((a: AnalyzedInstallmentItem, b: AnalyzedInstallmentItem) => {
-        let comparison = 0;
+        let comparison: number;
         switch (sortBy) {
           case "dueDate":
             comparison = a.dueDate.getTime() - b.dueDate.getTime();
@@ -126,7 +148,7 @@ export default function InstallmentPaymentManagement() {
   }, [paymentItems, searchTerm, statusFilter, projectFilter, categoryFilter, sortBy, sortOrder]);
 
   // 表單
-  const createForm = useForm({
+  const createForm = useForm<CreateFormData>({
     defaultValues: {
       itemName: "",
       totalAmount: "",
@@ -140,19 +162,13 @@ export default function InstallmentPaymentManagement() {
       paymentType: "installment",
       extraFirstPayment: "",
       extraLastPayment: "",
+      installmentMonths: "",
     },
   });
 
-  const editForm = useForm({
+  const editForm = useForm<EditFormData>({
     defaultValues: {
-      itemName: "",
-      totalAmount: "",
-      installmentMonths: "",
-      categoryId: "",
-      projectId: "",
-      startDate: "",
       notes: "",
-      fixedCategoryId: "",
     },
   });
 
@@ -173,7 +189,7 @@ export default function InstallmentPaymentManagement() {
 
   // Mutations
   const createMutation = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: CreateFormData) => {
       const response = await apiRequest("POST", "/api/payment/items", data);
       return response;
     },
@@ -184,7 +200,7 @@ export default function InstallmentPaymentManagement() {
       setSelectedCategoryId("");
       toast({ title: "分期項目建立成功", description: "新的分期項目已成功新增" });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "建立失敗",
         description: error.message || "建立分期項目時發生錯誤",
@@ -194,7 +210,7 @@ export default function InstallmentPaymentManagement() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: number; data: any }) => {
+    mutationFn: async ({ id, data }: { id: number; data: EditFormData }) => {
       return apiRequest("PUT", `/api/payment/items/${id}`, data);
     },
     onSuccess: () => {
@@ -204,7 +220,7 @@ export default function InstallmentPaymentManagement() {
       editForm.reset();
       toast({ title: "分期項目更新成功", description: "分期項目資訊已成功更新" });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "更新失敗",
         description: error.message || "更新分期項目時發生錯誤",
@@ -221,7 +237,7 @@ export default function InstallmentPaymentManagement() {
       queryClient.invalidateQueries({ queryKey: ["/api/payment/items"] });
       toast({ title: "分期項目刪除成功", description: "分期項目已成功刪除" });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "刪除失敗",
         description: error.message || "刪除分期項目時發生錯誤",
@@ -231,7 +247,7 @@ export default function InstallmentPaymentManagement() {
   });
 
   // 事件處理
-  const handleCreateSubmit = async (data: any) => {
+  const handleCreateSubmit = async (data: CreateFormData) => {
     const totalAmount = parseFloat(data.totalAmount);
     const installmentMonths = parseInt(data.installmentMonths);
     const calculation = calculateInstallmentPayments(totalAmount, installmentMonths);
@@ -266,16 +282,17 @@ export default function InstallmentPaymentManagement() {
         title: "分期項目建立成功",
         description: `已成功建立 ${installmentMonths} 期付款項目`,
       });
-    } catch (error: any) {
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "建立分期項目時發生錯誤";
       toast({
         title: "建立失敗",
-        description: error.message || "建立分期項目時發生錯誤",
+        description: errorMessage,
         variant: "destructive",
       });
     }
   };
 
-  const handleEditSubmit = (data: any) => {
+  const handleEditSubmit = (data: EditFormData) => {
     if (!editingItem) return;
     updateMutation.mutate({ id: editingItem.id, data: { notes: data.notes } });
   };
@@ -311,8 +328,8 @@ export default function InstallmentPaymentManagement() {
         <InstallmentCreateDialog
           open={isCreateDialogOpen}
           onOpenChange={setIsCreateDialogOpen}
-          form={createForm}
-          onSubmit={handleCreateSubmit}
+          form={createForm as unknown as UseFormReturn<FieldValues>}
+          onSubmit={handleCreateSubmit as unknown as (data: FieldValues) => Promise<void>}
           isPending={createMutation.isPending}
           paymentCalculation={paymentCalculation}
           watchTotalAmount={watchTotalAmount}
@@ -364,8 +381,8 @@ export default function InstallmentPaymentManagement() {
       <InstallmentEditDialog
         open={isEditDialogOpen}
         onOpenChange={setIsEditDialogOpen}
-        form={editForm}
-        onSubmit={handleEditSubmit}
+        form={editForm as unknown as UseFormReturn<FieldValues>}
+        onSubmit={handleEditSubmit as unknown as (data: FieldValues) => void}
         isPending={updateMutation.isPending}
         editingItem={editingItem}
       />

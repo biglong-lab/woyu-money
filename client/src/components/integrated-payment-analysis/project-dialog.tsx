@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Building2 } from "lucide-react";
-import { UseFormReturn } from "react-hook-form";
+import { UseFormReturn, FieldValues } from "react-hook-form";
 
 // ========================================
 // 新增專案對話框元件
@@ -22,9 +22,9 @@ interface ProjectDialogProps {
   /** 開關狀態變更處理 */
   onOpenChange: (open: boolean) => void;
   /** 專案表單實例 */
-  form: UseFormReturn<any>;
+  form: UseFormReturn<FieldValues>;
   /** 表單提交處理（建立專案） */
-  onSubmit: (data: any) => void;
+  onSubmit: (data: FieldValues) => void;
   /** 是否正在建立中 */
   isPending: boolean;
 }

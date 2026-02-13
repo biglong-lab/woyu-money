@@ -11,7 +11,6 @@ const imagesDir = path.join(uploadDir, "images")
 const inboxDir = path.join(uploadDir, "inbox")
 
 export { uploadDir, contractsDir, receiptsDir, documentsDir, imagesDir, inboxDir }
-
 ;[uploadDir, contractsDir, receiptsDir, documentsDir, imagesDir, inboxDir].forEach((dir) => {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true })
@@ -76,6 +75,23 @@ export const batchImportUpload = multer({
   },
 })
 
+// 允許的檔案類型（圖片 + PDF + 文件）
+const allowedFileTypes = /jpeg|jpg|png|gif|pdf|doc|docx|xlsx|xls|csv|webp|heic|heif/
+function commonFileFilter(
+  _req: Express.Request,
+  file: Express.Multer.File,
+  cb: multer.FileFilterCallback
+) {
+  const extOk = allowedFileTypes.test(path.extname(file.originalname).toLowerCase())
+  const mimeOk =
+    allowedFileTypes.test(file.mimetype) ||
+    file.mimetype.startsWith("image/") ||
+    file.mimetype.includes("spreadsheet") ||
+    file.mimetype.includes("document")
+  if (mimeOk || extOk) return cb(null, true)
+  cb(new Error("不支援的檔案格式"))
+}
+
 // 一般檔案附件上傳
 export const fileUpload = multer({
   storage: multer.diskStorage({
@@ -88,6 +104,7 @@ export const fileUpload = multer({
     },
   }),
   limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: commonFileFilter,
 })
 
 // 付款憑證上傳
@@ -102,6 +119,7 @@ export const paymentFileUpload = multer({
     },
   }),
   limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: commonFileFilter,
 })
 
 // 文件收件箱上傳

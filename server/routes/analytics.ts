@@ -3,15 +3,59 @@ import { storage } from "../storage"
 import { requireAuth } from "../auth"
 import { batchImportProcessor } from "../batch-import-processor"
 import { batchImportUpload } from "./upload-config"
+import type { PaymentItem } from "@shared/schema"
+
+/** getPaymentItems 透過 SQL JOIN 回傳的擴展欄位 */
+interface PaymentItemWithJoins extends PaymentItem {
+  categoryName?: string
+  projectName?: string
+  projectType?: string
+  fixedCategoryName?: string
+  vendor?: string
+  dueDate?: string | null
+}
+
+/** getPaymentRecords 回傳的付款記錄行（extends Record 以相容 storage 回傳型別） */
+interface PaymentRecordRow extends Record<string, unknown> {
+  id: number
+  itemId: number
+  amount: string
+  paymentDate: string
+  paymentMethod: string | null
+  notes: string
+  receiptImageUrl: string
+  vendor?: string
+  createdAt: Date
+  updatedAt: Date
+  itemName: string
+  itemType: string
+  totalAmount: string
+  projectId: number
+  projectName: string
+  projectType: string
+  categoryId: number
+  categoryName: string
+}
+
+/** 現金流專案統計 */
+interface ProjectCashFlowStat {
+  projectId: number
+  projectName: string
+  totalPaid: number
+  recordCount: number
+}
+
+import { asyncHandler, AppError } from "../middleware/error-handler"
 
 const router = Router()
 
 // 專案統計 API
-router.get("/api/payment/projects/stats", async (req, res) => {
-  try {
+router.get(
+  "/api/payment/projects/stats",
+  asyncHandler(async (req, res) => {
     const projects = await storage.getPaymentProjects()
     const paymentItems = await storage.getPaymentItems({}, 1, 10000)
-    const paymentRecords = await storage.getPaymentRecords({}, 1, 10000)
+    const paymentRecords = (await storage.getPaymentRecords({}, 1, 10000)) as PaymentRecordRow[]
 
     const projectStats = projects.map((project) => {
       const projectItems = paymentItems.filter((item) => item.projectId === project.id)
@@ -47,24 +91,18 @@ router.get("/api/payment/projects/stats", async (req, res) => {
       totalProjects: projects.length,
       projects: projectStats,
     })
-  } catch (error: any) {
-    console.error("Error fetching project stats:", error)
-    res.status(500).json({ message: "Failed to fetch project stats" })
-  }
-})
+  })
+)
 
 // 現金流統計
-router.get("/api/payment/cashflow/stats", async (req, res) => {
-  try {
+router.get(
+  "/api/payment/cashflow/stats",
+  asyncHandler(async (req, res) => {
     const { year, month, projectId } = req.query
-    const filters: any = {}
-    if (projectId && projectId !== "all") {
-      filters.projectId = parseInt(projectId as string)
-    }
 
-    const paymentRecords = await storage.getPaymentRecords(filters)
-    const paymentItems = await storage.getPaymentItems({}, undefined, 10000)
-    const itemsMap = new Map(paymentItems.map((item: any) => [item.id, item]))
+    const paymentRecords = (await storage.getPaymentRecords()) as PaymentRecordRow[]
+    const items = (await storage.getPaymentItems({}, undefined, 10000)) as PaymentItemWithJoins[]
+    const itemsMap = new Map(items.map((item) => [item.id, item]))
 
     const filteredRecords = paymentRecords.filter((record) => {
       if (!record.paymentDate) return false
@@ -82,7 +120,7 @@ router.get("/api/payment/cashflow/stats", async (req, res) => {
 
     const projectCashFlow = filteredRecords.reduce(
       (acc, record) => {
-        const item: any = itemsMap.get(record.itemId)
+        const item = itemsMap.get(record.itemId)
         if (!item) return acc
         const pId = item.projectId || 0
         const projectName = item.projectName || "未分類"
@@ -93,7 +131,7 @@ router.get("/api/payment/cashflow/stats", async (req, res) => {
         acc[pId].recordCount += 1
         return acc
       },
-      {} as Record<number, any>
+      {} as Record<number, ProjectCashFlowStat>
     )
 
     res.json({
@@ -105,26 +143,24 @@ router.get("/api/payment/cashflow/stats", async (req, res) => {
         month: month || new Date().getMonth() + 1,
       },
     })
-  } catch (error: any) {
-    console.error("Error fetching cashflow stats:", error)
-    res.status(500).json({ message: "Failed to fetch cashflow stats" })
-  }
-})
+  })
+)
 
 // 現金流詳細項目
-router.get("/api/payment/cashflow/details", async (req, res) => {
-  try {
+router.get(
+  "/api/payment/cashflow/details",
+  asyncHandler(async (req, res) => {
     const { year, month, projectId, page = 1, limit = 50 } = req.query
-    const filters: any = {}
-    if (projectId && projectId !== "all") {
-      filters.projectId = parseInt(projectId as string)
-    }
 
-    const paymentRecords = await storage.getPaymentRecords(filters)
-    const paymentItems = await storage.getPaymentItems({}, undefined, 10000)
+    const paymentRecords = (await storage.getPaymentRecords()) as PaymentRecordRow[]
+    const paymentItems = (await storage.getPaymentItems(
+      {},
+      undefined,
+      10000
+    )) as PaymentItemWithJoins[]
     const projects = await storage.getPaymentProjects()
 
-    const itemsMap = new Map(paymentItems.map((item: any) => [item.id, item]))
+    const itemsMap = new Map(paymentItems.map((item) => [item.id, item]))
     const projectsMap = new Map(projects.map((project) => [project.id, project]))
 
     const filteredRecords = paymentRecords.filter((record) => {
@@ -138,7 +174,7 @@ router.get("/api/payment/cashflow/details", async (req, res) => {
     })
 
     const detailItems = filteredRecords.map((record) => {
-      const item: any = itemsMap.get(record.itemId)
+      const item = itemsMap.get(record.itemId)
       const project = item?.projectId ? projectsMap.get(item.projectId) : null
       return {
         recordId: record.id,
@@ -194,17 +230,15 @@ router.get("/api/payment/cashflow/details", async (req, res) => {
         },
       },
     })
-  } catch (error: any) {
-    console.error("Error fetching cashflow details:", error)
-    res.status(500).json({ message: "Failed to fetch cashflow details" })
-  }
-})
+  })
+)
 
 // 付款專案詳細統計
-router.get("/api/payment/project/stats", async (req, res) => {
-  try {
+router.get(
+  "/api/payment/project/stats",
+  asyncHandler(async (req, res) => {
     const paymentItems = await storage.getPaymentItems({}, undefined, 10000)
-    const paymentRecords = await storage.getPaymentRecords({})
+    const paymentRecords = (await storage.getPaymentRecords({})) as PaymentRecordRow[]
 
     const totalPlanned = paymentItems.reduce(
       (sum, item) => sum + parseFloat(item.totalAmount || "0"),
@@ -223,9 +257,7 @@ router.get("/api/payment/project/stats", async (req, res) => {
 
     const currentMonthRecords = paymentRecords.filter((record) => {
       const recordDate = new Date(record.paymentDate)
-      return (
-        recordDate.getMonth() + 1 === currentMonth && recordDate.getFullYear() === currentYear
-      )
+      return recordDate.getMonth() + 1 === currentMonth && recordDate.getFullYear() === currentYear
     })
     const monthlyPaid = currentMonthRecords.reduce(
       (sum, record) => sum + parseFloat(record.amount || "0"),
@@ -269,17 +301,16 @@ router.get("/api/payment/project/stats", async (req, res) => {
       paidItems: paymentItems.filter((item) => parseFloat(item.paidAmount || "0") > 0).length,
       overdueItems: overdueItems.length,
     })
-  } catch (error: any) {
-    console.error("Error fetching project stats:", error)
-    res.status(500).json({ message: "Failed to fetch project stats" })
-  }
-})
+  })
+)
 
 // 付款統計
-router.get("/api/payment-statistics", async (req, res) => {
-  try {
+router.get(
+  "/api/payment-statistics",
+  asyncHandler(async (req, res) => {
     const { startDate, endDate, projectId, categoryId } = req.query
-    const filters: any = {}
+    const filters: { startDate?: Date; endDate?: Date; projectId?: number; categoryId?: number } =
+      {}
     if (startDate) filters.startDate = new Date(startDate as string)
     if (endDate) filters.endDate = new Date(endDate as string)
     if (projectId) filters.projectId = parseInt(projectId as string)
@@ -287,35 +318,30 @@ router.get("/api/payment-statistics", async (req, res) => {
 
     const stats = await storage.getPaymentStatistics(filters)
     res.json(stats)
-  } catch (error: any) {
-    console.error("Error fetching payment statistics:", error)
-    res.status(500).json({ message: "Failed to fetch payment statistics" })
-  }
-})
+  })
+)
 
 // 付款總覽
-router.get("/api/payment-overview", async (req, res) => {
-  try {
+router.get(
+  "/api/payment-overview",
+  asyncHandler(async (req, res) => {
     const overview = await storage.getPaymentOverview()
     res.json(overview)
-  } catch (error: any) {
-    console.error("Error fetching payment overview:", error)
-    res.status(500).json({ message: "Failed to fetch payment overview" })
-  }
-})
+  })
+)
 
 // 智能分析 API
-router.get("/api/payment/analytics/intelligent", async (req, res) => {
-  try {
+router.get(
+  "/api/payment/analytics/intelligent",
+  asyncHandler(async (req, res) => {
     const paymentItems = await storage.getPaymentItems()
-    const paymentRecords = await storage.getPaymentRecords()
+    const paymentRecords = (await storage.getPaymentRecords()) as PaymentRecordRow[]
 
     const now = new Date()
     const totalPending = paymentItems
       .filter((item) => item.status === "unpaid" || item.status === "partial")
       .reduce(
-        (sum, item) =>
-          sum + parseFloat(item.totalAmount) - parseFloat(item.paidAmount || "0"),
+        (sum, item) => sum + parseFloat(item.totalAmount) - parseFloat(item.paidAmount || "0"),
         0
       )
 
@@ -350,8 +376,7 @@ router.get("/api/payment/analytics/intelligent", async (req, res) => {
         100
       ),
       criticalItems: overdueItems.length,
-      riskLevel:
-        overdueItems.length > 5 ? "high" : overdueItems.length > 2 ? "medium" : "low",
+      riskLevel: overdueItems.length > 5 ? "high" : overdueItems.length > 2 ? "medium" : "low",
     }
 
     const recentPayments = paymentRecords.filter((record) => {
@@ -410,10 +435,7 @@ router.get("/api/payment/analytics/intelligent", async (req, res) => {
         const recordDate = new Date(record.paymentDate)
         return recordDate.getMonth() === index
       })
-      const monthTotal = monthData.reduce(
-        (sum, record) => sum + parseFloat(record.amount),
-        0
-      )
+      const monthTotal = monthData.reduce((sum, record) => sum + parseFloat(record.amount), 0)
       return {
         month,
         predicted: Math.round(avgMonthlyPayment * (0.8 + Math.random() * 0.4)),
@@ -428,47 +450,40 @@ router.get("/api/payment/analytics/intelligent", async (req, res) => {
       recommendations,
       seasonalTrends,
     })
-  } catch (error) {
-    console.error("Error generating intelligent analytics:", error)
-    res.status(500).json({ message: "Failed to generate analytics" })
-  }
-})
+  })
+)
 
 // 智能警報
-router.get("/api/smart-alerts", async (req, res) => {
-  try {
+router.get(
+  "/api/smart-alerts",
+  asyncHandler(async (req, res) => {
     const alerts = await storage.getSmartAlerts()
     res.json(alerts)
-  } catch (error: any) {
-    console.error("Error fetching smart alerts:", error)
-    res.status(500).json({ message: "Failed to fetch smart alerts" })
-  }
-})
+  })
+)
 
-router.get("/api/smart-alerts/stats", async (req, res) => {
-  try {
+router.get(
+  "/api/smart-alerts/stats",
+  asyncHandler(async (req, res) => {
     const stats = await storage.getSmartAlertStats()
     res.json(stats)
-  } catch (error: any) {
-    console.error("Error fetching smart alert stats:", error)
-    res.status(500).json({ message: "Failed to fetch smart alert stats" })
-  }
-})
+  })
+)
 
-router.post("/api/smart-alerts/dismiss", async (req, res) => {
-  try {
+router.post(
+  "/api/smart-alerts/dismiss",
+  asyncHandler(async (req, res) => {
     const { alertId } = req.body
     await storage.dismissSmartAlert(alertId)
     res.json({ message: "Alert dismissed successfully" })
-  } catch (error: any) {
-    console.error("Error dismissing smart alert:", error)
-    res.status(500).json({ message: "Failed to dismiss smart alert" })
-  }
-})
+  })
+)
 
 // 進階搜尋
-router.post("/api/search/advanced", requireAuth, async (req, res) => {
-  try {
+router.post(
+  "/api/search/advanced",
+  requireAuth,
+  asyncHandler(async (req, res) => {
     const { filters, searchType = "payment_items" } = req.body
 
     let results
@@ -483,67 +498,59 @@ router.post("/api/search/advanced", requireAuth, async (req, res) => {
         results = await storage.advancedSearchCategories(filters)
         break
       default:
-        return res.status(400).json({ message: "不支援的搜尋類型" })
+        throw new AppError(400, "不支援的搜尋類型")
     }
 
     res.json(results)
-  } catch (error) {
-    console.error("進階搜尋失敗:", error)
-    res.status(500).json({ message: "進階搜尋失敗" })
-  }
-})
+  })
+)
 
 // 批量操作
-router.post("/api/batch/update", requireAuth, async (req, res) => {
-  try {
-    const userId = (req as any).user.id
+router.post(
+  "/api/batch/update",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const userId = req.user!.id
     const { action, itemIds, data } = req.body
     const result = await storage.batchUpdatePaymentItems(itemIds, action, data, userId)
     res.json(result)
-  } catch (error) {
-    console.error("批量更新失敗:", error)
-    res.status(500).json({ message: "批量更新失敗" })
-  }
-})
+  })
+)
 
 // 批量導入解析
 router.post(
   "/api/payment/batch-import/parse",
   requireAuth,
   batchImportUpload.single("file"),
-  async (req, res) => {
-    try {
-      if (!req.file) {
-        return res.status(400).json({ message: "請選擇要匯入的檔案" })
-      }
-      const result = await batchImportProcessor.parseFile(req.file.buffer, req.file.originalname)
-      res.json(result)
-    } catch (error: any) {
-      console.error("檔案解析失敗:", error)
-      res.status(500).json({ message: error.message || "檔案解析失敗" })
+  asyncHandler(async (req, res) => {
+    if (!req.file) {
+      throw new AppError(400, "請選擇要匯入的檔案")
     }
-  }
+    const result = await batchImportProcessor.parseFile(req.file.buffer, req.file.originalname)
+    res.json(result)
+  })
 )
 
 // 批量導入執行
-router.post("/api/payment/batch-import/execute", requireAuth, async (req, res) => {
-  try {
+router.post(
+  "/api/payment/batch-import/execute",
+  requireAuth,
+  asyncHandler(async (req, res) => {
     const { records } = req.body
     if (!records || !Array.isArray(records)) {
-      return res.status(400).json({ message: "無效的導入數據" })
+      throw new AppError(400, "無效的導入數據")
     }
     const result = await batchImportProcessor.executeImport(records)
     res.json(result)
-  } catch (error: any) {
-    console.error("批量導入失敗:", error)
-    res.status(500).json({ message: error.message || "批量導入失敗" })
-  }
-})
+  })
+)
 
 // 智能報表
-router.get("/api/reports/intelligent", requireAuth, async (req, res) => {
-  try {
-    const userId = (req as any).user.id
+router.get(
+  "/api/reports/intelligent",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const userId = req.user!.id
     const { period = "monthly", reportType = "overview" } = req.query
     const reportData = await storage.generateIntelligentReport(
       period as string,
@@ -551,22 +558,18 @@ router.get("/api/reports/intelligent", requireAuth, async (req, res) => {
       userId
     )
     res.json(reportData)
-  } catch (error) {
-    console.error("生成智能報表失敗:", error)
-    res.status(500).json({ message: "生成智能報表失敗" })
-  }
-})
+  })
+)
 
-router.post("/api/reports/export", requireAuth, async (req, res) => {
-  try {
-    const userId = (req as any).user.id
+router.post(
+  "/api/reports/export",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const userId = req.user!.id
     const { format, reportType, filters } = req.body
     const exportData = await storage.exportReport(format, reportType, filters, userId)
     res.json(exportData)
-  } catch (error) {
-    console.error("匯出報表失敗:", error)
-    res.status(500).json({ message: "匯出報表失敗" })
-  }
-})
+  })
+)
 
 export default router

@@ -21,7 +21,7 @@ export default function SettingsAdminTab() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: systemUsers = [], isLoading: usersLoading } = useQuery<any[]>({
+  const { data: systemUsers = [], isLoading: usersLoading } = useQuery<SystemUser[]>({
     queryKey: ["/api/admin/users"],
     enabled: isUserListDialogOpen || isUserPermissionDialogOpen,
   });

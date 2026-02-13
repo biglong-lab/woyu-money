@@ -64,6 +64,20 @@ interface PaymentProject {
   isActive: boolean;
 }
 
+
+interface ProjectStat {
+  id: number;
+  name: string;
+  totalPlanned: number;
+  totalPaid: number;
+  itemCount: number;
+  pendingItems: number;
+  completedItems: number;
+  overdueItems: number;
+  completionRate?: number;
+  pendingAmount?: number;
+}
+
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82ca9d'];
 
 export default function PaymentProjectStatsOptimized() {
@@ -121,9 +135,9 @@ export default function PaymentProjectStatsOptimized() {
       else if (item.status === "overdue") acc[projectId].overdueItems += 1;
 
       return acc;
-    }, {} as Record<number, any>);
+    }, {} as Record<number, ProjectStat>);
 
-    return Object.values(stats).map((stat: any) => ({
+    return Object.values(stats).map((stat: ProjectStat) => ({
       ...stat,
       completionRate: stat.totalPlanned > 0 ? (stat.totalPaid / stat.totalPlanned * 100) : 0,
       pendingAmount: stat.totalPlanned - stat.totalPaid

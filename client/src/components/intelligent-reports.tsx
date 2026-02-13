@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, FC } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -11,7 +11,7 @@ import {
 } from 'recharts';
 import { 
   TrendingUp, TrendingDown, DollarSign, Calendar, 
-  Download, FileText, AlertTriangle, Target 
+  Download, FileText, AlertTriangle, Target, LucideIcon
 } from 'lucide-react';
 
 interface ReportData {
@@ -48,6 +48,15 @@ interface IntelligentReportsProps {
   onExport: (format: string, reportType: string) => void;
 }
 
+interface KPICardProps {
+  title: string;
+  value: number;
+  format?: 'number' | 'currency' | 'percentage';
+  trend?: number;
+  icon: LucideIcon;
+  color?: string;
+}
+
 export function IntelligentReports({ data, onExport }: IntelligentReportsProps) {
   const [selectedPeriod, setSelectedPeriod] = useState('monthly');
   const [selectedReport, setSelectedReport] = useState('overview');
@@ -66,7 +75,7 @@ export function IntelligentReports({ data, onExport }: IntelligentReportsProps) 
   }, [data.monthlyTrends]);
 
   // KPI 卡片組件
-  const KPICard = ({ title, value, format = 'number', trend, icon: Icon, color = 'blue' }: { title: any; value: any; format?: string; trend?: any; icon: any; color?: string }) => (
+  const KPICard: FC<KPICardProps> = ({ title, value, format = 'number', trend, icon: Icon, color = 'blue' }) => (
     <Card>
       <CardContent className="p-6">
         <div className="flex items-center justify-between">
@@ -82,7 +91,7 @@ export function IntelligentReports({ data, onExport }: IntelligentReportsProps) 
             <Icon className={`h-6 w-6 text-${color}-600`} />
           </div>
         </div>
-        {trend && (
+        {trend !== undefined && (
           <div className="flex items-center mt-2">
             {trend > 0 ? (
               <TrendingUp className="h-4 w-4 text-green-500 mr-1" />
@@ -251,7 +260,7 @@ export function IntelligentReports({ data, onExport }: IntelligentReportsProps) 
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="month" />
                     <YAxis />
-                    <Tooltip formatter={(value) => [`NT$ ${value.toLocaleString()}`, '']} />
+                    <Tooltip formatter={(value) => [`NT$ ${Number(value).toLocaleString()}`, '']} />
                     <Legend />
                     <Line 
                       type="monotone" 
@@ -297,7 +306,7 @@ export function IntelligentReports({ data, onExport }: IntelligentReportsProps) 
                         <Cell key={`cell-${index}`} fill={entry.color} />
                       ))}
                     </Pie>
-                    <Tooltip formatter={(value) => [`NT$ ${value.toLocaleString()}`, '金額']} />
+                    <Tooltip formatter={(value) => [`NT$ ${Number(value).toLocaleString()}`, '金額']} />
                   </PieChart>
                 </ResponsiveContainer>
                 

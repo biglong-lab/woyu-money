@@ -157,15 +157,15 @@ export function CollapsibleCard({
 
 // 響應式資料表格
 interface ResponsiveDataTableProps {
-  data: Array<Record<string, any>>;
+  data: Array<Record<string, unknown>>;
   columns: {
     key: string;
     label: string;
     width?: string;
-    render?: (value: any, row: Record<string, any>) => ReactNode;
+    render?: (value: unknown, row: Record<string, unknown>) => ReactNode;
     hideOnMobile?: boolean;
   }[];
-  onRowClick?: (row: Record<string, any>) => void;
+  onRowClick?: (row: Record<string, unknown>) => void;
   className?: string;
 }
 
@@ -210,7 +210,7 @@ export function ResponsiveDataTable({
                     key={column.key}
                     className="py-3 px-4 text-sm text-gray-900"
                   >
-                    {column.render ? column.render(row[column.key], row) : row[column.key]}
+                    {column.render ? column.render(row[column.key], row) : String(row[column.key] ?? '')}
                   </td>
                 ))}
               </tr>
@@ -240,7 +240,7 @@ export function ResponsiveDataTable({
                         {column.label}:
                       </span>
                       <span className="text-sm text-gray-900 text-right flex-1 min-w-0">
-                        {column.render ? column.render(row[column.key], row) : row[column.key]}
+                        {column.render ? column.render(row[column.key], row) : String(row[column.key] ?? '')}
                       </span>
                     </div>
                   ))}
