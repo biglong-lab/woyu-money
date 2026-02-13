@@ -1,0 +1,217 @@
+/**
+ * Rental API 整合測試
+ * 測試租約 CRUD、價格層級、付款、統計
+ */
+import { describe, it, expect, beforeAll, afterAll } from "vitest"
+import request from "supertest"
+import type { Express } from "express"
+
+const skipIfNoDb = !process.env.DATABASE_URL
+
+async function createTestApp(): Promise<Express> {
+  const express = (await import("express")).default
+  const app = express()
+  app.use(express.json())
+
+  // 模擬認證中間件
+  app.use((req, _res, next) => {
+    const reqWithAuth = req as typeof req & {
+      user: { id: number; username: string; isActive: boolean }
+      isAuthenticated: () => boolean
+      session: Record<string, unknown>
+    }
+    reqWithAuth.user = { id: 1, username: "admin", isActive: true }
+    reqWithAuth.isAuthenticated = () => true
+    reqWithAuth.session = { userId: 1, isAuthenticated: true }
+    next()
+  })
+
+  const rentalRoutes = (await import("../../server/routes/rental")).default
+  app.use(rentalRoutes)
+
+  const { globalErrorHandler } = await import("../../server/middleware/error-handler")
+  app.use(globalErrorHandler)
+  return app
+}
+
+describe.skipIf(skipIfNoDb)("Rental API", () => {
+  let app: Express
+  const createdContractIds: number[] = []
+
+  beforeAll(async () => {
+    app = await createTestApp()
+  })
+
+  afterAll(async () => {
+    for (const id of createdContractIds) {
+      try {
+        await request(app).delete(`/api/rental/contracts/${id}`)
+      } catch {
+        // 忽略清理錯誤
+      }
+    }
+  })
+
+  // ── GET /api/rental/contracts ──────────────────────────────────
+
+  describe("GET /api/rental/contracts - 租約列表", () => {
+    it("應回傳租約陣列", async () => {
+      const res = await request(app)
+        .get("/api/rental/contracts")
+        .expect("Content-Type", /json/)
+        .expect(200)
+
+      expect(Array.isArray(res.body)).toBe(true)
+    })
+  })
+
+  // ── POST /api/rental/contracts ─────────────────────────────────
+
+  describe("POST /api/rental/contracts - 新增租約", () => {
+    it("應成功建立租約並回傳 201", async () => {
+      const timestamp = Date.now()
+      const newContract = {
+        projectId: 1,
+        contractName: `測試合約_${timestamp}`,
+        tenantName: `測試租客_${timestamp}`,
+        startDate: "2026-01-01",
+        endDate: "2026-12-31",
+        totalYears: 1,
+        totalMonths: 12,
+        baseAmount: "15000",
+      }
+
+      const res = await request(app)
+        .post("/api/rental/contracts")
+        .send(newContract)
+        .expect(201)
+
+      expect(res.body).toHaveProperty("id")
+      expect(res.body.contractName).toBe(newContract.contractName)
+      createdContractIds.push(res.body.id)
+    })
+
+    it("缺少必填欄位應回傳 400", async () => {
+      const res = await request(app)
+        .post("/api/rental/contracts")
+        .send({ tenantName: "不完整資料" })
+
+      expect(res.status).toBe(400)
+    })
+  })
+
+  // ── GET /api/rental/contracts/:id ──────────────────────────────
+
+  describe("GET /api/rental/contracts/:id - 單一租約", () => {
+    it("應回傳指定租約", async () => {
+      const contractId = createdContractIds[0]
+      if (!contractId) return
+
+      const res = await request(app)
+        .get(`/api/rental/contracts/${contractId}`)
+        .expect(200)
+
+      expect(res.body).toHaveProperty("id", contractId)
+    })
+
+    it("不存在的租約應回傳 404", async () => {
+      await request(app).get("/api/rental/contracts/999999").expect(404)
+    })
+  })
+
+  // ── PUT /api/rental/contracts/:id ──────────────────────────────
+
+  describe("PUT /api/rental/contracts/:id - 更新租約", () => {
+    it("應成功更新租約", async () => {
+      const contractId = createdContractIds[0]
+      if (!contractId) return
+
+      const res = await request(app)
+        .put(`/api/rental/contracts/${contractId}`)
+        .send({ baseAmount: "18000" })
+        .expect(200)
+
+      expect(res.body).toHaveProperty("id")
+    })
+  })
+
+  // ── GET /api/rental/contracts/:id/price-tiers ──────────────────
+
+  describe("GET /api/rental/contracts/:id/price-tiers - 價格層級", () => {
+    it("應回傳價格層級陣列", async () => {
+      const contractId = createdContractIds[0]
+      if (!contractId) return
+
+      const res = await request(app)
+        .get(`/api/rental/contracts/${contractId}/price-tiers`)
+        .expect(200)
+
+      expect(Array.isArray(res.body)).toBe(true)
+    })
+  })
+
+  // ── GET /api/rental/contracts/:id/payments ─────────────────────
+
+  describe("GET /api/rental/contracts/:id/payments - 租約付款", () => {
+    it("應回傳付款陣列", async () => {
+      const contractId = createdContractIds[0]
+      if (!contractId) return
+
+      const res = await request(app)
+        .get(`/api/rental/contracts/${contractId}/payments`)
+        .expect(200)
+
+      expect(Array.isArray(res.body)).toBe(true)
+    })
+  })
+
+  // ── GET /api/rental/stats ──────────────────────────────────────
+
+  describe("GET /api/rental/stats - 租約統計", () => {
+    it("應回傳統計資料", async () => {
+      const res = await request(app)
+        .get("/api/rental/stats")
+        .expect("Content-Type", /json/)
+        .expect(200)
+
+      expect(res.body).toBeDefined()
+    })
+  })
+
+  // ── GET /api/rental/payments ───────────────────────────────────
+
+  describe("GET /api/rental/payments - 所有租金付款", () => {
+    it("應回傳租金付款陣列", async () => {
+      const res = await request(app)
+        .get("/api/rental/payments")
+        .expect(200)
+
+      expect(Array.isArray(res.body)).toBe(true)
+    })
+  })
+
+  // ── DELETE /api/rental/contracts/:id ────────────────────────────
+
+  describe("DELETE /api/rental/contracts/:id - 刪除租約", () => {
+    it("應成功刪除租約", async () => {
+      const timestamp = Date.now()
+      const createRes = await request(app)
+        .post("/api/rental/contracts")
+        .send({
+          projectId: 1,
+          contractName: `待刪除合約_${timestamp}`,
+          tenantName: `待刪除租客_${timestamp}`,
+          startDate: "2026-06-01",
+          endDate: "2026-12-31",
+          totalYears: 1,
+          totalMonths: 7,
+          baseAmount: "10000",
+        })
+        .expect(201)
+
+      await request(app)
+        .delete(`/api/rental/contracts/${createRes.body.id}`)
+        .expect(200)
+    })
+  })
+})
