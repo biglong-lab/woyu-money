@@ -1,0 +1,7 @@
+dist
+build
+node_modules
+uploads
+database_backup
+drizzle
+*.md

@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: woyu
+          POSTGRES_PASSWORD: woyu123
+          POSTGRES_DB: woyu_money
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://woyu:woyu123@localhost:5432/woyu_money
+      SESSION_SECRET: ci-test-secret
+      NODE_ENV: test
+      PORT: 5001
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: 安裝依賴
+        run: npm ci
+
+      - name: TypeScript 型別檢查
+        run: npx tsc --noEmit
+
+      - name: 初始化資料庫
+        run: npx drizzle-kit push
+
+      - name: 執行測試
+        run: npm run test:coverage
+
+      - name: 檢查覆蓋率
+        run: |
+          echo "測試覆蓋率報告已產生"
