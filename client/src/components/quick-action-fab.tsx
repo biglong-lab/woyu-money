@@ -14,6 +14,7 @@ import {
   Camera,
   DollarSign,
   FileText,
+  Bot,
 } from "lucide-react";
 
 interface QuickActionFABProps {
