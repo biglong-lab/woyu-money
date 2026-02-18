@@ -13,7 +13,7 @@ export const aiSettings = pgTable("ai_settings", {
   apiKey: text("api_key"),
   // 選用的模型（OpenRouter model ID）
   selectedModel: varchar("selected_model", { length: 150 })
-    .default("google/gemini-2.0-flash-exp:free"),
+    .default("meta-llama/llama-3.3-70b-instruct:free"),
   // 是否啟用 AI 助手浮動按鈕
   isEnabled: boolean("is_enabled").default(true),
   // 自訂系統提示詞補充（可選）
