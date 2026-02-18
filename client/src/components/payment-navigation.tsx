@@ -30,6 +30,12 @@ const navigationItems = [
     description: "查看專案收款記錄與趨勢分析"
   },
   {
+    title: "PMS vs PM 比對",
+    href: "/revenue/compare",
+    icon: Activity,
+    description: "PMS 與 PM 月度收入差距分析"
+  },
+  {
     title: "專案子分類管理",
     href: "/project/subcategory",
     icon: Building2,
