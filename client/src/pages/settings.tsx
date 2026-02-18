@@ -7,6 +7,7 @@ import SettingsCategoriesTab from "@/components/settings-categories-tab";
 import SettingsProjectsTab from "@/components/settings-projects-tab";
 import SettingsLineConfigTab from "@/components/settings-line-config-tab";
 import SettingsAdminTab from "@/components/settings-admin-tab";
+import { SettingsAiTab } from "@/components/settings-ai-tab";
 
 export default function Settings() {
   const [activeTab, setActiveTab] = useState("categories");
