@@ -383,112 +383,86 @@ export default function RevenueCompare() {
               <TableBody>
                 {comparison.map((row) => {
                   const isExpanded = expandedMonth === row.month
-                  const absDiff   = Math.abs(row.diff)
                   const diffColor =
-                    row.status === "insufficient_pm"  ? "text-gray-400" :
-                    row.status === "match"             ? "text-green-600" :
-                    row.diff > 0                       ? "text-orange-500" : "text-red-500"
+                    row.status === "insufficient_pm" ? "text-gray-400" :
+                    row.status === "match"            ? "text-green-600" :
+                    row.diff > 0                      ? "text-orange-500" : "text-red-500"
+                  const hasBranches = row.pms.branchDetail.length > 0
 
                   return (
                     <>
-                      <Collapsible
+                      {/* 主列 */}
+                      <TableRow
                         key={row.month}
-                        open={isExpanded}
-                        onOpenChange={(open) => setExpandedMonth(open ? row.month : null)}
-                        asChild
+                        className={`cursor-pointer hover:bg-muted/50 ${isExpanded ? "bg-muted/30" : ""}`}
+                        onClick={() => setExpandedMonth(isExpanded ? null : row.month)}
                       >
-                        <>
-                          <CollapsibleTrigger asChild>
-                            <TableRow className="cursor-pointer hover:bg-muted/50">
-                              {/* 展開按鈕 */}
-                              <TableCell className="w-8 py-2 pl-4">
-                                {row.pms.branchDetail.length > 0
-                                  ? isExpanded
-                                    ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-                                    : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
-                                  : null}
-                              </TableCell>
+                        <TableCell className="w-8 py-2 pl-4">
+                          {hasBranches
+                            ? isExpanded
+                              ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                              : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                            : null}
+                        </TableCell>
 
-                              {/* 月份 */}
-                              <TableCell className="py-2 font-medium text-sm">{row.month}</TableCell>
+                        <TableCell className="py-2 font-medium text-sm">{row.month}</TableCell>
 
-                              {/* PMS */}
-                              <TableCell className="text-right py-2">
-                                <div className="font-semibold text-blue-600 text-sm">
-                                  {fmtM(row.pms.total)}
-                                </div>
-                                <div className="text-xs text-muted-foreground">
-                                  {row.pms.branches} 分店
-                                </div>
-                              </TableCell>
+                        <TableCell className="text-right py-2">
+                          <div className="font-semibold text-blue-600 text-sm">{fmtM(row.pms.total)}</div>
+                          <div className="text-xs text-muted-foreground">{row.pms.branches} 分店</div>
+                        </TableCell>
 
-                              {/* PM */}
-                              <TableCell className="text-right py-2">
-                                <div className={`font-semibold text-sm ${row.status === "insufficient_pm" ? "text-gray-400" : "text-emerald-600"}`}>
-                                  {row.status === "insufficient_pm"
-                                    ? <span className="text-xs text-muted-foreground">({row.pm.records} 筆，資料不足)</span>
-                                    : fmtM(row.pm.total)}
-                                </div>
-                                {row.status !== "insufficient_pm" && (
-                                  <div className="text-xs text-muted-foreground">
-                                    {row.pm.records.toLocaleString()} 筆
-                                  </div>
-                                )}
-                              </TableCell>
-
-                              {/* 差距 */}
-                              <TableCell className="text-right py-2">
-                                {row.status === "insufficient_pm" ? (
-                                  <span className="text-xs text-muted-foreground">–</span>
-                                ) : (
-                                  <>
-                                    <span className={`font-semibold text-sm ${diffColor}`}>
-                                      {fmtDiff(row.diff)}
-                                    </span>
-                                    {row.diffPct !== null && (
-                                      <div className={`text-xs ${diffColor}`}>
-                                        {row.diff >= 0 ? "+" : ""}{row.diffPct?.toFixed(1)}%
-                                      </div>
-                                    )}
-                                  </>
-                                )}
-                              </TableCell>
-
-                              {/* 狀態 */}
-                              <TableCell className="text-center py-2">
-                                {statusBadge(row.status, row.diff)}
-                              </TableCell>
-                            </TableRow>
-                          </CollapsibleTrigger>
-
-                          {/* 分店明細展開 */}
-                          <CollapsibleContent asChild>
+                        <TableCell className="text-right py-2">
+                          {row.status === "insufficient_pm" ? (
+                            <span className="text-xs text-muted-foreground">({row.pm.records} 筆，資料不足)</span>
+                          ) : (
                             <>
-                              {row.pms.branchDetail.map((b) => (
-                                <TableRow
-                                  key={`${row.month}-${b.branchId}`}
-                                  className="bg-blue-50/50 dark:bg-blue-950/10"
-                                >
-                                  <TableCell />
-                                  <TableCell className="py-1.5 pl-8 text-xs text-muted-foreground">
-                                    <span className="font-mono bg-blue-100 dark:bg-blue-900 px-1.5 py-0.5 rounded text-blue-700 dark:text-blue-300 mr-2">
-                                      {b.branchCode}
-                                    </span>
-                                    {b.branchName}
-                                    <span className="ml-2 text-gray-400 text-[11px]">
-                                      ({b.lastDate})
-                                    </span>
-                                  </TableCell>
-                                  <TableCell className="text-right py-1.5 text-sm text-blue-600 font-medium">
-                                    {fmtM(b.revenue)}
-                                  </TableCell>
-                                  <TableCell colSpan={3} />
-                                </TableRow>
-                              ))}
+                              <div className="font-semibold text-emerald-600 text-sm">{fmtM(row.pm.total)}</div>
+                              <div className="text-xs text-muted-foreground">{row.pm.records.toLocaleString()} 筆</div>
                             </>
-                          </CollapsibleContent>
-                        </>
-                      </Collapsible>
+                          )}
+                        </TableCell>
+
+                        <TableCell className="text-right py-2">
+                          {row.status === "insufficient_pm" ? (
+                            <span className="text-xs text-muted-foreground">–</span>
+                          ) : (
+                            <>
+                              <span className={`font-semibold text-sm ${diffColor}`}>{fmtDiff(row.diff)}</span>
+                              {row.diffPct !== null && (
+                                <div className={`text-xs ${diffColor}`}>
+                                  {row.diff >= 0 ? "+" : ""}{row.diffPct?.toFixed(1)}%
+                                </div>
+                              )}
+                            </>
+                          )}
+                        </TableCell>
+
+                        <TableCell className="text-center py-2">
+                          {statusBadge(row.status, row.diff)}
+                        </TableCell>
+                      </TableRow>
+
+                      {/* 分店明細展開列 */}
+                      {isExpanded && row.pms.branchDetail.map((b) => (
+                        <TableRow
+                          key={`${row.month}-${b.branchId}`}
+                          className="bg-blue-50/40 dark:bg-blue-950/10"
+                        >
+                          <TableCell />
+                          <TableCell className="py-1.5 pl-8 text-xs text-muted-foreground">
+                            <span className="font-mono bg-blue-100 dark:bg-blue-900/50 px-1.5 py-0.5 rounded text-blue-700 dark:text-blue-300 mr-2">
+                              {b.branchCode}
+                            </span>
+                            {b.branchName}
+                            <span className="ml-2 text-gray-400 text-[11px]">({b.lastDate})</span>
+                          </TableCell>
+                          <TableCell className="text-right py-1.5 text-sm text-blue-600 font-medium">
+                            {fmtM(b.revenue)}
+                          </TableCell>
+                          <TableCell colSpan={3} />
+                        </TableRow>
+                      ))}
                     </>
                   )
                 })}
