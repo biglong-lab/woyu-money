@@ -691,6 +691,30 @@ router.post(
         return
       }
 
+      // 偵測模型用文字輸出 tool_code block（Gemma 等模型的 fallback 行為）
+      if (toolCalls.length === 0 && assistantContent.includes("tool_code")) {
+        const toolCodeMatch = assistantContent.match(/```tool_code\s*([\s\S]*?)```/)
+        if (toolCodeMatch) {
+          try {
+            const parsed = JSON.parse(toolCodeMatch[1].trim())
+            const calls = Array.isArray(parsed) ? parsed : [parsed]
+            for (const call of calls) {
+              const name = call.function ?? call.name ?? ""
+              const args = call.parameters ?? call.arguments ?? call.args ?? {}
+              if (name) {
+                toolCalls.push({
+                  id: `tc_text_${Date.now()}`,
+                  type: "function",
+                  function: { name, arguments: JSON.stringify(args) },
+                })
+              }
+            }
+            // 把 code block 從顯示內容中移除
+            assistantContent = assistantContent.replace(/```tool_code[\s\S]*?```/g, "").trim()
+          } catch { /* 解析失敗就當作一般文字 */ }
+        }
+      }
+
       // 沒有工具調用 → 對話結束
       if (toolCalls.length === 0) {
         sendEvent({ type: "done" })
