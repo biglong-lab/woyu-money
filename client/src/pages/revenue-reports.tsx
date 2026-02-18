@@ -301,26 +301,23 @@ export default function RevenueReports() {
                 </CardContent>
               </Card>
 
-              {/* 近期收款記錄 */}
+              {/* 近期每日收款（含所有來源） */}
               <Card>
                 <CardHeader>
-                  <CardTitle>近期收款記錄</CardTitle>
-                  <CardDescription>最新 10 筆收款記錄</CardDescription>
+                  <CardTitle>近期每日收款</CardTitle>
+                  <CardDescription>最近 10 天收款彙總（含 PM 系統 + 手動輸入）</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-3">
-                    {dailyRevenues.slice(0, 10).map((revenue) => (
-                      <div key={revenue.id} className="flex items-center justify-between p-2 border rounded">
-                        <div>
-                          <div className="font-medium">{revenue.description || '收款記錄'}</div>
-                          <div className="text-sm text-gray-500">{revenue.date}</div>
-                        </div>
+                  <div className="space-y-2">
+                    {[...dailyTrend].reverse().slice(0, 10).map((item) => (
+                      <div key={item.date} className="flex items-center justify-between p-2 border rounded hover:bg-gray-50">
+                        <div className="text-sm font-medium text-gray-700">{item.date}</div>
                         <div className="font-bold text-green-600">
-                          NT$ {parseInt(revenue.amount).toLocaleString()}
+                          NT$ {item.totalRevenue.toLocaleString()}
                         </div>
                       </div>
                     ))}
-                    {dailyRevenues.length === 0 && (
+                    {dailyTrend.length === 0 && (
                       <div className="text-center py-6 text-gray-500">
                         尚無收款記錄
                       </div>
