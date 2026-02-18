@@ -72,12 +72,19 @@ interface YearlyComparisonItem {
   totalRevenue: number
 }
 
-// 每日收款記錄
+// 每日收款記錄（手動新增）
 interface DailyRevenueRecord {
   id: number
   description: string | null
   date: string
   amount: string
+}
+
+// 來源統計
+interface RevenueSource {
+  sourceType: string
+  totalRevenue: number
+  recordCount: number
 }
 
 // 處理後的年度資料
