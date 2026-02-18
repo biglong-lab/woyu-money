@@ -478,7 +478,7 @@ function PmSyncDialog({ onClose, onDone }: { onClose: () => void; onDone: () => 
                   <SelectValue placeholder="所有館舍" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">所有館舍</SelectItem>
+                  <SelectItem value="all">所有館舍</SelectItem>
                   {companies.map((c) => (
                     <SelectItem key={c.id} value={c.id.toString()}>
                       {c.name}
