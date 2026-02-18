@@ -84,6 +84,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use(pmBridgeRoutes)
   app.use(pmsBridgeRoutes)
   app.use(dailyRevenueRoutes)
+  app.use(aiAssistantRoutes)
 
   const httpServer = createServer(app)
   return httpServer
