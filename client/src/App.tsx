@@ -141,11 +141,19 @@ function Router() {
               </Switch>
             </main>
             {/* 浮動快速操作按鈕 */}
-            <QuickActionFAB onQuickPayment={() => setQuickPaymentOpen(true)} />
+            <QuickActionFAB
+              onQuickPayment={() => setQuickPaymentOpen(true)}
+              onOpenAi={() => setAiSheetOpen(true)}
+            />
             {/* 快速付款對話框 */}
             <QuickPaymentDialog
               open={quickPaymentOpen}
               onOpenChange={setQuickPaymentOpen}
+            />
+            {/* AI 助手側邊抽屜 */}
+            <AiAssistantSheet
+              open={aiSheetOpen}
+              onOpenChange={setAiSheetOpen}
             />
             {/* 手機版底部導航欄 */}
             <MobileTabBar />
