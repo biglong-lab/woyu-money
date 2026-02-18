@@ -23,6 +23,7 @@ import documentInboxRoutes from "./document-inbox"
 import invoiceRoutes from "./invoice"
 import hrCostRoutes from "./hr-costs"
 import reportRoutes from "./reports"
+import incomeRoutes from "./income"
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // 設定認證系統
