@@ -49,7 +49,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       "/api/line/login",
       "/api/line/callback",
     ]
-    const isPublic = publicPaths.some((p) => req.path === p)
+    // Webhook 接收端點：以 /api/income/webhook/ 開頭的 POST 請求不需 session 認證
+    // （改用 secret/token 驗證，在路由層處理）
+    const isWebhookReceiver =
+      req.method === "POST" && req.path.startsWith("/income/webhook/")
+
+    const isPublic = publicPaths.some((p) => req.path === p) || isWebhookReceiver
     if (isPublic) return next()
     return requireAuth(req, res, next)
   })
