@@ -82,20 +82,27 @@ function buildRevenueUnionSQL(startDate?: string, endDate?: string) {
 
   // income_webhooks 透過 income_sources.default_project_id 取 project_name
   // 僅取 pending（待確認）和 confirmed（已確認），排除 rejected / duplicate / error
+  //
+  // 注意：parsed_paid_at 欄位型別為 timestamp without time zone，
+  //       直接用 AT TIME ZONE 會造成日期跑掉（-8h）。
+  //       改用 raw_payload->>'date' 取台灣日期（pm-bridge 已修正為 UTC+8）；
+  //       其他來源若無 raw_payload.date 則 fallback 回 parsed_paid_at::date。
   const webhookSql = `
     SELECT
-      TO_CHAR(iw.parsed_paid_at AT TIME ZONE 'Asia/Taipei', 'YYYY-MM-DD') AS date,
-      iw.parsed_amount_twd::numeric AS amount,
+      COALESCE(
+        iw.raw_payload->>'date',
+        iw.parsed_paid_at::date::text
+      )                                                          AS date,
+      iw.parsed_amount_twd::numeric                             AS amount,
       COALESCE(pp.project_name, iw.parsed_payer_name, '未分類') AS project_name,
       COALESCE(src.source_type, 'api_sync')                    AS source_type,
-      iw.parsed_description AS description
+      iw.parsed_description                                     AS description
     FROM income_webhooks iw
     LEFT JOIN income_sources src ON src.id = iw.source_id
     LEFT JOIN payment_projects pp ON pp.id = src.default_project_id
     WHERE iw.status IN ('pending', 'confirmed')
-      AND iw.parsed_paid_at IS NOT NULL
       AND iw.parsed_amount_twd IS NOT NULL
-      ${dateFilter("TO_CHAR(iw.parsed_paid_at AT TIME ZONE 'Asia/Taipei', 'YYYY-MM-DD')")}
+      ${dateFilter("COALESCE(iw.raw_payload->>'date', iw.parsed_paid_at::date::text)")}
   `
 
   return `(${manualSql}) UNION ALL (${webhookSql})`
