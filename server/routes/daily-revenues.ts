@@ -389,31 +389,55 @@ router.get(
 )
 
 /** GET /api/revenue/reports/sources
- *  各來源（PM/手動/...）的收入統計，方便未來追蹤哪個系統貢獻多少
+ *  各來源系統的收入統計，直接查 income_sources 取正確名稱
+ *  回傳：PM / PMS / 手動 各自的金額與筆數
  */
 router.get(
   "/api/revenue/reports/sources",
   asyncHandler(async (req, res) => {
     const startDate = parseOptionalDate(req.query.startDate)
-    const endDate = parseOptionalDate(req.query.endDate)
+    const endDate   = parseOptionalDate(req.query.endDate)
 
-    const unionSql = buildRevenueUnionSQL(startDate, endDate)
+    const dateWhere = [
+      startDate ? `AND COALESCE(iw.raw_payload->>'date', iw.parsed_paid_at::date::text) >= '${startDate}'` : "",
+      endDate   ? `AND COALESCE(iw.raw_payload->>'date', iw.parsed_paid_at::date::text) <= '${endDate}'`   : "",
+    ].join(" ")
 
     const result = await db.execute(sql.raw(`
       SELECT
-        source_type,
-        SUM(amount)::numeric AS total_revenue,
-        COUNT(*)::int        AS record_count
-      FROM (${unionSql}) AS combined
-      GROUP BY source_type
+        src.source_name   AS source_name,
+        src.source_key    AS source_key,
+        COUNT(*)::int     AS record_count,
+        SUM(iw.parsed_amount_twd::numeric)::numeric AS total_revenue
+      FROM income_webhooks iw
+      JOIN income_sources src ON src.id = iw.source_id
+      WHERE iw.status IN ('pending', 'confirmed')
+        AND iw.parsed_amount_twd IS NOT NULL
+        ${dateWhere}
+      GROUP BY src.source_name, src.source_key
+      UNION ALL
+      SELECT
+        '手動輸入'  AS source_name,
+        'manual'   AS source_key,
+        COUNT(*)::int AS record_count,
+        SUM(dr.amount::numeric)::numeric AS total_revenue
+      FROM daily_revenues dr
+      WHERE 1=1
+        ${startDate ? `AND dr.date >= '${startDate}'` : ""}
+        ${endDate   ? `AND dr.date <= '${endDate}'`   : ""}
+      HAVING COUNT(*) > 0
       ORDER BY total_revenue DESC
     `))
 
     res.json(
-      (result.rows as Array<{ source_type: string; total_revenue: string; record_count: number }>).map((r) => ({
-        sourceType: r.source_type,
+      (result.rows as Array<{
+        source_name: string; source_key: string
+        total_revenue: string; record_count: number
+      }>).map((r) => ({
+        sourceName:   r.source_name,
+        sourceKey:    r.source_key,
         totalRevenue: Number(r.total_revenue),
-        recordCount: r.record_count,
+        recordCount:  r.record_count,
       }))
     )
   })
