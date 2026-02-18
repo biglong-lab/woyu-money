@@ -4,14 +4,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { 
-  DollarSign, 
-  TrendingUp, 
-  Calendar, 
+import {
+  DollarSign,
+  TrendingUp,
+  Calendar,
   Building2,
   BarChart3,
   PieChart as PieChartIcon,
-  LineChart as LineChartIcon
+  LineChart as LineChartIcon,
+  Plug
 } from "lucide-react";
 import { 
   LineChart, 
