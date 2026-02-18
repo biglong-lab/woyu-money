@@ -51,6 +51,8 @@ import HRCostReports from "@/pages/hr-cost-reports";
 import TaxReports from "@/pages/tax-reports";
 import HouseholdBudget from "@/pages/household-budget";
 import HouseholdCategoryManagement from "@/pages/household-category-management";
+import IncomeSourcesManagement from "@/pages/income-sources-management";
+import IncomeWebhooksInbox from "@/pages/income-webhooks-inbox";
 
 function Router() {
   const [quickPaymentOpen, setQuickPaymentOpen] = useState(false);
