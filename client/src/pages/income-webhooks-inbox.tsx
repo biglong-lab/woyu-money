@@ -360,6 +360,179 @@ function BatchConfirmDialog({
   )
 }
 
+// ─── PM 同步 Dialog ───────────────────────────────
+interface PmCompany {
+  id: number
+  name: string
+}
+
+interface SyncResult {
+  synced: number
+  skipped: number
+  errors: number
+  period: { startDate: string; endDate: string }
+}
+
+function PmSyncDialog({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
+  const { toast } = useToast()
+
+  // 預設：本月 1 日到今天
+  const today = new Date()
+  const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1)
+  const fmtDate = (d: Date) => d.toISOString().slice(0, 10)
+
+  const [startDate, setStartDate] = useState(fmtDate(firstOfMonth))
+  const [endDate, setEndDate] = useState(fmtDate(today))
+  const [companyId, setCompanyId] = useState("")
+  const [lastResult, setLastResult] = useState<SyncResult | null>(null)
+
+  const { data: companies = [] } = useQuery<PmCompany[]>({
+    queryKey: ["/api/pm-bridge/companies"],
+    staleTime: 5 * 60 * 1000,
+  })
+
+  const { data: status } = useQuery<{
+    pm: { connected: boolean; error: string | null; totalRevenues: number | null }
+    money: { sourceId: number | null; importedCount: number }
+  }>({
+    queryKey: ["/api/pm-bridge/status"],
+    staleTime: 10000,
+  })
+
+  const syncMutation = useMutation<SyncResult, Error, void>({
+    mutationFn: () =>
+      apiRequest("POST", "/api/pm-bridge/sync", {
+        startDate,
+        endDate,
+        companyId: companyId ? parseInt(companyId) : undefined,
+      }) as Promise<SyncResult>,
+    onSuccess: (data) => {
+      setLastResult(data)
+      if (data.synced > 0) {
+        queryClient.invalidateQueries({ queryKey: ["/api/income/webhooks"] })
+        queryClient.invalidateQueries({ queryKey: ["/api/income/webhooks/pending-count"] })
+        queryClient.invalidateQueries({ queryKey: ["/api/pm-bridge/status"] })
+      }
+      toast({
+        title: `同步完成`,
+        description: `新增 ${data.synced} 筆，略過 ${data.skipped} 筆${data.errors > 0 ? `，${data.errors} 筆錯誤` : ""}`,
+      })
+    },
+    onError: (err) => {
+      toast({ title: "同步失敗", description: err.message, variant: "destructive" })
+    },
+  })
+
+  const pmOk = status?.pm.connected
+
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Building2 className="h-5 w-5 text-blue-600" />
+            從 PM 旅館系統同步收入
+          </DialogTitle>
+          <DialogDescription>
+            唯讀讀取 PM 系統的收入記錄，轉入待確認收件箱。
+            不會修改 PM 任何資料。
+          </DialogDescription>
+        </DialogHeader>
+
+        {/* 連線狀態 */}
+        <div className={`flex items-center gap-2 text-sm rounded-md p-2 ${
+          pmOk ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"
+        }`}>
+          <div className={`h-2 w-2 rounded-full ${pmOk ? "bg-green-500" : "bg-red-500"}`} />
+          {pmOk
+            ? `PM 系統已連線（共 ${status?.pm.totalRevenues ?? 0} 筆收入）`
+            : `無法連線：${status?.pm.error ?? "檢查中..."}`}
+        </div>
+
+        {/* 已匯入數 */}
+        {status?.money.importedCount !== undefined && (
+          <p className="text-xs text-muted-foreground">
+            已匯入 {status.money.importedCount} 筆到進帳收件箱
+          </p>
+        )}
+
+        <div className="space-y-3">
+          {/* 日期範圍 */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>起始日期</Label>
+              <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>結束日期</Label>
+              <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+            </div>
+          </div>
+
+          {/* 館舍篩選 */}
+          {companies.length > 0 && (
+            <div className="space-y-1.5">
+              <Label>館舍（選填）</Label>
+              <Select value={companyId} onValueChange={setCompanyId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="所有館舍" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">所有館舍</SelectItem>
+                  {companies.map((c) => (
+                    <SelectItem key={c.id} value={c.id.toString()}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+        </div>
+
+        {/* 上次結果 */}
+        {lastResult && (
+          <div className="bg-gray-50 rounded-md p-3 text-sm space-y-1">
+            <p className="font-medium">上次同步結果</p>
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div>
+                <p className="text-lg font-bold text-green-600">{lastResult.synced}</p>
+                <p className="text-xs text-muted-foreground">新增</p>
+              </div>
+              <div>
+                <p className="text-lg font-bold text-gray-400">{lastResult.skipped}</p>
+                <p className="text-xs text-muted-foreground">略過</p>
+              </div>
+              <div>
+                <p className="text-lg font-bold text-red-500">{lastResult.errors}</p>
+                <p className="text-xs text-muted-foreground">錯誤</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <DialogFooter className="gap-2">
+          <Button variant="outline" onClick={onClose}>
+            關閉
+          </Button>
+          <Button
+            disabled={!pmOk || syncMutation.isPending}
+            onClick={() => syncMutation.mutate()}
+            className="gap-2"
+          >
+            {syncMutation.isPending ? (
+              <RefreshCw className="h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4" />
+            )}
+            {syncMutation.isPending ? "同步中..." : "開始同步"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 // ─── 主頁面 ──────────────────────────────────────
 export default function IncomeWebhooksInboxPage() {
   const { toast } = useToast()
