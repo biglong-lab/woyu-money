@@ -605,17 +605,25 @@ router.post(
       }
     }
 
+    // 使用模型（優先選用設定的，429 時切換備用）
+    const primaryModel = settings.selectedModel ?? "google/gemma-3-27b-it:free"
+    const fallbackModels = [
+      "google/gemma-3-27b-it:free",
+      "google/gemma-3-12b-it:free",
+      "meta-llama/llama-3.3-70b-instruct:free",
+    ].filter(m => m !== primaryModel)
+    let activeModel = primaryModel
+
     // 工具調用循環（最多 5 輪）
     for (let round = 0; round < 5; round++) {
       let assistantContent = ""
       const toolCalls: ToolCallItem[] = []
-      let currentToolCall: {
-        id: string; name: string; argsRaw: string
-      } | null = null
+      // 用 Map<index, ToolCallItem> 追蹤多個並行工具呼叫
+      const toolCallMap = new Map<number, { id: string; name: string; argsRaw: string }>()
 
       try {
         const stream = await client.chat.completions.create({
-          model: settings.selectedModel ?? "google/gemini-2.0-flash-exp:free",
+          model: activeModel,
           messages: chatMessages,
           tools: AI_TOOLS,
           tool_choice: "auto",
@@ -632,37 +640,49 @@ router.post(
             sendEvent({ type: "delta", content: delta.content })
           }
 
-          // 工具調用 delta
+          // 工具調用 delta — 用 index 追蹤每個工具
           if (delta.tool_calls) {
             for (const tc of delta.tool_calls) {
-              if (tc.index !== undefined && tc.function?.name) {
-                // 開始新的工具調用
-                currentToolCall = {
-                  id: tc.id ?? `tc_${Date.now()}`,
-                  name: tc.function.name,
-                  argsRaw: tc.function.arguments ?? "",
-                }
-              } else if (currentToolCall && tc.function?.arguments) {
-                currentToolCall.argsRaw += tc.function.arguments
+              const idx = tc.index ?? 0
+              const existing = toolCallMap.get(idx)
+              if (!existing) {
+                // 第一次出現這個 index：建立新工具呼叫
+                toolCallMap.set(idx, {
+                  id: tc.id ?? `tc_${Date.now()}_${idx}`,
+                  name: tc.function?.name ?? "",
+                  argsRaw: tc.function?.arguments ?? "",
+                })
+              } else {
+                // 累積 arguments 片段
+                if (tc.id && !existing.id) existing.id = tc.id
+                if (tc.function?.name && !existing.name) existing.name = tc.function.name
+                if (tc.function?.arguments) existing.argsRaw += tc.function.arguments
               }
             }
           }
+        }
 
-          // 完成原因
-          const finishReason = chunk.choices[0]?.finish_reason
-          if (finishReason === "tool_calls" && currentToolCall) {
+        // 串流結束後，將 toolCallMap 轉成 toolCalls 陣列
+        for (const [, tc] of Array.from(toolCallMap.entries()).sort(([a], [b]) => a - b)) {
+          if (tc.name) {
             toolCalls.push({
-              id: currentToolCall.id,
+              id: tc.id,
               type: "function",
-              function: {
-                name: currentToolCall.name,
-                arguments: currentToolCall.argsRaw,
-              },
+              function: { name: tc.name, arguments: tc.argsRaw || "{}" },
             })
-            currentToolCall = null
           }
         }
+
       } catch (err) {
+        const apiErr = err as { status?: number; error?: { code?: number } }
+        const status = apiErr?.status ?? apiErr?.error?.code
+        // 429 rate-limit：切換備用模型重試
+        if (status === 429 && fallbackModels.length > 0) {
+          const next = fallbackModels.shift()!
+          activeModel = next
+          sendEvent({ type: "delta", content: "" }) // 保持連線
+          continue
+        }
         const msg = err instanceof Error ? err.message : "AI 請求失敗"
         sendEvent({ type: "error", message: msg })
         res.end()
