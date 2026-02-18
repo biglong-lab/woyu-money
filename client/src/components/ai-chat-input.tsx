@@ -67,6 +67,7 @@ export function AiChatInput({ onSend, isStreaming, onStop, disabled }: AiChatInp
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault()
+        e.stopPropagation() // 防止 Enter 事件冒泡到 Sheet，導致 Sheet 關閉
         handleSend()
       }
     },
