@@ -27,11 +27,12 @@ export default function Settings() {
 
       {/* 主要內容 */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="categories">分類管理</TabsTrigger>
           <TabsTrigger value="projects">專案管理</TabsTrigger>
           <TabsTrigger value="line-config">LINE設定</TabsTrigger>
           <TabsTrigger value="admin">系統管理</TabsTrigger>
+          <TabsTrigger value="ai">AI 助手</TabsTrigger>
         </TabsList>
 
         {/* 分類管理 */}
