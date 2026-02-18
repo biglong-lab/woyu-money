@@ -85,6 +85,23 @@ const navigationItems = [
     ]
   },
   {
+    category: "人事管理",
+    items: [
+      {
+        title: "員工設定",
+        href: "/hr-cost-management",
+        icon: Users,
+        description: "員工資料、薪資設定、保險投保"
+      },
+      {
+        title: "人事費報表",
+        href: "/hr-cost-reports",
+        icon: ClipboardList,
+        description: "月度人事費用彙總與分析"
+      }
+    ]
+  },
+  {
     category: "系統管理",
     items: [
       {
