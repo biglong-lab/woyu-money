@@ -19,6 +19,7 @@ import {
 
 interface QuickActionFABProps {
   onQuickPayment: () => void;
+  onOpenAi?: () => void;
 }
 
 export function QuickActionFAB({ onQuickPayment }: QuickActionFABProps) {
