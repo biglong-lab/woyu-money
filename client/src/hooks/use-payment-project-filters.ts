@@ -248,7 +248,7 @@ export function usePaymentProjectFilters(): UsePaymentProjectFiltersReturn {
     setDateRange("currentMonth");
     setDateFilterType("itemDate");
     setSelectedYear(new Date().getFullYear());
-    setSelectedMonth(new Date().getMonth() + 1);
+    setSelectedMonth(new Date().getMonth()); // 0-indexed，與 JS Date.getMonth() 保持一致
     setStartDate("");
     setEndDate("");
     setPriorityFilter("all");
