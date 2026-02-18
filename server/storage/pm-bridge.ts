@@ -212,7 +212,7 @@ export async function syncPmRevenues(
       const rawPayload = {
         _source: "pm-bridge",
         pm_id: rev.id,
-        date: dateStr,
+        date: dateStr, // 台灣日期 (UTC+8)
         source: rev.source,
         amount: rev.amount,
         description: rev.description,
