@@ -497,7 +497,7 @@ router.post(
       baseURL: "https://openrouter.ai/api/v1",
       defaultHeaders: {
         "HTTP-Referer": "http://localhost:5001",
-        "X-Title": "浯島財務管理系統",
+        "X-Title": "WuDao Finance System",
       },
     })
 
@@ -539,7 +539,7 @@ router.post(
       baseURL: "https://openrouter.ai/api/v1",
       defaultHeaders: {
         "HTTP-Referer": "http://localhost:5001",
-        "X-Title": "浯島財務管理系統",
+        "X-Title": "WuDao Finance System",
       },
     })
 
