@@ -239,17 +239,23 @@ export default function RevenueReports() {
 
         {/* 來源統計提示條 */}
         {revenueSources.length > 0 && (
-          <div className="flex flex-wrap gap-2 items-center text-sm text-gray-600 bg-blue-50 border border-blue-200 rounded-lg px-4 py-2">
+          <div className="flex flex-wrap gap-2 items-center text-sm bg-blue-50 border border-blue-200 rounded-lg px-4 py-2">
             <Plug className="h-4 w-4 text-blue-500 flex-shrink-0" />
-            <span className="text-blue-700 font-medium">資料來源：</span>
-            {revenueSources.map((s) => (
-              <Badge key={s.sourceType} variant="secondary" className="bg-blue-100 text-blue-700">
-                {s.sourceType === "manual" ? "手動輸入" :
-                 s.sourceType === "custom_api" ? "PM 系統" :
-                 s.sourceType}
-                &nbsp;·&nbsp;{s.recordCount} 筆 NT${s.totalRevenue.toLocaleString()}
-              </Badge>
-            ))}
+            <span className="text-blue-700 font-medium text-sm">資料來源：</span>
+            {revenueSources.map((s) => {
+              const color =
+                s.sourceKey === "pms-bridge" ? "bg-blue-100 text-blue-800" :
+                s.sourceKey === "pm-bridge"  ? "bg-emerald-100 text-emerald-800" :
+                s.sourceKey === "manual"     ? "bg-gray-100 text-gray-700" :
+                "bg-purple-100 text-purple-800"
+              return (
+                <Badge key={s.sourceKey} variant="secondary" className={color}>
+                  {s.sourceName}
+                  &nbsp;·&nbsp;{s.recordCount.toLocaleString()} 筆
+                  &nbsp;NT${Math.round(s.totalRevenue).toLocaleString()}
+                </Badge>
+              )
+            })}
           </div>
         )}
 
