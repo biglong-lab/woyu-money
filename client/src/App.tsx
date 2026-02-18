@@ -118,6 +118,10 @@ function Router() {
                 {/* Household Management */}
                 <ProtectedRoute path="/household-budget" component={HouseholdBudget} />
                 <ProtectedRoute path="/household-category-management" component={HouseholdCategoryManagement} />
+
+                {/* Income Webhook Gateway — 進帳多系統接入 */}
+                <ProtectedRoute path="/income/sources" component={IncomeSourcesManagement} />
+                <ProtectedRoute path="/income/inbox" component={IncomeWebhooksInbox} />
                 
                 {/* Feature Showcase */}
                 <ProtectedRoute path="/features" component={FeatureShowcase} />
