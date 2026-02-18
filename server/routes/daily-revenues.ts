@@ -1,15 +1,19 @@
 /**
  * 每日收款記錄 & 收入報表 路由
  *
+ * 資料來源：
+ *   1. daily_revenues — 手動輸入的每日收款
+ *   2. income_webhooks — 外部系統（PM、未來其他系統）API 同步進來的進帳
+ *
  * CRUD: GET/POST /api/daily-revenues, PATCH/DELETE /api/daily-revenues/:id
  * 報表: GET /api/revenue/reports/stats|by-project|daily-trend|monthly-trend|yearly-comparison
+ *       GET /api/revenue/reports/sources   (各來源統計)
  */
 
 import { Router } from "express"
 import { db } from "../db"
-import { dailyRevenues } from "@shared/schema"
-import { paymentProjects } from "@shared/schema"
-import { eq, desc, sql, and, gte, lte, asc } from "drizzle-orm"
+import { dailyRevenues, incomeWebhooks, incomeSources, paymentProjects } from "@shared/schema"
+import { eq, desc, sql, and, gte, lte, asc, inArray } from "drizzle-orm"
 import { asyncHandler, AppError } from "../middleware/error-handler"
 import multer from "multer"
 import path from "path"
@@ -36,7 +40,7 @@ const storage = multer.diskStorage({
 const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } })
 
 // ─────────────────────────────────────────────
-// 工具
+// 工具函式
 // ─────────────────────────────────────────────
 
 function parseOptionalDate(value: unknown): string | undefined {
@@ -46,8 +50,59 @@ function parseOptionalDate(value: unknown): string | undefined {
   return str
 }
 
+/**
+ * 收入資料 UNION SQL
+ *
+ * 合併兩個來源：
+ *  - daily_revenues（manual）
+ *  - income_webhooks（api_sync，僅取 pending + confirmed，排除 rejected/duplicate/error）
+ *
+ * 欄位統一為：date TEXT, amount NUMERIC, project_name TEXT, source_type TEXT
+ */
+function buildRevenueUnionSQL(startDate?: string, endDate?: string) {
+  const dateFilter = (dateExpr: string) => {
+    const parts: string[] = []
+    if (startDate) parts.push(`${dateExpr} >= '${startDate}'`)
+    if (endDate) parts.push(`${dateExpr} <= '${endDate}'`)
+    return parts.length > 0 ? `AND ${parts.join(" AND ")}` : ""
+  }
+
+  // daily_revenues 透過 payment_projects join 取 project_name
+  const manualSql = `
+    SELECT
+      dr.date::text            AS date,
+      dr.amount::numeric       AS amount,
+      COALESCE(pp.project_name, '未分類') AS project_name,
+      'manual'                 AS source_type,
+      dr.description           AS description
+    FROM daily_revenues dr
+    LEFT JOIN payment_projects pp ON pp.id = dr.project_id
+    WHERE 1=1 ${dateFilter("dr.date")}
+  `
+
+  // income_webhooks 透過 income_sources.default_project_id 取 project_name
+  // 僅取 pending（待確認）和 confirmed（已確認），排除 rejected / duplicate / error
+  const webhookSql = `
+    SELECT
+      TO_CHAR(iw.parsed_paid_at AT TIME ZONE 'Asia/Taipei', 'YYYY-MM-DD') AS date,
+      iw.parsed_amount_twd::numeric AS amount,
+      COALESCE(pp.project_name, iw.parsed_payer_name, '未分類') AS project_name,
+      COALESCE(src.source_type, 'api_sync')                    AS source_type,
+      iw.parsed_description AS description
+    FROM income_webhooks iw
+    LEFT JOIN income_sources src ON src.id = iw.source_id
+    LEFT JOIN payment_projects pp ON pp.id = src.default_project_id
+    WHERE iw.status IN ('pending', 'confirmed')
+      AND iw.parsed_paid_at IS NOT NULL
+      AND iw.parsed_amount_twd IS NOT NULL
+      ${dateFilter("TO_CHAR(iw.parsed_paid_at AT TIME ZONE 'Asia/Taipei', 'YYYY-MM-DD')")}
+  `
+
+  return `(${manualSql}) UNION ALL (${webhookSql})`
+}
+
 // ─────────────────────────────────────────────
-// CRUD
+// CRUD（daily_revenues 手動記錄）
 // ─────────────────────────────────────────────
 
 /** GET /api/daily-revenues */
@@ -166,7 +221,7 @@ router.delete(
 )
 
 // ─────────────────────────────────────────────
-// 報表 API
+// 報表 API（合併兩個來源）
 // ─────────────────────────────────────────────
 
 /** GET /api/revenue/reports/stats */
@@ -176,37 +231,34 @@ router.get(
     const startDate = parseOptionalDate(req.query.startDate)
     const endDate = parseOptionalDate(req.query.endDate)
 
-    const conditions = []
-    if (startDate) conditions.push(gte(dailyRevenues.date, startDate))
-    if (endDate) conditions.push(lte(dailyRevenues.date, endDate))
+    const unionSql = buildRevenueUnionSQL(startDate, endDate)
 
-    const [stats] = await db
-      .select({
-        totalRevenue: sql<number>`COALESCE(SUM(${dailyRevenues.amount}::numeric), 0)`,
-        recordCount: sql<number>`COUNT(*)::int`,
-      })
-      .from(dailyRevenues)
-      .where(conditions.length > 0 ? and(...conditions) : undefined)
+    const result = await db.execute(sql.raw(`
+      SELECT
+        COALESCE(SUM(amount), 0)::numeric AS total_revenue,
+        COUNT(*)::int                      AS record_count,
+        MIN(date)                          AS min_date,
+        MAX(date)                          AS max_date
+      FROM (${unionSql}) AS combined
+    `))
 
-    // 計算實際天數區間（用於計算平均日收入）
-    const [dateRange] = await db
-      .select({
-        minDate: sql<string>`MIN(${dailyRevenues.date})`,
-        maxDate: sql<string>`MAX(${dailyRevenues.date})`,
-      })
-      .from(dailyRevenues)
-      .where(conditions.length > 0 ? and(...conditions) : undefined)
+    const row = result.rows[0] as {
+      total_revenue: string
+      record_count: number
+      min_date: string | null
+      max_date: string | null
+    }
 
     let avgDaily = 0
-    if (stats.recordCount > 0 && dateRange.minDate && dateRange.maxDate) {
-      const diffMs = new Date(dateRange.maxDate).getTime() - new Date(dateRange.minDate).getTime()
+    if (row.record_count > 0 && row.min_date && row.max_date) {
+      const diffMs = new Date(row.max_date).getTime() - new Date(row.min_date).getTime()
       const diffDays = Math.max(1, Math.round(diffMs / (1000 * 60 * 60 * 24)) + 1)
-      avgDaily = Number(stats.totalRevenue) / diffDays
+      avgDaily = Number(row.total_revenue) / diffDays
     }
 
     res.json({
-      totalRevenue: Number(stats.totalRevenue),
-      recordCount: stats.recordCount,
+      totalRevenue: Number(row.total_revenue),
+      recordCount: row.record_count,
       avgDaily: Math.round(avgDaily),
     })
   })
@@ -219,28 +271,24 @@ router.get(
     const startDate = parseOptionalDate(req.query.startDate)
     const endDate = parseOptionalDate(req.query.endDate)
 
-    const conditions = []
-    if (startDate) conditions.push(gte(dailyRevenues.date, startDate))
-    if (endDate) conditions.push(lte(dailyRevenues.date, endDate))
+    const unionSql = buildRevenueUnionSQL(startDate, endDate)
 
-    const rows = await db
-      .select({
-        projectId: dailyRevenues.projectId,
-        projectName: paymentProjects.projectName,
-        totalRevenue: sql<number>`SUM(${dailyRevenues.amount}::numeric)`,
-        recordCount: sql<number>`COUNT(*)::int`,
-      })
-      .from(dailyRevenues)
-      .leftJoin(paymentProjects, eq(dailyRevenues.projectId, paymentProjects.id))
-      .where(conditions.length > 0 ? and(...conditions) : undefined)
-      .groupBy(dailyRevenues.projectId, paymentProjects.projectName)
-      .orderBy(desc(sql`SUM(${dailyRevenues.amount}::numeric)`))
+    const result = await db.execute(sql.raw(`
+      SELECT
+        project_name,
+        SUM(amount)::numeric AS total_revenue,
+        COUNT(*)::int        AS record_count
+      FROM (${unionSql}) AS combined
+      GROUP BY project_name
+      ORDER BY total_revenue DESC
+    `))
 
     res.json(
-      rows.map((r) => ({
-        ...r,
-        projectName: r.projectName ?? "未分類",
-        totalRevenue: Number(r.totalRevenue),
+      result.rows.map((r: Record<string, unknown>, idx: number) => ({
+        projectId: idx,
+        projectName: r.project_name ?? "未分類",
+        totalRevenue: Number(r.total_revenue),
+        recordCount: Number(r.record_count),
       }))
     )
   })
@@ -252,30 +300,27 @@ router.get(
   asyncHandler(async (req, res) => {
     const startDate = parseOptionalDate(req.query.startDate)
     const endDate = parseOptionalDate(req.query.endDate)
-    const limit = Math.min(parseInt(String(req.query.limit ?? "30")), 365)
+    const limitN = Math.min(parseInt(String(req.query.limit ?? "30")), 365)
 
-    const conditions = []
-    if (startDate) conditions.push(gte(dailyRevenues.date, startDate))
-    if (endDate) conditions.push(lte(dailyRevenues.date, endDate))
+    const unionSql = buildRevenueUnionSQL(startDate, endDate)
 
-    const rows = await db
-      .select({
-        date: dailyRevenues.date,
-        totalRevenue: sql<number>`SUM(${dailyRevenues.amount}::numeric)`,
-      })
-      .from(dailyRevenues)
-      .where(conditions.length > 0 ? and(...conditions) : undefined)
-      .groupBy(dailyRevenues.date)
-      .orderBy(desc(dailyRevenues.date))
-      .limit(limit)
+    const result = await db.execute(sql.raw(`
+      SELECT
+        date,
+        SUM(amount)::numeric AS total_revenue
+      FROM (${unionSql}) AS combined
+      WHERE date IS NOT NULL
+      GROUP BY date
+      ORDER BY date DESC
+      LIMIT ${limitN}
+    `))
 
     // 回傳時間順序（舊→新）
-    res.json(
-      rows.reverse().map((r) => ({
-        date: r.date,
-        totalRevenue: Number(r.totalRevenue),
-      }))
-    )
+    const rows = (result.rows as Array<{ date: string; total_revenue: string }>)
+      .reverse()
+      .map((r) => ({ date: r.date, totalRevenue: Number(r.total_revenue) }))
+
+    res.json(rows)
   })
 )
 
@@ -285,27 +330,25 @@ router.get(
   asyncHandler(async (req, res) => {
     const startDate = parseOptionalDate(req.query.startDate)
     const endDate = parseOptionalDate(req.query.endDate)
-    const limit = Math.min(parseInt(String(req.query.limit ?? "12")), 60)
+    const limitN = Math.min(parseInt(String(req.query.limit ?? "12")), 60)
 
-    const conditions = []
-    if (startDate) conditions.push(gte(dailyRevenues.date, startDate))
-    if (endDate) conditions.push(lte(dailyRevenues.date, endDate))
+    const unionSql = buildRevenueUnionSQL(startDate, endDate)
 
-    const rows = await db
-      .select({
-        month: sql<string>`TO_CHAR(${dailyRevenues.date}::date, 'YYYY-MM')`,
-        totalRevenue: sql<number>`SUM(${dailyRevenues.amount}::numeric)`,
-      })
-      .from(dailyRevenues)
-      .where(conditions.length > 0 ? and(...conditions) : undefined)
-      .groupBy(sql`TO_CHAR(${dailyRevenues.date}::date, 'YYYY-MM')`)
-      .orderBy(asc(sql`TO_CHAR(${dailyRevenues.date}::date, 'YYYY-MM')`))
-      .limit(limit)
+    const result = await db.execute(sql.raw(`
+      SELECT
+        SUBSTR(date, 1, 7)       AS month,
+        SUM(amount)::numeric     AS total_revenue
+      FROM (${unionSql}) AS combined
+      WHERE date IS NOT NULL
+      GROUP BY SUBSTR(date, 1, 7)
+      ORDER BY month ASC
+      LIMIT ${limitN}
+    `))
 
     res.json(
-      rows.map((r) => ({
+      (result.rows as Array<{ month: string; total_revenue: string }>).map((r) => ({
         month: r.month,
-        totalRevenue: Number(r.totalRevenue),
+        totalRevenue: Number(r.total_revenue),
       }))
     )
   })
@@ -315,27 +358,55 @@ router.get(
 router.get(
   "/api/revenue/reports/yearly-comparison",
   asyncHandler(async (_req, res) => {
-    const rows = await db
-      .select({
-        year: sql<number>`EXTRACT(YEAR FROM ${dailyRevenues.date}::date)::int`,
-        month: sql<number>`EXTRACT(MONTH FROM ${dailyRevenues.date}::date)::int`,
-        totalRevenue: sql<number>`SUM(${dailyRevenues.amount}::numeric)`,
-      })
-      .from(dailyRevenues)
-      .groupBy(
-        sql`EXTRACT(YEAR FROM ${dailyRevenues.date}::date)`,
-        sql`EXTRACT(MONTH FROM ${dailyRevenues.date}::date)`
-      )
-      .orderBy(
-        asc(sql`EXTRACT(YEAR FROM ${dailyRevenues.date}::date)`),
-        asc(sql`EXTRACT(MONTH FROM ${dailyRevenues.date}::date)`)
-      )
+    const unionSql = buildRevenueUnionSQL()
+
+    const result = await db.execute(sql.raw(`
+      SELECT
+        EXTRACT(YEAR  FROM date::date)::int AS year,
+        EXTRACT(MONTH FROM date::date)::int AS month,
+        SUM(amount)::numeric                AS total_revenue
+      FROM (${unionSql}) AS combined
+      WHERE date IS NOT NULL
+      GROUP BY year, month
+      ORDER BY year ASC, month ASC
+    `))
 
     res.json(
-      rows.map((r) => ({
+      (result.rows as Array<{ year: number; month: number; total_revenue: string }>).map((r) => ({
         year: r.year,
         month: r.month,
-        totalRevenue: Number(r.totalRevenue),
+        totalRevenue: Number(r.total_revenue),
+      }))
+    )
+  })
+)
+
+/** GET /api/revenue/reports/sources
+ *  各來源（PM/手動/...）的收入統計，方便未來追蹤哪個系統貢獻多少
+ */
+router.get(
+  "/api/revenue/reports/sources",
+  asyncHandler(async (req, res) => {
+    const startDate = parseOptionalDate(req.query.startDate)
+    const endDate = parseOptionalDate(req.query.endDate)
+
+    const unionSql = buildRevenueUnionSQL(startDate, endDate)
+
+    const result = await db.execute(sql.raw(`
+      SELECT
+        source_type,
+        SUM(amount)::numeric AS total_revenue,
+        COUNT(*)::int        AS record_count
+      FROM (${unionSql}) AS combined
+      GROUP BY source_type
+      ORDER BY total_revenue DESC
+    `))
+
+    res.json(
+      (result.rows as Array<{ source_type: string; total_revenue: string; record_count: number }>).map((r) => ({
+        sourceType: r.source_type,
+        totalRevenue: Number(r.total_revenue),
+        recordCount: r.record_count,
       }))
     )
   })
