@@ -306,9 +306,11 @@ export async function previewPmRevenues(
     if (source) parts.push(source)
     if (rev.description && rev.description !== source) parts.push(rev.description)
 
+    const utcD = new Date(rev.date)
+    const twD = new Date(utcD.getTime() + 8 * 60 * 60 * 1000)
     return {
       pmId: rev.id,
-      date: rev.date.slice(0, 10),
+      date: twD.toISOString().slice(0, 10), // 台灣日期
       source,
       amount: rev.amount,
       companyName,
