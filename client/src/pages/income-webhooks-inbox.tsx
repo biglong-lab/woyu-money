@@ -541,6 +541,7 @@ export default function IncomeWebhooksInboxPage() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
   const [detailWebhook, setDetailWebhook] = useState<IncomeWebhook | null>(null)
   const [showBatchConfirm, setShowBatchConfirm] = useState(false)
+  const [showPmSync, setShowPmSync] = useState(false)
   const [page, setPage] = useState(1)
   const pageSize = 20
 
