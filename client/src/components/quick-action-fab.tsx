@@ -22,12 +22,21 @@ interface QuickActionFABProps {
   onOpenAi?: () => void;
 }
 
-export function QuickActionFAB({ onQuickPayment }: QuickActionFABProps) {
+export function QuickActionFAB({ onQuickPayment, onOpenAi }: QuickActionFABProps) {
   const [isOpen, setIsOpen] = useState(false);
 
   const toggle = () => setIsOpen((prev) => !prev);
 
   const actions = [
+    {
+      label: "AI 助手",
+      icon: Bot,
+      onClick: () => {
+        setIsOpen(false);
+        onOpenAi?.();
+      },
+      color: "bg-purple-600 hover:bg-purple-700",
+    },
     {
       label: "掃描單據",
       icon: Camera,
