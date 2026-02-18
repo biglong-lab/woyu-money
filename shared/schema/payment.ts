@@ -239,7 +239,41 @@ export const insertBudgetItemSchema = createInsertSchema(budgetItems).omit({
   variancePercentage: z.union([z.string(), z.number(), z.null()]).transform((val) => val !== null ? val.toString() : null).optional().nullable(),
 });
 
+// ─────────────────────────────────────────────
+// 每日收款記錄表
+// 記錄各專案每日的實際收款金額（手動輸入 / PM 同步）
+// ─────────────────────────────────────────────
+export const dailyRevenues = pgTable(
+  "daily_revenues",
+  {
+    id: serial("id").primaryKey(),
+    projectId: integer("project_id").references(() => paymentProjects.id),
+    date: date("date").notNull(),
+    amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+    description: text("description"),
+    receiptImageUrl: varchar("receipt_image_url", { length: 500 }),
+    createdAt: timestamp("created_at").defaultNow(),
+    updatedAt: timestamp("updated_at").defaultNow(),
+  },
+  (table) => ({
+    projectIdIdx: index("daily_revenues_project_id_idx").on(table.projectId),
+    dateIdx: index("daily_revenues_date_idx").on(table.date),
+    projectDateIdx: index("daily_revenues_project_date_idx").on(table.projectId, table.date),
+  })
+)
+
+export const insertDailyRevenueSchema = createInsertSchema(dailyRevenues).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  amount: z.union([z.string(), z.number()]).transform((v) => v.toString()),
+})
+
 // 型別匯出
+export type DailyRevenue = typeof dailyRevenues.$inferSelect
+export type InsertDailyRevenue = z.infer<typeof insertDailyRevenueSchema>
+
 export type PaymentItem = typeof paymentItems.$inferSelect;
 export type InsertPaymentItem = z.infer<typeof insertPaymentItemSchema>;
 export type PaymentRecord = typeof paymentRecords.$inferSelect;
