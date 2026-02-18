@@ -24,6 +24,7 @@ import RentalManagementEnhanced from "@/pages/rental-management-enhanced";
 import LoanInvestmentEnhanced from "@/pages/loan-investment-enhanced";
 import LoanInvestmentManagement from "@/pages/loan-investment-management";
 import RevenueReports from "@/pages/revenue-reports";
+import RevenueCompare from "@/pages/revenue-compare";
 import Settings from "@/pages/settings";
 import AccountSettings from "@/pages/account-settings";
 import CategoryManagement from "@/pages/category-management";
