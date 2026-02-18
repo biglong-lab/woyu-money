@@ -94,6 +94,7 @@ function Router() {
                 <ProtectedRoute path="/payment-reports" component={PaymentReports} />
                 <ProtectedRoute path="/payment/reports" component={PaymentReports} />
                 <ProtectedRoute path="/revenue/reports" component={RevenueReports} />
+                <ProtectedRoute path="/revenue/compare" component={RevenueCompare} />
                 <ProtectedRoute path="/payment-project" component={PaymentProject} />
                 <ProtectedRoute path="/payment-schedule" component={PaymentSchedule} />
                 <ProtectedRoute path="/project-budget" component={ProjectBudgetManagement} />
