@@ -54,6 +54,11 @@ export default function Settings() {
         <TabsContent value="admin" className="space-y-6">
           <SettingsAdminTab />
         </TabsContent>
+
+        {/* AI 助手 */}
+        <TabsContent value="ai" className="space-y-6">
+          <SettingsAiTab />
+        </TabsContent>
       </Tabs>
     </div>
   );
