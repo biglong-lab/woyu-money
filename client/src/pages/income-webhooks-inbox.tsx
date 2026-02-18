@@ -902,6 +902,14 @@ export default function IncomeWebhooksInboxPage() {
           }
         />
       )}
+
+      {/* PM 同步 Dialog */}
+      {showPmSync && (
+        <PmSyncDialog
+          onClose={() => setShowPmSync(false)}
+          onDone={() => setShowPmSync(false)}
+        />
+      )}
     </div>
   )
 }
