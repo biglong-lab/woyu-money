@@ -473,7 +473,7 @@ function PmSyncDialog({ onClose, onDone }: { onClose: () => void; onDone: () => 
           {companies.length > 0 && (
             <div className="space-y-1.5">
               <Label>館舍（選填）</Label>
-              <Select value={companyId} onValueChange={setCompanyId}>
+              <Select value={companyId || "all"} onValueChange={(v) => setCompanyId(v === "all" ? "" : v)}>
                 <SelectTrigger>
                   <SelectValue placeholder="所有館舍" />
                 </SelectTrigger>
