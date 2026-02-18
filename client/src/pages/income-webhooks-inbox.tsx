@@ -15,6 +15,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import {
@@ -45,6 +46,8 @@ import {
   User,
   Hash,
   Layers,
+  Building2,
+  Download,
 } from "lucide-react"
 import type { IncomeWebhook, IncomeSource, PaymentProject } from "@shared/schema"
 
