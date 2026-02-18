@@ -58,6 +58,7 @@ import IncomeWebhooksInbox from "@/pages/income-webhooks-inbox";
 
 function Router() {
   const [quickPaymentOpen, setQuickPaymentOpen] = useState(false);
+  const [aiSheetOpen, setAiSheetOpen] = useState(false);
 
   return (
     <AuthProvider>
