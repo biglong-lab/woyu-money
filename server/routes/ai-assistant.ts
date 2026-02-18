@@ -501,14 +501,42 @@ router.post(
       },
     })
 
-    const response = await client.chat.completions.create({
-      model: settings.selectedModel ?? "google/gemini-2.0-flash-exp:free",
-      messages: [{ role: "user", content: "請回答「連線成功」這四個字" }],
-      max_tokens: 20,
-    })
+    // 優先使用已選模型，若 rate-limited 則依序嘗試備用免費模型
+    const primaryModel = settings.selectedModel ?? "google/gemma-3-27b-it:free"
+    const fallbackModels = [
+      "google/gemma-3-27b-it:free",
+      "meta-llama/llama-3.3-70b-instruct:free",
+      "google/gemma-3-12b-it:free",
+    ].filter(m => m !== primaryModel)
 
-    const content = response.choices[0]?.message?.content ?? ""
-    res.json({ success: true, message: content, model: settings.selectedModel })
+    const modelsToTry = [primaryModel, ...fallbackModels]
+    let lastError: Error | null = null
+
+    for (const model of modelsToTry) {
+      try {
+        const response = await client.chat.completions.create({
+          model,
+          messages: [{ role: "user", content: "請回答「連線成功」這四個字" }],
+          max_tokens: 20,
+        })
+        const content = response.choices[0]?.message?.content ?? "連線成功"
+        return res.json({ success: true, message: content, model })
+      } catch (err: unknown) {
+        const apiErr = err as { status?: number; error?: { code?: number } }
+        const status = apiErr?.status ?? apiErr?.error?.code
+        if (status === 429 || status === 404) {
+          lastError = err as Error
+          continue // 嘗試下一個模型
+        }
+        throw err // 其他錯誤直接拋出
+      }
+    }
+
+    // 所有模型都失敗
+    const msg = lastError?.message?.includes("rate-limited")
+      ? "所有免費模型目前都被速率限制，請稍後再試，或換付費模型"
+      : `連線失敗：${lastError?.message ?? "未知錯誤"}`
+    throw new AppError(503, msg)
   })
 )
 
