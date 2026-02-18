@@ -202,8 +202,11 @@ export async function syncPmRevenues(
       if (rev.description && rev.description !== source) parts.push(rev.description)
       const description = parts.join(" · ")
 
-      // 取日期字串（PM 的 date 是帶時區的 ISO 字串，取日期部分）
-      const dateStr = rev.date.slice(0, 10)  // YYYY-MM-DD
+      // PM 的 date 欄位存的是 UTC 前一日午夜（UTC+8 關係），需轉換為台灣日期
+      // 例：2026-02-15T16:00:00Z = 台灣 2026-02-16 00:00
+      const utcDate = new Date(rev.date)
+      const twDate = new Date(utcDate.getTime() + 8 * 60 * 60 * 1000)
+      const dateStr = twDate.toISOString().slice(0, 10)  // 台灣當地 YYYY-MM-DD
 
       // 組合原始 payload（完整保留 PM 資料）
       const rawPayload = {
