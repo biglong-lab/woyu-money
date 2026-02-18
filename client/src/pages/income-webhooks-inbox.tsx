@@ -681,12 +681,24 @@ export default function IncomeWebhooksInboxPage() {
           </p>
         </div>
 
-        {selectedIds.size > 0 && statusFilter === "pending" && (
-          <Button onClick={() => setShowBatchConfirm(true)} className="gap-2">
-            <CheckCircle2 className="h-4 w-4" />
-            批次確認 {selectedIds.size} 筆
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowPmSync(true)}
+            className="gap-2 text-blue-600 border-blue-200 hover:bg-blue-50"
+          >
+            <Building2 className="h-4 w-4" />
+            從 PM 同步
           </Button>
-        )}
+
+          {selectedIds.size > 0 && statusFilter === "pending" && (
+            <Button onClick={() => setShowBatchConfirm(true)} className="gap-2">
+              <CheckCircle2 className="h-4 w-4" />
+              批次確認 {selectedIds.size} 筆
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* 篩選列 */}
