@@ -136,15 +136,14 @@ router.get(
 
 // ─────────────────────────────────────────────
 // GET /api/pms-bridge/compare
-// PMS vs PM 月度比對
-// 傳回兩個系統的月度匯總，供差距分析
+// PMS vs PM 月度比對（含分店明細）
 // ─────────────────────────────────────────────
 
 router.get(
   "/api/pms-bridge/compare",
   asyncHandler(async (req, res) => {
     const startMonth = parseMonth(
-      req.query.startMonth ?? "2025-07",
+      req.query.startMonth ?? "2025-08", // 預設從 2025-08（PM 開始完整記錄）
       "startMonth"
     )
     const endMonth = parseMonth(
@@ -153,23 +152,14 @@ router.get(
     )
 
     const { Pool } = await import("pg")
-
-    // PMS 月度數據（每月最後一筆 = 當月實際）
-    const pmsPool = new Pool({
-      connectionString: process.env.PMS_DATABASE_URL,
-      max: 2,
-    })
-
-    // PM 月度數據
-    const pmPool = new Pool({
-      connectionString: process.env.PM_DATABASE_URL,
-      max: 2,
-    })
+    const pmsPool = new Pool({ connectionString: process.env.PMS_DATABASE_URL, max: 2 })
+    const pmPool  = new Pool({ connectionString: process.env.PM_DATABASE_URL,  max: 2 })
 
     try {
-      const [pmsResult, pmResult] = await Promise.all([
+      const [pmsMonthly, pmsBranch, pmResult] = await Promise.all([
+        // PMS 月度彙總
         pmsPool.query<{ month: string; total: string; branches: string }>(`
-          WITH latest_per_month AS (
+          WITH latest AS (
             SELECT DISTINCT ON (branch_id, TO_CHAR(date, 'YYYY-MM'))
               TO_CHAR(date, 'YYYY-MM') AS month,
               branch_id,
@@ -179,17 +169,41 @@ router.get(
               AND TO_CHAR(date, 'YYYY-MM') <= $2
             ORDER BY branch_id, TO_CHAR(date, 'YYYY-MM'), date DESC
           )
-          SELECT month, SUM(current_month_revenue)::text AS total, COUNT(*)::text AS branches
-          FROM latest_per_month
-          GROUP BY month
-          ORDER BY month
+          SELECT month,
+                 SUM(current_month_revenue)::text AS total,
+                 COUNT(*)::text                   AS branches
+          FROM latest
+          GROUP BY month ORDER BY month
         `, [startMonth, endMonth]),
 
+        // PMS 分店明細（每月每分店最後一筆）
+        pmsPool.query<{
+          month: string; branch_id: string; branch_name: string
+          branch_code: string; revenue: string; last_date: string
+        }>(`
+          WITH latest AS (
+            SELECT DISTINCT ON (pe.branch_id, TO_CHAR(pe.date, 'YYYY-MM'))
+              TO_CHAR(pe.date, 'YYYY-MM')      AS month,
+              pe.branch_id::text               AS branch_id,
+              b.name                           AS branch_name,
+              b.code                           AS branch_code,
+              pe.current_month_revenue::text   AS revenue,
+              pe.date::text                    AS last_date
+            FROM performance_entries pe
+            JOIN branches b ON b.id = pe.branch_id
+            WHERE TO_CHAR(pe.date, 'YYYY-MM') >= $1
+              AND TO_CHAR(pe.date, 'YYYY-MM') <= $2
+            ORDER BY pe.branch_id, TO_CHAR(pe.date, 'YYYY-MM'), pe.date DESC
+          )
+          SELECT * FROM latest ORDER BY month, branch_id
+        `, [startMonth, endMonth]),
+
+        // PM 月度彙總
         pmPool.query<{ month: string; total: string; records: string }>(`
           SELECT
             TO_CHAR(date AT TIME ZONE 'Asia/Taipei', 'YYYY-MM') AS month,
             SUM(amount::numeric)::text AS total,
-            COUNT(*)::text AS records
+            COUNT(*)::text             AS records
           FROM revenues
           WHERE deleted_at IS NULL
             AND TO_CHAR(date AT TIME ZONE 'Asia/Taipei', 'YYYY-MM') >= $1
@@ -199,45 +213,64 @@ router.get(
         `, [startMonth, endMonth]),
       ])
 
+      // 建立分店明細 Map（按月份）
+      const branchDetailMap = new Map<string, typeof pmsBranch.rows>()
+      for (const row of pmsBranch.rows) {
+        if (!branchDetailMap.has(row.month)) branchDetailMap.set(row.month, [])
+        branchDetailMap.get(row.month)!.push(row)
+      }
+
       // 合併比對
       const months = new Set([
-        ...pmsResult.rows.map((r) => r.month),
+        ...pmsMonthly.rows.map((r) => r.month),
         ...pmResult.rows.map((r) => r.month),
       ])
+      const pmsMap = new Map(pmsMonthly.rows.map((r) => [r.month, r]))
+      const pmMap  = new Map(pmResult.rows.map((r) => [r.month, r]))
 
-      const pmsMap = new Map(pmsResult.rows.map((r) => [r.month, r]))
-      const pmMap = new Map(pmResult.rows.map((r) => [r.month, r]))
+      const comparison = Array.from(months).sort().map((month) => {
+        const pms = pmsMap.get(month)
+        const pm  = pmMap.get(month)
+        const pmsTotal = pms ? parseFloat(pms.total) : 0
+        const pmTotal  = pm  ? parseFloat(pm.total)  : 0
+        const diff     = pmsTotal - pmTotal
+        // 若 PM 幾乎無資料（< 10 筆），diffPct 不具參考意義，標為 null
+        const pmRecords = pm ? parseInt(pm.records) : 0
+        const diffPct =
+          pmTotal > 0 && pmRecords >= 10
+            ? Math.round(((diff / pmTotal) * 100) * 10) / 10
+            : null
 
-      const comparison = Array.from(months)
-        .sort()
-        .map((month) => {
-          const pms = pmsMap.get(month)
-          const pm = pmMap.get(month)
-          const pmsTotal = pms ? parseFloat(pms.total) : 0
-          const pmTotal = pm ? parseFloat(pm.total) : 0
-          const diff = pmsTotal - pmTotal
-          const diffPct = pmTotal > 0 ? (diff / pmTotal) * 100 : null
-
-          return {
-            month,
-            pms: {
-              total: pmsTotal,
-              branches: pms ? parseInt(pms.branches) : 0,
-            },
-            pm: {
-              total: pmTotal,
-              records: pm ? parseInt(pm.records) : 0,
-            },
-            diff,
-            diffPct: diffPct !== null ? Math.round(diffPct * 10) / 10 : null,
-            status:
-              Math.abs(diff) < 1000
+        return {
+          month,
+          pms: {
+            total: pmsTotal,
+            branches: pms ? parseInt(pms.branches) : 0,
+            branchDetail: (branchDetailMap.get(month) ?? []).map((b) => ({
+              branchId:   parseInt(b.branch_id),
+              branchName: b.branch_name,
+              branchCode: b.branch_code,
+              revenue:    parseFloat(b.revenue),
+              lastDate:   b.last_date,
+            })),
+          },
+          pm: {
+            total:   pmTotal,
+            records: pmRecords,
+          },
+          diff,
+          diffPct,
+          // 若 PM 資料不足，不作 match/higher 判斷
+          status:
+            pmRecords < 10
+              ? "insufficient_pm"
+              : Math.abs(diff) < 1000
                 ? "match"
                 : diff > 0
                   ? "pms_higher"
                   : "pm_higher",
-          }
-        })
+        }
+      })
 
       res.json({ startMonth, endMonth, comparison })
     } finally {
