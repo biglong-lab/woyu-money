@@ -1,13 +1,18 @@
-// 專案付款管理 - 搜尋篩選區域元件
+// 專案付款管理 - 搜尋篩選區域元件（重構版）
+// 合併重複控制項，提供乾淨易用的介面
 import { Ref } from "react";
-import { Search, Filter, MoreHorizontal, Calendar, DollarSign, TrendingUp, AlertTriangle, RefreshCw, ChevronDown, ChevronUp, Star, Clock, RotateCcw, X } from "lucide-react";
+import {
+  Search, Filter, Calendar, DollarSign, TrendingUp, AlertTriangle,
+  ChevronDown, ChevronUp, Star, Clock, RotateCcw, X, ChevronLeft,
+  ChevronRight, Settings2
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ResponsiveButtonGroup } from "@/components/enhanced-responsive-components";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import type { PaymentItem, PaymentProject } from "./payment-project-types";
 import type { FixedCategory, DebtCategory } from "@/../../shared/schema/category";
 
@@ -66,69 +71,141 @@ export interface PaymentProjectFiltersProps {
   projectCategoriesData: DebtCategory[];
 }
 
-export default function PaymentProjectFilters({
-  statisticsMode,
-  setStatisticsMode,
-  onOpenProjectCategoryDialog,
-  filteredItemsCount,
-  isLoadingMore,
-  selectedItemsCount,
-  searchTerm,
-  setSearchTerm,
-  debouncedSearchTerm,
-  setDebouncedSearchTerm,
-  searchInputRef,
-  selectedProject,
-  setSelectedProject,
-  selectedCategory,
-  setSelectedCategory,
-  selectedStatus,
-  setSelectedStatus,
-  selectedPaymentType,
-  setSelectedPaymentType,
-  dateRange,
-  setDateRange,
-  priorityFilter,
-  setPriorityFilter,
-  showPaidItems,
-  setShowPaidItems,
-  sortBy,
-  setSortBy,
-  sortOrder,
-  setSortOrder,
-  showAdvancedFilters,
-  setShowAdvancedFilters,
-  selectedYear,
-  setSelectedYear,
-  selectedMonth,
-  setSelectedMonth,
-  startDate,
-  setStartDate,
-  endDate,
-  setEndDate,
-  resetFilters,
-  applySmartFilter,
-  projects,
-  fixedCategoriesData,
-  projectCategoriesData,
-}: PaymentProjectFiltersProps) {
+/** 計算已啟用的篩選條件數量 */
+function countActiveFilters(props: PaymentProjectFiltersProps): number {
+  let count = 0;
+  if (props.selectedProject !== "all") count++;
+  if (props.selectedStatus !== "all") count++;
+  if (props.selectedPaymentType !== "all") count++;
+  if (props.dateRange !== "all" && props.dateRange !== "currentMonth") count++;
+  if (props.priorityFilter !== "all") count++;
+  if (props.selectedCategory !== "all") count++;
+  if (props.searchTerm) count++;
+  return count;
+}
+
+const MONTH_NAMES = ["1月","2月","3月","4月","5月","6月","7月","8月","9月","10月","11月","12月"];
+
+// 快捷篩選設定
+interface QuickFilter {
+  label: string;
+  icon?: React.ReactNode;
+  isActive: (props: PaymentProjectFiltersProps) => boolean;
+  apply: (props: PaymentProjectFiltersProps) => void;
+}
+
+const QUICK_FILTERS: QuickFilter[] = [
+  {
+    label: "逾期",
+    icon: <AlertTriangle className="h-3 w-3" />,
+    isActive: (p) => p.selectedStatus === "overdue",
+    apply: (p) => { p.setSelectedStatus("overdue"); p.setDateRange("all"); },
+  },
+  {
+    label: "本月到期",
+    icon: <Calendar className="h-3 w-3" />,
+    isActive: (p) => p.dateRange === "currentMonth" && p.selectedStatus === "unpaid",
+    apply: (p) => { p.setDateRange("currentMonth"); p.setSelectedStatus("unpaid"); },
+  },
+  {
+    label: "本月實付",
+    icon: <DollarSign className="h-3 w-3" />,
+    isActive: (p) => p.dateRange === "currentMonthPayment",
+    apply: (p) => { p.setDateRange("currentMonthPayment"); p.setSelectedStatus("all"); p.setShowPaidItems(true); },
+  },
+  {
+    label: "分期待付",
+    icon: <Clock className="h-3 w-3" />,
+    isActive: (p) => p.selectedPaymentType === "installment" && p.selectedStatus === "pending",
+    apply: (p) => { p.setSelectedPaymentType("installment"); p.setSelectedStatus("pending"); p.setDateRange("all"); },
+  },
+  {
+    label: "高優先",
+    icon: <Star className="h-3 w-3" />,
+    isActive: (p) => p.priorityFilter === "high",
+    apply: (p) => p.setPriorityFilter(p.priorityFilter === "high" ? "all" : "high"),
+  },
+  {
+    label: "分期付款",
+    icon: <TrendingUp className="h-3 w-3" />,
+    isActive: (p) => p.selectedPaymentType === "installment" && p.selectedStatus !== "pending",
+    apply: (p) => { p.setSelectedPaymentType("installment"); p.setSelectedStatus("all"); p.setDateRange("all"); },
+  },
+];
+
+export default function PaymentProjectFilters(props: PaymentProjectFiltersProps) {
+  const {
+    statisticsMode, setStatisticsMode,
+    onOpenProjectCategoryDialog,
+    filteredItemsCount,
+    searchTerm, setSearchTerm, debouncedSearchTerm, setDebouncedSearchTerm, searchInputRef,
+    selectedProject, setSelectedProject,
+    selectedCategory, setSelectedCategory,
+    selectedStatus, setSelectedStatus,
+    selectedPaymentType, setSelectedPaymentType,
+    dateRange, setDateRange,
+    priorityFilter, setPriorityFilter,
+    showPaidItems, setShowPaidItems,
+    sortBy, setSortBy,
+    sortOrder, setSortOrder,
+    showAdvancedFilters, setShowAdvancedFilters,
+    selectedYear, setSelectedYear,
+    selectedMonth, setSelectedMonth,
+    startDate, setStartDate,
+    endDate, setEndDate,
+    resetFilters,
+    projects,
+    fixedCategoriesData,
+    projectCategoriesData,
+  } = props;
+
+  const activeFilterCount = countActiveFilters(props);
+
+  // 月份導航
+  const goToPrevMonth = () => {
+    if (selectedMonth === 0) {
+      setSelectedMonth(11);
+      setSelectedYear(selectedYear - 1);
+    } else {
+      setSelectedMonth(selectedMonth - 1);
+    }
+  };
+  const goToNextMonth = () => {
+    if (selectedMonth === 11) {
+      setSelectedMonth(0);
+      setSelectedYear(selectedYear + 1);
+    } else {
+      setSelectedMonth(selectedMonth + 1);
+    }
+  };
+  const goToToday = () => {
+    setSelectedYear(new Date().getFullYear());
+    setSelectedMonth(new Date().getMonth());
+  };
+
   return (
-    <>
-      {/* 標題區域 - 手機版簡化 */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4 px-1">
+    <div className="space-y-3">
+      {/* ── 標題列 ── */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 px-1">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold tracking-tight">專案付款管理</h1>
-          <p className="text-sm sm:text-base text-muted-foreground hidden sm:block">管理專案相關的付款項目和記錄</p>
+          <p className="text-xs text-muted-foreground">
+            共 <span className="font-semibold text-foreground">{filteredItemsCount}</span> 筆
+            {activeFilterCount > 0 && (
+              <Badge variant="secondary" className="ml-2 text-xs py-0 h-5">
+                {activeFilterCount} 個篩選中
+              </Badge>
+            )}
+          </p>
         </div>
-
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
-          {/* 統計邏輯模式切換 */}
-          <div className="flex items-center bg-gray-100 rounded-lg p-1">
+        <div className="flex items-center gap-2">
+          {/* 費用模式切換 */}
+          <div className="flex items-center bg-gray-100 rounded-lg p-1 gap-0.5">
             <Button
               variant={statisticsMode === 'expense' ? 'default' : 'ghost'}
               size="sm"
               onClick={() => setStatisticsMode('expense')}
-              className={`px-2 py-1 text-xs rounded-md transition-all ${
+              className={`h-7 px-2 text-xs rounded-md transition-all ${
                 statisticsMode === 'expense'
                   ? 'bg-white shadow-sm text-blue-600 font-medium'
                   : 'text-gray-600 hover:text-gray-900'
@@ -141,7 +218,7 @@ export default function PaymentProjectFilters({
               variant={statisticsMode === 'cashflow' ? 'default' : 'ghost'}
               size="sm"
               onClick={() => setStatisticsMode('cashflow')}
-              className={`px-2 py-1 text-xs rounded-md transition-all ${
+              className={`h-7 px-2 text-xs rounded-md transition-all ${
                 statisticsMode === 'cashflow'
                   ? 'bg-white shadow-sm text-green-600 font-medium'
                   : 'text-gray-600 hover:text-gray-900'
@@ -151,539 +228,254 @@ export default function PaymentProjectFilters({
               現金流
             </Button>
           </div>
-
-          <ResponsiveButtonGroup
-            buttons={[
-              {
-                label: "專案管理",
-                onClick: onOpenProjectCategoryDialog,
-                variant: "outline",
-              },
-            ]}
-            orientation="horizontal"
-          />
+          <Button variant="outline" size="sm" onClick={onOpenProjectCategoryDialog} className="h-7 text-xs">
+            <Settings2 className="h-3 w-3 mr-1" />
+            專案管理
+          </Button>
         </div>
       </div>
 
-      {/* 效能監控指標 - 手機版隱藏 */}
-      <Card className="border border-blue-200 bg-blue-50/30 hidden sm:block">
-        <CardContent className="p-3 sm:p-4">
-          <div className="flex items-center justify-between text-sm">
-            <div className="flex items-center gap-2 sm:gap-4">
-              <div className="flex items-center gap-1 sm:gap-2">
-                <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                <span className="text-gray-600 text-xs sm:text-sm">載入: <span className="font-mono text-green-600">0.3s</span></span>
-              </div>
-              <div className="flex items-center gap-1 sm:gap-2">
-                <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 text-blue-500" />
-                <span className="text-gray-600 text-xs sm:text-sm">項目: <span className="font-mono text-blue-600">{filteredItemsCount}</span></span>
-              </div>
-              {isLoadingMore && (
-                <div className="flex items-center gap-1 sm:gap-2">
-                  <RefreshCw className="h-3 w-3 animate-spin text-orange-500" />
-                  <span className="text-orange-600 text-xs sm:text-sm">載入中...</span>
-                </div>
-              )}
-            </div>
-            <div className="hidden lg:flex items-center gap-2 text-xs text-gray-500">
-              <span>虛擬滾動: 啟用</span>
-              <span>•</span>
-              <span>智能篩選: 可用</span>
-              <span>•</span>
-              <span>批量操作: {selectedItemsCount > 0 ? `已選擇 ${selectedItemsCount} 項` : '就緒'}</span>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {/* ── 篩選主卡片 ── */}
+      <Card className="border-2">
+        <CardContent className="p-3 sm:p-4 space-y-3">
 
-      {/* 搜尋與篩選區域 - 手機版優化 */}
-      <Card className="border-2 mx-1 sm:mx-0">
-        <CardHeader className="p-3 sm:p-6 pb-2 sm:pb-4">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0">
-            <CardTitle className="text-base sm:text-lg">搜尋與篩選</CardTitle>
-            <div className="flex items-center justify-between sm:justify-end gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={resetFilters}
-                className="h-7 sm:h-8 text-xs sm:text-sm px-2 sm:px-3 text-muted-foreground"
-              >
-                <RotateCcw className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                <span className="hidden sm:inline">重置</span>
-              </Button>
-
-              {/* 智能篩選按鈕群組 - 手機版橫向滾動 */}
-              <div className="flex gap-1 overflow-x-auto scrollbar-none">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => applySmartFilter('urgent')}
-                  className="h-7 sm:h-8 text-xs bg-red-50 hover:bg-red-100 border-red-200 text-red-700 flex-shrink-0"
-                >
-                  <AlertTriangle className="h-3 w-3 mr-1" />
-                  緊急
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => applySmartFilter('thisMonth')}
-                  className="h-7 sm:h-8 text-xs bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-700 flex-shrink-0"
-                >
-                  <Calendar className="h-3 w-3 mr-1" />
-                  本月
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => applySmartFilter('highAmount')}
-                  className="h-7 sm:h-8 text-xs bg-green-50 hover:bg-green-100 border-green-200 text-green-700 flex-shrink-0"
-                >
-                  <DollarSign className="h-3 w-3 mr-1" />
-                  高額
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => applySmartFilter('overdue')}
-                  className="h-7 sm:h-8 text-xs bg-orange-50 hover:bg-orange-100 border-orange-200 text-orange-700 flex-shrink-0"
-                >
-                  <Clock className="h-3 w-3 mr-1" />
-                  逾期
-                </Button>
-              </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-                className="h-8"
-              >
-                <Filter className="h-4 w-4 mr-1" />
-                {showAdvancedFilters ? "簡化" : "進階"}
-                {showAdvancedFilters ? <ChevronUp className="h-4 w-4 ml-1" /> : <ChevronDown className="h-4 w-4 ml-1" />}
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {/* 搜尋欄與重置按鈕 */}
-          <div className="flex gap-2">
+          {/* 第一行：搜尋 + 重置 + 進階展開 */}
+          <div className="flex gap-2 items-center">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-4 w-4" />
               <Input
                 ref={searchInputRef}
-                placeholder="搜尋項目名稱、分類或專案... (Ctrl+K快速搜尋)"
+                placeholder="搜尋項目名稱或專案… (Ctrl+K)"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 pr-12 h-10"
+                className="pl-9 pr-8 h-9 text-sm"
               />
               {searchTerm !== debouncedSearchTerm && (
-                <div className="absolute right-8 top-1/2 transform -translate-y-1/2">
-                  <div className="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full"></div>
+                <div className="absolute right-8 top-1/2 -translate-y-1/2">
+                  <div className="animate-spin h-3 w-3 border-2 border-primary border-t-transparent rounded-full" />
                 </div>
               )}
               {searchTerm && (
                 <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setSearchTerm("");
-                    setDebouncedSearchTerm("");
-                  }}
-                  className="absolute right-2 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0"
+                  variant="ghost" size="sm"
+                  onClick={() => { setSearchTerm(""); setDebouncedSearchTerm(""); }}
+                  className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 p-0"
                 >
-                  <X className="h-4 w-4" />
+                  <X className="h-3 w-3" />
                 </Button>
               )}
             </div>
+
             <Button
-              variant="outline"
-              size="sm"
+              variant="outline" size="sm"
               onClick={resetFilters}
-              className="h-10 px-3"
-              title="重置所有篩選條件 (Alt+0)"
+              className={`h-9 px-3 flex-shrink-0 ${activeFilterCount > 0 ? 'border-orange-300 text-orange-600 bg-orange-50 hover:bg-orange-100' : ''}`}
+              title="重置所有篩選 (Alt+0)"
             >
-              <RotateCcw className="h-4 w-4" />
+              <RotateCcw className="h-3.5 w-3.5 mr-1" />
+              重置
+              {activeFilterCount > 0 && (
+                <Badge className="ml-1 h-4 w-4 p-0 flex items-center justify-center text-[10px] bg-orange-500">
+                  {activeFilterCount}
+                </Badge>
+              )}
+            </Button>
+
+            <Button
+              variant="ghost" size="sm"
+              onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+              className="h-9 px-3 flex-shrink-0"
+            >
+              <Filter className="h-3.5 w-3.5 mr-1" />
+              {showAdvancedFilters ? "收起" : "進階"}
+              {showAdvancedFilters ? <ChevronUp className="h-3 w-3 ml-1" /> : <ChevronDown className="h-3 w-3 ml-1" />}
             </Button>
           </div>
 
-          {/* 快捷篩選按鈕 - 移到搜尋欄下方 */}
-          <div className="flex flex-wrap gap-2">
-            <Button
-              variant={selectedStatus === "overdue" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setSelectedStatus("overdue")}
-              className="h-8"
-            >
-              <AlertTriangle className="h-4 w-4 mr-1" />
-              逾期項目
-            </Button>
-            <Button
-              variant={dateRange === "currentMonth" && selectedStatus === "unpaid" ? "default" : "outline"}
-              size="sm"
-              onClick={() => {
-                setDateRange("currentMonth");
-                setSelectedStatus("unpaid");
-              }}
-              className="h-8"
-            >
-              <Calendar className="h-4 w-4 mr-1" />
-              本月到期
-            </Button>
-            <Button
-              variant={dateRange === "currentMonthPayment" ? "default" : "outline"}
-              size="sm"
-              onClick={() => {
-                setDateRange("currentMonthPayment");
-                setSelectedStatus("all");
-                setShowPaidItems(true);
-              }}
-              className="h-8"
-            >
-              <DollarSign className="h-4 w-4 mr-1" />
-              本月實付
-            </Button>
-            <Button
-              variant={priorityFilter === "high" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setPriorityFilter("high")}
-              className="h-8"
-            >
-              <Star className="h-4 w-4 mr-1" />
-              高優先級
-            </Button>
-            <Button
-              variant={selectedStatus === "partial" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setSelectedStatus("partial")}
-              className="h-8"
-            >
-              <Clock className="h-4 w-4 mr-1" />
-              部分付款
-            </Button>
-            <Button
-              variant={selectedPaymentType === "installment" ? "default" : "outline"}
-              size="sm"
-              onClick={() => {
-                setSelectedPaymentType("installment");
-                setSelectedStatus("all");
-              }}
-              className="h-8 bg-purple-600 hover:bg-purple-700 text-white border-purple-600"
-            >
-              <TrendingUp className="h-4 w-4 mr-1" />
-              分期付款
-            </Button>
-            <Button
-              variant={selectedPaymentType === "installment" && selectedStatus === "pending" ? "default" : "outline"}
-              size="sm"
-              onClick={() => {
-                setSelectedPaymentType("installment");
-                setSelectedStatus("pending");
-              }}
-              className="h-8"
-            >
-              <Clock className="h-4 w-4 mr-1" />
-              分期待付
-            </Button>
+          {/* 第二行：快捷篩選（合併後，不重複） */}
+          <div className="flex flex-wrap gap-1.5">
+            {QUICK_FILTERS.map((qf) => (
+              <Button
+                key={qf.label}
+                variant={qf.isActive(props) ? "default" : "outline"}
+                size="sm"
+                onClick={() => qf.apply(props)}
+                className="h-7 text-xs px-2 flex items-center gap-1"
+              >
+                {qf.icon}
+                {qf.label}
+              </Button>
+            ))}
           </div>
 
-          {/* 基本篩選 */}
-          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">專案</Label>
-              <Select value={selectedProject} onValueChange={setSelectedProject}>
-                <SelectTrigger className="h-10">
-                  <SelectValue placeholder="選擇專案" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">全部專案</SelectItem>
-                  {(Array.isArray(projects) ? projects : []).map((project: PaymentProject) => (
-                    <SelectItem key={project.id} value={project.id.toString()}>
-                      {project.projectName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          {/* 第三行：月份導航（緊湊版，含左右箭頭） */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs text-muted-foreground">時間：</span>
+            <div className="flex items-center gap-1 bg-gray-50 rounded-md border px-2 py-1">
+              <Button variant="ghost" size="sm" onClick={goToPrevMonth} className="h-6 w-6 p-0">
+                <ChevronLeft className="h-3.5 w-3.5" />
+              </Button>
+              <span className="text-sm font-medium min-w-[72px] text-center">
+                {selectedYear}年{MONTH_NAMES[selectedMonth]}
+              </span>
+              <Button variant="ghost" size="sm" onClick={goToNextMonth} className="h-6 w-6 p-0">
+                <ChevronRight className="h-3.5 w-3.5" />
+              </Button>
+              <Button variant="ghost" size="sm" onClick={goToToday} className="h-6 text-xs px-2 ml-0.5 text-blue-600 hover:text-blue-700">
+                今月
+              </Button>
             </div>
 
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">狀態</Label>
-              <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-                <SelectTrigger className="h-10">
-                  <SelectValue placeholder="選擇狀態" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">全部狀態</SelectItem>
-                  <SelectItem value="pending">待付款</SelectItem>
-                  <SelectItem value="partial">部分付款</SelectItem>
-                  <SelectItem value="paid">已付清</SelectItem>
-                  <SelectItem value="unpaid">未付款</SelectItem>
-                  <SelectItem value="overdue">逾期項目</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">付款類型</Label>
-              <Select value={selectedPaymentType} onValueChange={setSelectedPaymentType}>
-                <SelectTrigger className="h-10">
-                  <SelectValue placeholder="選擇類型" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">全部類型</SelectItem>
-                  <SelectItem value="single">單次付款</SelectItem>
-                  <SelectItem value="installment">分期付款</SelectItem>
-                  <SelectItem value="monthly">月付</SelectItem>
-                  <SelectItem value="recurring">定期付款</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">時間範圍</Label>
-              <Select value={dateRange} onValueChange={setDateRange}>
-                <SelectTrigger className="h-10">
-                  <SelectValue placeholder="選擇時間範圍" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">全部時間</SelectItem>
-                  <SelectItem value="currentMonth">本月</SelectItem>
-                  <SelectItem value="nextMonth">下月</SelectItem>
-                  <SelectItem value="currentYear">今年</SelectItem>
-                  <SelectItem value="upcoming">即將到期(7天內)</SelectItem>
-                  <SelectItem value="overdue">已逾期</SelectItem>
-                  <SelectItem value="custom">自訂範圍</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">優先級</Label>
-              <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-                <SelectTrigger className="h-10">
-                  <SelectValue placeholder="選擇優先級" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">全部優先級</SelectItem>
-                  <SelectItem value="high">高優先級</SelectItem>
-                  <SelectItem value="medium">中優先級</SelectItem>
-                  <SelectItem value="low">低優先級</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="flex items-center gap-1.5 ml-auto">
+              <Switch
+                id="show-paid-compact"
+                checked={showPaidItems}
+                onCheckedChange={setShowPaidItems}
+              />
+              <Label htmlFor="show-paid-compact" className="text-xs text-muted-foreground cursor-pointer select-none">
+                顯示已付清
+              </Label>
             </div>
           </div>
 
-          {/* 時間導航 */}
-          <div className="border-t pt-4">
-            <div className="flex items-center justify-between mb-4">
-              <Label className="text-sm font-medium">時間導航</Label>
-              <div className="flex items-center gap-2">
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      const now = new Date();
-                      setSelectedYear(now.getFullYear());
-                      setSelectedMonth(now.getMonth());
-                    }}
-                    className="h-8 text-xs btn-hover-lift"
-                  >
-                    回到當前月份
-                  </Button>
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="show-paid-items"
-                      checked={showPaidItems}
-                      onCheckedChange={setShowPaidItems}
-                    />
-                    <Label htmlFor="show-paid-items" className="text-sm">顯示已付款項目</Label>
-                  </div>
-                </div>
+          {/* 第四行：基本篩選（2+2 佈局） */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <Select value={selectedProject} onValueChange={setSelectedProject}>
+              <SelectTrigger className="h-9 text-sm">
+                <SelectValue placeholder="全部專案" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">全部專案</SelectItem>
+                {(Array.isArray(projects) ? projects : []).map((p: PaymentProject) => (
+                  <SelectItem key={p.id} value={p.id.toString()}>{p.projectName}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+              <SelectTrigger className="h-9 text-sm">
+                <SelectValue placeholder="全部狀態" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">全部狀態</SelectItem>
+                <SelectItem value="pending">待付款</SelectItem>
+                <SelectItem value="partial">部分付款</SelectItem>
+                <SelectItem value="paid">已付清</SelectItem>
+                <SelectItem value="unpaid">未付款</SelectItem>
+                <SelectItem value="overdue">逾期項目</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={selectedPaymentType} onValueChange={setSelectedPaymentType}>
+              <SelectTrigger className="h-9 text-sm">
+                <SelectValue placeholder="付款類型" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">全部類型</SelectItem>
+                <SelectItem value="single">單次付款</SelectItem>
+                <SelectItem value="installment">分期付款</SelectItem>
+                <SelectItem value="monthly">月付</SelectItem>
+                <SelectItem value="recurring">定期付款</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={dateRange} onValueChange={setDateRange}>
+              <SelectTrigger className="h-9 text-sm">
+                <SelectValue placeholder="時間範圍" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">全部時間</SelectItem>
+                <SelectItem value="currentMonth">本月（項目日期）</SelectItem>
+                <SelectItem value="currentMonthPayment">本月（付款日期）</SelectItem>
+                <SelectItem value="upcoming">7天內到期</SelectItem>
+                <SelectItem value="custom">自訂範圍</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* 自訂日期範圍 */}
+          {dateRange === "custom" && (
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">開始日期</Label>
+                <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="h-9 text-sm" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">結束日期</Label>
+                <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="h-9 text-sm" />
               </div>
             </div>
+          )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-              {/* 年份選擇器 */}
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">年份</Label>
-                <Select value={selectedYear.toString()} onValueChange={(value) => setSelectedYear(parseInt(value))}>
-                  <SelectTrigger className="h-10">
-                    <SelectValue placeholder="選擇年份" />
+          {/* 進階篩選 */}
+          {showAdvancedFilters && (
+            <div className="border-t pt-3 space-y-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                  <SelectTrigger className="h-9 text-sm">
+                    <SelectValue placeholder="全部分類" />
                   </SelectTrigger>
                   <SelectContent>
-                    {Array.from({ length: 30 }, (_, i) => {
-                      const currentYear = new Date().getFullYear();
-                      const year = currentYear - 10 + i;
-                      return (
-                        <SelectItem key={year} value={year.toString()}>
-                          {year}年
-                        </SelectItem>
-                      );
-                    })}
+                    <SelectItem value="all">全部分類</SelectItem>
+                    {(Array.isArray(fixedCategoriesData) ? fixedCategoriesData : []).map((c: FixedCategory) => (
+                      <SelectItem key={`fixed:${c.id}`} value={`fixed:${c.id}`}>{c.categoryName}（固定）</SelectItem>
+                    ))}
+                    {(Array.isArray(projectCategoriesData) ? projectCategoriesData : []).map((c: DebtCategory) => (
+                      <SelectItem key={`project:${c.id}`} value={`project:${c.id}`}>{c.categoryName}（專案）</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+                  <SelectTrigger className="h-9 text-sm">
+                    <SelectValue placeholder="全部優先級" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">全部優先級</SelectItem>
+                    <SelectItem value="high">高優先級</SelectItem>
+                    <SelectItem value="medium">中優先級</SelectItem>
+                    <SelectItem value="low">低優先級</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <Select value={sortBy} onValueChange={setSortBy}>
+                  <SelectTrigger className="h-9 text-sm">
+                    <SelectValue placeholder="排序方式" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="dueDate">到期日期</SelectItem>
+                    <SelectItem value="amount">金額</SelectItem>
+                    <SelectItem value="name">項目名稱</SelectItem>
+                    <SelectItem value="project">專案名稱</SelectItem>
+                    <SelectItem value="status">狀態</SelectItem>
+                    <SelectItem value="priority">優先級</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
-              {/* 月份按鈕 */}
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">月份</Label>
-                <div className="grid grid-cols-6 gap-1">
-                  {Array.from({ length: 12 }, (_, i) => (
-                    <Button
-                      key={i}
-                      variant={selectedMonth === i ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setSelectedMonth(i)}
-                      className="h-8 text-xs"
-                    >
-                      {i + 1}月
-                    </Button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* 進階篩選 */}
-          {showAdvancedFilters && (
-            <div className="border-t pt-4 space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">分類</Label>
-                  <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                    <SelectTrigger className="h-10">
-                      <SelectValue placeholder="選擇分類" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">全部分類</SelectItem>
-                      {(Array.isArray(fixedCategoriesData) ? fixedCategoriesData : []).map((category: FixedCategory) => (
-                        <SelectItem key={`fixed:${category.id}`} value={`fixed:${category.id}`}>
-                          {category.categoryName} (固定)
-                        </SelectItem>
-                      ))}
-                      {(Array.isArray(projectCategoriesData) ? projectCategoriesData : []).map((category: DebtCategory) => (
-                        <SelectItem key={`project:${category.id}`} value={`project:${category.id}`}>
-                          {category.categoryName} (專案)
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">時間範圍</Label>
-                  <Select value={dateRange} onValueChange={setDateRange}>
-                    <SelectTrigger className="h-10">
-                      <SelectValue placeholder="選擇時間範圍" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">全部時間</SelectItem>
-                      <SelectItem value="currentMonth">本月（項目日期）</SelectItem>
-                      <SelectItem value="currentMonthPayment">本月（付款日期）</SelectItem>
-                      <SelectItem value="upcoming">未來一週</SelectItem>
-                      <SelectItem value="custom">自訂範圍</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">排序</Label>
-                  <Select value={sortBy} onValueChange={setSortBy}>
-                    <SelectTrigger className="h-10">
-                      <SelectValue placeholder="排序方式" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="dueDate">到期日期</SelectItem>
-                      <SelectItem value="amount">金額</SelectItem>
-                      <SelectItem value="name">項目名稱</SelectItem>
-                      <SelectItem value="project">專案名稱</SelectItem>
-                      <SelectItem value="status">狀態</SelectItem>
-                      <SelectItem value="priority">優先級</SelectItem>
-                      {/* 分期項目專屬排序 */}
-                      <SelectItem value="installmentProgress">分期進度</SelectItem>
-                      <SelectItem value="installmentDueDate">分期到期</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              {/* 自訂日期範圍 */}
-              {dateRange === "custom" && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium">開始日期</Label>
-                    <Input
-                      type="date"
-                      value={startDate}
-                      onChange={(e) => setStartDate(e.target.value)}
-                      className="h-10"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium">結束日期</Label>
-                    <Input
-                      type="date"
-                      value={endDate}
-                      onChange={(e) => setEndDate(e.target.value)}
-                      className="h-10"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* 其他選項 */}
               <div className="flex flex-wrap gap-4">
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center gap-2">
                   <Switch
-                    id="show-paid"
+                    id="sort-order-adv"
+                    checked={sortOrder === "desc"}
+                    onCheckedChange={(c) => setSortOrder(c ? "desc" : "asc")}
+                  />
+                  <Label htmlFor="sort-order-adv" className="text-xs cursor-pointer select-none">降序排列</Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch
+                    id="show-paid-adv"
                     checked={showPaidItems}
                     onCheckedChange={setShowPaidItems}
                   />
-                  <Label htmlFor="show-paid" className="text-sm">顯示已付清項目</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Switch
-                    id="sort-order"
-                    checked={sortOrder === "desc"}
-                    onCheckedChange={(checked) => setSortOrder(checked ? "desc" : "asc")}
-                  />
-                  <Label htmlFor="sort-order" className="text-sm">降序排列</Label>
+                  <Label htmlFor="show-paid-adv" className="text-xs cursor-pointer select-none">顯示已付清項目</Label>
                 </div>
               </div>
             </div>
           )}
 
-          {/* 篩選結果統計 */}
-          <div className="border-t pt-4">
-            <div className="text-sm text-muted-foreground">
-              顯示 <span className="font-medium text-foreground">{filteredItemsCount}</span> 個項目
-              {searchTerm && (
-                <>
-                  ，搜尋「<span className="font-medium text-foreground">{searchTerm}</span>」
-                </>
-              )}
-              {selectedProject !== "all" && projects && (
-                <>
-                  ，專案：<span className="font-medium text-foreground">
-                    {projects.find((p: PaymentProject) => p.id.toString() === selectedProject)?.projectName}
-                  </span>
-                </>
-              )}
-              {selectedStatus !== "all" && (
-                <>
-                  ，狀態：<span className="font-medium text-foreground">
-                    {selectedStatus === "pending" ? "待付款" :
-                     selectedStatus === "partial" ? "部分付款" :
-                     selectedStatus === "paid" ? "已付清" :
-                     selectedStatus === "unpaid" ? "未付款" :
-                     selectedStatus === "overdue" ? "逾期項目" : selectedStatus}
-                  </span>
-                </>
-              )}
-            </div>
-          </div>
         </CardContent>
       </Card>
-    </>
+    </div>
   );
 }
