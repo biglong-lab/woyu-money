@@ -88,6 +88,12 @@ export function AiAssistantSheet({ open, onOpenChange }: AiAssistantSheetProps) 
       <SheetContent
         side="right"
         className="w-full sm:w-[500px] p-0 flex flex-col"
+        onKeyDown={(e) => {
+          // 防止 Enter 鍵觸發 Radix Sheet 的關閉行為
+          if (e.key === "Enter") {
+            e.stopPropagation()
+          }
+        }}
       >
         {/* Header */}
         <SheetHeader className="px-4 py-3 border-b bg-gradient-to-r from-purple-50 to-blue-50 flex-shrink-0">
