@@ -38,14 +38,18 @@ interface ToolCallItem {
 // ─────────────────────────────────────────────
 
 export const AVAILABLE_MODELS = [
-  { id: "google/gemini-2.0-flash-exp:free", name: "Gemini 2.0 Flash（免費）", free: true },
-  { id: "google/gemini-2.5-pro-exp-03-25:free", name: "Gemini 2.5 Pro（免費）", free: true },
-  { id: "meta-llama/llama-4-maverick:free", name: "Llama 4 Maverick（免費）", free: true },
+  // 免費模型（已驗證可用）
+  { id: "meta-llama/llama-3.3-70b-instruct:free", name: "Llama 3.3 70B（免費，推薦）", free: true },
+  { id: "google/gemma-3-27b-it:free", name: "Gemma 3 27B（免費）", free: true },
+  { id: "deepseek/deepseek-r1-0528:free", name: "DeepSeek R1（免費，強推理）", free: true },
+  { id: "qwen/qwen3-4b:free", name: "Qwen3 4B（免費，快速）", free: true },
+  // 付費模型
   { id: "anthropic/claude-3.5-sonnet", name: "Claude 3.5 Sonnet", free: false },
   { id: "anthropic/claude-3.5-haiku", name: "Claude 3.5 Haiku（快速）", free: false },
   { id: "openai/gpt-4o", name: "GPT-4o", free: false },
   { id: "openai/gpt-4o-mini", name: "GPT-4o Mini（快速）", free: false },
-  { id: "google/gemini-2.0-flash", name: "Gemini 2.0 Flash", free: false },
+  { id: "google/gemini-2.5-flash", name: "Gemini 2.5 Flash", free: false },
+  { id: "google/gemini-2.5-pro", name: "Gemini 2.5 Pro", free: false },
 ]
 
 // ─────────────────────────────────────────────
