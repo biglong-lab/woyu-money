@@ -28,6 +28,7 @@ import * as budgetFns from "./budget"
 import * as hrCostsFns from "./hr-costs"
 import * as invoiceFns from "./invoice"
 import * as financialReportsFns from "./financial-reports"
+import * as incomeFns from "./income"
 
 // 重新匯出所有領域函式
 export * from "./users"
@@ -47,6 +48,7 @@ export * from "./budget"
 export * from "./hr-costs"
 export * from "./invoice"
 export * from "./financial-reports"
+export * from "./income"
 
 // 管理功能模組選擇性匯出（避免與 statistics.ts、subcategory-payments.ts 的重複匯出衝突）
 // 智慧提醒
