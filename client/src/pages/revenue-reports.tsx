@@ -82,7 +82,8 @@ interface DailyRevenueRecord {
 
 // 來源統計
 interface RevenueSource {
-  sourceType: string
+  sourceName: string
+  sourceKey: string
   totalRevenue: number
   recordCount: number
 }
