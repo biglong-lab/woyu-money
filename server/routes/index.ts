@@ -27,6 +27,7 @@ import incomeRoutes from "./income"
 import pmBridgeRoutes from "./pm-bridge"
 import pmsBridgeRoutes from "./pms-bridge"
 import dailyRevenueRoutes from "./daily-revenues"
+import aiAssistantRoutes from "./ai-assistant"
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // 設定認證系統
