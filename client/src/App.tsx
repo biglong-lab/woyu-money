@@ -11,6 +11,7 @@ import MobileTabBar from "@/components/mobile-tab-bar";
 import AppBreadcrumb from "@/components/app-breadcrumb";
 import QuickActionFAB from "@/components/quick-action-fab";
 import QuickPaymentDialog from "@/components/quick-payment-dialog";
+import { AiAssistantSheet } from "@/components/ai-assistant-sheet";
 import NotFound from "@/pages/not-found";
 import AuthPage from "@/pages/auth-page";
 
