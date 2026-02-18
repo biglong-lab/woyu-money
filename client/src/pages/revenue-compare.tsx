@@ -24,8 +24,7 @@ import {
 } from "recharts"
 import {
   RefreshCw, TrendingUp, TrendingDown, CheckCircle2,
-  AlertTriangle, BarChart3, Info, ChevronDown, ChevronRight,
-  Minus,
+  AlertTriangle, BarChart3, Info, ChevronDown, ChevronRight, Minus,
 } from "lucide-react"
 import { apiRequest } from "@/lib/queryClient"
 import { useToast } from "@/hooks/use-toast"
