@@ -80,6 +80,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use(reportRoutes)
   app.use(incomeRoutes)
   app.use(pmBridgeRoutes)
+  app.use(dailyRevenueRoutes)
 
   const httpServer = createServer(app)
   return httpServer
