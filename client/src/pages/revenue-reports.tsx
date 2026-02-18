@@ -123,9 +123,14 @@ export default function RevenueReports() {
     queryKey: ["/api/revenue/reports/yearly-comparison"],
   });
 
-  // 每日收款記錄
+  // 每日收款記錄（手動新增）
   const { data: dailyRevenues = [] } = useQuery<DailyRevenueRecord[]>({
     queryKey: ["/api/daily-revenues"],
+  });
+
+  // 來源統計（各系統貢獻）
+  const { data: revenueSources = [] } = useQuery<RevenueSource[]>({
+    queryKey: ["/api/revenue/reports/sources"],
   });
 
   // 處理月度趨勢數據
