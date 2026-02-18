@@ -73,6 +73,12 @@ const navigationItems = [
         href: "/revenue/reports",
         icon: DollarSign,
         description: "專案收款記錄與分析"
+      },
+      {
+        title: "PMS vs PM 比對",
+        href: "/revenue/compare",
+        icon: BarChart3,
+        description: "兩系統月度收入差距分析"
       }
     ]
   },
