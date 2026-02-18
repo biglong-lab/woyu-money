@@ -1,16 +1,18 @@
 import { Link, useLocation } from "wouter";
-import { 
-  Home, 
-  Building2, 
-  CreditCard, 
-  FileText, 
-  BarChart3, 
-  DollarSign, 
+import {
+  Home,
+  Building2,
+  CreditCard,
+  FileText,
+  BarChart3,
+  DollarSign,
   Target,
   Settings,
   Calculator,
   TrendingUp,
-  Layers
+  Layers,
+  Users,
+  ClipboardList
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
