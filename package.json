@@ -17,7 +17,13 @@
     "lint:fix": "eslint client/src server shared --fix",
     "format": "prettier --write \"client/src/**/*.{ts,tsx}\" \"server/**/*.ts\" \"shared/**/*.ts\"",
     "format:check": "prettier --check \"client/src/**/*.{ts,tsx}\" \"server/**/*.ts\" \"shared/**/*.ts\"",
-    "prepare": "husky"
+    "prepare": "husky",
+    "sync:prod": "bash scripts/sync-from-production.sh",
+    "sync:db": "bash scripts/sync-from-production.sh db-only",
+    "sync:files": "bash scripts/sync-from-production.sh files-only",
+    "dev:start": "bash scripts/dev-start.sh",
+    "db:export": "tsx database_backup/export-data.ts",
+    "db:import": "tsx database_backup/import-data.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.37.0",
