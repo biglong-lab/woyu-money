@@ -158,6 +158,14 @@ export function GeneralPaymentFilterPanel({
           </Badge>
           <Badge
             variant="outline"
+            className="cursor-pointer px-3 py-1 hover:bg-amber-100 border-amber-400 text-amber-800 font-medium"
+            onClick={() => onApplyQuickFilter("dueUnpaid")}
+            data-testid="quick-filter-due-unpaid"
+          >
+            到期欠款 ({statusCounts.dueUnpaid})
+          </Badge>
+          <Badge
+            variant="outline"
             className="cursor-pointer px-3 py-1 hover:bg-gray-100 border-gray-300 text-gray-700"
             onClick={() => onApplyQuickFilter("unpaid")}
             data-testid="quick-filter-unpaid"
