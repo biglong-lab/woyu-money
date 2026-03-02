@@ -275,6 +275,11 @@ export default function GeneralPaymentManagement() {
             matchesDate = itemDate.getMonth() === today.getMonth() && itemDate.getFullYear() === today.getFullYear();
             break;
           }
+          case "up-to-today": {
+            const todayStr = today.toISOString().split('T')[0];
+            matchesDate = item.startDate <= todayStr;
+            break;
+          }
         }
       }
 
