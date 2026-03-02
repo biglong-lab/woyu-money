@@ -665,6 +665,10 @@ export default function GeneralPaymentManagement() {
       case "unpaid":
         setShowPaidItems(false);
         break;
+      case "dueUnpaid":
+        setDateRange("up-to-today");
+        setShowPaidItems(false);
+        break;
     }
   };
 
