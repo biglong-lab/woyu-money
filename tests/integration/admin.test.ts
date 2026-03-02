@@ -8,7 +8,6 @@
 import { describe, it, expect, beforeAll, afterEach } from "vitest"
 import type { Express } from "express"
 import { createTestApp, createAuthenticatedAgent } from "../helpers/test-app"
-import { storage } from "../../server/storage"
 
 // 檢查是否有資料庫連線
 const skipIfNoDb = !process.env.DATABASE_URL
@@ -22,9 +21,9 @@ describe.skipIf(skipIfNoDb)("Admin API 整合測試", () => {
     adminAgent = await createAuthenticatedAgent(app, "admin", "admin123")
   })
 
-  // 清理測試資料
+  // 清理測試資料（動態 import 避免無 DB 時載入失敗）
   afterEach(async () => {
-    // 刪除測試建立的用戶
+    const { storage } = await import("../../server/storage")
     const users = await storage.getAllUsers()
     for (const user of users) {
       if (user.username.startsWith("test_")) {
@@ -57,15 +56,13 @@ describe.skipIf(skipIfNoDb)("Admin API 整合測試", () => {
     it("非管理員應返回 403", async () => {
       // 建立非管理員用戶
       const testAgent = await createAuthenticatedAgent(app, "admin", "admin123")
-      
+
       // 先建立測試用戶
-      await adminAgent
-        .post("/api/admin/users")
-        .send({
-          username: "test_user_non_admin",
-          password: "testpass123",
-          role: "user2"
-        })
+      await adminAgent.post("/api/admin/users").send({
+        username: "test_user_non_admin",
+        password: "testpass123",
+        role: "user2",
+      })
 
       // 用一般用戶登入
       const normalAgent = await createAuthenticatedAgent(app, "test_user_non_admin", "testpass123")
@@ -83,10 +80,10 @@ describe.skipIf(skipIfNoDb)("Admin API 整合測試", () => {
 
       expect(res.status).toBe(200)
       expect(Array.isArray(res.body)).toBe(true)
-      
+
       // 至少應有 admin 用戶
       expect(res.body.length).toBeGreaterThan(0)
-      
+
       // 驗證用戶資料結構（不應包含密碼）
       const firstUser = res.body[0]
       expect(firstUser).toHaveProperty("id")
@@ -98,13 +95,11 @@ describe.skipIf(skipIfNoDb)("Admin API 整合測試", () => {
 
     it("非管理員應返回 403", async () => {
       // 建立並登入非管理員用戶
-      await adminAgent
-        .post("/api/admin/users")
-        .send({
-          username: "test_user_list",
-          password: "testpass123",
-          role: "user2"
-        })
+      await adminAgent.post("/api/admin/users").send({
+        username: "test_user_list",
+        password: "testpass123",
+        role: "user2",
+      })
 
       const normalAgent = await createAuthenticatedAgent(app, "test_user_list", "testpass123")
       const res = await normalAgent.get("/api/admin/users")
@@ -120,7 +115,7 @@ describe.skipIf(skipIfNoDb)("Admin API 整合測試", () => {
         password: "password123",
         email: "test@example.com",
         fullName: "測試用戶",
-        role: "user2"
+        role: "user2",
       }
 
       const res = await adminAgent.post("/api/admin/users").send(newUser)
@@ -137,9 +132,7 @@ describe.skipIf(skipIfNoDb)("Admin API 整合測試", () => {
     })
 
     it("缺少必填欄位應返回 400", async () => {
-      const res = await adminAgent
-        .post("/api/admin/users")
-        .send({ username: "test_incomplete" })
+      const res = await adminAgent.post("/api/admin/users").send({ username: "test_incomplete" })
 
       expect(res.status).toBe(400)
       expect(res.body).toHaveProperty("message")
@@ -147,13 +140,11 @@ describe.skipIf(skipIfNoDb)("Admin API 整合測試", () => {
     })
 
     it("重複用戶名應返回 400", async () => {
-      const res = await adminAgent
-        .post("/api/admin/users")
-        .send({
-          username: "admin",
-          password: "testpass123",
-          role: "user2"
-        })
+      const res = await adminAgent.post("/api/admin/users").send({
+        username: "admin",
+        password: "testpass123",
+        role: "user2",
+      })
 
       expect(res.status).toBe(400)
       expect(res.body.message).toContain("已存在")
@@ -163,20 +154,16 @@ describe.skipIf(skipIfNoDb)("Admin API 整合測試", () => {
   describe("PUT /api/admin/users/:id/role", () => {
     it("應成功更新用戶角色", async () => {
       // 先建立用戶
-      const createRes = await adminAgent
-        .post("/api/admin/users")
-        .send({
-          username: "test_role_update",
-          password: "testpass123",
-          role: "user2"
-        })
+      const createRes = await adminAgent.post("/api/admin/users").send({
+        username: "test_role_update",
+        password: "testpass123",
+        role: "user2",
+      })
 
       const userId = createRes.body.id
 
       // 更新角色
-      const res = await adminAgent
-        .put(`/api/admin/users/${userId}/role`)
-        .send({ role: "user1" })
+      const res = await adminAgent.put(`/api/admin/users/${userId}/role`).send({ role: "user1" })
 
       expect(res.status).toBe(200)
       expect(res.body).toHaveProperty("id", userId)
@@ -185,9 +172,7 @@ describe.skipIf(skipIfNoDb)("Admin API 整合測試", () => {
     })
 
     it("無效角色應返回 400", async () => {
-      const res = await adminAgent
-        .put("/api/admin/users/999/role")
-        .send({ role: "invalid_role" })
+      const res = await adminAgent.put("/api/admin/users/999/role").send({ role: "invalid_role" })
 
       expect(res.status).toBe(400)
       expect(res.body.message).toContain("無效")
@@ -197,13 +182,11 @@ describe.skipIf(skipIfNoDb)("Admin API 整合測試", () => {
   describe("PUT /api/admin/users/:id/permissions", () => {
     it("應成功更新用戶權限", async () => {
       // 先建立用戶
-      const createRes = await adminAgent
-        .post("/api/admin/users")
-        .send({
-          username: "test_perm_update",
-          password: "testpass123",
-          role: "user2"
-        })
+      const createRes = await adminAgent.post("/api/admin/users").send({
+        username: "test_perm_update",
+        password: "testpass123",
+        role: "user2",
+      })
 
       const userId = createRes.body.id
       const newPermissions = ["dashboard", "payments"]
@@ -223,13 +206,11 @@ describe.skipIf(skipIfNoDb)("Admin API 整合測試", () => {
   describe("PUT /api/admin/users/:id/password", () => {
     it("應成功重置用戶密碼", async () => {
       // 先建立用戶
-      const createRes = await adminAgent
-        .post("/api/admin/users")
-        .send({
-          username: "test_pwd_reset",
-          password: "testpass123",
-          role: "user2"
-        })
+      const createRes = await adminAgent.post("/api/admin/users").send({
+        username: "test_pwd_reset",
+        password: "testpass123",
+        role: "user2",
+      })
 
       const userId = createRes.body.id
 
@@ -255,13 +236,11 @@ describe.skipIf(skipIfNoDb)("Admin API 整合測試", () => {
   describe("PUT /api/admin/users/:id/status", () => {
     it("應成功切換用戶狀態", async () => {
       // 先建立用戶
-      const createRes = await adminAgent
-        .post("/api/admin/users")
-        .send({
-          username: "test_status_toggle",
-          password: "testpass123",
-          role: "user2"
-        })
+      const createRes = await adminAgent.post("/api/admin/users").send({
+        username: "test_status_toggle",
+        password: "testpass123",
+        role: "user2",
+      })
 
       const userId = createRes.body.id
 
@@ -279,13 +258,11 @@ describe.skipIf(skipIfNoDb)("Admin API 整合測試", () => {
   describe("PUT /api/admin/users/:id/toggle-status", () => {
     it("應成功切換用戶狀態", async () => {
       // 先建立用戶
-      const createRes = await adminAgent
-        .post("/api/admin/users")
-        .send({
-          username: "test_toggle",
-          password: "testpass123",
-          role: "user2"
-        })
+      const createRes = await adminAgent.post("/api/admin/users").send({
+        username: "test_toggle",
+        password: "testpass123",
+        role: "user2",
+      })
 
       const userId = createRes.body.id
 
@@ -303,13 +280,11 @@ describe.skipIf(skipIfNoDb)("Admin API 整合測試", () => {
   describe("DELETE /api/admin/users/:id", () => {
     it("應成功刪除用戶", async () => {
       // 先建立用戶
-      const createRes = await adminAgent
-        .post("/api/admin/users")
-        .send({
-          username: "test_delete",
-          password: "testpass123",
-          role: "user2"
-        })
+      const createRes = await adminAgent.post("/api/admin/users").send({
+        username: "test_delete",
+        password: "testpass123",
+        role: "user2",
+      })
 
       const userId = createRes.body.id
 
@@ -320,15 +295,17 @@ describe.skipIf(skipIfNoDb)("Admin API 整合測試", () => {
       expect(res.body).toHaveProperty("message")
 
       // 驗證用戶已刪除
+      const { storage } = await import("../../server/storage")
       const users = await storage.getAllUsers()
-      const deletedUser = users.find(u => u.id === userId)
+      const deletedUser = users.find((u) => u.id === userId)
       expect(deletedUser).toBeUndefined()
     })
 
     it("不能刪除自己的帳戶", async () => {
       // 獲取 admin 用戶 ID
+      const { storage } = await import("../../server/storage")
       const users = await storage.getAllUsers()
-      const adminUser = users.find(u => u.username === "admin")
+      const adminUser = users.find((u) => u.username === "admin")
 
       const res = await adminAgent.delete(`/api/admin/users/${adminUser!.id}`)
 
@@ -350,13 +327,11 @@ describe.skipIf(skipIfNoDb)("Admin API 整合測試", () => {
     })
 
     it("非管理員應返回 403", async () => {
-      await adminAgent
-        .post("/api/admin/users")
-        .send({
-          username: "test_backup_user",
-          password: "testpass123",
-          role: "user2"
-        })
+      await adminAgent.post("/api/admin/users").send({
+        username: "test_backup_user",
+        password: "testpass123",
+        role: "user2",
+      })
 
       const normalAgent = await createAuthenticatedAgent(app, "test_backup_user", "testpass123")
       const res = await normalAgent.post("/api/admin/backup")
@@ -408,13 +383,11 @@ describe.skipIf(skipIfNoDb)("Admin API 整合測試", () => {
     })
 
     it("非管理員存取 LINE 配置應返回 403", async () => {
-      await adminAgent
-        .post("/api/admin/users")
-        .send({
-          username: "test_line_user",
-          password: "testpass123",
-          role: "user2"
-        })
+      await adminAgent.post("/api/admin/users").send({
+        username: "test_line_user",
+        password: "testpass123",
+        role: "user2",
+      })
 
       const normalAgent = await createAuthenticatedAgent(app, "test_line_user", "testpass123")
       const res = await normalAgent.get("/api/line-config")
