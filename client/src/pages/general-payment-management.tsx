@@ -197,6 +197,7 @@ export default function GeneralPaymentManagement() {
 
   const statusCounts = useMemo(() => {
     const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
     return {
       pending: generalItems.filter((item) => item.status === "pending").length,
       paid: generalItems.filter((item) => item.status === "paid").length,
@@ -208,6 +209,9 @@ export default function GeneralPaymentManagement() {
         return itemDate.getMonth() === today.getMonth() &&
                itemDate.getFullYear() === today.getFullYear();
       }).length,
+      dueUnpaid: generalItems.filter((item) =>
+        item.status !== "paid" && item.startDate <= todayStr
+      ).length,
     };
   }, [generalItems]);
 
