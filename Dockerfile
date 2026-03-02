@@ -16,7 +16,7 @@ WORKDIR /app
 
 # 安裝全部依賴（drizzle-kit 遷移需要 devDependencies）
 COPY package.json package-lock.json ./
-RUN npm ci && npm cache clean --force
+RUN npm ci --legacy-peer-deps && npm cache clean --force
 
 # 從 builder 複製建置產物
 COPY --from=builder /app/dist ./dist
