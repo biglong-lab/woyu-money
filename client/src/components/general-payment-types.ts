@@ -77,4 +77,5 @@ export interface StatusCounts {
   paid: number;
   overdue: number;
   thisMonth: number;
+  dueUnpaid: number;
 }
