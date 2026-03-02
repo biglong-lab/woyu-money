@@ -246,6 +246,7 @@ export function GeneralPaymentFilterPanel({
                 <SelectItem value="week">近7天</SelectItem>
                 <SelectItem value="month">近30天</SelectItem>
                 <SelectItem value="current-month">本月</SelectItem>
+                <SelectItem value="up-to-today">到今天為止</SelectItem>
                 <SelectItem value="quarter">近90天</SelectItem>
               </SelectContent>
             </Select>
