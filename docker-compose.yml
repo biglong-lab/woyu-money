@@ -1,0 +1,37 @@
+services:
+  app:
+    build: .
+    container_name: woyu-money
+    restart: unless-stopped
+    ports:
+      - "5001:5001"
+    environment:
+      - DATABASE_URL=postgresql://woyu:woyu123@db:5432/woyu_money
+      - SESSION_SECRET=${SESSION_SECRET:-change-me-to-random-string}
+      - NODE_ENV=production
+      - PORT=5001
+    volumes:
+      - uploads:/app/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:16-alpine
+    container_name: woyu-money-db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=woyu
+      - POSTGRES_PASSWORD=woyu123
+      - POSTGRES_DB=woyu_money
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U woyu -d woyu_money"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:
+  uploads:
