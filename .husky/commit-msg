@@ -1,0 +1,1 @@
+bash scripts/verify-commit-msg.sh "$1"

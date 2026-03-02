@@ -95,6 +95,14 @@
   - [x] 最終清理：修復 build-error-resolver 引入的 `as any`，全部改為 `FieldValues`/`as unknown as` 等正確型別
   - [x] **最終結果：762 → 0 個 any warnings，83 個檔案全部清除**
 
+- [x] **版本管理與安全部署工作流程** — 全部完成
+  - [x] commit-msg hook：驗證 Conventional Commits 格式（feat/fix/refactor/...）
+  - [x] CHANGELOG 自動產生：依 commit type 分類、markdown 格式化
+  - [x] release 腳本：語義化版本遞增、自動測試、CHANGELOG 產生、git tag
+  - [x] pre-push hook：TypeScript 檢查 + console.log 掃描 + 測試 + 推送摘要
+  - [x] dev-start.sh 整合版本號與 CHANGELOG 顯示
+  - [x] package.json 新增 release:patch/minor/major、changelog 指令
+
 ### 進行中
 （無）
 

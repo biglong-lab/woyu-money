@@ -23,7 +23,11 @@
     "sync:files": "bash scripts/sync-from-production.sh files-only",
     "dev:start": "bash scripts/dev-start.sh",
     "db:export": "tsx database_backup/export-data.ts",
-    "db:import": "tsx database_backup/import-data.ts"
+    "db:import": "tsx database_backup/import-data.ts",
+    "release:patch": "bash scripts/release.sh patch",
+    "release:minor": "bash scripts/release.sh minor",
+    "release:major": "bash scripts/release.sh major",
+    "changelog": "bash scripts/generate-changelog.sh"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.37.0",
