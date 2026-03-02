@@ -94,8 +94,25 @@ else
   log_ok "依賴已是最新"
 fi
 
-# ============ 步驟 5：顯示進度 ============
-log_info "步驟 5/5：讀取專案進度..."
+# ============ 步驟 5：顯示版本與進度 ============
+log_info "步驟 5/5：讀取版本與進度..."
+
+# 顯示版本號
+VERSION=$(node -p "require('./package.json').version" 2>/dev/null || echo "unknown")
+LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "無")
+echo ""
+echo -e "${GREEN}📦 目前版本: v${VERSION}  |  最新 Tag: ${LAST_TAG}${NC}"
+
+# 顯示最近 CHANGELOG
+if [ -f "CHANGELOG.md" ]; then
+  echo ""
+  echo "--- 最近更新紀錄 ---"
+  # 顯示第一個版本區塊（到下一個 ## 或檔案結束）
+  sed -n '/^## \[/,/^## \[/{/^## \[/!{/^## \[/!p}}' CHANGELOG.md | head -15
+  echo "---"
+fi
+
+# 顯示專案進度
 if [ -f "PROGRESS.md" ]; then
   echo ""
   echo "--- PROGRESS.md ---"
