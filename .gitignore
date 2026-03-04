@@ -10,6 +10,9 @@ node_modules/
 dist/
 build/
 
+# 測試覆蓋率報告
+coverage/
+
 # 本地上傳檔案
 uploads/
 

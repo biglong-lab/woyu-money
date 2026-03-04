@@ -22,7 +22,7 @@ async function initializeAdminUser() {
     const existingAdmin = await db.select().from(users).where(eq(users.username, adminUsername))
 
     if (existingAdmin.length > 0) {
-      console.log("管理員帳戶已存在，跳過建立")
+      console.info("管理員帳戶已存在，跳過建立")
       return
     }
 
@@ -40,7 +40,7 @@ async function initializeAdminUser() {
       updatedAt: new Date(),
     })
 
-    console.log("管理員帳戶建立成功")
+    console.info("管理員帳戶建立成功")
   } catch (error) {
     console.error("初始化管理員帳戶失敗:", error)
   } finally {

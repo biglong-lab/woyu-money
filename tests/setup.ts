@@ -2,10 +2,7 @@
  * 測試環境設定
  * 在所有測試前執行
  */
-import { beforeAll } from "vitest"
 import dotenv from "dotenv"
 
-// 載入環境變數
-beforeAll(() => {
-  dotenv.config()
-})
+// 立即載入環境變數（在模組頂層，不在 beforeAll 裡）
+dotenv.config()
