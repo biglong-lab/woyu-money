@@ -13,6 +13,11 @@ build/
 # 測試覆蓋率報告
 coverage/
 
+# Playwright E2E 測試報告與狀態
+e2e-report/
+test-results/
+e2e/.auth-state.json
+
 # 本地上傳檔案
 uploads/
 

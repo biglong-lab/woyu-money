@@ -105,13 +105,16 @@ export const createRateLimit = (windowMs: number, max: number, message: string) 
   })
 }
 
+// 開發環境使用較寬鬆的速率限制
+const isDev = process.env.NODE_ENV !== "production"
+
 // 常用的速率限制配置
 export const rateLimits = {
-  // 一般API請求：每分鐘100次
-  general: createRateLimit(60 * 1000, 100, "請求過於頻繁"),
+  // 一般API請求：生產 100次/分鐘，開發 1000次/分鐘
+  general: createRateLimit(60 * 1000, isDev ? 1000 : 100, "請求過於頻繁"),
 
-  // 登入嘗試：每15分鐘5次
-  auth: createRateLimit(15 * 60 * 1000, 5, "登入嘗試過於頻繁"),
+  // 登入嘗試：生產 5次/15分鐘，開發 50次/15分鐘
+  auth: createRateLimit(15 * 60 * 1000, isDev ? 50 : 5, "登入嘗試過於頻繁"),
 
   // 檔案上傳：每小時10次
   upload: createRateLimit(60 * 60 * 1000, 10, "上傳過於頻繁"),
@@ -128,15 +131,15 @@ export const requestLogger = (req: Request, res: Response, next: NextFunction) =
   // 監聽回應完成
   res.on("finish", () => {
     const duration = Date.now() - start
-    const logLevel = res.statusCode >= 400 ? "warn" : "info"
-
-    console[logLevel](
-      `[API] ${req.method} ${req.path} ${res.statusCode} - ${duration}ms - User: ${user?.id || "anonymous"}`
-    )
+    if (res.statusCode >= 400) {
+      console.warn(
+        `[API] ${req.method} ${req.path} ${res.statusCode} - ${duration}ms - User: ${user?.id || "anonymous"}`
+      )
+    }
 
     // 記錄敏感操作
-    if (["POST", "PUT", "DELETE"].includes(req.method)) {
-      console.info(
+    if (["POST", "PUT", "DELETE"].includes(req.method) && res.statusCode >= 400) {
+      console.warn(
         `[Audit] ${user?.username || "anonymous"} performed ${req.method} on ${req.path}`
       )
     }
