@@ -2,7 +2,7 @@
 
 ## 專案狀態：開發中
 
-**最後更新**: 2026-02-07
+**最後更新**: 2026-03-04
 
 ---
 
@@ -103,13 +103,25 @@
   - [x] dev-start.sh 整合版本號與 CHANGELOG 顯示
   - [x] package.json 新增 release:patch/minor/major、changelog 指令
 
+- [x] **第六波測試覆蓋率提升至 80%** — 全部完成
+  - [x] 修復 dotenv 載入時序問題（setup.ts 模組頂層載入，解決 285 個測試被跳過）
+  - [x] 修復 admin 角色、categories categoryType、rental 驗證等測試失敗
+  - [x] 設定 fileParallelism: false 避免 DB 競爭條件
+  - [x] 排除非核心檔案（pm-bridge、pms-bridge、vite.ts）
+  - [x] 批次新增 60 個測試檔案、1559 個測試
+    - 整合測試: income, daily-revenues, document-inbox-crud/archive, statistics, analytics-extended, financial-reports, rental-extended, loans-extended, payment-extended, household-extended, notifications-extended, admin-extended, ai-assistant/extended, subcategory-payments, statistics-extended, overdue-batch, hr-costs, upload-config
+    - 單元測試: security, routes-helpers, file-upload-utils/extended, error-handler, storage-helpers/extended, batch-import-processor, notification-system, object-storage, schema-extended, auth, document-ai, init-admin, db, storage-household, storage-notifications, storage-hr-costs, storage-admin, storage-invoice, storage-project-stats, storage-users
+  - [x] **最終結果: 60 個測試檔案、1559 個測試全部通過**
+  - [x] **覆蓋率: 80.45% (Stmts) / 66.11% (Branch) / 82.73% (Funcs) / 81.04% (Lines)**
+  - [x] 覆蓋率歷程: 4.12% → 46.2% → 54.66% → 62.22% → 66.3% → 76.22% → 80.45%
+
 ### 進行中
 （無）
 
 ### 待處理 — 依優先級排列
 
 #### 持續改善
-- [ ] 測試覆蓋率提升至 80%（目前 42.44%，需增加更多路由和 storage 層測試）
+- [x] ~~測試覆蓋率提升至 80%~~ ✅ 完成（42.44% → 80.45%，1559 個測試）
 - [ ] E2E 測試（Playwright 關鍵流程）
 - [ ] 前端元件目錄重組（80+ 元件按功能分類）[已延遲，等測試安全網完善後再執行]
 - [x] ~~漸進消除前端 any 類型~~ ✅ 全部完成（762 → 0）

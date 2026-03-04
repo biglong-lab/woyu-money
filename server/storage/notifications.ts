@@ -174,8 +174,6 @@ export async function generatePaymentReminders(): Promise<number> {
       .where(sql`is_deleted = false`)
       .limit(3)
 
-    // console.log(`找到 ${paymentItems.length} 個付款項目可生成通知`);
-
     // 為用戶ID=1創建測試通知
     for (const payment of paymentItems) {
       await createNotification({
@@ -193,7 +191,6 @@ export async function generatePaymentReminders(): Promise<number> {
       createdCount++
     }
 
-    // console.log(`成功生成 ${createdCount} 個付款提醒通知`);
     return createdCount
   } catch (error) {
     console.error("Error generating payment reminders:", error)

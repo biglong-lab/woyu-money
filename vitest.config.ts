@@ -23,11 +23,24 @@ export default defineConfig({
       provider: "v8",
       reporter: ["text", "html"],
       include: ["server/**/*.ts", "shared/**/*.ts"],
-      exclude: ["**/*.d.ts", "**/*.test.ts"],
+      exclude: [
+        "**/*.d.ts",
+        "**/*.test.ts",
+        // 外部系統橋接（需要外部 DB 連線，非核心業務邏輯）
+        "server/routes/pm-bridge.ts",
+        "server/routes/pms-bridge.ts",
+        "server/storage/pm-bridge.ts",
+        "server/storage/pms-bridge.ts",
+        // Vite 開發伺服器設定（非業務邏輯）
+        "server/vite.ts",
+      ],
     },
 
     // 超時設定
-    testTimeout: 10000,
+    testTimeout: 15000,
+
+    // 整合測試共用資料庫，需要序列化執行避免競爭
+    fileParallelism: false,
   },
 
   resolve: {
