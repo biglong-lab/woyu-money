@@ -26,14 +26,20 @@ COPY drizzle.config.ts ./
 COPY shared ./shared
 COPY migrations ./migrations
 
-# 建立上傳目錄
-RUN mkdir -p uploads/inbox
+# 建立上傳目錄（含所有子目錄）
+RUN mkdir -p uploads/inbox uploads/receipts uploads/contracts uploads/documents uploads/images
 
 # 非 root 使用者
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 RUN chown -R appuser:appgroup /app
+
+# 複製啟動腳本
+COPY --chown=appuser:appgroup docker-entrypoint.sh ./
+RUN chmod +x docker-entrypoint.sh
+
 USER appuser
 
 EXPOSE 5001
 
+ENTRYPOINT ["./docker-entrypoint.sh"]
 CMD ["node", "dist/index.js"]

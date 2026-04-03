@@ -10,10 +10,26 @@ const documentsDir = path.join(uploadDir, "documents")
 const imagesDir = path.join(uploadDir, "images")
 const inboxDir = path.join(uploadDir, "inbox")
 
-export { uploadDir, contractsDir, receiptsDir, documentsDir, imagesDir, inboxDir }
+export {
+  uploadDir,
+  contractsDir,
+  receiptsDir,
+  documentsDir,
+  imagesDir,
+  inboxDir,
+
+  // 啟動時建立所有上傳目錄並驗證可寫入
+}
 ;[uploadDir, contractsDir, receiptsDir, documentsDir, imagesDir, inboxDir].forEach((dir) => {
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true })
+  try {
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true })
+      console.info(`[upload-config] 建立目錄: ${dir}`)
+    }
+    // 驗證目錄可寫入
+    fs.accessSync(dir, fs.constants.W_OK)
+  } catch (err) {
+    console.error(`[upload-config] 目錄不可用: ${dir}`, err)
   }
 })
 

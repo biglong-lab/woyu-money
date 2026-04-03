@@ -1,14 +1,40 @@
-import { Router } from "express"
+import { Router, Request, Response, NextFunction } from "express"
 import { requireAuth } from "../auth"
 import { asyncHandler, AppError } from "../middleware/error-handler"
 import { ObjectStorageService, ObjectNotFoundError } from "../objectStorage"
 import { recognizeDocument } from "../document-ai"
 import { documentUpload, inboxDir } from "./upload-config"
 import * as docInboxStorage from "../storage/document-inbox"
+import multer from "multer"
 import fs from "fs"
 import path from "path"
 
 const router = Router()
+
+/** multer 錯誤處理中間件 */
+function handleMulterError(err: Error, _req: Request, res: Response, next: NextFunction) {
+  if (err instanceof multer.MulterError) {
+    const messages: Record<string, string> = {
+      LIMIT_FILE_SIZE: "檔案大小超過限制（最大 20MB）",
+      LIMIT_FILE_COUNT: "上傳檔案數量超過限制（最多 10 個）",
+      LIMIT_FIELD_KEY: "欄位名稱過長",
+      LIMIT_FIELD_VALUE: "欄位值過長",
+      LIMIT_FIELD_COUNT: "表單欄位過多",
+      LIMIT_UNEXPECTED_FILE: "未預期的檔案欄位",
+      MISSING_FIELD_NAME: "缺少欄位名稱",
+      LIMIT_PART_COUNT: "表單部分過多",
+    }
+    const message = messages[err.code] || `上傳錯誤: ${err.message}`
+    return res.status(400).json({ success: false, message })
+  }
+  if (err && err.message === "不支援的檔案格式") {
+    return res.status(400).json({
+      success: false,
+      message: "不支援的檔案格式，請上傳 JPEG、PNG、GIF、WebP、HEIC 或 PDF",
+    })
+  }
+  next(err)
+}
 
 // --- 輔助函式 ---
 
@@ -65,11 +91,27 @@ router.get(
   })
 )
 
-// 上傳並辨識單據
+// 上傳並辨識單據（支援多檔上傳，最多 10 個）
 router.post(
   "/api/document-inbox/upload",
   requireAuth,
+  (req: Request, res: Response, next: NextFunction) => {
+    // 先驗證上傳目錄可寫入
+    if (!fs.existsSync(inboxDir)) {
+      try {
+        fs.mkdirSync(inboxDir, { recursive: true })
+      } catch (dirErr) {
+        console.error("[upload] 無法建立上傳目錄:", inboxDir, dirErr)
+        return res.status(500).json({
+          success: false,
+          message: "伺服器上傳目錄不可用，請聯繫管理員",
+        })
+      }
+    }
+    next()
+  },
   documentUpload.array("file", 10),
+  handleMulterError,
   asyncHandler(async (req, res) => {
     const files = req.files as Express.Multer.File[]
 
@@ -89,88 +131,107 @@ router.post(
     }
 
     const results = []
+    const errors: string[] = []
     const objectStorageService = new ObjectStorageService()
 
     for (const file of files) {
-      if (!fs.existsSync(file.path)) {
-        console.error("ERROR: File not saved by multer:", file.path)
-        continue
-      }
-
-      const imageBuffer = fs.readFileSync(file.path)
-      const mimeType = file.mimetype || "image/jpeg"
-
-      let imagePath: string
       try {
-        imagePath = await objectStorageService.uploadBuffer(
-          imageBuffer,
-          file.originalname,
-          mimeType
-        )
-      } catch {
-        imagePath = `/uploads/inbox/${file.filename}`
-      }
-
-      if (imagePath.startsWith("/objects/")) {
-        try {
-          fs.unlinkSync(file.path)
-        } catch (unlinkError: unknown) {
-          console.error("無法刪除暫存檔案:", unlinkError)
+        if (!fs.existsSync(file.path)) {
+          console.error("[upload] multer 暫存檔案不存在:", file.path)
+          errors.push(`${file.originalname}: 暫存檔案寫入失敗`)
+          continue
         }
-      }
 
-      const newDoc = await docInboxStorage.createDocumentInboxItem({
-        userId,
-        documentType,
-        status: "processing",
-        imagePath,
-        originalFilename: file.originalname,
-        notes: uploadNotes,
-        uploadedByUsername,
-      })
+        const imageBuffer = fs.readFileSync(file.path)
+        const mimeType = file.mimetype || "image/jpeg"
 
-      results.push(newDoc)
-
-      const imageBase64 = imageBuffer.toString("base64")
-
-      // 背景 AI 辨識
-      ;(async () => {
+        let imagePath: string
         try {
-          const result = await recognizeDocument(imageBase64, mimeType, documentType)
+          imagePath = await objectStorageService.uploadBuffer(
+            imageBuffer,
+            file.originalname,
+            mimeType
+          )
+        } catch {
+          // 如果 objectStorage 失敗，退回使用 multer 暫存路徑
+          imagePath = `/uploads/inbox/${file.filename}`
+        }
 
-          if (result.success) {
-            await docInboxStorage.updateDocumentAiResult(newDoc.id, {
-              success: true,
-              confidence: result.confidence,
-              extractedData: result.extractedData,
-              rawResponse: result.rawResponse,
-            })
-          } else {
-            await docInboxStorage.updateDocumentAiResult(newDoc.id, {
-              success: false,
-            })
-          }
-        } catch (aiError: unknown) {
-          console.error("AI recognition error:", aiError)
+        // 清理 multer 暫存檔（已搬到 objectStorage）
+        if (imagePath.startsWith("/objects/")) {
           try {
-            const errorNotes =
-              (uploadNotes ? uploadNotes + "\n" : "") +
-              `AI辨識錯誤: ${aiError instanceof Error ? aiError.message : "未知錯誤"}`
-
-            await docInboxStorage.updateDocumentAiResult(newDoc.id, {
-              success: false,
-              notes: errorNotes,
-            })
-          } catch (fallbackError: unknown) {
-            console.error("更新文件狀態失敗:", fallbackError)
+            fs.unlinkSync(file.path)
+          } catch (unlinkError: unknown) {
+            console.error("[upload] 無法刪除暫存檔案:", unlinkError)
           }
         }
-      })()
+
+        const newDoc = await docInboxStorage.createDocumentInboxItem({
+          userId,
+          documentType,
+          status: "processing",
+          imagePath,
+          originalFilename: file.originalname,
+          notes: uploadNotes,
+          uploadedByUsername,
+        })
+
+        results.push(newDoc)
+
+        const imageBase64 = imageBuffer.toString("base64")
+
+        // 背景 AI 辨識（不阻塞回應）
+        void (async () => {
+          try {
+            const result = await recognizeDocument(imageBase64, mimeType, documentType)
+
+            if (result.success) {
+              await docInboxStorage.updateDocumentAiResult(newDoc.id, {
+                success: true,
+                confidence: result.confidence,
+                extractedData: result.extractedData,
+                rawResponse: result.rawResponse,
+              })
+            } else {
+              await docInboxStorage.updateDocumentAiResult(newDoc.id, {
+                success: false,
+              })
+            }
+          } catch (aiError: unknown) {
+            console.error("[upload] AI 辨識錯誤:", aiError)
+            try {
+              const errorNotes =
+                (uploadNotes ? uploadNotes + "\n" : "") +
+                `AI辨識錯誤: ${aiError instanceof Error ? aiError.message : "未知錯誤"}`
+
+              await docInboxStorage.updateDocumentAiResult(newDoc.id, {
+                success: false,
+                notes: errorNotes,
+              })
+            } catch (fallbackError: unknown) {
+              console.error("[upload] 更新文件狀態失敗:", fallbackError)
+            }
+          }
+        })()
+      } catch (fileError: unknown) {
+        console.error("[upload] 處理檔案失敗:", file.originalname, fileError)
+        errors.push(
+          `${file.originalname}: ${fileError instanceof Error ? fileError.message : "處理失敗"}`
+        )
+      }
+    }
+
+    if (results.length === 0) {
+      throw new AppError(500, `所有檔案上傳失敗: ${errors.join("; ")}`)
     }
 
     res.status(201).json({
-      message: `已上傳 ${files.length} 個檔案，正在辨識中...`,
+      message:
+        errors.length > 0
+          ? `已上傳 ${results.length} 個檔案（${errors.length} 個失敗），正在辨識中...`
+          : `已上傳 ${results.length} 個檔案，正在辨識中...`,
       documents: results,
+      errors: errors.length > 0 ? errors : undefined,
     })
   })
 )
