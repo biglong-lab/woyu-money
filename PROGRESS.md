@@ -116,6 +116,17 @@
   - [x] **覆蓋率: 80.45% (Stmts) / 66.11% (Branch) / 82.73% (Funcs) / 81.04% (Lines)**
   - [x] 覆蓋率歷程: 4.12% → 46.2% → 54.66% → 62.22% → 66.3% → 76.22% → 80.45%
 
+- [x] **文件上傳 500 錯誤修復** (2026-04-09) — 全部完成
+  - [x] 新增 multer 錯誤處理中間件（檔案過大、格式不支援等返回明確 400 錯誤訊息）
+  - [x] 上傳前驗證 uploads/inbox 目錄存在且可寫入
+  - [x] 多檔上傳改為個別檔案獨立 try-catch（單一檔案失敗不影響其他）
+  - [x] 改善全域錯誤處理器：記錄完整請求路徑和錯誤堆疊
+  - [x] 新增 Docker entrypoint 腳本（docker-entrypoint.sh）解決 volume 權限問題
+  - [x] 啟動時驗證上傳目錄可寫入並記錄日誌
+  - [x] 修改檔案：server/routes/document-inbox.ts、upload-config.ts、middleware/error-handler.ts、Dockerfile、新增 docker-entrypoint.sh
+  - [x] 本地測試：單張/多張上傳、格式驗證、無檔案、整合測試全部通過
+  - [x] **提交 `a7bb6db`** 已推送至 GitHub main，Coolify 自動部署
+
 - [x] **E2E 測試（Playwright 關鍵流程）** — 全部完成
   - [x] Playwright 1.58.2 安裝與配置
   - [x] 全局認證設定（storageState 模式，避免重複登入觸發速率限制）
