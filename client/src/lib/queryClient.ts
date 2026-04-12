@@ -70,7 +70,7 @@ export const queryClient = new QueryClient({
         return false;
       },
       retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
-      refetchOnMount: false, // 禁用自動重新獲取以提升效能
+      refetchOnMount: true, // 進入頁面自動刷新，資料永遠最新
       networkMode: 'online', // 只在線上時執行查詢
     },
     mutations: {
