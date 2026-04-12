@@ -56,9 +56,9 @@ export const queryClient = new QueryClient({
     queries: {
       queryFn: getQueryFn({ on401: "throw" }),
       refetchInterval: false,
-      refetchOnWindowFocus: false, // 禁用視窗焦點刷新
-      staleTime: 10 * 60 * 1000, // 延長至10分鐘緩存時間
-      gcTime: 30 * 60 * 1000, // 30分鐘垃圾回收時間
+      refetchOnWindowFocus: true, // 切回視窗自動刷新，確保資料即時
+      staleTime: 30 * 1000, // 30 秒快取，平衡即時性與效能
+      gcTime: 5 * 60 * 1000, // 5 分鐘垃圾回收
       retry: (failureCount, error: Error) => {
         // 智能重試策略
         if (error?.message?.includes('Too many database connection attempts')) {
