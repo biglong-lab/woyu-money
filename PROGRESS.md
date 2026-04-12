@@ -142,6 +142,31 @@
   - [x] 開發環境速率限制調整（auth 50次/15分鐘、general 1000次/分鐘，生產環境不變）
   - [x] npm scripts: `test:e2e`, `test:e2e:ui`, `test:e2e:report`
 
+- [x] **手機端 UX 優化（Phase 1-5）** (2026-04-12) — 全部完成
+  - [x] Phase 2: 快取策略修復 — 資料即時性
+    - refetchOnWindowFocus: true（切回自動刷新）
+    - staleTime: 30 秒（從 10 分鐘降低）
+    - refetchOnMount: true（進頁面自動刷新）
+    - gcTime: 5 分鐘（從 30 分鐘降低）
+  - [x] Phase 1A: 首頁快速記帳入口
+    - 新增 quick-add-drawer.tsx：底部抽屜式快速記帳（項目名+金額+專案+到期日+拍照）
+    - 新增 useQuickCameraUpload hook：一鍵開相機上傳到單據收件箱
+    - 首頁置頂兩大按鈕：「拍單據」+「手動記帳」
+    - 新增「記錄已付款」快速入口
+  - [x] Phase 3A: 首頁重設計為行動中心
+    - 快速動作區（置頂）：拍單據 + 手動記帳 + 記錄付款
+    - 待處理區：待歸檔單據提示 + 緊急付款項目（可直接點擊付款）
+    - 精簡統計卡片、排程和最近記錄
+  - [x] Phase 5A: 簡化單據上傳流程
+    - 快速拍照不需選擇文件類型（自動為 bill）
+    - 不需填備註即可上傳
+  - [x] Phase 4A: Tab Bar 導航精簡
+    - 重新設計：首頁 | 項目 | (+記帳) | 單據 | 更多
+    - 中間大圓按鈕：展開拍單據/手動記帳/記錄付款三選項
+    - 單據 Tab 加未處理數量徽章（10 秒更新）
+    - QuickActionFAB 改為僅桌面版顯示
+  - [x] 修改檔案：queryClient.ts, payment-home.tsx, mobile-tab-bar.tsx, App.tsx, 新增 quick-add-drawer.tsx
+
 ### 進行中
 （無）
 
