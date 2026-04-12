@@ -1,11 +1,10 @@
 /**
- * PaymentHome - 付款首頁（操作中心）
- * 重新設計為以操作為核心的儀表板：
- * 1. 全域搜尋列
- * 2. 緊急待辦（逾期 + 3日內到期）
- * 3. 本月摘要 + 快速記錄入口
- * 4. 近期付款時間線
- * 5. 專案狀況矩陣
+ * PaymentHome - 付款首頁（行動中心）
+ * 重新設計為行動優先：
+ * 1. 快速動作區（拍單據 + 手動記帳）
+ * 2. 待處理區（逾期/即將到期/待歸檔，可直接操作）
+ * 3. 本月摘要
+ * 4. 最近動態
  */
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,18 +17,21 @@ import {
   Clock,
   AlertTriangle,
   Search,
-  Plus,
   Camera,
   ArrowRight,
   Calendar,
   Building2,
   Home as HomeIcon,
-  TrendingUp,
   CreditCard,
+  FileText,
+  Inbox,
+  Loader2,
 } from "lucide-react";
-import { Link, useLocation } from "wouter";
-import { useState, useMemo } from "react";
+import { Link } from "wouter";
+import { useState, useMemo, useCallback } from "react";
 import type { PaymentItem, PaymentRecord, PaymentSchedule } from "@shared/schema";
+import { QuickAddDrawer, useQuickCameraUpload } from "@/components/quick-add-drawer";
+import { QuickPaymentDialog } from "@/components/quick-payment-dialog";
 
 /** API 回傳的付款項目（含關聯專案名） */
 interface PaymentItemWithProject extends PaymentItem {
@@ -77,9 +79,19 @@ interface UrgentItem extends PaymentItemWithProject {
   diffDays: number;
 }
 
+/** 單據收件箱統計 */
+interface InboxStats {
+  pending?: number;
+  processing?: number;
+  recognized?: number;
+  total?: number;
+}
+
 export default function PaymentHome() {
-  const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
+  const [showQuickAdd, setShowQuickAdd] = useState(false);
+  const [showQuickPay, setShowQuickPay] = useState(false);
+  const { openCamera, isUploading } = useQuickCameraUpload();
 
   // API 查詢
   const { data: overallStats } = useQuery({
@@ -103,6 +115,10 @@ export default function PaymentHome() {
     queryKey: ["/api/payment-schedules"],
   });
 
+  const { data: inboxStats } = useQuery<InboxStats>({
+    queryKey: ["/api/document-inbox/stats"],
+  });
+
   // 安全的資料取出
   const stats = (overallStats as ProjectStatsOverall) || {};
   const items: PaymentItemWithProject[] = Array.isArray(paymentItems) ? paymentItems : [];
@@ -111,12 +127,13 @@ export default function PaymentHome() {
     ? projectStatsTyped.projects
     : [];
   const schedules: ScheduleWithNames[] = Array.isArray(scheduleData) ? scheduleData : [];
+  const pendingDocs = (inboxStats?.pending || 0) + (inboxStats?.recognized || 0);
 
   // 格式化函數
-  const formatCurrency = (value: string | number | null | undefined) => {
+  const formatCurrency = useCallback((value: string | number | null | undefined) => {
     const num = parseFloat(String(value || "0"));
     return isNaN(num) ? "0" : Math.round(num).toLocaleString();
-  };
+  }, []);
 
   // 計算緊急待辦（逾期 + 3日內到期）
   const urgentItems = useMemo(() => {
@@ -235,39 +252,84 @@ export default function PaymentHome() {
     );
   };
 
+  // 待處理總數（緊急 + 待歸檔單據）
+  const totalPending = urgentItems.length + pendingDocs;
+
   return (
-    <div className="space-y-6">
-      {/* 標題區 */}
+    <div className="space-y-4 sm:space-y-6">
+      {/* ===== 快速動作區（置頂、最醒目）===== */}
       <div>
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
-          浯島財務管理
-        </h1>
-        <p className="text-gray-500 mt-1">
-          {new Date().toLocaleDateString("zh-TW", {
-            year: "numeric",
-            month: "long",
-            day: "numeric",
-            weekday: "long",
-          })}
-        </p>
+        <div className="flex items-end justify-between mb-3">
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
+              浯島財務
+            </h1>
+            <p className="text-xs sm:text-sm text-gray-500">
+              {new Date().toLocaleDateString("zh-TW", {
+                month: "long",
+                day: "numeric",
+                weekday: "short",
+              })}
+            </p>
+          </div>
+          {totalPending > 0 && (
+            <Badge variant="destructive" className="text-xs px-2 py-1">
+              {totalPending} 項待處理
+            </Badge>
+          )}
+        </div>
+
+        {/* 兩個大按鈕 — 拍單據 + 手動記帳 */}
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            onClick={openCamera}
+            disabled={isUploading}
+            className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-gradient-to-br from-purple-500 to-purple-700 text-white shadow-lg active:scale-95 transition-transform"
+          >
+            {isUploading ? (
+              <Loader2 className="w-8 h-8 animate-spin" />
+            ) : (
+              <Camera className="w-8 h-8" />
+            )}
+            <span className="text-sm font-semibold">
+              {isUploading ? "上傳中..." : "拍單據"}
+            </span>
+          </button>
+          <button
+            onClick={() => setShowQuickAdd(true)}
+            className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-700 text-white shadow-lg active:scale-95 transition-transform"
+          >
+            <FileText className="w-8 h-8" />
+            <span className="text-sm font-semibold">手動記帳</span>
+          </button>
+        </div>
+
+        {/* 快速付款按鈕 — 次要但常用 */}
+        <Button
+          variant="outline"
+          className="w-full mt-2 h-11 gap-2 text-green-700 border-green-200 bg-green-50 hover:bg-green-100"
+          onClick={() => setShowQuickPay(true)}
+        >
+          <DollarSign className="w-4 h-4" />
+          記錄已付款
+        </Button>
       </div>
 
-      {/* 全域搜尋列 */}
+      {/* ===== 搜尋列 ===== */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
         <Input
-          placeholder="搜尋項目名稱、專案、金額..."
+          placeholder="搜尋項目或專案..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-10 h-11 bg-white"
+          className="pl-10 h-10 bg-white"
         />
-        {/* 搜尋結果下拉 */}
         {searchResults.length > 0 && (
-          <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-30 max-h-[300px] overflow-y-auto">
+          <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-30 max-h-[250px] overflow-y-auto">
             {searchResults.map((item: PaymentItemWithProject) => (
               <Link
                 key={item.id}
-                href={`/payment-records`}
+                href="/payment-records"
                 onClick={() => setSearchQuery("")}
               >
                 <div className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 border-b border-gray-50">
@@ -289,199 +351,175 @@ export default function PaymentHome() {
         )}
       </div>
 
-      {/* 緊急待辦 */}
-      {urgentItems.length > 0 && (
-        <Card className="border-red-200 bg-red-50/50">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2 text-red-800">
-              <AlertTriangle className="w-4 h-4" />
-              緊急待辦
-              <Badge variant="destructive" className="ml-auto">
-                {urgentItems.length}
-              </Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {urgentItems.map((item: UrgentItem) => {
-              const remaining =
-                parseFloat(item.totalAmount || "0") -
-                parseFloat(item.paidAmount || "0");
-              return (
-                <div
-                  key={item.id}
-                  className="flex items-center justify-between p-3 bg-white rounded-lg border border-red-100"
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-medium text-gray-900 truncate">
-                        {item.itemName}
-                      </p>
-                      {getDueBadge(item.diffDays)}
+      {/* ===== 待處理區（可直接操作）===== */}
+      {(urgentItems.length > 0 || pendingDocs > 0) && (
+        <div className="space-y-3">
+          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
+            待處理
+          </h2>
+
+          {/* 待歸檔單據提示 */}
+          {pendingDocs > 0 && (
+            <Link href="/document-inbox">
+              <Card className="border-purple-200 bg-purple-50/50 hover:bg-purple-50 transition-colors cursor-pointer">
+                <CardContent className="p-3 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center">
+                      <Inbox className="w-5 h-5 text-purple-600" />
                     </div>
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      {item.projectName || "無專案"} / 待付 $
-                      {formatCurrency(remaining)}
-                    </p>
+                    <div>
+                      <p className="text-sm font-medium text-purple-900">
+                        {pendingDocs} 張單據待處理
+                      </p>
+                      <p className="text-xs text-purple-600">
+                        點擊查看並歸檔
+                      </p>
+                    </div>
                   </div>
-                  <Link href="/payment-records">
-                    <Button size="sm" variant="outline" className="ml-2 text-xs">
-                      處理
+                  <ArrowRight className="w-4 h-4 text-purple-400" />
+                </CardContent>
+              </Card>
+            </Link>
+          )}
+
+          {/* 緊急付款項目 — 可直接點擊付款 */}
+          {urgentItems.map((item: UrgentItem) => {
+            const remaining =
+              parseFloat(item.totalAmount || "0") -
+              parseFloat(item.paidAmount || "0");
+            return (
+              <Card
+                key={item.id}
+                className="border-red-200 bg-red-50/30 hover:bg-red-50 transition-colors"
+              >
+                <CardContent className="p-3">
+                  <div className="flex items-center justify-between">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium text-gray-900 truncate">
+                          {item.itemName}
+                        </p>
+                        {getDueBadge(item.diffDays)}
+                      </div>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        {item.projectName || "無專案"} · 待付 $
+                        {formatCurrency(remaining)}
+                      </p>
+                    </div>
+                    <Button
+                      size="sm"
+                      className="ml-2 text-xs bg-green-600 hover:bg-green-700"
+                      onClick={() => setShowQuickPay(true)}
+                    >
+                      付款
                     </Button>
-                  </Link>
-                </div>
-              );
-            })}
-          </CardContent>
-        </Card>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
       )}
 
-      {/* 本月摘要 + 快速記錄 */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* 本月摘要 */}
-        <Card className="md:col-span-2">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">本月摘要</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-3 gap-4">
-              <div className="text-center p-3 bg-blue-50 rounded-lg">
-                <p className="text-xs text-blue-600 font-medium">應付總額</p>
-                <p className="text-lg sm:text-xl font-bold text-blue-900 mt-1">
-                  ${formatCurrency(monthlySummary.totalDue)}
-                </p>
-              </div>
-              <div className="text-center p-3 bg-green-50 rounded-lg">
-                <p className="text-xs text-green-600 font-medium">已付金額</p>
-                <p className="text-lg sm:text-xl font-bold text-green-900 mt-1">
-                  ${formatCurrency(monthlySummary.totalPaid)}
-                </p>
-              </div>
-              <div className="text-center p-3 bg-orange-50 rounded-lg">
-                <p className="text-xs text-orange-600 font-medium">待付餘額</p>
-                <p className="text-lg sm:text-xl font-bold text-orange-900 mt-1">
-                  ${formatCurrency(monthlySummary.remaining)}
-                </p>
-              </div>
+      {/* ===== 本月摘要 ===== */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-gray-700">本月摘要</h3>
+            <span className="text-xs text-gray-400">
+              {monthlySummary.itemCount} 筆項目
+            </span>
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <div className="text-center p-2 bg-blue-50 rounded-xl">
+              <p className="text-[10px] text-blue-600 font-medium">應付</p>
+              <p className="text-sm sm:text-base font-bold text-blue-900 mt-0.5">
+                ${formatCurrency(monthlySummary.totalDue)}
+              </p>
             </div>
-            {/* 進度條 */}
-            <div className="mt-4">
-              <div className="flex justify-between text-xs text-gray-500 mb-1">
-                <span>本月完成進度</span>
-                <span>
-                  {monthlySummary.totalDue > 0
-                    ? Math.round(
-                        (monthlySummary.totalPaid / monthlySummary.totalDue) * 100
-                      )
-                    : 0}
-                  %
-                </span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-2">
-                <div
-                  className="bg-green-500 h-2 rounded-full transition-all duration-500"
-                  style={{
-                    width: `${
-                      monthlySummary.totalDue > 0
-                        ? Math.min(
-                            (monthlySummary.totalPaid / monthlySummary.totalDue) *
-                              100,
-                            100
-                          )
-                        : 0
-                    }%`,
-                  }}
-                />
-              </div>
+            <div className="text-center p-2 bg-green-50 rounded-xl">
+              <p className="text-[10px] text-green-600 font-medium">已付</p>
+              <p className="text-sm sm:text-base font-bold text-green-900 mt-0.5">
+                ${formatCurrency(monthlySummary.totalPaid)}
+              </p>
             </div>
-          </CardContent>
-        </Card>
+            <div className="text-center p-2 bg-orange-50 rounded-xl">
+              <p className="text-[10px] text-orange-600 font-medium">待付</p>
+              <p className="text-sm sm:text-base font-bold text-orange-900 mt-0.5">
+                ${formatCurrency(monthlySummary.remaining)}
+              </p>
+            </div>
+          </div>
+          {/* 進度條 */}
+          <div className="mt-3">
+            <div className="w-full bg-gray-200 rounded-full h-1.5">
+              <div
+                className="bg-green-500 h-1.5 rounded-full transition-all duration-500"
+                style={{
+                  width: `${
+                    monthlySummary.totalDue > 0
+                      ? Math.min(
+                          (monthlySummary.totalPaid / monthlySummary.totalDue) * 100,
+                          100
+                        )
+                      : 0
+                  }%`,
+                }}
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
-        {/* 快速記錄 */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">快速操作</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <Link href="/document-inbox">
-              <Button
-                variant="outline"
-                className="w-full justify-start gap-2 h-11"
-              >
-                <Camera className="w-4 h-4 text-purple-500" />
-                掃描單據
-              </Button>
-            </Link>
-            <Link href="/general-payment-management">
-              <Button
-                variant="outline"
-                className="w-full justify-start gap-2 h-11"
-              >
-                <Plus className="w-4 h-4 text-blue-500" />
-                新增項目
-              </Button>
-            </Link>
-            <Link href="/financial-overview">
-              <Button
-                variant="outline"
-                className="w-full justify-start gap-2 h-11"
-              >
-                <TrendingUp className="w-4 h-4 text-green-500" />
-                財務總覽
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* 全局統計 */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <Card className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
-              <DollarSign className="w-5 h-5 text-blue-600" />
+      {/* ===== 全局統計卡片 ===== */}
+      <div className="grid grid-cols-2 gap-3">
+        <Card className="p-3">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
+              <DollarSign className="w-4 h-4 text-blue-600" />
             </div>
             <div>
-              <p className="text-xs text-gray-500">總計劃</p>
-              <p className="text-lg font-bold text-gray-900">
+              <p className="text-[10px] text-gray-500">總計劃</p>
+              <p className="text-sm font-bold text-gray-900">
                 ${formatCurrency(stats.totalPlanned)}
               </p>
             </div>
           </div>
         </Card>
-        <Card className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center">
-              <CheckCircle2 className="w-5 h-5 text-green-600" />
+        <Card className="p-3">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center">
+              <CheckCircle2 className="w-4 h-4 text-green-600" />
             </div>
             <div>
-              <p className="text-xs text-gray-500">已完成</p>
-              <p className="text-lg font-bold text-gray-900">
+              <p className="text-[10px] text-gray-500">已完成</p>
+              <p className="text-sm font-bold text-gray-900">
                 ${formatCurrency(stats.totalPaid)}
               </p>
             </div>
           </div>
         </Card>
-        <Card className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-orange-100 flex items-center justify-center">
-              <Clock className="w-5 h-5 text-orange-600" />
+        <Card className="p-3">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center">
+              <Clock className="w-4 h-4 text-orange-600" />
             </div>
             <div>
-              <p className="text-xs text-gray-500">待付款</p>
-              <p className="text-lg font-bold text-gray-900">
+              <p className="text-[10px] text-gray-500">待付款</p>
+              <p className="text-sm font-bold text-gray-900">
                 ${formatCurrency(stats.totalUnpaid)}
               </p>
             </div>
           </div>
         </Card>
-        <Card className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center">
-              <CreditCard className="w-5 h-5 text-purple-600" />
+        <Card className="p-3">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center">
+              <CreditCard className="w-4 h-4 text-purple-600" />
             </div>
             <div>
-              <p className="text-xs text-gray-500">專案數</p>
-              <p className="text-lg font-bold text-gray-900">
+              <p className="text-[10px] text-gray-500">專案數</p>
+              <p className="text-sm font-bold text-gray-900">
                 {projectStats.length}
               </p>
             </div>
@@ -489,83 +527,82 @@ export default function PaymentHome() {
         </Card>
       </div>
 
-      {/* 近期付款時間線 */}
+      {/* ===== 近期付款時間線 ===== */}
       {upcomingSchedules.length > 0 && (
         <Card>
-          <CardHeader className="pb-3">
+          <CardHeader className="pb-2 pt-4 px-4">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-base flex items-center gap-2">
+              <CardTitle className="text-sm flex items-center gap-2">
                 <Calendar className="w-4 h-4" />
-                近期付款時間線
+                近期排程
               </CardTitle>
               <Link href="/payment-schedule">
-                <Button variant="ghost" size="sm" className="text-xs gap-1">
-                  查看全部 <ArrowRight className="w-3 h-3" />
+                <Button variant="ghost" size="sm" className="text-xs gap-1 h-7">
+                  全部 <ArrowRight className="w-3 h-3" />
                 </Button>
               </Link>
             </div>
           </CardHeader>
-          <CardContent>
-            <div className="relative">
-              <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-gray-200" />
-              <div className="space-y-4">
-                {upcomingSchedules.map((schedule: ScheduleWithNames) => (
-                  <div key={schedule.id} className="flex items-start gap-4 relative">
-                    <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center z-10 flex-shrink-0">
+          <CardContent className="px-4 pb-4">
+            <div className="space-y-2">
+              {upcomingSchedules.map((schedule: ScheduleWithNames) => (
+                <div key={schedule.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-gray-50">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
                       <span className="text-xs font-medium text-blue-700">
                         {new Date(schedule.scheduledDate).getDate()}
                       </span>
                     </div>
-                    <div className="flex-1 min-w-0 pb-2">
-                      <div className="flex items-center justify-between">
-                        <p className="text-sm font-medium text-gray-900 truncate">
-                          {schedule.itemName || "付款項目"}
-                        </p>
-                        <span className="text-sm font-semibold text-gray-700 flex-shrink-0 ml-2">
-                          ${formatCurrency(schedule.scheduledAmount)}
-                        </span>
-                      </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">
+                        {schedule.itemName || "付款項目"}
+                      </p>
                       <p className="text-xs text-gray-500">
                         {new Date(schedule.scheduledDate).toLocaleDateString(
                           "zh-TW",
                           { month: "short", day: "numeric" }
                         )}
-                        {schedule.projectName ? ` / ${schedule.projectName}` : ""}
+                        {schedule.projectName ? ` · ${schedule.projectName}` : ""}
                       </p>
                     </div>
                   </div>
-                ))}
-              </div>
+                  <span className="text-sm font-semibold text-gray-700 flex-shrink-0 ml-2">
+                    ${formatCurrency(schedule.scheduledAmount)}
+                  </span>
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>
       )}
 
-      {/* 專案狀況矩陣 */}
+      {/* ===== 專案狀況 ===== */}
       {projectStats.length > 0 && (
         <div>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-bold text-gray-900">專案狀況</h2>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
+              專案狀況
+            </h2>
             <Link href="/payment-project">
-              <Button variant="ghost" size="sm" className="text-xs gap-1">
-                查看全部 <ArrowRight className="w-3 h-3" />
+              <Button variant="ghost" size="sm" className="text-xs gap-1 h-7">
+                全部 <ArrowRight className="w-3 h-3" />
               </Button>
             </Link>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
             {projectStats.slice(0, 6).map((project: ProjectStatItem) => {
               const rate = Math.min(project.completionRate || 0, 100);
               return (
                 <Card key={project.id} className="hover:shadow-md transition-shadow">
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between mb-3">
+                  <CardContent className="p-3">
+                    <div className="flex items-start justify-between mb-2">
                       <div className="flex items-center gap-2 min-w-0">
                         {project.projectType === "business" ? (
                           <Building2 className="w-4 h-4 text-blue-600 flex-shrink-0" />
                         ) : (
                           <HomeIcon className="w-4 h-4 text-green-600 flex-shrink-0" />
                         )}
-                        <span className="font-medium text-gray-900 truncate">
+                        <span className="text-sm font-medium text-gray-900 truncate">
                           {project.projectName || "未命名"}
                         </span>
                       </div>
@@ -591,32 +628,32 @@ export default function PaymentHome() {
         </div>
       )}
 
-      {/* 最近付款記錄 */}
+      {/* ===== 最近付款記錄 ===== */}
       {recentRecords && recentRecords.length > 0 && (
         <Card>
-          <CardHeader className="pb-3">
+          <CardHeader className="pb-2 pt-4 px-4">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-base">最近付款記錄</CardTitle>
+              <CardTitle className="text-sm">最近付款</CardTitle>
               <Link href="/payment-records">
-                <Button variant="ghost" size="sm" className="text-xs gap-1">
-                  全部記錄 <ArrowRight className="w-3 h-3" />
+                <Button variant="ghost" size="sm" className="text-xs gap-1 h-7">
+                  全部 <ArrowRight className="w-3 h-3" />
                 </Button>
               </Link>
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-4 pb-4">
             <div className="space-y-2">
               {recentRecords.map((record: RecordWithNames) => (
                 <div
                   key={record.id}
-                  className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                  className="flex items-center justify-between p-2 bg-gray-50 rounded-lg"
                 >
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-gray-900 truncate">
                       {record.itemName || "付款項目"}
                     </p>
                     <p className="text-xs text-gray-500">
-                      {record.projectName} /{" "}
+                      {record.projectName} ·{" "}
                       {new Date(record.paymentDate).toLocaleDateString("zh-TW")}
                     </p>
                   </div>
@@ -629,6 +666,10 @@ export default function PaymentHome() {
           </CardContent>
         </Card>
       )}
+
+      {/* ===== 對話框/抽屜 ===== */}
+      <QuickAddDrawer open={showQuickAdd} onOpenChange={setShowQuickAdd} />
+      <QuickPaymentDialog open={showQuickPay} onOpenChange={setShowQuickPay} />
     </div>
   );
 }
