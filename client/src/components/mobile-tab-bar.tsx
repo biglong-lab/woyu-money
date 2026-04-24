@@ -274,6 +274,13 @@ export function MobileTabBar() {
     staleTime: 10000,
   })
 
+  // 獲取緊急付款數量（critical 級別）— 顯示在首頁 tab
+  const { data: priorityReport } = useQuery<{ counts: { critical: number; high: number } }>({
+    queryKey: ["/api/payment/priority-report?includeLow=true"],
+    staleTime: 30000,
+  })
+  const urgentCount = (priorityReport?.counts?.critical ?? 0) + (priorityReport?.counts?.high ?? 0)
+
   // 判斷當前路徑是否在某個分類下
   const isInPaymentSection = managementNavItems.some(
     (item) => location === item.href || location.startsWith(item.href)
@@ -338,7 +345,13 @@ export function MobileTabBar() {
       >
         <div className="flex items-center justify-around">
           {/* 首頁 */}
-          <TabItem title="首頁" href="/" icon={Home} isActive={location === "/"} />
+          <TabItem
+            title="首頁"
+            href="/"
+            icon={Home}
+            isActive={location === "/"}
+            badge={urgentCount}
+          />
 
           {/* 項目管理 */}
           <TabItem
