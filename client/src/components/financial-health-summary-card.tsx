@@ -5,16 +5,19 @@
 
 import { useQuery } from "@tanstack/react-query"
 import { Link } from "wouter"
-import { AlertTriangle, CheckCircle2, TrendingDown, ArrowRight } from "lucide-react"
+import { AlertTriangle, CheckCircle2, TrendingDown, ArrowRight, Clock } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 
 type UrgencyLevel = "critical" | "high" | "medium" | "low"
 
 interface PriorityResult {
+  itemName: string
   unpaidAmount: number
   urgency: UrgencyLevel
   daysOverdue: number
+  daysUntilDue: number
   lateFeeEstimate: number
+  dueDate: string
 }
 
 interface PriorityReport {
@@ -47,6 +50,15 @@ export function FinancialHealthSummaryCard() {
   const overdueCount = priority.all.filter((r) => r.daysOverdue > 0).length
   const accumulatedLateFee = priority.all.reduce((s, r) => s + (r.lateFeeEstimate ?? 0), 0)
   const yearLateFee = annual?.totalLateFee ?? 0
+
+  // 找最緊急的：有逾期就顯示最久逾期，否則顯示最近到期
+  const mostOverdue = priority.all
+    .filter((r) => r.daysOverdue > 0)
+    .sort((a, b) => b.daysOverdue - a.daysOverdue)[0]
+  const nextUpcoming = priority.all
+    .filter((r) => r.daysUntilDue > 0 && r.daysUntilDue <= 14)
+    .sort((a, b) => a.daysUntilDue - b.daysUntilDue)[0]
+  const nextItem = mostOverdue ?? nextUpcoming
 
   return (
     <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200">
@@ -134,9 +146,28 @@ export function FinancialHealthSummaryCard() {
           <Badge level="low" count={priority.counts.low} label="可緩" />
         </div>
 
+        {nextItem && (
+          <div
+            className={`mt-3 flex items-center gap-2 rounded p-2 text-xs ${
+              mostOverdue ? "bg-red-100 text-red-900" : "bg-blue-50 text-blue-900"
+            }`}
+          >
+            <Clock className="h-4 w-4 shrink-0" />
+            <div className="flex-1 min-w-0 truncate">
+              {mostOverdue ? "🔴 最久逾期：" : "⏰ 下一筆截止："}
+              <strong>{nextItem.itemName}</strong>
+              <span className="ml-1">
+                {mostOverdue
+                  ? `（已逾期 ${nextItem.daysOverdue} 天）`
+                  : `（剩 ${nextItem.daysUntilDue} 天 · ${nextItem.dueDate}）`}
+              </span>
+            </div>
+          </div>
+        )}
+
         {(overdueCount > 0 || priority.counts.critical > 0) && (
           <Link href="/cash-allocation">
-            <div className="mt-3 flex items-center justify-between bg-amber-100 hover:bg-amber-200 rounded p-2 cursor-pointer transition-colors">
+            <div className="mt-2 flex items-center justify-between bg-amber-100 hover:bg-amber-200 rounded p-2 cursor-pointer transition-colors">
               <span className="text-xs font-medium text-amber-900">
                 有 {priority.counts.critical + priority.counts.high} 件緊急事項，立刻分配現金
               </span>
