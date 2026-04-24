@@ -31,6 +31,7 @@ import aiAssistantRoutes from "./ai-assistant"
 import paymentAllocationRoutes from "./payment-allocation"
 import lateFeeRoutes from "./late-fee"
 import rentalMatrixRoutes from "./rental-matrix"
+import rentalBatchRoutes from "./rental-batch"
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // 設定認證系統
@@ -90,6 +91,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use(paymentAllocationRoutes)
   app.use(lateFeeRoutes)
   app.use(rentalMatrixRoutes)
+  app.use(rentalBatchRoutes)
 
   const httpServer = createServer(app)
   return httpServer
