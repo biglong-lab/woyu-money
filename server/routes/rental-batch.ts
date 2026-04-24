@@ -286,4 +286,87 @@ router.post(
   })
 )
 
+// ─────────────────────────────────────────────
+// POST create-yearly-items（為某 project 整年建立月租 payment_items）
+// ─────────────────────────────────────────────
+
+const yearlyItemsBodySchema = z.object({
+  projectId: z.number().int().positive(),
+  year: z.number().int().min(2000).max(2100),
+  monthlyAmount: z.number().finite().positive(),
+  dayOfMonth: z.number().int().min(1).max(28).optional(),
+  itemNamePrefix: z.string().max(100).optional(),
+})
+
+const CHECK_EXISTING_SQL = `
+  SELECT EXTRACT(MONTH FROM start_date)::int AS month
+  FROM payment_items
+  WHERE project_id = $1
+    AND is_deleted = false
+    AND EXTRACT(YEAR FROM start_date) = $2
+    AND (item_name ILIKE '%租%')
+`
+
+const INSERT_RENTAL_ITEM_SQL = `
+  INSERT INTO payment_items (
+    project_id, item_name, total_amount, item_type, payment_type,
+    start_date, paid_amount, status
+  ) VALUES ($1, $2, $3, 'project', 'single', $4, 0, 'pending')
+  RETURNING id
+`
+
+router.post(
+  "/api/rental-batch/create-yearly-items",
+  asyncHandler(async (req, res) => {
+    const parsed = yearlyItemsBodySchema.safeParse(req.body)
+    if (!parsed.success) {
+      throw errors.badRequest("請求格式錯誤")
+    }
+    const { projectId, year, monthlyAmount } = parsed.data
+    const dayOfMonth = parsed.data.dayOfMonth ?? 1
+    const prefix = parsed.data.itemNamePrefix ?? "租金"
+
+    const { pool } = await import("../db")
+    const client = await pool.connect()
+    try {
+      await client.query("BEGIN")
+
+      // 檢查既有月份避免重複建立
+      const existing = await client.query<{ month: number }>(CHECK_EXISTING_SQL, [projectId, year])
+      const existingMonths = new Set(existing.rows.map((r) => r.month))
+
+      const created: Array<{ month: number; itemId: number }> = []
+      for (let m = 1; m <= 12; m++) {
+        if (existingMonths.has(m)) continue
+        const monthStr = String(m).padStart(2, "0")
+        const dayStr = String(dayOfMonth).padStart(2, "0")
+        const startDate = `${year}-${monthStr}-${dayStr}`
+        const itemName = `${year}-${monthStr} ${prefix}`
+        const result = await client.query<{ id: number }>(INSERT_RENTAL_ITEM_SQL, [
+          projectId,
+          itemName,
+          monthlyAmount.toFixed(2),
+          startDate,
+        ])
+        created.push({ month: m, itemId: result.rows[0].id })
+      }
+
+      await client.query("COMMIT")
+      res.json({
+        projectId,
+        year,
+        monthlyAmount,
+        skipped: 12 - created.length,
+        createdCount: created.length,
+        items: created,
+      })
+    } catch (err) {
+      await client.query("ROLLBACK")
+      throw err
+    } finally {
+      client.release()
+    }
+  })
+)
+
 export default router
