@@ -361,16 +361,24 @@ export function MobileTabBar() {
             onClick={() => toggleMenu("payment")}
           />
 
-          {/* 中間大按鈕 — 記帳 */}
-          <div className="flex items-center justify-center -mt-4">
+          {/* 中間大按鈕 — 記帳（有緊急時紅色脈搏）*/}
+          <div className="relative flex items-center justify-center -mt-4">
+            {urgentCount > 0 && openMenu !== "quick" && (
+              <span
+                className="absolute inset-0 m-auto w-14 h-14 rounded-full bg-red-500 opacity-50 animate-ping pointer-events-none"
+                aria-hidden="true"
+              />
+            )}
             <button
               onClick={() => toggleMenu("quick")}
               className={cn(
-                "w-14 h-14 rounded-full flex items-center justify-center shadow-lg transition-all duration-200",
+                "relative w-14 h-14 rounded-full flex items-center justify-center shadow-lg transition-all duration-200",
                 "active:scale-90",
                 openMenu === "quick"
                   ? "bg-gray-700 rotate-45"
-                  : "bg-gradient-to-br from-blue-500 to-blue-700"
+                  : urgentCount > 0
+                    ? "bg-gradient-to-br from-red-500 to-red-700 ring-2 ring-red-300"
+                    : "bg-gradient-to-br from-blue-500 to-blue-700"
               )}
             >
               {openMenu === "quick" ? (
