@@ -82,7 +82,12 @@
   - `client/src/pages/rental-matrix.tsx`：合約×12月份表格（5 狀態色碼）
   - 掛載至 App.tsx 路由 `/rental-matrix`
   - payments mapping 骨架（下階段由 rental 模組補精確付款來源）
-- [ ] 第 8 步：批次建立與複製
+- [~] **第 8 步：批次建立與複製（核心 API 完成）**
+  - `server/routes/rental-batch.ts`：
+    - GET /api/rental-batch/month-preview?year=YYYY&month=MM（預覽本月應付租金）
+    - POST /api/rental-batch/mark-month-paid（批次標記本月租金已付，含交易保護）
+  - 掛載至 routes/index.ts
+  - 下輪：前端整合到 rental-matrix 頁面 + 複製上月功能
 - [ ] 第 9 步：現金流決策中心（加入收入預估）
 - [ ] 第 10 步：收據 AI 自動對應（改為匹配既有項目）
 
