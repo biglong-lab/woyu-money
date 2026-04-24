@@ -2,12 +2,39 @@
 
 ## 專案狀態：開發中
 
-**最後更新**: 2026-04-12
+**最後更新**: 2026-04-25
 **最新提交**: `a7bb6db` — 已推送至 GitHub
 
 ---
 
-## 目前階段：手機端 UX 優化
+## 🎯 當前階段：財務決策助理改造（Loop 推進中）
+
+**核心目標**：把系統從「讓人焦慮的記帳工具」改造為「主動幫我省力的財務決策助理」。
+
+### 10 步實施計畫進度
+
+- [x] **第 1 步：優先付款清單 CLI 腳本**（今日止血工具）
+  - 新增 `shared/payment-priority.ts` — 5 維度優先級演算法（495 行）
+  - 新增 `scripts/priority-payment-list.ts` — CLI 腳本（205 行）
+  - 新增 `tests/unit/payment-priority.test.ts` — 43 個單元測試（462 行）
+  - 9 種分類規則：勞健保/稅/銀行貸款/信用卡/水電/保險/租金/廠商/其他
+  - 每類別自帶：滯納金率、違約後果權重、彈性空間
+  - 輸出 Markdown：critical/high/medium/low 分群 + 預算缺口計算
+  - **覆蓋率：97.87% (Stmts) / 84.37% (Branch) / 100% (Funcs)**
+  - 使用：`npx tsx scripts/priority-payment-list.ts --budget 300000`
+- [ ] 第 2 步：智能優先級演算法（server/services/payment-priority.service.ts）
+- [ ] 第 3 步：現金分配引擎 API + /cash-allocation.tsx
+- [ ] 第 4 步：首頁今日焦點改版（破解逃避心理）
+- [ ] 第 5 步：勞健保滯納金監控（針對 40% 損失專項）
+- [ ] 第 6 步：LINE 雙向互動（資料不斷鏈）
+- [ ] 第 7 步：租金月度矩陣視圖
+- [ ] 第 8 步：批次建立與複製
+- [ ] 第 9 步：現金流決策中心（加入收入預估）
+- [ ] 第 10 步：收據 AI 自動對應（改為匹配既有項目）
+
+---
+
+## 先前階段：手機端 UX 優化
 
 ### 已完成
 - [x] Replit → 本地環境遷移（PostgreSQL、檔案儲存、Vite 設定）
