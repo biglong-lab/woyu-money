@@ -56,6 +56,7 @@ import IncomeSourcesManagement from "@/pages/income-sources-management"
 import IncomeWebhooksInbox from "@/pages/income-webhooks-inbox"
 import CashAllocation from "@/pages/cash-allocation"
 import LaborInsuranceWatch from "@/pages/labor-insurance-watch"
+import RentalMatrix from "@/pages/rental-matrix"
 
 function Router() {
   const [quickPaymentOpen, setQuickPaymentOpen] = useState(false)
@@ -166,6 +167,9 @@ function Router() {
 
                 {/* Labor Insurance Watch — 勞健保滯納金監控 */}
                 <ProtectedRoute path="/labor-insurance-watch" component={LaborInsuranceWatch} />
+
+                {/* Rental Matrix — 租金月度矩陣 */}
+                <ProtectedRoute path="/rental-matrix" component={RentalMatrix} />
 
                 {/* Feature Showcase */}
                 <ProtectedRoute path="/features" component={FeatureShowcase} />

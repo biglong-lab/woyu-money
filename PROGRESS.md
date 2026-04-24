@@ -76,12 +76,12 @@
   - `shared/line-bot-utils.ts`：每日推播訊息建構 + 回覆解析（1 / 1 延 3 / help）
   - 21 個單元測試全通過
   - webhook route 需 `LINE_BOT_CHANNEL_ACCESS_TOKEN`，等使用者提供後補上
-- [~] **第 7 步：租金月度矩陣（純函式 + API 完成）**
+- [x] **第 7 步：租金月度矩陣（全部完成）**
   - `shared/rental-matrix.ts` + 12 單元測試
   - `server/routes/rental-matrix.ts`：GET /api/rental-matrix?year=YYYY
-  - 掛載至 routes/index.ts
-  - payments mapping 待後續 round 補（前端可先顯示骨架）
-  - 下輪：前端頁面 /rental-matrix
+  - `client/src/pages/rental-matrix.tsx`：合約×12月份表格（5 狀態色碼）
+  - 掛載至 App.tsx 路由 `/rental-matrix`
+  - payments mapping 骨架（下階段由 rental 模組補精確付款來源）
 - [ ] 第 8 步：批次建立與複製
 - [ ] 第 9 步：現金流決策中心（加入收入預估）
 - [ ] 第 10 步：收據 AI 自動對應（改為匹配既有項目）
