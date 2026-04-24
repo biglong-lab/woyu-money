@@ -92,7 +92,12 @@
   - `server/routes/cashflow-forecast.ts`：GET /api/cashflow/forecast?monthsAhead=6
   - `client/src/pages/cashflow-decision-center.tsx`：月度卡片 + 缺口警示 + 信心度 + 行動建議
   - 可切換預估範圍 3/6/12 月
-- [ ] 第 10 步：收據 AI 自動對應（改為匹配既有項目）
+- [~] **第 10 步：收據自動對應演算法（純函式完成）**
+  - `shared/receipt-matcher.ts`：依金額/日期/OCR/分類 評分匹配既有 payment_items
+  - 三層信心：high（auto-confirm）/ medium / low
+  - 分期款尾款偵測（金額=未付餘額最優先）
+  - 11 單元測試通過
+  - 下輪：API + 整合到 document-inbox
 
 ---
 
