@@ -31,16 +31,23 @@
   - 現金分配演算法：critical/high 強制 suggested，medium/low 依預算決定，含 shortage/surplus
   - DB 查詢延遲載入（`await import("../db")`），單元測試不觸發連線
   - **覆蓋率：100% (Stmts/Branch/Funcs/Lines 全滿)**
-- [~] **第 3 步：現金分配引擎 API**（後端完成，前端 /cash-allocation.tsx 下輪處理）
-  - 新增 `server/routes/payment-allocation.ts`（72 行）
-  - 新增 `tests/integration/payment-allocation.test.ts`（14 個整合測試，252 行）
-  - Endpoints：
-    - `GET /api/payment/priority-report?includeLow=true` — 取得優先級報告
-    - `POST /api/payment/allocation-suggest` — 現金分配建議（body: `{ availableBudget, asOf? }`）
-  - Zod 驗證：budget 必須為有限非負數，asOf 為 ISO datetime
-  - 掛載至 `server/routes/index.ts`
-  - 整合測試使用 `vi.mock` 隔離 service 層，不依賴 DB
-  - **路由覆蓋率 100% (Stmts/Funcs/Lines)**
+- [x] **第 3 步：現金分配引擎（全部完成）**
+  - **後端 API**：
+    - `server/routes/payment-allocation.ts`（72 行）
+    - `tests/integration/payment-allocation.test.ts`（14 個整合測試，252 行）
+    - Endpoints：
+      - `GET /api/payment/priority-report?includeLow=true`
+      - `POST /api/payment/allocation-suggest`（body: `{ availableBudget, asOf? }`）
+    - Zod 驗證 + 整合測試使用 `vi.mock` 隔離 service，不依賴 DB
+    - 路由覆蓋率 100% (Stmts/Funcs/Lines)
+  - **前端頁面** `/cash-allocation`：
+    - `client/src/pages/cash-allocation.tsx`（383 行）
+    - 表單輸入可動用金額 → 呼叫 `POST /api/payment/allocation-suggest`
+    - 摘要卡：可動用金額 / 必須支付 / 可延後 + 缺口/餘額警示
+    - 依 urgency 分 4 群顯示（critical/high/medium/low）
+    - 每筆項目顯示：到期日、滯納金累積、每日新增滯納金、原因說明
+    - 響應式設計（手機 + 桌面）
+    - 掛載至 App.tsx 路由 `/cash-allocation`
 - [ ] 第 4 步：首頁今日焦點改版（破解逃避心理）
 - [ ] 第 5 步：勞健保滯納金監控（針對 40% 損失專項）
 - [ ] 第 6 步：LINE 雙向互動（資料不斷鏈）
