@@ -309,12 +309,36 @@ function EmptyState({ scope }: { scope: ViewScope }) {
 // 主元件
 // ─────────────────────────────────────────────
 
+// localStorage key + helpers：每天重置完成計數
+const COMPLETED_KEY = "today-focus:completed"
+function loadCompleted(): { date: string; count: number; amount: number } {
+  try {
+    const raw = localStorage.getItem(COMPLETED_KEY)
+    if (raw) {
+      const parsed = JSON.parse(raw) as { date: string; count: number; amount: number }
+      const today = new Date().toISOString().slice(0, 10)
+      if (parsed.date === today) return parsed
+    }
+  } catch {
+    // ignore
+  }
+  return { date: new Date().toISOString().slice(0, 10), count: 0, amount: 0 }
+}
+function saveCompleted(state: { date: string; count: number; amount: number }) {
+  try {
+    localStorage.setItem(COMPLETED_KEY, JSON.stringify(state))
+  } catch {
+    // ignore
+  }
+}
+
 export function TodayFocusCard() {
   const { toast } = useToast()
   const [scope, setScope] = useState<ViewScope>("today")
   const [skippedIds, setSkippedIds] = useState<Set<number>>(new Set())
   const [payDialogOpen, setPayDialogOpen] = useState(false)
   const [payingItem, setPayingItem] = useState<PriorityResult | null>(null)
+  const [completed, setCompleted] = useState(loadCompleted)
 
   const { data: report, isLoading } = useQuery<PriorityReport>({
     queryKey: ["/api/payment/priority-report?includeLow=true"],
@@ -350,10 +374,22 @@ export function TodayFocusCard() {
         paymentDate: data.paymentDate,
       })
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["/api/payment/priority-report?includeLow=true"] })
       queryClient.invalidateQueries({ queryKey: ["/api/payment/items"] })
       queryClient.invalidateQueries({ queryKey: ["/api/payment/records"] })
+      // 累計今日已完成
+      const today = new Date().toISOString().slice(0, 10)
+      const next =
+        completed.date === today
+          ? {
+              ...completed,
+              count: completed.count + 1,
+              amount: completed.amount + variables.amountPaid,
+            }
+          : { date: today, count: 1, amount: variables.amountPaid }
+      setCompleted(next)
+      saveCompleted(next)
       toast({ title: "已標記為已付款", description: "正在載入下一筆..." })
       setPayDialogOpen(false)
       setPayingItem(null)
@@ -414,12 +450,24 @@ export function TodayFocusCard() {
               專注在最該處理的 1 件事，完成後自動顯示下一件
             </CardDescription>
           </div>
-          {report && report.totalUnpaid > 0 && (
-            <div className="text-right text-xs">
-              <div className="text-gray-500">總未付</div>
-              <div className="font-bold text-gray-900">{formatCurrency(report.totalUnpaid)}</div>
-            </div>
-          )}
+          <div className="text-right text-xs">
+            {completed.count > 0 ? (
+              <>
+                <div className="text-green-600 font-medium">今天 ✨ {completed.count} 件</div>
+                <div className="text-gray-500">{formatCurrency(completed.amount)}</div>
+              </>
+            ) : (
+              report &&
+              report.totalUnpaid > 0 && (
+                <>
+                  <div className="text-gray-500">總未付</div>
+                  <div className="font-bold text-gray-900">
+                    {formatCurrency(report.totalUnpaid)}
+                  </div>
+                </>
+              )
+            )}
+          </div>
         </div>
         <ScopeTabs scope={scope} onChange={setScope} counts={scopeCounts} />
       </CardHeader>
