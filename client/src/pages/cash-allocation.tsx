@@ -238,9 +238,40 @@ function UrgencyGroup({
 function SummaryCard({ result }: { result: AllocationResult }) {
   const hasShortage = result.shortage > 0
   const hasSurplus = result.surplus > 0
+
+  // 進度條：必須付 vs 可動用
+  const max = Math.max(result.suggestedTotal, result.availableBudget)
+  const suggestedPct = max > 0 ? (result.suggestedTotal / max) * 100 : 0
+  const budgetPct = max > 0 ? (result.availableBudget / max) * 100 : 0
+
   return (
     <Card className={hasShortage ? "border-red-300 bg-red-50" : "border-green-300 bg-green-50"}>
       <CardContent className="pt-6">
+        {/* 視覺化進度條：必須付 vs 可動用 */}
+        <div className="mb-4 space-y-1.5">
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-gray-700">必須支付</span>
+            <span className={`font-semibold ${hasShortage ? "text-red-700" : "text-gray-900"}`}>
+              {formatCurrency(result.suggestedTotal)}
+            </span>
+          </div>
+          <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
+            <div
+              className={hasShortage ? "h-full bg-red-500" : "h-full bg-green-500"}
+              style={{ width: `${suggestedPct}%` }}
+            />
+          </div>
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-gray-700">可動用金額</span>
+            <span className="font-semibold text-blue-700">
+              {formatCurrency(result.availableBudget)}
+            </span>
+          </div>
+          <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
+            <div className="h-full bg-blue-400" style={{ width: `${budgetPct}%` }} />
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
             <div className="text-sm text-gray-600 flex items-center gap-1">
