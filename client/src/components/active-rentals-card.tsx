@@ -82,18 +82,49 @@ export function ActiveRentalsCard() {
   const thisMonth = data.cells.filter((c) => c.month === month && c.status !== "out_of_contract")
   if (thisMonth.length === 0) return null
 
-  const items = thisMonth.map((cell) => {
+  // 排序：未付 > 部分 > 已付 > 未到期（待處理優先）
+  const STATUS_ORDER: Record<CellStatus, number> = {
+    unpaid: 0,
+    partial: 1,
+    paid: 2,
+    upcoming: 3,
+    out_of_contract: 4,
+  }
+  const sortedThisMonth = [...thisMonth].sort(
+    (a, b) => STATUS_ORDER[a.status] - STATUS_ORDER[b.status]
+  )
+
+  const items = sortedThisMonth.map((cell) => {
     const contract = data.contracts.find((c) => c.id === cell.contractId)
     return { cell, contract }
   })
 
+  // 統計進度
+  const total = thisMonth.length
+  const paidCount = thisMonth.filter((c) => c.status === "paid").length
+  const monthExpected = thisMonth.reduce((sum, c) => sum + c.expectedAmount, 0)
+  const monthPaid = thisMonth.reduce((sum, c) => sum + c.paidAmount, 0)
+  const progressPct = monthExpected > 0 ? (monthPaid / monthExpected) * 100 : 0
+
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-sm sm:text-base flex items-center gap-1.5">
-          <Building2 className="h-4 w-4" />
-          {month} 月租金狀態
-        </CardTitle>
+        <div className="flex items-center justify-between gap-2">
+          <CardTitle className="text-sm sm:text-base flex items-center gap-1.5">
+            <Building2 className="h-4 w-4" />
+            {month} 月租金狀態
+          </CardTitle>
+          <span className="text-xs text-gray-500">
+            已付 {paidCount}/{total} · {fmt(monthPaid)} / {fmt(monthExpected)}
+          </span>
+        </div>
+        {/* 進度條 */}
+        <div className="mt-2 h-1.5 rounded-full bg-gray-100 overflow-hidden">
+          <div
+            className="h-full bg-green-500 transition-all duration-300"
+            style={{ width: `${progressPct}%` }}
+          />
+        </div>
       </CardHeader>
       <CardContent className="space-y-2">
         {items.map(({ cell, contract }) => {
