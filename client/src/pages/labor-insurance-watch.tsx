@@ -4,11 +4,13 @@
  */
 
 import { useState } from "react"
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useMutation } from "@tanstack/react-query"
 import { AlertTriangle, TrendingDown, Clock, Calendar, CheckCircle2, XCircle } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { apiRequest, queryClient } from "@/lib/queryClient"
+import { useToast } from "@/hooks/use-toast"
 
 type ReminderLevel = "none" | "early" | "warning" | "final"
 type LateFeeStatus = "unpaid" | "paid_late" | "paid_on_time"
@@ -92,8 +94,36 @@ const STATUS_META: Record<LateFeeStatus, { label: string; color: string }> = {
 }
 
 function ReminderCard() {
+  const { toast } = useToast()
+  const [pendingId, setPendingId] = useState<number | null>(null)
   const { data, isLoading } = useQuery<ReminderStatus>({
     queryKey: ["/api/late-fee/reminder-status"],
+  })
+
+  const markPaidMutation = useMutation<
+    unknown,
+    Error,
+    { id: number; itemName: string; unpaidAmount: number }
+  >({
+    mutationFn: (input) =>
+      apiRequest("POST", "/api/payment/records", {
+        itemId: input.id,
+        amountPaid: input.unpaidAmount,
+        paymentDate: new Date().toISOString().slice(0, 10),
+      }),
+    onMutate: (input) => setPendingId(input.id),
+    onSuccess: (_data, input) => {
+      toast({
+        title: "已標記為已付",
+        description: `${input.itemName}（${formatCurrency(input.unpaidAmount)}）`,
+      })
+      queryClient.invalidateQueries({ queryKey: ["/api/late-fee/reminder-status"] })
+      queryClient.invalidateQueries({ queryKey: ["/api/late-fee/annual-loss"] })
+      queryClient.invalidateQueries({ queryKey: ["/api/payment/priority-report?includeLow=true"] })
+    },
+    onSettled: () => setPendingId(null),
+    onError: (err) =>
+      toast({ title: "標記失敗", description: err.message, variant: "destructive" }),
   })
 
   if (isLoading) {
@@ -144,10 +174,13 @@ function ReminderCard() {
                 </div>
               </div>
             </div>
-            <div className="space-y-2 pt-2 border-t">
+            <div className="space-y-3 pt-2 border-t">
               {data.items.slice(0, 5).map((item) => (
-                <div key={item.id} className="flex items-center justify-between text-sm">
-                  <div>
+                <div
+                  key={item.id}
+                  className="flex items-center justify-between gap-2 text-sm rounded p-2 bg-white/50"
+                >
+                  <div className="flex-1 min-w-0">
                     <div className="font-medium">{item.itemName}</div>
                     <div className="text-xs text-gray-500">
                       到期：{item.dueDate}
@@ -156,7 +189,7 @@ function ReminderCard() {
                       )}
                     </div>
                   </div>
-                  <div className="text-right">
+                  <div className="text-right shrink-0">
                     <div className="font-semibold">{formatCurrency(item.unpaidAmount)}</div>
                     {item.lateFee > 0 && (
                       <div className="text-xs text-red-700">
@@ -164,6 +197,22 @@ function ReminderCard() {
                       </div>
                     )}
                   </div>
+                  <Button
+                    size="sm"
+                    className="bg-green-600 hover:bg-green-700 text-xs h-7 shrink-0"
+                    onClick={() =>
+                      markPaidMutation.mutate({
+                        id: item.id,
+                        itemName: item.itemName,
+                        unpaidAmount: item.unpaidAmount,
+                      })
+                    }
+                    disabled={pendingId === item.id}
+                    data-testid={`labor-mark-paid-${item.id}`}
+                  >
+                    <CheckCircle2 className="h-3 w-3 mr-1" />
+                    {pendingId === item.id ? "處理中" : "已付"}
+                  </Button>
                 </div>
               ))}
             </div>
