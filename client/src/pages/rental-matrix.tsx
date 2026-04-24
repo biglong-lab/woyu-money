@@ -4,10 +4,20 @@
  */
 
 import { useState } from "react"
-import { useQuery } from "@tanstack/react-query"
-import { Calendar } from "lucide-react"
+import { useQuery, useMutation } from "@tanstack/react-query"
+import { Calendar, CheckCircle2 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { apiRequest, queryClient } from "@/lib/queryClient"
+import { useToast } from "@/hooks/use-toast"
 
 type CellStatus = "paid" | "partial" | "unpaid" | "upcoming" | "out_of_contract"
 
@@ -102,12 +112,58 @@ function LegendBar() {
   )
 }
 
+interface PreviewItem {
+  id: number
+  contractName: string
+  tenantName: string | null
+  expectedAmount: number
+}
+interface PreviewData {
+  year: number
+  month: number
+  count: number
+  totalAmount: number
+  items: PreviewItem[]
+}
+
 export default function RentalMatrixPage() {
   const [year, setYear] = useState(new Date().getFullYear())
+  const [batchOpen, setBatchOpen] = useState(false)
+  const currentMonth = new Date().getMonth() + 1
+  const { toast } = useToast()
   const years = [year - 1, year, year + 1].filter((y) => y >= 2020)
 
   const { data, isLoading } = useQuery<RentalMatrixData>({
     queryKey: [`/api/rental-matrix?year=${year}`],
+  })
+
+  const { data: preview } = useQuery<PreviewData>({
+    queryKey: [`/api/rental-batch/month-preview?year=${year}&month=${currentMonth}`],
+    enabled: batchOpen,
+  })
+
+  const markPaidMutation = useMutation<{ processedCount: number; totalPaid: number }, Error, void>({
+    mutationFn: async () => {
+      return apiRequest("POST", "/api/rental-batch/mark-month-paid", {
+        year,
+        month: currentMonth,
+      })
+    },
+    onSuccess: (result) => {
+      toast({
+        title: `已標記 ${result.processedCount} 筆租金為已付`,
+        description: `合計 NT$ ${Math.round(result.totalPaid).toLocaleString()}`,
+      })
+      setBatchOpen(false)
+      queryClient.invalidateQueries({ queryKey: [`/api/rental-matrix?year=${year}`] })
+      queryClient.invalidateQueries({
+        queryKey: [`/api/rental-batch/month-preview?year=${year}&month=${currentMonth}`],
+      })
+      queryClient.invalidateQueries({ queryKey: ["/api/payment/priority-report?includeLow=true"] })
+    },
+    onError: (err) => {
+      toast({ title: "批次標記失敗", description: err.message, variant: "destructive" })
+    },
   })
 
   return (
@@ -131,7 +187,7 @@ export default function RentalMatrixPage() {
                 {data ? `共 ${data.contracts.length} 份合約` : "載入中..."}
               </CardDescription>
             </div>
-            <div className="flex gap-1">
+            <div className="flex gap-1 flex-wrap items-center">
               {years.map((y) => (
                 <Button
                   key={y}
@@ -143,6 +199,15 @@ export default function RentalMatrixPage() {
                   {y}
                 </Button>
               ))}
+              <Button
+                size="sm"
+                onClick={() => setBatchOpen(true)}
+                className="text-xs bg-green-600 hover:bg-green-700"
+                data-testid="button-batch-mark-paid"
+              >
+                <CheckCircle2 className="h-3 w-3 mr-1" />
+                {currentMonth} 月全部已付
+              </Button>
             </div>
           </div>
         </CardHeader>
@@ -211,6 +276,62 @@ export default function RentalMatrixPage() {
           <LegendBar />
         </CardContent>
       </Card>
+
+      <Dialog open={batchOpen} onOpenChange={setBatchOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              批次標記 {year}/{currentMonth} 月租金已付
+            </DialogTitle>
+            <DialogDescription>
+              系統會為以下符合租金類別的付款項目，建立已付款記錄（交易保護）
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2 max-h-[50vh] overflow-auto space-y-2">
+            {!preview && <div className="text-sm text-gray-500">載入中...</div>}
+            {preview && preview.count === 0 && (
+              <div className="text-sm text-gray-600">本月沒有符合條件的租金項目。</div>
+            )}
+            {preview && preview.count > 0 && (
+              <>
+                <div className="text-sm text-gray-700">
+                  共 <strong>{preview.count}</strong> 筆，合計 NT${" "}
+                  <strong>{Math.round(preview.totalAmount).toLocaleString()}</strong>
+                </div>
+                <ul className="text-sm border rounded divide-y">
+                  {preview.items.map((it) => (
+                    <li key={it.id} className="p-2 flex justify-between">
+                      <span>
+                        {it.contractName}
+                        {it.tenantName && (
+                          <span className="text-gray-500 ml-1">（{it.tenantName}）</span>
+                        )}
+                      </span>
+                      <span>NT$ {Math.round(it.expectedAmount).toLocaleString()}</span>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setBatchOpen(false)}
+              disabled={markPaidMutation.isPending}
+            >
+              取消
+            </Button>
+            <Button
+              onClick={() => markPaidMutation.mutate()}
+              disabled={markPaidMutation.isPending || !preview || preview.count === 0}
+              data-testid="button-confirm-batch"
+            >
+              {markPaidMutation.isPending ? "處理中..." : "確認批次標記已付"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
