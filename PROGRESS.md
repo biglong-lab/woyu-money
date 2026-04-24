@@ -59,19 +59,19 @@
   - 明示拖延成本：每筆顯示「已產生滯納金 + 每拖一天再多 $XXX」
   - 呼叫既有 API：`POST /api/payment/records`（和 quick-payment 相同模式）
   - 空狀態：逐層顯示成就感文案
-- [~] **第 5 步：勞健保滯納金監控（核心演算法 + Service 完成）**
-  - 新增 `shared/late-fee-tracker.ts`（229 行，前後端共用純函式）
-    - `isLaborInsurance` 識別勞健保（共用 payment-priority 分類）
-    - `calculateUnpaidLateFee` 未付項目累積滯納金
-    - `calculatePaidLateFee` 已付項目歷史滯納金（逾期付款損失）
-    - `aggregateAnnualLoss` 年度損失報告（彙總未付 + 已付）
-    - `getReminderLevel` 依日期判斷提醒等級：20 日 early / 25 日 warning / 28 日 final
-  - 新增 `tests/unit/late-fee-tracker.test.ts`（35 個單元測試，全通過）
-  - 新增 `server/services/late-fee.service.ts`（247 行，DI 設計）
-    - 純函式：`buildAnnualLossReport`
-    - 依賴注入：`getAnnualLossReportWith` / `getTodayReminderStatusWith`
-    - 公開 API：`getAnnualLossReport(year)` / `getTodayReminderStatus()`
-  - API route + 整合測試 + 前端頁面留待後續 round（避免單 commit 超過檔案上限）
+- [~] **第 5 步：勞健保滯納金監控（核心 + API 完成，前端進行中）**
+  - 5a：`shared/late-fee-tracker.ts`（229 行）+ 35 個單元測試
+    - `isLaborInsurance`、`calculateUnpaidLateFee`、`calculatePaidLateFee`
+    - `aggregateAnnualLoss`、`getReminderLevel`（20/25/28 三層）
+  - 5a：`server/services/late-fee.service.ts`（247 行，DI）
+    - 純函式 + 注入式 + 公開 API
+  - 5b：**`server/routes/late-fee.ts`**（65 行，API endpoints）
+    - `GET /api/late-fee/annual-loss?year=YYYY` — 年度損失報告
+    - `GET /api/late-fee/reminder-status` — 今日提醒狀態
+    - Zod 驗證 year 範圍 2000-2100
+  - 5b：`tests/integration/late-fee.test.ts`（12 個整合測試）
+  - 5b：掛載至 `server/routes/index.ts`
+  - 5c（下輪）：前端頁面 `/labor-insurance-watch`
 - [ ] 第 6 步：LINE 雙向互動（資料不斷鏈）
 - [ ] 第 7 步：租金月度矩陣視圖
 - [ ] 第 8 步：批次建立與複製

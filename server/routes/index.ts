@@ -29,6 +29,7 @@ import pmsBridgeRoutes from "./pms-bridge"
 import dailyRevenueRoutes from "./daily-revenues"
 import aiAssistantRoutes from "./ai-assistant"
 import paymentAllocationRoutes from "./payment-allocation"
+import lateFeeRoutes from "./late-fee"
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // 設定認證系統
@@ -86,6 +87,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use(dailyRevenueRoutes)
   app.use(aiAssistantRoutes)
   app.use(paymentAllocationRoutes)
+  app.use(lateFeeRoutes)
 
   const httpServer = createServer(app)
   return httpServer
