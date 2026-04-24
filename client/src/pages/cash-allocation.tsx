@@ -509,7 +509,21 @@ export default function CashAllocationPage() {
       )}
 
       {/* 結果 */}
-      {result && (
+      {result && result.suggested.length === 0 && result.deferred.length === 0 && (
+        <Card className="border-green-300 bg-gradient-to-br from-green-50 to-emerald-50">
+          <CardContent className="pt-10 pb-10 text-center">
+            <div className="text-6xl mb-3 animate-bounce">🎉</div>
+            <h3 className="text-xl sm:text-2xl font-bold text-green-700">太棒了！全部都付清</h3>
+            <p className="mt-2 text-sm text-gray-600">
+              目前沒有未付項目，財務狀態很健康！
+              <br />
+              繼續保持，準時付款可避免滯納金損失。
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {result && (result.suggested.length > 0 || result.deferred.length > 0) && (
         <div className="space-y-4 sm:space-y-6" data-testid="allocation-result">
           <SummaryCard result={result} />
 
