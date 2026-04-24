@@ -56,54 +56,72 @@ export function FinancialHealthSummaryCard() {
           <span className="text-xs text-gray-500">{year} 年度</span>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
-          <div className="bg-white/70 rounded p-2.5">
-            <div className="text-xs text-gray-500">未付總額</div>
-            <div className="text-base sm:text-lg font-bold text-gray-900">
-              {fmt(priority.totalUnpaid)}
+          <Link href="/cash-allocation">
+            <div className="bg-white/70 rounded p-2.5 cursor-pointer hover:bg-white transition-colors active:scale-95">
+              <div className="text-xs text-gray-500">未付總額</div>
+              <div className="text-base sm:text-lg font-bold text-gray-900">
+                {fmt(priority.totalUnpaid)}
+              </div>
             </div>
-          </div>
-          <div className={`rounded p-2.5 ${overdueCount > 0 ? "bg-red-50" : "bg-white/70"}`}>
-            <div className="text-xs text-gray-500 flex items-center gap-1">
-              {overdueCount > 0 && <AlertTriangle className="h-3 w-3 text-red-600" />}
-              逾期筆數
-            </div>
+          </Link>
+          <Link href="/cash-allocation">
             <div
-              className={`text-base sm:text-lg font-bold ${
-                overdueCount > 0 ? "text-red-700" : "text-gray-900"
+              className={`rounded p-2.5 cursor-pointer hover:opacity-80 transition-opacity active:scale-95 ${
+                overdueCount > 0 ? "bg-red-50" : "bg-white/70"
               }`}
             >
-              {overdueCount} 筆
+              <div className="text-xs text-gray-500 flex items-center gap-1">
+                {overdueCount > 0 && <AlertTriangle className="h-3 w-3 text-red-600" />}
+                逾期筆數
+              </div>
+              <div
+                className={`text-base sm:text-lg font-bold ${
+                  overdueCount > 0 ? "text-red-700" : "text-gray-900"
+                }`}
+              >
+                {overdueCount} 筆
+              </div>
             </div>
-          </div>
-          <div
-            className={`rounded p-2.5 ${accumulatedLateFee > 0 ? "bg-amber-50" : "bg-white/70"}`}
-          >
-            <div className="text-xs text-gray-500">已產生滯納金</div>
+          </Link>
+          <Link href="/labor-insurance-watch">
             <div
-              className={`text-base sm:text-lg font-bold ${
-                accumulatedLateFee > 0 ? "text-amber-700" : "text-gray-900"
+              className={`rounded p-2.5 cursor-pointer hover:opacity-80 transition-opacity active:scale-95 ${
+                accumulatedLateFee > 0 ? "bg-amber-50" : "bg-white/70"
               }`}
             >
-              {fmt(accumulatedLateFee)}
+              <div className="text-xs text-gray-500">已產生滯納金</div>
+              <div
+                className={`text-base sm:text-lg font-bold ${
+                  accumulatedLateFee > 0 ? "text-amber-700" : "text-gray-900"
+                }`}
+              >
+                {fmt(accumulatedLateFee)}
+              </div>
             </div>
-          </div>
-          <div className={`rounded p-2.5 ${yearLateFee > 0 ? "bg-red-50" : "bg-green-50"}`}>
-            <div className="text-xs text-gray-500 flex items-center gap-1">
-              {yearLateFee > 0 ? (
-                <TrendingDown className="h-3 w-3 text-red-600" />
-              ) : (
-                <CheckCircle2 className="h-3 w-3 text-green-600" />
-              )}
-              年度損失
-            </div>
+          </Link>
+          <Link href="/labor-insurance-watch">
             <div
-              className={`text-base sm:text-lg font-bold ${
-                yearLateFee > 0 ? "text-red-700" : "text-green-700"
+              className={`rounded p-2.5 cursor-pointer hover:opacity-80 transition-opacity active:scale-95 ${
+                yearLateFee > 0 ? "bg-red-50" : "bg-green-50"
               }`}
             >
-              {yearLateFee > 0 ? fmt(yearLateFee) : "0"}
+              <div className="text-xs text-gray-500 flex items-center gap-1">
+                {yearLateFee > 0 ? (
+                  <TrendingDown className="h-3 w-3 text-red-600" />
+                ) : (
+                  <CheckCircle2 className="h-3 w-3 text-green-600" />
+                )}
+                年度損失
+              </div>
+              <div
+                className={`text-base sm:text-lg font-bold ${
+                  yearLateFee > 0 ? "text-red-700" : "text-green-700"
+                }`}
+              >
+                {yearLateFee > 0 ? fmt(yearLateFee) : "0"}
+              </div>
             </div>
-          </div>
+          </Link>
         </div>
 
         <div className="mt-3 flex flex-wrap gap-2 text-xs">
