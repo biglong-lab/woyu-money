@@ -22,6 +22,7 @@ import {
   ArrowRight,
   ChevronRight,
   Sparkles,
+  Copy,
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -427,6 +428,34 @@ export function TodayFocusCard() {
 
   const handleResetSkipped = () => setSkippedIds(new Set())
 
+  // 複製今日清單為 LINE 風格訊息
+  const handleCopyDigest = async () => {
+    const items = visibleItems.slice(0, 10)
+    if (items.length === 0) return
+    const today = new Date()
+    const dateStr = `${today.getMonth() + 1}/${today.getDate()}`
+    const total = items.reduce((s, r) => s + r.unpaidAmount, 0)
+    const lines = items.map((item, i) => {
+      const icon = { critical: "🔴", high: "🟠", medium: "🟡", low: "🟢" }[item.urgency]
+      const suffix = item.daysOverdue > 0 ? `（逾期 ${item.daysOverdue} 天）` : ""
+      return `${i + 1}. ${icon} ${item.itemName}\n   ${formatCurrency(item.unpaidAmount)}${suffix}`
+    })
+    const text =
+      `📅 ${dateStr} 待付款清單（${items.length} 件）：\n\n` +
+      lines.join("\n\n") +
+      `\n\n💰 合計：${formatCurrency(total)}`
+    try {
+      await navigator.clipboard.writeText(text)
+      toast({ title: "已複製到剪貼簿", description: "可貼到 LINE / 備忘錄" })
+    } catch {
+      toast({
+        title: "複製失敗",
+        description: "瀏覽器不支援，請手動截圖",
+        variant: "destructive",
+      })
+    }
+  }
+
   if (isLoading) {
     return (
       <Card>
@@ -494,7 +523,19 @@ export function TodayFocusCard() {
           </button>
         )}
 
-        <div className="flex items-center justify-end gap-2 pt-2 border-t">
+        <div className="flex items-center justify-end gap-2 pt-2 border-t flex-wrap">
+          {visibleItems.length > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-xs"
+              onClick={handleCopyDigest}
+              data-testid="copy-digest"
+            >
+              <Copy className="h-3 w-3 mr-1" />
+              複製清單
+            </Button>
+          )}
           <Link href="/cash-allocation">
             <Button variant="ghost" size="sm" className="text-xs">
               現金分配助理
