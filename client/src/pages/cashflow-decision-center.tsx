@@ -4,7 +4,7 @@
  */
 
 import { useState } from "react"
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useMutation } from "@tanstack/react-query"
 import {
   TrendingUp,
   AlertTriangle,
@@ -16,6 +16,8 @@ import {
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { apiRequest, queryClient } from "@/lib/queryClient"
+import { useToast } from "@/hooks/use-toast"
 
 type Basis = "last_year_same_month" | "recent_average" | "overall_average" | "no_data"
 type Confidence = "high" | "medium" | "low"
@@ -85,9 +87,30 @@ interface MonthDetailData {
 }
 
 function MonthDetail({ year, month }: { year: number; month: number }) {
-  const { data, isLoading } = useQuery<MonthDetailData>({
-    queryKey: [`/api/cashflow/month-detail?year=${year}&month=${month}`],
+  const { toast } = useToast()
+  const [pendingId, setPendingId] = useState<number | null>(null)
+  const queryKey = [`/api/cashflow/month-detail?year=${year}&month=${month}`]
+  const { data, isLoading } = useQuery<MonthDetailData>({ queryKey })
+
+  const markPaidMutation = useMutation<unknown, Error, MonthDetailItem>({
+    mutationFn: (item) =>
+      apiRequest("POST", "/api/payment/records", {
+        itemId: item.id,
+        amountPaid: item.unpaidAmount,
+        paymentDate: new Date().toISOString().slice(0, 10),
+      }),
+    onMutate: (item) => setPendingId(item.id),
+    onSuccess: (_data, item) => {
+      toast({ title: "已標記為已付", description: item.itemName })
+      queryClient.invalidateQueries({ queryKey })
+      queryClient.invalidateQueries({ queryKey: ["/api/cashflow/forecast"] })
+      queryClient.invalidateQueries({ queryKey: ["/api/payment/priority-report?includeLow=true"] })
+    },
+    onSettled: () => setPendingId(null),
+    onError: (err) =>
+      toast({ title: "標記失敗", description: err.message, variant: "destructive" }),
   })
+
   if (isLoading) return <div className="text-xs text-gray-500 p-2">載入中...</div>
   if (!data || data.count === 0)
     return <div className="text-xs text-gray-500 p-2">該月無未付項目明細</div>
@@ -96,14 +119,27 @@ function MonthDetail({ year, month }: { year: number; month: number }) {
       <div className="text-xs text-gray-600">
         共 {data.count} 筆未付，{fmt(data.totalUnpaid)}
       </div>
-      <ul className="text-xs space-y-1 max-h-48 overflow-y-auto">
+      <ul className="text-xs space-y-1 max-h-64 overflow-y-auto">
         {data.items.slice(0, 20).map((item) => (
-          <li key={item.id} className="flex justify-between gap-2 py-0.5">
-            <span className="truncate">
-              {item.itemName}
-              {item.projectName && <span className="text-gray-400 ml-1">· {item.projectName}</span>}
-            </span>
+          <li key={item.id} className="flex items-center justify-between gap-2 py-1">
+            <div className="flex-1 min-w-0">
+              <span className="truncate block">
+                {item.itemName}
+                {item.projectName && (
+                  <span className="text-gray-400 ml-1">· {item.projectName}</span>
+                )}
+              </span>
+            </div>
             <span className="shrink-0 font-medium">{fmt(item.unpaidAmount)}</span>
+            <Button
+              size="sm"
+              className="bg-green-600 hover:bg-green-700 text-[10px] h-6 px-2 shrink-0"
+              onClick={() => markPaidMutation.mutate(item)}
+              disabled={pendingId === item.id}
+              data-testid={`cashflow-mark-paid-${item.id}`}
+            >
+              {pendingId === item.id ? "..." : "已付"}
+            </Button>
           </li>
         ))}
         {data.count > 20 && <li className="text-gray-400 italic">…還有 {data.count - 20} 筆</li>}
