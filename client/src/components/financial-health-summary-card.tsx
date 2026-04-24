@@ -124,7 +124,10 @@ export function FinancialHealthSummaryCard() {
           </Link>
         </div>
 
-        <div className="mt-3 flex flex-wrap gap-2 text-xs">
+        <div className="mt-3">
+          <UrgencyProgressBar counts={priority.counts} />
+        </div>
+        <div className="mt-2 flex flex-wrap gap-2 text-xs">
           <Badge level="critical" count={priority.counts.critical} label="緊急" />
           <Badge level="high" count={priority.counts.high} label="本週" />
           <Badge level="medium" count={priority.counts.medium} label="本月" />
@@ -151,6 +154,43 @@ const URGENCY_BADGE: Record<UrgencyLevel, string> = {
   high: "bg-orange-100 text-orange-800",
   medium: "bg-yellow-100 text-yellow-800",
   low: "bg-gray-100 text-gray-700",
+}
+
+const URGENCY_BAR: Record<UrgencyLevel, string> = {
+  critical: "bg-red-500",
+  high: "bg-orange-400",
+  medium: "bg-yellow-400",
+  low: "bg-gray-300",
+}
+
+function UrgencyProgressBar({ counts }: { counts: Record<UrgencyLevel, number> }) {
+  const total = counts.critical + counts.high + counts.medium + counts.low
+  if (total === 0) {
+    return (
+      <div className="flex h-2 rounded-full bg-green-200 overflow-hidden">
+        <div className="flex-1 flex items-center justify-center text-[10px] text-green-800 font-medium">
+          ✅ 沒有未付款
+        </div>
+      </div>
+    )
+  }
+  const levels: UrgencyLevel[] = ["critical", "high", "medium", "low"]
+  return (
+    <div className="flex h-2 rounded-full overflow-hidden bg-gray-100">
+      {levels.map((level) => {
+        const pct = (counts[level] / total) * 100
+        if (pct === 0) return null
+        return (
+          <div
+            key={level}
+            className={URGENCY_BAR[level]}
+            style={{ width: `${pct}%` }}
+            title={`${level}: ${counts[level]} 筆`}
+          />
+        )
+      })}
+    </div>
+  )
 }
 
 function Badge({ level, count, label }: { level: UrgencyLevel; count: number; label: string }) {
