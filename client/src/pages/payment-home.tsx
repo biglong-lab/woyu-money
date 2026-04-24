@@ -36,6 +36,7 @@ import { TodayFocusCard } from "@/components/today-focus-card"
 import { FinancialAssistantQuickCard } from "@/components/financial-assistant-quick-card"
 import { FinancialHealthSummaryCard } from "@/components/financial-health-summary-card"
 import { ActiveRentalsCard } from "@/components/active-rentals-card"
+import { RecentPaymentsCard } from "@/components/recent-payments-card"
 
 /** API 回傳的付款項目（含關聯專案名） */
 interface PaymentItemWithProject extends PaymentItem {
@@ -345,6 +346,9 @@ export default function PaymentHome() {
 
       {/* ===== 本月主要租金狀態（一鍵付款）===== */}
       <ActiveRentalsCard />
+
+      {/* ===== 最近已付（成就回饋）===== */}
+      <RecentPaymentsCard />
 
       {/* ===== 待處理區（可直接操作）===== */}
       {(urgentItems.length > 0 || pendingDocs > 0) && (
