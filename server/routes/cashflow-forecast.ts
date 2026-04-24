@@ -114,4 +114,100 @@ router.get(
   })
 )
 
+// ─────────────────────────────────────────────
+// GET /api/cashflow/month-detail?year=YYYY&month=MM
+// 回傳該月所有未付清項目（依 dueDate 推算），給展開明細用
+// ─────────────────────────────────────────────
+
+const monthDetailQuerySchema = z.object({
+  year: z.preprocess(
+    (v) => (v === undefined ? undefined : Number(v)),
+    z.number().int().min(2000).max(2100)
+  ),
+  month: z.preprocess(
+    (v) => (v === undefined ? undefined : Number(v)),
+    z.number().int().min(1).max(12)
+  ),
+})
+
+interface MonthItemRow {
+  id: number
+  itemName: string
+  totalAmount: string | number
+  paidAmount: string | number
+  dueDate: string
+  projectName: string | null
+  categoryName: string | null
+}
+
+const MONTH_ITEMS_SQL = `
+  SELECT
+    pi.id,
+    pi.item_name AS "itemName",
+    pi.total_amount AS "totalAmount",
+    COALESCE(pi.paid_amount, 0) AS "paidAmount",
+    COALESCE(
+      (
+        SELECT ps.scheduled_date::text
+        FROM payment_schedules ps
+        WHERE ps.payment_item_id = pi.id AND ps.status != 'completed'
+        ORDER BY ps.scheduled_date ASC LIMIT 1
+      ),
+      pi.end_date::text,
+      pi.start_date::text
+    ) AS "dueDate",
+    pp.project_name AS "projectName",
+    COALESCE(fc.category_name, dc.category_name) AS "categoryName"
+  FROM payment_items pi
+  LEFT JOIN payment_projects pp ON pp.id = pi.project_id
+  LEFT JOIN fixed_categories fc ON fc.id = pi.fixed_category_id
+  LEFT JOIN debt_categories dc ON dc.id = pi.category_id
+  WHERE pi.is_deleted = false
+    AND COALESCE(pi.status, 'pending') != 'paid'
+    AND (pi.total_amount::numeric - COALESCE(pi.paid_amount, 0)::numeric) > 0
+    AND EXTRACT(YEAR FROM COALESCE(
+      (SELECT ps.scheduled_date FROM payment_schedules ps
+        WHERE ps.payment_item_id = pi.id AND ps.status != 'completed'
+        ORDER BY ps.scheduled_date ASC LIMIT 1),
+      pi.end_date,
+      pi.start_date
+    )) = $1
+    AND EXTRACT(MONTH FROM COALESCE(
+      (SELECT ps.scheduled_date FROM payment_schedules ps
+        WHERE ps.payment_item_id = pi.id AND ps.status != 'completed'
+        ORDER BY ps.scheduled_date ASC LIMIT 1),
+      pi.end_date,
+      pi.start_date
+    )) = $2
+  ORDER BY (pi.total_amount::numeric - COALESCE(pi.paid_amount, 0)::numeric) DESC
+  LIMIT 100
+`
+
+router.get(
+  "/api/cashflow/month-detail",
+  asyncHandler(async (req, res) => {
+    const parsed = monthDetailQuerySchema.safeParse(req.query)
+    if (!parsed.success) {
+      throw errors.badRequest("year/month 參數錯誤")
+    }
+    const { year, month } = parsed.data
+    const { pool } = await import("../db")
+    const result = await pool.query<MonthItemRow>(MONTH_ITEMS_SQL, [year, month])
+
+    const items = result.rows.map((row) => ({
+      id: row.id,
+      itemName: row.itemName,
+      totalAmount: Number(row.totalAmount),
+      paidAmount: Number(row.paidAmount),
+      unpaidAmount: Number(row.totalAmount) - Number(row.paidAmount),
+      dueDate: row.dueDate,
+      projectName: row.projectName,
+      categoryName: row.categoryName,
+    }))
+    const totalUnpaid = items.reduce((s, i) => s + i.unpaidAmount, 0)
+
+    res.json({ year, month, count: items.length, totalUnpaid, items })
+  })
+)
+
 export default router
