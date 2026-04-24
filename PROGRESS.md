@@ -92,13 +92,20 @@
   - `server/routes/cashflow-forecast.ts`：GET /api/cashflow/forecast?monthsAhead=6
   - `client/src/pages/cashflow-decision-center.tsx`：月度卡片 + 缺口警示 + 信心度 + 行動建議
   - 可切換預估範圍 3/6/12 月
-- [~] **第 10 步：收據自動對應（演算法 + API 完成）**
+- [x] **第 10 步：收據自動對應（全部完成）**
   - `shared/receipt-matcher.ts` + 11 單元測試
   - `server/routes/receipt-match.ts`：POST /api/receipt-match/suggest
-    - 輸入 { amount, receiptDate, vendor, category, ocrText }
-    - 查 payment_items 未付候選 → 呼叫演算法 → 回傳 top N 匹配 + autoConfirmable
-  - 掛載到 routes/index.ts
-  - 下輪：前端整合 document-inbox 拍照後顯示對應建議
+  - `client/src/pages/receipt-match-helper.tsx`：輸入收據 → 顯示匹配建議 → 一鍵標記已付
+  - 掛載 `/receipt-match-helper`
+
+---
+
+## 🎯 規劃完成總結
+
+- 第 1-5 步：完全完成
+- 第 6 步：LINE 訊息 builder + 回覆解析完成（webhook 等 token）
+- 第 7-10 步：完全完成
+- 剩餘：第 6 步 webhook route（提供 `LINE_BOT_CHANNEL_ACCESS_TOKEN` 後即可上線）
 
 ---
 
