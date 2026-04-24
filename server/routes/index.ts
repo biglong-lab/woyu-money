@@ -28,6 +28,12 @@ import pmBridgeRoutes from "./pm-bridge"
 import pmsBridgeRoutes from "./pms-bridge"
 import dailyRevenueRoutes from "./daily-revenues"
 import aiAssistantRoutes from "./ai-assistant"
+import paymentAllocationRoutes from "./payment-allocation"
+import lateFeeRoutes from "./late-fee"
+import rentalMatrixRoutes from "./rental-matrix"
+import rentalBatchRoutes from "./rental-batch"
+import cashflowForecastRoutes from "./cashflow-forecast"
+import receiptMatchRoutes from "./receipt-match"
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // 設定認證系統
@@ -55,8 +61,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     ]
     // Webhook 接收端點：以 /api/income/webhook/ 開頭的 POST 請求不需 session 認證
     // （改用 secret/token 驗證，在路由層處理）
-    const isWebhookReceiver =
-      req.method === "POST" && req.path.startsWith("/income/webhook/")
+    const isWebhookReceiver = req.method === "POST" && req.path.startsWith("/income/webhook/")
 
     const isPublic = publicPaths.some((p) => req.path === p) || isWebhookReceiver
     if (isPublic) return next()
@@ -85,6 +90,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use(pmsBridgeRoutes)
   app.use(dailyRevenueRoutes)
   app.use(aiAssistantRoutes)
+  app.use(paymentAllocationRoutes)
+  app.use(lateFeeRoutes)
+  app.use(rentalMatrixRoutes)
+  app.use(rentalBatchRoutes)
+  app.use(cashflowForecastRoutes)
+  app.use(receiptMatchRoutes)
 
   const httpServer = createServer(app)
   return httpServer

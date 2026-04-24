@@ -1,0 +1,474 @@
+/**
+ * 今日焦點卡片（Today Focus Card）
+ *
+ * 設計哲學：
+ * - 破解「看到一堆欠款 → 逃避」的惡性循環
+ * - 預設只顯示「今天 1 件事」，完成一件才看下一件
+ * - 漸進揭露：本日 → 本週 → 本月 → 全部
+ * - 每筆強調：拖延成本（已滯納金 + 每日新增）
+ *
+ * 呼叫 API：
+ * - GET  /api/payment/priority-report?includeLow=true
+ * - POST /api/payment/records        （標記已付）
+ */
+
+import { useState, useMemo } from "react"
+import { useQuery, useMutation } from "@tanstack/react-query"
+import { Link } from "wouter"
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Clock,
+  ArrowRight,
+  ChevronRight,
+  Sparkles,
+} from "lucide-react"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { apiRequest, queryClient } from "@/lib/queryClient"
+import { useToast } from "@/hooks/use-toast"
+
+// ─────────────────────────────────────────────
+// 型別
+// ─────────────────────────────────────────────
+
+type UrgencyLevel = "critical" | "high" | "medium" | "low"
+type ViewScope = "today" | "week" | "month" | "all"
+
+interface PriorityResult {
+  id: number
+  itemName: string
+  unpaidAmount: number
+  dueDate: string
+  category: string
+  categoryLabel: string
+  daysOverdue: number
+  daysUntilDue: number
+  score: number
+  urgency: UrgencyLevel
+  lateFeeEstimate: number
+  dailyLateFee: number
+  reasons: string[]
+  projectName?: string
+}
+
+interface PriorityReport {
+  generatedAt: string
+  totalUnpaid: number
+  counts: Record<UrgencyLevel, number>
+  byUrgency: Record<UrgencyLevel, PriorityResult[]>
+  all: PriorityResult[]
+}
+
+// ─────────────────────────────────────────────
+// 輔助函式
+// ─────────────────────────────────────────────
+
+function formatCurrency(n: number): string {
+  return `NT$ ${Math.round(n).toLocaleString()}`
+}
+
+function todayISODate(): string {
+  const d = new Date()
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, "0")
+  const day = String(d.getDate()).padStart(2, "0")
+  return `${y}-${m}-${day}`
+}
+
+const SCOPE_FILTERS: Record<ViewScope, UrgencyLevel[]> = {
+  today: ["critical"],
+  week: ["critical", "high"],
+  month: ["critical", "high", "medium"],
+  all: ["critical", "high", "medium", "low"],
+}
+
+function filterByScope(items: PriorityResult[], scope: ViewScope): PriorityResult[] {
+  const allowed = SCOPE_FILTERS[scope]
+  return items.filter((item) => allowed.includes(item.urgency))
+}
+
+// ─────────────────────────────────────────────
+// 子元件：Scope 切換（本日 / 本週 / 本月 / 全部）
+// ─────────────────────────────────────────────
+
+interface ScopeTabsProps {
+  scope: ViewScope
+  onChange: (scope: ViewScope) => void
+  counts: Record<ViewScope, number>
+}
+
+function ScopeTabs({ scope, onChange, counts }: ScopeTabsProps) {
+  const tabs: { value: ViewScope; label: string }[] = [
+    { value: "today", label: "本日" },
+    { value: "week", label: "本週" },
+    { value: "month", label: "本月" },
+    { value: "all", label: "全部" },
+  ]
+  return (
+    <div className="flex gap-1 border-b overflow-x-auto">
+      {tabs.map((tab) => {
+        const active = scope === tab.value
+        return (
+          <button
+            key={tab.value}
+            type="button"
+            onClick={() => onChange(tab.value)}
+            className={`px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors
+              ${active ? "border-b-2 border-blue-600 text-blue-700" : "text-gray-500 hover:text-gray-700"}
+            `}
+            data-testid={`scope-tab-${tab.value}`}
+          >
+            {tab.label}
+            <span
+              className={`ml-1.5 inline-flex items-center justify-center min-w-5 h-5 px-1 text-xs rounded-full
+                ${active ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-600"}
+              `}
+            >
+              {counts[tab.value]}
+            </span>
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────
+// 子元件：主焦點卡片（當前項目）
+// ─────────────────────────────────────────────
+
+interface FocusCardProps {
+  item: PriorityResult
+  position: number
+  total: number
+  onMarkPaid: () => void
+  onDefer: () => void
+}
+
+function FocusCard({ item, position, total, onMarkPaid, onDefer }: FocusCardProps) {
+  const isOverdue = item.daysOverdue > 0
+  return (
+    <div className="rounded-lg border-2 border-amber-200 bg-gradient-to-br from-amber-50 to-white p-4 sm:p-5">
+      <div className="flex items-center justify-between mb-3">
+        <div className="text-xs text-gray-500">
+          {position} / {total} 筆
+        </div>
+        <Badge variant="outline" className="text-xs">
+          {item.categoryLabel}
+        </Badge>
+      </div>
+
+      <h3 className="text-lg sm:text-xl font-bold text-gray-900">{item.itemName}</h3>
+      <div className="mt-1 text-2xl sm:text-3xl font-bold text-gray-900">
+        {formatCurrency(item.unpaidAmount)}
+      </div>
+
+      <div className="mt-3 space-y-1.5 text-sm">
+        <div className="flex items-center gap-2 text-gray-700">
+          <Clock className="h-4 w-4 shrink-0" />
+          <span>到期日：{item.dueDate}</span>
+          {isOverdue && (
+            <span className="text-red-700 font-semibold">（已逾期 {item.daysOverdue} 天）</span>
+          )}
+          {!isOverdue && item.daysUntilDue <= 7 && (
+            <span className="text-amber-700 font-semibold">（{item.daysUntilDue} 天後到期）</span>
+          )}
+        </div>
+
+        {item.projectName && <div className="text-xs text-gray-500">專案：{item.projectName}</div>}
+
+        {item.lateFeeEstimate > 0 && (
+          <div className="flex items-start gap-2 text-red-700 bg-red-50 rounded p-2">
+            <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+            <div className="text-xs">
+              已產生滯納金 <strong>{formatCurrency(item.lateFeeEstimate)}</strong>
+              <br />
+              每拖 1 天再多 <strong>{formatCurrency(item.dailyLateFee)}</strong>
+            </div>
+          </div>
+        )}
+
+        {item.reasons.length > 0 && item.lateFeeEstimate === 0 && (
+          <div className="text-xs text-gray-600 italic">{item.reasons.join("、")}</div>
+        )}
+      </div>
+
+      <div className="mt-4 flex flex-col sm:flex-row gap-2">
+        <Button
+          onClick={onMarkPaid}
+          className="flex-1 bg-green-600 hover:bg-green-700"
+          data-testid="button-mark-paid"
+        >
+          <CheckCircle2 className="h-4 w-4 mr-1.5" />
+          已付款
+        </Button>
+        <Button onClick={onDefer} variant="outline" className="flex-1" data-testid="button-defer">
+          ⏰ 晚點再看
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────
+// 子元件：確認付款對話框
+// ─────────────────────────────────────────────
+
+interface PaidDialogProps {
+  item: PriorityResult | null
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  onConfirm: (paymentDate: string) => void
+  isPending: boolean
+}
+
+function PaidDialog({ item, open, onOpenChange, onConfirm, isPending }: PaidDialogProps) {
+  const [paymentDate, setPaymentDate] = useState(todayISODate())
+
+  if (!item) return null
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>確認已付款</DialogTitle>
+          <DialogDescription>
+            將把 <strong>{item.itemName}</strong> 標記為已全額付款
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3 py-2">
+          <div className="flex justify-between text-sm">
+            <span className="text-gray-600">項目</span>
+            <span className="font-medium">{item.itemName}</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-gray-600">應付金額</span>
+            <span className="font-bold text-lg">{formatCurrency(item.unpaidAmount)}</span>
+          </div>
+          <div className="flex justify-between items-center text-sm">
+            <label htmlFor="payment-date" className="text-gray-600">
+              付款日期
+            </label>
+            <input
+              id="payment-date"
+              type="date"
+              value={paymentDate}
+              onChange={(e) => setPaymentDate(e.target.value)}
+              className="border rounded px-2 py-1 text-sm"
+              data-testid="input-payment-date"
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isPending}>
+            取消
+          </Button>
+          <Button
+            onClick={() => onConfirm(paymentDate)}
+            disabled={isPending}
+            data-testid="button-confirm-paid"
+          >
+            {isPending ? "處理中..." : "確認付款"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ─────────────────────────────────────────────
+// 子元件：空狀態
+// ─────────────────────────────────────────────
+
+function EmptyState({ scope }: { scope: ViewScope }) {
+  const messages: Record<ViewScope, string> = {
+    today: "🎉 今天沒有緊急事項，可以稍微放鬆",
+    week: "✅ 本週沒有待處理項目",
+    month: "✅ 本月沒有需緊急處理的項目",
+    all: "✨ 所有款項都已處理完畢",
+  }
+  return (
+    <div className="rounded-lg border border-green-200 bg-green-50 p-6 text-center">
+      <CheckCircle2 className="h-12 w-12 mx-auto text-green-600 mb-2" />
+      <div className="text-sm text-gray-700">{messages[scope]}</div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────
+// 主元件
+// ─────────────────────────────────────────────
+
+export function TodayFocusCard() {
+  const { toast } = useToast()
+  const [scope, setScope] = useState<ViewScope>("today")
+  const [skippedIds, setSkippedIds] = useState<Set<number>>(new Set())
+  const [payDialogOpen, setPayDialogOpen] = useState(false)
+  const [payingItem, setPayingItem] = useState<PriorityResult | null>(null)
+
+  const { data: report, isLoading } = useQuery<PriorityReport>({
+    queryKey: ["/api/payment/priority-report?includeLow=true"],
+  })
+
+  // 依 scope 篩選 + 排除已跳過
+  const visibleItems = useMemo(() => {
+    if (!report) return []
+    return filterByScope(report.all, scope).filter((item) => !skippedIds.has(item.id))
+  }, [report, scope, skippedIds])
+
+  // 各 scope 的計數（供 tab 顯示）
+  const scopeCounts: Record<ViewScope, number> = useMemo(() => {
+    if (!report) return { today: 0, week: 0, month: 0, all: 0 }
+    return {
+      today: filterByScope(report.all, "today").length,
+      week: filterByScope(report.all, "week").length,
+      month: filterByScope(report.all, "month").length,
+      all: filterByScope(report.all, "all").length,
+    }
+  }, [report])
+
+  // 標記已付款
+  const markPaidMutation = useMutation<
+    unknown,
+    Error,
+    { itemId: number; amountPaid: number; paymentDate: string }
+  >({
+    mutationFn: async (data) => {
+      return apiRequest("POST", "/api/payment/records", {
+        itemId: data.itemId,
+        amountPaid: data.amountPaid,
+        paymentDate: data.paymentDate,
+      })
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/payment/priority-report?includeLow=true"] })
+      queryClient.invalidateQueries({ queryKey: ["/api/payment/items"] })
+      queryClient.invalidateQueries({ queryKey: ["/api/payment/records"] })
+      toast({ title: "已標記為已付款", description: "正在載入下一筆..." })
+      setPayDialogOpen(false)
+      setPayingItem(null)
+    },
+    onError: (err) => {
+      toast({
+        title: "付款失敗",
+        description: err.message,
+        variant: "destructive",
+      })
+    },
+  })
+
+  const current = visibleItems[0]
+
+  const handleMarkPaidClick = () => {
+    if (!current) return
+    setPayingItem(current)
+    setPayDialogOpen(true)
+  }
+
+  const handleConfirmPaid = (paymentDate: string) => {
+    if (!payingItem) return
+    markPaidMutation.mutate({
+      itemId: payingItem.id,
+      amountPaid: payingItem.unpaidAmount,
+      paymentDate,
+    })
+  }
+
+  const handleDefer = () => {
+    if (!current) return
+    setSkippedIds((prev) => new Set(prev).add(current.id))
+  }
+
+  const handleResetSkipped = () => setSkippedIds(new Set())
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardContent className="pt-6">
+          <div className="text-center text-sm text-gray-500">載入今日焦點中...</div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  return (
+    <Card className="border-amber-200" data-testid="today-focus-card">
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="text-lg sm:text-xl flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-amber-600" />
+              今日焦點
+            </CardTitle>
+            <CardDescription className="text-xs sm:text-sm mt-1">
+              專注在最該處理的 1 件事，完成後自動顯示下一件
+            </CardDescription>
+          </div>
+          {report && report.totalUnpaid > 0 && (
+            <div className="text-right text-xs">
+              <div className="text-gray-500">總未付</div>
+              <div className="font-bold text-gray-900">{formatCurrency(report.totalUnpaid)}</div>
+            </div>
+          )}
+        </div>
+        <ScopeTabs scope={scope} onChange={setScope} counts={scopeCounts} />
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {current ? (
+          <FocusCard
+            item={current}
+            position={1}
+            total={visibleItems.length}
+            onMarkPaid={handleMarkPaidClick}
+            onDefer={handleDefer}
+          />
+        ) : (
+          <EmptyState scope={scope} />
+        )}
+
+        {skippedIds.size > 0 && (
+          <button
+            onClick={handleResetSkipped}
+            className="text-xs text-blue-600 hover:underline"
+            type="button"
+          >
+            已跳過 {skippedIds.size} 筆，點此復原
+          </button>
+        )}
+
+        <div className="flex items-center justify-end gap-2 pt-2 border-t">
+          <Link href="/cash-allocation">
+            <Button variant="ghost" size="sm" className="text-xs">
+              現金分配助理
+              <ArrowRight className="h-3 w-3 ml-1" />
+            </Button>
+          </Link>
+          <Link href="/payment-schedule">
+            <Button variant="ghost" size="sm" className="text-xs">
+              看全部排程
+              <ChevronRight className="h-3 w-3 ml-1" />
+            </Button>
+          </Link>
+        </div>
+      </CardContent>
+
+      <PaidDialog
+        item={payingItem}
+        open={payDialogOpen}
+        onOpenChange={setPayDialogOpen}
+        onConfirm={handleConfirmPaid}
+        isPending={markPaidMutation.isPending}
+      />
+    </Card>
+  )
+}

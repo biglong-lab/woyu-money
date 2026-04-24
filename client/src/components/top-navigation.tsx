@@ -2,24 +2,16 @@
  * TopNavigation - 頂部導航組件
  * 重構版本：使用配置化導航項目，減少重複程式碼
  */
-import { Link, useLocation } from "wouter";
-import {
-  Home,
-  DollarSign,
-  Menu,
-  LogOut,
-  User,
-  ChevronDown,
-  ChevronRight,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Link, useLocation } from "wouter"
+import { Home, DollarSign, Menu, LogOut, User, ChevronDown, ChevronRight } from "lucide-react"
+import { Button } from "@/components/ui/button"
 import {
   Sheet,
   SheetContent,
   SheetTrigger,
   SheetTitle,
   SheetDescription,
-} from "@/components/ui/sheet";
+} from "@/components/ui/sheet"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,35 +19,39 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import { useState } from "react";
-import { Badge } from "@/components/ui/badge";
-import { useAuth } from "@/hooks/use-auth";
-import { useQuery } from "@tanstack/react-query";
+} from "@/components/ui/dropdown-menu"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import { useState } from "react"
+import { Badge } from "@/components/ui/badge"
+import { useAuth } from "@/hooks/use-auth"
+import { useQuery } from "@tanstack/react-query"
 import {
   mainNavItems,
+  decisionNavItems,
   managementNavItems,
   viewNavItems,
   systemNavItems,
   NavItem,
-} from "@/config/navigation";
+} from "@/config/navigation"
 
 // 分類配置：標題、樣式、項目
 interface CategoryConfig {
-  id: string;
-  title: string;
-  titleClass: string;
-  hoverClass: string;
-  items: NavItem[];
+  id: string
+  title: string
+  titleClass: string
+  hoverClass: string
+  items: NavItem[]
 }
 
 const categoryConfigs: CategoryConfig[] = [
+  {
+    id: "decision",
+    title: "💡 財務助理",
+    titleClass: "text-amber-900",
+    hoverClass: "hover:bg-amber-50",
+    items: decisionNavItems,
+  },
   {
     id: "management",
     title: "付款方式管理",
@@ -77,17 +73,17 @@ const categoryConfigs: CategoryConfig[] = [
     hoverClass: "hover:bg-orange-50",
     items: systemNavItems,
   },
-];
+]
 
 // 導航項目渲染組件
 interface NavItemButtonProps {
-  item: NavItem;
-  isActive: boolean;
-  onClick?: () => void;
-  showBadge?: boolean;
-  badgeCount?: number;
-  indent?: boolean;
-  size?: "default" | "sm";
+  item: NavItem
+  isActive: boolean
+  onClick?: () => void
+  showBadge?: boolean
+  badgeCount?: number
+  indent?: boolean
+  size?: "default" | "sm"
 }
 
 function NavItemButton({
@@ -99,7 +95,7 @@ function NavItemButton({
   indent = false,
   size = "default",
 }: NavItemButtonProps) {
-  const Icon = item.icon;
+  const Icon = item.icon
 
   return (
     <Link href={item.href}>
@@ -126,16 +122,16 @@ function NavItemButton({
         )}
       </Button>
     </Link>
-  );
+  )
 }
 
 // 可收納的分類組件
 interface CollapsibleCategoryProps {
-  config: CategoryConfig;
-  isExpanded: boolean;
-  onToggle: () => void;
-  currentPath: string;
-  onItemClick?: () => void;
+  config: CategoryConfig
+  isExpanded: boolean
+  onToggle: () => void
+  currentPath: string
+  onItemClick?: () => void
 }
 
 function CollapsibleCategory({
@@ -153,11 +149,7 @@ function CollapsibleCategory({
           className={`w-full justify-between ${config.titleClass} font-medium ${config.hoverClass} text-sm`}
         >
           <span>{config.title}</span>
-          {isExpanded ? (
-            <ChevronDown className="w-4 h-4" />
-          ) : (
-            <ChevronRight className="w-4 h-4" />
-          )}
+          {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
         </Button>
       </CollapsibleTrigger>
       <CollapsibleContent className="space-y-1 mt-1">
@@ -171,58 +163,50 @@ function CollapsibleCategory({
               size="sm"
             />
             {item.description && (
-              <p className="text-xs text-gray-500 mt-1 ml-7">
-                {item.description}
-              </p>
+              <p className="text-xs text-gray-500 mt-1 ml-7">{item.description}</p>
             )}
           </div>
         ))}
       </CollapsibleContent>
     </Collapsible>
-  );
+  )
 }
 
 export default function TopNavigation() {
-  const [location] = useLocation();
-  const [isOpen, setIsOpen] = useState(false);
-  const [expandedCategories, setExpandedCategories] = useState<
-    Record<string, boolean>
-  >({});
-  const { user, logoutMutation } = useAuth();
+  const [location] = useLocation()
+  const [isOpen, setIsOpen] = useState(false)
+  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({})
+  const { user, logoutMutation } = useAuth()
 
   // 查詢待處理單據數量
   const { data: pendingDocuments = [] } = useQuery({
     queryKey: ["/api/document-inbox"],
     enabled: !!user,
     refetchInterval: 60000,
-  });
+  })
 
   // 計算待處理數量
   const pendingCount = Array.isArray(pendingDocuments)
-    ? pendingDocuments.filter(
-        (doc: { status: string }) => doc.status !== "archived"
-      ).length
-    : 0;
+    ? pendingDocuments.filter((doc: { status: string }) => doc.status !== "archived").length
+    : 0
 
   const toggleCategory = (categoryId: string) => {
     setExpandedCategories((prev) => ({
       ...prev,
       [categoryId]: !prev[categoryId],
-    }));
-  };
+    }))
+  }
 
   const handleLogout = () => {
-    logoutMutation.mutate();
-  };
+    logoutMutation.mutate()
+  }
 
-  const closeSheet = () => setIsOpen(false);
+  const closeSheet = () => setIsOpen(false)
 
   // 獲取當前頁面標題
   const currentPage =
     mainNavItems.find((item) => item.href === location) ||
-    categoryConfigs
-      .flatMap((c) => c.items)
-      .find((item) => item.href === location);
+    categoryConfigs.flatMap((c) => c.items).find((item) => item.href === location)
 
   return (
     <nav className="bg-white/95 backdrop-blur-sm border-b border-gray-200 sticky top-0 z-50 shadow-sm">
@@ -244,10 +228,9 @@ export default function TopNavigation() {
           <div className="hidden md:flex items-center space-x-1">
             {/* 核心功能按鈕 */}
             {mainNavItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = location === item.href;
-              const showPendingBadge =
-                item.href === "/document-inbox" && pendingCount > 0;
+              const Icon = item.icon
+              const isActive = location === item.href
+              const showPendingBadge = item.href === "/document-inbox" && pendingCount > 0
 
               return (
                 <Link key={item.href} href={item.href}>
@@ -268,12 +251,10 @@ export default function TopNavigation() {
                         </span>
                       )}
                     </div>
-                    <span className="hidden lg:inline text-sm font-medium">
-                      {item.title}
-                    </span>
+                    <span className="hidden lg:inline text-sm font-medium">{item.title}</span>
                   </Button>
                 </Link>
-              );
+              )
             })}
 
             {/* User Menu */}
@@ -298,12 +279,8 @@ export default function TopNavigation() {
                 <DropdownMenuContent align="end" className="w-56">
                   <DropdownMenuLabel className="font-normal">
                     <div className="flex flex-col space-y-1">
-                      <p className="text-sm font-medium leading-none">
-                        {user.username}
-                      </p>
-                      <p className="text-xs leading-none text-muted-foreground">
-                        付款管理系統
-                      </p>
+                      <p className="text-sm font-medium leading-none">{user.username}</p>
+                      <p className="text-xs leading-none text-muted-foreground">付款管理系統</p>
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
@@ -334,15 +311,10 @@ export default function TopNavigation() {
                   className="flex items-center space-x-1.5 px-3 py-2 rounded-lg transition-all duration-200 text-gray-700 hover:text-gray-900 hover:bg-gray-100"
                 >
                   <Menu className="w-4 h-4 flex-shrink-0" />
-                  <span className="hidden lg:inline text-sm font-medium">
-                    完整選單
-                  </span>
+                  <span className="hidden lg:inline text-sm font-medium">完整選單</span>
                 </Button>
               </SheetTrigger>
-              <SheetContent
-                side="right"
-                className="w-[340px] sm:w-[380px] overflow-y-auto"
-              >
+              <SheetContent side="right" className="w-[340px] sm:w-[380px] overflow-y-auto">
                 <SheetTitle>完整選單</SheetTitle>
                 <SheetDescription>系統功能導航選單</SheetDescription>
                 <div className="py-4 space-y-4 max-h-[calc(100vh-8rem)] overflow-y-auto">
@@ -386,13 +358,8 @@ export default function TopNavigation() {
                   <Menu className="w-5 h-5" />
                 </Button>
               </SheetTrigger>
-              <SheetContent
-                side="right"
-                className="w-[320px] sm:w-[360px] overflow-y-auto"
-              >
-                <SheetTitle className="text-lg font-bold">
-                  付款管理系統
-                </SheetTitle>
+              <SheetContent side="right" className="w-[320px] sm:w-[360px] overflow-y-auto">
+                <SheetTitle className="text-lg font-bold">付款管理系統</SheetTitle>
                 <SheetDescription className="text-sm text-gray-600 mb-4">
                   手機版導航選單
                 </SheetDescription>
@@ -434,13 +401,11 @@ export default function TopNavigation() {
             <div className="flex items-center space-x-2 text-sm text-gray-600">
               <Home className="w-3 h-3" />
               <span>/</span>
-              <span className="text-blue-600 font-medium">
-                {currentPage.title}
-              </span>
+              <span className="text-blue-600 font-medium">{currentPage.title}</span>
             </div>
           </div>
         )}
       </div>
     </nav>
-  );
+  )
 }
