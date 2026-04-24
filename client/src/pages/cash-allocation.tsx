@@ -416,6 +416,17 @@ export default function CashAllocationPage() {
     mutation.mutate(amount)
   }
 
+  // 即時千分位格式化（去除非數字後重新加逗號）
+  const handleBudgetChange = (raw: string) => {
+    const cleaned = raw.replace(/[^\d]/g, "")
+    if (!cleaned) {
+      setBudgetInput("")
+      return
+    }
+    const n = Number(cleaned)
+    if (Number.isFinite(n)) setBudgetInput(n.toLocaleString())
+  }
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     const budget = parseBudgetInput(budgetInput)
@@ -460,7 +471,7 @@ export default function CashAllocationPage() {
                 inputMode="numeric"
                 placeholder="例如：300,000"
                 value={budgetInput}
-                onChange={(e) => setBudgetInput(e.target.value)}
+                onChange={(e) => handleBudgetChange(e.target.value)}
                 disabled={mutation.isPending}
                 data-testid="input-budget"
               />
