@@ -68,10 +68,22 @@ const STATUS_META: Record<CellStatus, { label: string; bg: string; icon: string 
   },
 }
 
-function MatrixCell({ cell }: { cell: Cell }) {
+function MatrixCell({
+  cell,
+  contractName,
+  onClick,
+}: {
+  cell: Cell
+  contractName: string
+  onClick?: (cell: Cell, contractName: string) => void
+}) {
   const meta = STATUS_META[cell.status]
-  const tooltip =
-    cell.status === "out_of_contract"
+  const clickable = cell.status === "unpaid" || cell.status === "partial"
+  const tooltip = clickable
+    ? `${meta.label}\n應付 ${formatCurrency(cell.expectedAmount)}${
+        cell.paidAmount > 0 ? `\n已付 ${formatCurrency(cell.paidAmount)}` : ""
+      }\n👆 點此標記已付`
+    : cell.status === "out_of_contract"
       ? "合約未涵蓋此月份"
       : `${meta.label}\n應付 ${formatCurrency(cell.expectedAmount)}${
           cell.paidAmount > 0 ? `\n已付 ${formatCurrency(cell.paidAmount)}` : ""
@@ -79,8 +91,11 @@ function MatrixCell({ cell }: { cell: Cell }) {
   return (
     <td className="p-1 text-center">
       <div
-        className={`border rounded text-xs font-medium py-1 px-1 ${meta.bg}`}
+        className={`border rounded text-xs font-medium py-1 px-1 ${meta.bg} ${
+          clickable ? "cursor-pointer hover:opacity-80 active:scale-95 transition-all" : ""
+        }`}
         title={tooltip}
+        onClick={() => clickable && onClick && onClick(cell, contractName)}
         data-testid={`cell-${cell.contractId}-${cell.month}`}
       >
         {meta.icon}
@@ -126,9 +141,15 @@ interface PreviewData {
   items: PreviewItem[]
 }
 
+interface CellTarget {
+  cell: Cell
+  contractName: string
+}
+
 export default function RentalMatrixPage() {
   const [year, setYear] = useState(new Date().getFullYear())
   const [batchOpen, setBatchOpen] = useState(false)
+  const [cellTarget, setCellTarget] = useState<CellTarget | null>(null)
   const currentMonth = new Date().getMonth() + 1
   const { toast } = useToast()
   const years = [year - 1, year, year + 1].filter((y) => y >= 2020)
@@ -140,6 +161,25 @@ export default function RentalMatrixPage() {
   const { data: preview } = useQuery<PreviewData>({
     queryKey: [`/api/rental-batch/month-preview?year=${year}&month=${currentMonth}`],
     enabled: batchOpen,
+  })
+
+  const cellPaidMutation = useMutation<
+    { processedCount: number; totalPaid: number },
+    Error,
+    { projectId: number; year: number; month: number }
+  >({
+    mutationFn: (data) => apiRequest("POST", "/api/rental-batch/mark-cell-paid", data),
+    onSuccess: (result) => {
+      toast({
+        title: `已標記 ${result.processedCount} 筆已付`,
+        description: `合計 NT$ ${Math.round(result.totalPaid).toLocaleString()}`,
+      })
+      setCellTarget(null)
+      queryClient.invalidateQueries({ queryKey: [`/api/rental-matrix?year=${year}`] })
+      queryClient.invalidateQueries({ queryKey: ["/api/payment/priority-report?includeLow=true"] })
+    },
+    onError: (err) =>
+      toast({ title: "標記失敗", description: err.message, variant: "destructive" }),
   })
 
   const markPaidMutation = useMutation<{ processedCount: number; totalPaid: number }, Error, void>({
@@ -174,7 +214,7 @@ export default function RentalMatrixPage() {
           租金月度矩陣
         </h1>
         <p className="mt-1 text-sm text-gray-600">
-          一眼看出哪間房哪個月欠租，點格子可標記已付（未來功能）
+          一眼看出哪間房哪個月欠租。<strong>點 🔴 或 🟡 格子即可一鍵標記已付</strong>
         </p>
       </div>
 
@@ -247,7 +287,12 @@ export default function RentalMatrixPage() {
                           )}
                         </td>
                         {cells.map((cell) => (
-                          <MatrixCell key={cell.month} cell={cell} />
+                          <MatrixCell
+                            key={cell.month}
+                            cell={cell}
+                            contractName={c.contractName}
+                            onClick={(cell, contractName) => setCellTarget({ cell, contractName })}
+                          />
                         ))}
                         <td className="p-2 text-right text-xs text-gray-700">
                           {formatCurrency(expected)}
@@ -276,6 +321,63 @@ export default function RentalMatrixPage() {
           <LegendBar />
         </CardContent>
       </Card>
+
+      {/* 點格子標記已付 Dialog */}
+      <Dialog open={!!cellTarget} onOpenChange={(open) => !open && setCellTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              標記 {cellTarget?.contractName} {year}/{cellTarget?.cell.month} 月已付
+            </DialogTitle>
+            <DialogDescription>
+              將為該專案該月份所有未付清的「租金」項目建立付款記錄
+            </DialogDescription>
+          </DialogHeader>
+          {cellTarget && (
+            <div className="py-2 space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-600">應付金額</span>
+                <span className="font-bold">{formatCurrency(cellTarget.cell.expectedAmount)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">已付金額</span>
+                <span>{formatCurrency(cellTarget.cell.paidAmount)}</span>
+              </div>
+              <div className="flex justify-between border-t pt-2">
+                <span className="text-gray-600">將要標記為已付</span>
+                <span className="font-bold text-green-700">
+                  {formatCurrency(
+                    Math.max(0, cellTarget.cell.expectedAmount - cellTarget.cell.paidAmount)
+                  )}
+                </span>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setCellTarget(null)}
+              disabled={cellPaidMutation.isPending}
+            >
+              取消
+            </Button>
+            <Button
+              onClick={() =>
+                cellTarget &&
+                cellPaidMutation.mutate({
+                  projectId: cellTarget.cell.contractId,
+                  year,
+                  month: cellTarget.cell.month,
+                })
+              }
+              disabled={cellPaidMutation.isPending}
+              data-testid="button-confirm-cell-paid"
+            >
+              {cellPaidMutation.isPending ? "處理中..." : "確認標記已付"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={batchOpen} onOpenChange={setBatchOpen}>
         <DialogContent>

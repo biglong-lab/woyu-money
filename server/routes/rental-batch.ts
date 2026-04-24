@@ -192,4 +192,98 @@ router.post(
   })
 )
 
+// ─────────────────────────────────────────────
+// POST mark-cell-paid（單格標記：某 project 某月所有租金 payment_items 標記已付）
+// ─────────────────────────────────────────────
+
+const cellPaidBodySchema = z.object({
+  projectId: z.number().int().positive(),
+  year: z.number().int().min(2000).max(2100),
+  month: z.number().int().min(1).max(12),
+  paymentDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
+})
+
+const PROJECT_MONTH_RENT_ITEMS_SQL = `
+  SELECT
+    pi.id,
+    pi.item_name AS "itemName",
+    pi.total_amount AS "totalAmount",
+    COALESCE(pi.paid_amount, 0) AS "paidAmount"
+  FROM payment_items pi
+  LEFT JOIN payment_projects pp ON pp.id = pi.project_id
+  WHERE pi.is_deleted = false
+    AND pi.project_id = $1
+    AND EXTRACT(YEAR FROM pi.start_date) = $2
+    AND EXTRACT(MONTH FROM pi.start_date) = $3
+    AND COALESCE(pi.status, 'pending') != 'paid'
+    AND (pi.total_amount::numeric - COALESCE(pi.paid_amount, 0)::numeric) > 0
+    AND (
+      pp.project_type = 'rental'
+      OR pi.item_name ILIKE '%租金%'
+      OR pi.item_name ILIKE '%房租%'
+      OR pi.item_name ILIKE '%租約%'
+      OR pi.item_name ILIKE '%租賃%'
+    )
+`
+
+router.post(
+  "/api/rental-batch/mark-cell-paid",
+  asyncHandler(async (req, res) => {
+    const parsed = cellPaidBodySchema.safeParse(req.body)
+    if (!parsed.success) {
+      throw errors.badRequest("請求格式錯誤（projectId/year/month）")
+    }
+    const { projectId, year, month } = parsed.data
+    const paymentDate = parsed.data.paymentDate ?? new Date().toISOString().slice(0, 10)
+
+    const { pool } = await import("../db")
+    const client = await pool.connect()
+    try {
+      await client.query("BEGIN")
+      const pendingResult = await client.query<PendingRentalRow>(PROJECT_MONTH_RENT_ITEMS_SQL, [
+        projectId,
+        year,
+        month,
+      ])
+      const pending = pendingResult.rows
+
+      const processed: Array<{ itemId: number; itemName: string; amountPaid: number }> = []
+      let totalPaid = 0
+
+      for (const row of pending) {
+        const unpaid = Number(row.totalAmount) - Number(row.paidAmount)
+        if (unpaid <= 0) continue
+        await client.query(INSERT_RECORD_SQL, [
+          row.id,
+          unpaid.toFixed(2),
+          paymentDate,
+          `矩陣點選標記：${year}/${month} ${row.itemName}`,
+        ])
+        await client.query(UPDATE_ITEM_PAID_SQL, [row.id])
+        processed.push({ itemId: row.id, itemName: row.itemName, amountPaid: unpaid })
+        totalPaid += unpaid
+      }
+
+      await client.query("COMMIT")
+      res.json({
+        projectId,
+        year,
+        month,
+        paymentDate,
+        processedCount: processed.length,
+        totalPaid,
+        items: processed,
+      })
+    } catch (err) {
+      await client.query("ROLLBACK")
+      throw err
+    } finally {
+      client.release()
+    }
+  })
+)
+
 export default router
