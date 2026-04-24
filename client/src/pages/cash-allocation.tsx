@@ -9,7 +9,7 @@
  * - 明示每筆的滯納金損失（讓拖延成本可見）
  */
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useMutation } from "@tanstack/react-query"
 import { AlertCircle, CheckCircle2, TrendingDown, Wallet, Clock, AlertTriangle } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
@@ -17,8 +17,11 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
-import { apiRequest } from "@/lib/queryClient"
+import { apiRequest, queryClient } from "@/lib/queryClient"
 import { useToast } from "@/hooks/use-toast"
+
+const BUDGET_PRESETS = [50000, 100000, 200000, 300000, 500000, 1000000]
+const BUDGET_KEY = "cash-allocation:lastBudget"
 
 // ─────────────────────────────────────────────
 // API 型別（對應 server AllocationResult）
@@ -118,7 +121,15 @@ const URGENCY_STYLES: Record<
 // 子元件：單筆項目卡
 // ─────────────────────────────────────────────
 
-function ItemCard({ item }: { item: PriorityResult }) {
+function ItemCard({
+  item,
+  onMarkPaid,
+  isPending,
+}: {
+  item: PriorityResult
+  onMarkPaid?: (item: PriorityResult) => void
+  isPending?: boolean
+}) {
   const style = URGENCY_STYLES[item.urgency]
   return (
     <div className={`rounded-lg border-l-4 ${style.border} ${style.bg} p-3 sm:p-4`}>
@@ -154,6 +165,20 @@ function ItemCard({ item }: { item: PriorityResult }) {
               {formatCurrency(item.dailyLateFee)}）
             </div>
           )}
+          {onMarkPaid && (
+            <div className="mt-2">
+              <Button
+                size="sm"
+                className="bg-green-600 hover:bg-green-700 text-xs h-7"
+                onClick={() => onMarkPaid(item)}
+                disabled={isPending}
+                data-testid={`mark-paid-${item.id}`}
+              >
+                <CheckCircle2 className="h-3 w-3 mr-1" />
+                {isPending ? "處理中..." : "標記此筆已付"}
+              </Button>
+            </div>
+          )}
         </div>
         <div className="text-right shrink-0">
           <div className="text-lg sm:text-xl font-bold text-gray-900">
@@ -173,10 +198,14 @@ function UrgencyGroup({
   level,
   items,
   title,
+  onMarkPaid,
+  pendingId,
 }: {
   level: UrgencyLevel
   items: PriorityResult[]
   title?: string
+  onMarkPaid?: (item: PriorityResult) => void
+  pendingId?: number | null
 }) {
   if (items.length === 0) return null
   const style = URGENCY_STYLES[level]
@@ -190,7 +219,12 @@ function UrgencyGroup({
       </CardHeader>
       <CardContent className="space-y-3">
         {items.map((item) => (
-          <ItemCard key={item.id} item={item} />
+          <ItemCard
+            key={item.id}
+            item={item}
+            onMarkPaid={onMarkPaid}
+            isPending={pendingId === item.id}
+          />
         ))}
       </CardContent>
     </Card>
@@ -274,7 +308,18 @@ function SummaryCard({ result }: { result: AllocationResult }) {
 export default function CashAllocationPage() {
   const [budgetInput, setBudgetInput] = useState("")
   const [result, setResult] = useState<AllocationResult | null>(null)
+  const [pendingId, setPendingId] = useState<number | null>(null)
   const { toast } = useToast()
+
+  // 載入上次輸入金額
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(BUDGET_KEY)
+      if (saved) setBudgetInput(saved)
+    } catch {
+      // localStorage 不可用，忽略
+    }
+  }, [])
 
   const mutation = useMutation<AllocationResult, Error, number>({
     mutationFn: async (availableBudget: number) => {
@@ -282,7 +327,14 @@ export default function CashAllocationPage() {
         availableBudget,
       })
     },
-    onSuccess: (data) => setResult(data),
+    onSuccess: (data, budget) => {
+      setResult(data)
+      try {
+        localStorage.setItem(BUDGET_KEY, String(budget))
+      } catch {
+        // localStorage 不可用，忽略
+      }
+    },
     onError: (err) => {
       toast({
         title: "無法取得分配建議",
@@ -291,6 +343,39 @@ export default function CashAllocationPage() {
       })
     },
   })
+
+  const markPaidMutation = useMutation<unknown, Error, PriorityResult>({
+    mutationFn: (item) =>
+      apiRequest("POST", "/api/payment/records", {
+        itemId: item.id,
+        amountPaid: item.unpaidAmount,
+        paymentDate: new Date().toISOString().slice(0, 10),
+      }),
+    onMutate: (item) => setPendingId(item.id),
+    onSuccess: (_data, item) => {
+      toast({
+        title: "已標記為已付款",
+        description: `${item.itemName}（${formatCurrency(item.unpaidAmount)}）`,
+      })
+      // 重新計算分配
+      const budget = parseBudgetInput(budgetInput)
+      if (budget !== null) mutation.mutate(budget)
+      queryClient.invalidateQueries({ queryKey: ["/api/payment/priority-report?includeLow=true"] })
+      queryClient.invalidateQueries({ queryKey: ["/api/payment/items"] })
+    },
+    onSettled: () => setPendingId(null),
+    onError: (err) =>
+      toast({ title: "標記失敗", description: err.message, variant: "destructive" }),
+  })
+
+  const handleMarkPaid = (item: PriorityResult) => {
+    markPaidMutation.mutate(item)
+  }
+
+  const handlePresetClick = (amount: number) => {
+    setBudgetInput(amount.toLocaleString())
+    mutation.mutate(amount)
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -327,7 +412,7 @@ export default function CashAllocationPage() {
           <CardTitle>這週/這期可動用多少？</CardTitle>
           <CardDescription>輸入手上可付的金額，系統依滯納金 + 違約後果排序建議</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-3">
           <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-3 sm:items-end">
             <div className="flex-1 space-y-1">
               <Label htmlFor="budget">可動用金額（NT$）</Label>
@@ -345,6 +430,25 @@ export default function CashAllocationPage() {
               {mutation.isPending ? "計算中..." : "計算分配建議"}
             </Button>
           </form>
+
+          {/* 快捷金額按鈕 */}
+          <div className="flex flex-wrap gap-1.5 pt-1">
+            <span className="text-xs text-gray-500 self-center mr-1">快捷：</span>
+            {BUDGET_PRESETS.map((amount) => (
+              <Button
+                key={amount}
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => handlePresetClick(amount)}
+                disabled={mutation.isPending}
+                className="text-xs h-7"
+                data-testid={`preset-${amount}`}
+              >
+                {amount >= 10000 ? `${amount / 10000}萬` : amount.toLocaleString()}
+              </Button>
+            ))}
+          </div>
         </CardContent>
       </Card>
 
@@ -370,10 +474,31 @@ export default function CashAllocationPage() {
         <div className="space-y-4 sm:space-y-6" data-testid="allocation-result">
           <SummaryCard result={result} />
 
-          <UrgencyGroup level="critical" items={suggestedCritical} />
-          <UrgencyGroup level="high" items={suggestedHigh} />
-          <UrgencyGroup level="medium" items={suggestedMedium} />
-          <UrgencyGroup level="low" items={suggestedLow} title="🟢 本期可納入（餘額充足）" />
+          <UrgencyGroup
+            level="critical"
+            items={suggestedCritical}
+            onMarkPaid={handleMarkPaid}
+            pendingId={pendingId}
+          />
+          <UrgencyGroup
+            level="high"
+            items={suggestedHigh}
+            onMarkPaid={handleMarkPaid}
+            pendingId={pendingId}
+          />
+          <UrgencyGroup
+            level="medium"
+            items={suggestedMedium}
+            onMarkPaid={handleMarkPaid}
+            pendingId={pendingId}
+          />
+          <UrgencyGroup
+            level="low"
+            items={suggestedLow}
+            title="🟢 本期可納入（餘額充足）"
+            onMarkPaid={handleMarkPaid}
+            pendingId={pendingId}
+          />
 
           {result.deferred.length > 0 && (
             <Card>
@@ -386,7 +511,12 @@ export default function CashAllocationPage() {
               </CardHeader>
               <CardContent className="space-y-3">
                 {result.deferred.map((item) => (
-                  <ItemCard key={item.id} item={item} />
+                  <ItemCard
+                    key={item.id}
+                    item={item}
+                    onMarkPaid={handleMarkPaid}
+                    isPending={pendingId === item.id}
+                  />
                 ))}
               </CardContent>
             </Card>
