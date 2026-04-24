@@ -34,6 +34,7 @@ import { QuickAddDrawer, useQuickCameraUpload } from "@/components/quick-add-dra
 import { QuickPaymentDialog } from "@/components/quick-payment-dialog"
 import { TodayFocusCard } from "@/components/today-focus-card"
 import { FinancialAssistantQuickCard } from "@/components/financial-assistant-quick-card"
+import { FinancialHealthSummaryCard } from "@/components/financial-health-summary-card"
 
 /** API 回傳的付款項目（含關聯專案名） */
 interface PaymentItemWithProject extends PaymentItem {
@@ -331,6 +332,9 @@ export default function PaymentHome() {
           </div>
         )}
       </div>
+
+      {/* ===== 財務健康度摘要（一眼看現狀）===== */}
+      <FinancialHealthSummaryCard />
 
       {/* ===== 財務助理快速入口（5 大決策工具）===== */}
       <FinancialAssistantQuickCard />
