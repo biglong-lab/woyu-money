@@ -31,6 +31,13 @@ interface ContractRow {
   startDate: string
   endDate: string
   baseAmount: string | number
+  projectId: number | null
+}
+
+interface RevenueRow {
+  projectId: number
+  month: number
+  amount: string | number
 }
 
 const CONTRACTS_SQL = `
@@ -40,10 +47,23 @@ const CONTRACTS_SQL = `
     tenant_name AS "tenantName",
     start_date::text AS "startDate",
     end_date::text AS "endDate",
-    base_amount AS "baseAmount"
+    base_amount AS "baseAmount",
+    project_id AS "projectId"
   FROM rental_contracts
   WHERE COALESCE(is_active, true) = true
   ORDER BY contract_name
+`
+
+// 聚合指定年度內，每個 project 每月的 daily_revenues 總額
+const REVENUES_BY_PROJECT_MONTH_SQL = `
+  SELECT
+    project_id AS "projectId",
+    EXTRACT(MONTH FROM date)::int AS "month",
+    SUM(amount::numeric) AS "amount"
+  FROM daily_revenues
+  WHERE EXTRACT(YEAR FROM date) = $1
+    AND project_id IS NOT NULL
+  GROUP BY project_id, month
 `
 
 function toContractInfo(row: ContractRow): RentalContractInfo {
@@ -57,6 +77,41 @@ function toContractInfo(row: ContractRow): RentalContractInfo {
   }
 }
 
+// 將每個 project 每月的收款分配到該 project 的所有 contract
+// 簡化規則：同 project 多合約時按 monthlyAmount 比例分配收款
+function distributePayments(
+  contracts: Array<ContractRow>,
+  revenues: RevenueRow[]
+): MonthlyPayment[] {
+  const byProjectMonth = new Map<string, number>()
+  for (const r of revenues) {
+    byProjectMonth.set(`${r.projectId}-${r.month}`, Number(r.amount))
+  }
+
+  const contractsByProject = new Map<number, ContractRow[]>()
+  for (const c of contracts) {
+    if (c.projectId == null) continue
+    const arr = contractsByProject.get(c.projectId) ?? []
+    arr.push(c)
+    contractsByProject.set(c.projectId, arr)
+  }
+
+  const result: MonthlyPayment[] = []
+  Array.from(contractsByProject.entries()).forEach(([projectId, cs]) => {
+    const totalMonthly = cs.reduce((s: number, c: ContractRow) => s + Number(c.baseAmount), 0)
+    if (totalMonthly <= 0) return
+    for (let m = 1; m <= 12; m++) {
+      const revenue = byProjectMonth.get(`${projectId}-${m}`) ?? 0
+      if (revenue <= 0) continue
+      for (const c of cs) {
+        const share = (Number(c.baseAmount) / totalMonthly) * revenue
+        result.push({ contractId: c.id, month: m, paidAmount: share })
+      }
+    }
+  })
+  return result
+}
+
 router.get(
   "/api/rental-matrix",
   asyncHandler(async (req, res) => {
@@ -67,11 +122,15 @@ router.get(
     const year = parsed.data ?? new Date().getFullYear()
 
     const { pool } = await import("../db")
-    const result = await pool.query<ContractRow>(CONTRACTS_SQL)
-    const contracts = result.rows.map(toContractInfo)
+    const [contractsResult, revenuesResult] = await Promise.all([
+      pool.query<ContractRow>(CONTRACTS_SQL),
+      pool.query<RevenueRow>(REVENUES_BY_PROJECT_MONTH_SQL, [year]),
+    ])
 
-    // payments 目前尚未接入（由 rental 模組負責 mapping）
-    const payments: MonthlyPayment[] = []
+    const contractRows = contractsResult.rows
+    const contracts = contractRows.map(toContractInfo)
+    const payments = distributePayments(contractRows, revenuesResult.rows)
+
     const matrix = buildRentalMatrix(contracts, payments, year)
     res.json(matrix)
   })
