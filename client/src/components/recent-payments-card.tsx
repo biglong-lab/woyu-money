@@ -42,6 +42,28 @@ function formatRelativeDate(dateStr: string): string {
   return `${m}/${d}`
 }
 
+type DateGroup = "today" | "yesterday" | "this_week" | "earlier"
+
+function groupOf(dateStr: string): DateGroup {
+  const date = new Date(dateStr)
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const target = new Date(date)
+  target.setHours(0, 0, 0, 0)
+  const diff = Math.round((today.getTime() - target.getTime()) / 86_400_000)
+  if (diff === 0) return "today"
+  if (diff === 1) return "yesterday"
+  if (diff < 7) return "this_week"
+  return "earlier"
+}
+
+const GROUP_LABEL: Record<DateGroup, string> = {
+  today: "今天",
+  yesterday: "昨天",
+  this_week: "本週",
+  earlier: "更早",
+}
+
 export function RecentPaymentsCard() {
   const { toast } = useToast()
   const [undoingId, setUndoingId] = useState<number | null>(null)
@@ -68,6 +90,16 @@ export function RecentPaymentsCard() {
 
   const records = data.slice(0, 5)
 
+  // 按日期分組
+  const grouped = records.reduce<Record<DateGroup, PaymentRecordWithNames[]>>(
+    (acc, rec) => {
+      const g = groupOf(rec.paymentDate)
+      acc[g].push(rec)
+      return acc
+    },
+    { today: [], yesterday: [], this_week: [], earlier: [] }
+  )
+
   const handleUndo = (rec: PaymentRecordWithNames) => {
     if (
       !window.confirm(
@@ -93,33 +125,53 @@ export function RecentPaymentsCard() {
           </Link>
         </div>
       </CardHeader>
-      <CardContent className="space-y-2">
-        {records.map((rec) => {
-          const amount = Number(rec.amountPaid ?? rec.amount ?? 0)
+      <CardContent className="space-y-3">
+        {(["today", "yesterday", "this_week", "earlier"] as DateGroup[]).map((group) => {
+          const items = grouped[group]
+          if (items.length === 0) return null
+          const groupTotal = items.reduce(
+            (s, rec) => s + Number(rec.amountPaid ?? rec.amount ?? 0),
+            0
+          )
           return (
-            <div
-              key={rec.id}
-              className="flex items-center justify-between gap-2 text-sm border-l-2 border-green-300 bg-green-50/50 rounded p-2"
-            >
-              <div className="flex-1 min-w-0">
-                <div className="font-medium truncate">{rec.itemName ?? "未命名項目"}</div>
-                <div className="text-xs text-gray-500">
-                  {formatRelativeDate(rec.paymentDate)}
-                  {rec.projectName && <span className="ml-1">· {rec.projectName}</span>}
-                </div>
+            <div key={group} className="space-y-2">
+              <div className="flex items-center justify-between text-xs text-gray-500 px-1">
+                <span className="font-medium">
+                  {GROUP_LABEL[group]} · {items.length} 件
+                </span>
+                <span className="text-green-700">{fmt(groupTotal)}</span>
               </div>
-              <div className="text-sm font-semibold text-green-700 shrink-0">{fmt(amount)}</div>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-7 px-1.5 text-[10px] text-gray-500 hover:text-red-600 shrink-0"
-                onClick={() => handleUndo(rec)}
-                disabled={undoingId === rec.id}
-                title="撤銷此筆付款"
-                data-testid={`undo-payment-${rec.id}`}
-              >
-                <Undo2 className="h-3 w-3" />
-              </Button>
+              {items.map((rec) => {
+                const amount = Number(rec.amountPaid ?? rec.amount ?? 0)
+                return (
+                  <div
+                    key={rec.id}
+                    className="flex items-center justify-between gap-2 text-sm border-l-2 border-green-300 bg-green-50/50 rounded p-2"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium truncate">{rec.itemName ?? "未命名項目"}</div>
+                      <div className="text-xs text-gray-500">
+                        {formatRelativeDate(rec.paymentDate)}
+                        {rec.projectName && <span className="ml-1">· {rec.projectName}</span>}
+                      </div>
+                    </div>
+                    <div className="text-sm font-semibold text-green-700 shrink-0">
+                      {fmt(amount)}
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 px-1.5 text-[10px] text-gray-500 hover:text-red-600 shrink-0"
+                      onClick={() => handleUndo(rec)}
+                      disabled={undoingId === rec.id}
+                      title="撤銷此筆付款"
+                      data-testid={`undo-payment-${rec.id}`}
+                    >
+                      <Undo2 className="h-3 w-3" />
+                    </Button>
+                  </div>
+                )
+              })}
             </div>
           )
         })}
