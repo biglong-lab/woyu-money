@@ -5,7 +5,14 @@
 
 import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
-import { TrendingUp, AlertTriangle, CheckCircle2, Calendar } from "lucide-react"
+import {
+  TrendingUp,
+  AlertTriangle,
+  CheckCircle2,
+  Calendar,
+  ChevronDown,
+  ChevronUp,
+} from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -59,8 +66,56 @@ const BASIS_LABEL: Record<Basis, string> = {
   no_data: "無歷史資料",
 }
 
+interface MonthDetailItem {
+  id: number
+  itemName: string
+  totalAmount: number
+  paidAmount: number
+  unpaidAmount: number
+  dueDate: string
+  projectName: string | null
+  categoryName: string | null
+}
+interface MonthDetailData {
+  year: number
+  month: number
+  count: number
+  totalUnpaid: number
+  items: MonthDetailItem[]
+}
+
+function MonthDetail({ year, month }: { year: number; month: number }) {
+  const { data, isLoading } = useQuery<MonthDetailData>({
+    queryKey: [`/api/cashflow/month-detail?year=${year}&month=${month}`],
+  })
+  if (isLoading) return <div className="text-xs text-gray-500 p-2">載入中...</div>
+  if (!data || data.count === 0)
+    return <div className="text-xs text-gray-500 p-2">該月無未付項目明細</div>
+  return (
+    <div className="mt-2 pt-2 border-t border-gray-200 space-y-1">
+      <div className="text-xs text-gray-600">
+        共 {data.count} 筆未付，{fmt(data.totalUnpaid)}
+      </div>
+      <ul className="text-xs space-y-1 max-h-48 overflow-y-auto">
+        {data.items.slice(0, 20).map((item) => (
+          <li key={item.id} className="flex justify-between gap-2 py-0.5">
+            <span className="truncate">
+              {item.itemName}
+              {item.projectName && <span className="text-gray-400 ml-1">· {item.projectName}</span>}
+            </span>
+            <span className="shrink-0 font-medium">{fmt(item.unpaidAmount)}</span>
+          </li>
+        ))}
+        {data.count > 20 && <li className="text-gray-400 italic">…還有 {data.count - 20} 筆</li>}
+      </ul>
+    </div>
+  )
+}
+
 function MonthCard({ forecast, gap }: { forecast: ForecastMonth; gap: GapItem }) {
+  const [expanded, setExpanded] = useState(false)
   const hasGap = gap.gap !== undefined && gap.gap > 0
+  const hasExpense = gap.estimatedExpense > 0
   const cls = hasGap ? "border-red-300 bg-red-50" : "border-green-200 bg-green-50"
   const conf = CONFIDENCE_META[forecast.confidence]
   return (
@@ -99,6 +154,27 @@ function MonthCard({ forecast, gap }: { forecast: ForecastMonth; gap: GapItem })
           </div>
         </div>
       )}
+      {hasExpense && (
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="mt-2 flex items-center gap-1 text-xs text-blue-700 hover:underline"
+          data-testid={`expand-month-${forecast.year}-${forecast.month}`}
+        >
+          {expanded ? (
+            <>
+              <ChevronUp className="h-3 w-3" />
+              收起明細
+            </>
+          ) : (
+            <>
+              <ChevronDown className="h-3 w-3" />
+              查看支出明細
+            </>
+          )}
+        </button>
+      )}
+      {expanded && <MonthDetail year={forecast.year} month={forecast.month} />}
     </div>
   )
 }
