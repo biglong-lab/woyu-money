@@ -163,9 +163,17 @@ interface QuickMenuProps {
   onQuickAdd: () => void
   onQuickPay: () => void
   onCamera: () => void
+  onCashAllocation: () => void
 }
 
-function QuickMenu({ isOpen, onClose, onQuickAdd, onQuickPay, onCamera }: QuickMenuProps) {
+function QuickMenu({
+  isOpen,
+  onClose,
+  onQuickAdd,
+  onQuickPay,
+  onCamera,
+  onCashAllocation,
+}: QuickMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -212,6 +220,15 @@ function QuickMenu({ isOpen, onClose, onQuickAdd, onQuickPay, onCamera }: QuickM
       onClick: () => {
         onClose()
         onQuickPay()
+      },
+    },
+    {
+      label: "現金分配",
+      icon: "🎯",
+      color: "bg-amber-50 text-amber-700",
+      onClick: () => {
+        onClose()
+        onCashAllocation()
       },
     },
   ]
@@ -304,6 +321,9 @@ export function MobileTabBar() {
         onQuickAdd={() => setShowQuickAdd(true)}
         onQuickPay={() => setShowQuickPay(true)}
         onCamera={openCamera}
+        onCashAllocation={() => {
+          window.location.href = "/cash-allocation"
+        }}
       />
 
       {/* 底部 Tab Bar */}
