@@ -87,7 +87,13 @@
   - rental-matrix 頁面加「本月全部已付」按鈕 + 確認 Dialog
   - 一鍵處理所有本月租金類別項目（含金額預覽）
   - 「複製上月」與「整年建立」功能留後續迭代（核心痛點已解決）
-- [ ] 第 9 步：現金流決策中心（加入收入預估）
+- [~] **第 9 步：收入預估 + 現金流缺口分析（純函式完成）**
+  - `shared/revenue-forecaster.ts`：
+    - forecastRevenue(history, fromYM, monthsAhead) — 基於歷史推算（去年同月 × 成長率）
+    - analyzeCashflowGap(forecast, expenses) — 缺口月份 + 行動建議
+    - 三層信心度：high/medium/low（依資料充足度）
+  - 11 個單元測試全通過
+  - 下輪：API 端點 + 整合到 cashflow-forecast
 - [ ] 第 10 步：收據 AI 自動對應（改為匹配既有項目）
 
 ---
