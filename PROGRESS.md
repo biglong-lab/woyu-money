@@ -22,7 +22,15 @@
   - 輸出 Markdown：critical/high/medium/low 分群 + 預算缺口計算
   - **覆蓋率：97.87% (Stmts) / 84.37% (Branch) / 100% (Funcs)**
   - 使用：`npx tsx scripts/priority-payment-list.ts --budget 300000`
-- [ ] 第 2 步：智能優先級演算法（server/services/payment-priority.service.ts）
+- [x] **第 2 步：智能優先級演算法 Service 層**（server/services/payment-priority.service.ts）
+  - 新增 `server/services/payment-priority.service.ts`（268 行）
+  - 新增 `tests/unit/payment-priority-service.test.ts`（24 個單元測試，402 行）
+  - 純函式：`buildPriorityReport`、`buildAllocation`、`mapRawRowsToInputs`
+  - 依賴注入：`getPriorityReportWith(fetcher, opts)`、`suggestAllocationWith(fetcher, input)`
+  - 公開 API：`getPriorityReport()`、`suggestAllocation({ availableBudget })`
+  - 現金分配演算法：critical/high 強制 suggested，medium/low 依預算決定，含 shortage/surplus
+  - DB 查詢延遲載入（`await import("../db")`），單元測試不觸發連線
+  - **覆蓋率：100% (Stmts/Branch/Funcs/Lines 全滿)**
 - [ ] 第 3 步：現金分配引擎 API + /cash-allocation.tsx
 - [ ] 第 4 步：首頁今日焦點改版（破解逃避心理）
 - [ ] 第 5 步：勞健保滯納金監控（針對 40% 損失專項）
