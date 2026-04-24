@@ -51,3 +51,9 @@ npm-debug.log*
 *.key
 *.cert
 .last-prod-sync
+# === HQ 自動補齊 ===
+node_modules
+.env.local
+dist
+.next
+coverage
