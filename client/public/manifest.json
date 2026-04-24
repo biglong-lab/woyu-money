@@ -1,0 +1,46 @@
+{
+  "name": "浯島財務管理系統",
+  "short_name": "浯島財務",
+  "description": "民宿財務 + 家庭預算 + AI 單據辨識",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f9fafb",
+  "theme_color": "#2563eb",
+  "lang": "zh-TW",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "現金分配",
+      "short_name": "分配",
+      "description": "輸入可動用金額，建議先付哪幾筆",
+      "url": "/cash-allocation"
+    },
+    {
+      "name": "勞健保監控",
+      "short_name": "勞健保",
+      "description": "三層提醒 + 年度損失",
+      "url": "/labor-insurance-watch"
+    },
+    {
+      "name": "租金矩陣",
+      "short_name": "租金",
+      "description": "12 月 × 合約一目了然",
+      "url": "/rental-matrix"
+    },
+    {
+      "name": "拍單據",
+      "short_name": "拍單據",
+      "description": "拍照上傳收據",
+      "url": "/document-inbox"
+    }
+  ]
+}
