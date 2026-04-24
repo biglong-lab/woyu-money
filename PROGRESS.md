@@ -72,7 +72,10 @@
   - 5b：`tests/integration/late-fee.test.ts`（12 個整合測試）
   - 5b：掛載至 `server/routes/index.ts`
   - 5c：`client/src/pages/labor-insurance-watch.tsx`（前端儀表頁）+ App.tsx 路由 → **第 5 步全部完成**
-- [ ] 第 6 步：LINE 雙向互動（資料不斷鏈）
+- [~] **第 6 步：LINE 雙向互動（純函式完成，webhook 待 token）**
+  - `shared/line-bot-utils.ts`：每日推播訊息建構 + 回覆解析（1 / 1 延 3 / help）
+  - 21 個單元測試全通過
+  - webhook route 需 `LINE_BOT_CHANNEL_ACCESS_TOKEN`，等使用者提供後補上
 - [ ] 第 7 步：租金月度矩陣視圖
 - [ ] 第 8 步：批次建立與複製
 - [ ] 第 9 步：現金流決策中心（加入收入預估）
