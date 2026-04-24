@@ -33,6 +33,7 @@ import lateFeeRoutes from "./late-fee"
 import rentalMatrixRoutes from "./rental-matrix"
 import rentalBatchRoutes from "./rental-batch"
 import cashflowForecastRoutes from "./cashflow-forecast"
+import receiptMatchRoutes from "./receipt-match"
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // 設定認證系統
@@ -94,6 +95,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use(rentalMatrixRoutes)
   app.use(rentalBatchRoutes)
   app.use(cashflowForecastRoutes)
+  app.use(receiptMatchRoutes)
 
   const httpServer = createServer(app)
   return httpServer
