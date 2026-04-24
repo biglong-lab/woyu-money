@@ -59,7 +59,19 @@
   - 明示拖延成本：每筆顯示「已產生滯納金 + 每拖一天再多 $XXX」
   - 呼叫既有 API：`POST /api/payment/records`（和 quick-payment 相同模式）
   - 空狀態：逐層顯示成就感文案
-- [ ] 第 5 步：勞健保滯納金監控（針對 40% 損失專項）
+- [~] **第 5 步：勞健保滯納金監控（核心演算法 + Service 完成）**
+  - 新增 `shared/late-fee-tracker.ts`（229 行，前後端共用純函式）
+    - `isLaborInsurance` 識別勞健保（共用 payment-priority 分類）
+    - `calculateUnpaidLateFee` 未付項目累積滯納金
+    - `calculatePaidLateFee` 已付項目歷史滯納金（逾期付款損失）
+    - `aggregateAnnualLoss` 年度損失報告（彙總未付 + 已付）
+    - `getReminderLevel` 依日期判斷提醒等級：20 日 early / 25 日 warning / 28 日 final
+  - 新增 `tests/unit/late-fee-tracker.test.ts`（35 個單元測試，全通過）
+  - 新增 `server/services/late-fee.service.ts`（247 行，DI 設計）
+    - 純函式：`buildAnnualLossReport`
+    - 依賴注入：`getAnnualLossReportWith` / `getTodayReminderStatusWith`
+    - 公開 API：`getAnnualLossReport(year)` / `getTodayReminderStatus()`
+  - API route + 整合測試 + 前端頁面留待後續 round（避免單 commit 超過檔案上限）
 - [ ] 第 6 步：LINE 雙向互動（資料不斷鏈）
 - [ ] 第 7 步：租金月度矩陣視圖
 - [ ] 第 8 步：批次建立與複製
