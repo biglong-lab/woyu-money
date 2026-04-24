@@ -57,6 +57,7 @@ import IncomeWebhooksInbox from "@/pages/income-webhooks-inbox"
 import CashAllocation from "@/pages/cash-allocation"
 import LaborInsuranceWatch from "@/pages/labor-insurance-watch"
 import RentalMatrix from "@/pages/rental-matrix"
+import CashflowDecisionCenter from "@/pages/cashflow-decision-center"
 
 function Router() {
   const [quickPaymentOpen, setQuickPaymentOpen] = useState(false)
@@ -170,6 +171,12 @@ function Router() {
 
                 {/* Rental Matrix — 租金月度矩陣 */}
                 <ProtectedRoute path="/rental-matrix" component={RentalMatrix} />
+
+                {/* Cashflow Decision Center — 現金流決策中心 */}
+                <ProtectedRoute
+                  path="/cashflow-decision-center"
+                  component={CashflowDecisionCenter}
+                />
 
                 {/* Feature Showcase */}
                 <ProtectedRoute path="/features" component={FeatureShowcase} />
