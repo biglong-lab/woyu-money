@@ -363,12 +363,44 @@ export default function RentalMatrixPage() {
                   })}
                 </tbody>
                 <tfoot>
-                  <tr className="border-t-2 font-semibold">
-                    <td className="p-2">合計</td>
-                    <td colSpan={12} className="p-2 text-right text-xs text-gray-600">
-                      已付 {formatCurrency(data.totals.paid)} / 應付
+                  {/* 每月應付小計 */}
+                  <tr className="border-t-2 font-semibold bg-gray-50">
+                    <td className="p-2 text-xs text-gray-600">每月應付</td>
+                    {data.months.map((m) => {
+                      const monthExpected = data.cells
+                        .filter(
+                          (c) =>
+                            c.month === m &&
+                            c.status !== "out_of_contract" &&
+                            c.status !== "upcoming"
+                        )
+                        .reduce((sum, c) => sum + c.expectedAmount, 0)
+                      return (
+                        <td key={m} className="p-1 text-center text-[10px] text-gray-600">
+                          {monthExpected > 0 ? `${Math.round(monthExpected / 1000)}k` : "—"}
+                        </td>
+                      )
+                    })}
+                    <td className="p-2 text-right text-sm">
+                      {formatCurrency(data.totals.expected)}
                     </td>
-                    <td className="p-2 text-right">{formatCurrency(data.totals.expected)}</td>
+                  </tr>
+                  {/* 每月已付小計 */}
+                  <tr className="font-semibold bg-green-50">
+                    <td className="p-2 text-xs text-green-800">每月已付</td>
+                    {data.months.map((m) => {
+                      const monthPaid = data.cells
+                        .filter((c) => c.month === m)
+                        .reduce((sum, c) => sum + c.paidAmount, 0)
+                      return (
+                        <td key={m} className="p-1 text-center text-[10px] text-green-700">
+                          {monthPaid > 0 ? `${Math.round(monthPaid / 1000)}k` : "—"}
+                        </td>
+                      )
+                    })}
+                    <td className="p-2 text-right text-sm text-green-700">
+                      {formatCurrency(data.totals.paid)}
+                    </td>
                   </tr>
                 </tfoot>
               </table>
