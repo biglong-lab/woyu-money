@@ -311,14 +311,22 @@ export default function CashAllocationPage() {
   const [pendingId, setPendingId] = useState<number | null>(null)
   const { toast } = useToast()
 
-  // 載入上次輸入金額
+  // 載入上次輸入金額並自動計算（不用使用者再點按鈕）
   useEffect(() => {
     try {
       const saved = localStorage.getItem(BUDGET_KEY)
-      if (saved) setBudgetInput(saved)
+      if (saved) {
+        const n = Number(saved)
+        if (Number.isFinite(n) && n > 0) {
+          setBudgetInput(n.toLocaleString())
+          // 延遲一點讓 UI 先 render，再觸發計算
+          setTimeout(() => mutation.mutate(n), 100)
+        }
+      }
     } catch {
       // localStorage 不可用，忽略
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const mutation = useMutation<AllocationResult, Error, number>({
