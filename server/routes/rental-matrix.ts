@@ -34,7 +34,7 @@ interface ContractRow {
   projectId: number | null
 }
 
-interface RevenueRow {
+interface PaymentRow {
   projectId: number
   month: number
   amount: string | number
@@ -54,16 +54,27 @@ const CONTRACTS_SQL = `
   ORDER BY contract_name
 `
 
-// 聚合指定年度內，每個 project 每月的 daily_revenues 總額
-const REVENUES_BY_PROJECT_MONTH_SQL = `
+// 聚合指定年度內，每個 project 每月的「租金類」已付款額
+// 來源：payment_records JOIN payment_items，過濾租金關鍵字（item_name / category 名稱）
+const RENT_PAYMENTS_SQL = `
   SELECT
-    project_id AS "projectId",
-    EXTRACT(MONTH FROM date)::int AS "month",
-    SUM(amount::numeric) AS "amount"
-  FROM daily_revenues
-  WHERE EXTRACT(YEAR FROM date) = $1
-    AND project_id IS NOT NULL
-  GROUP BY project_id, month
+    pi.project_id AS "projectId",
+    EXTRACT(MONTH FROM pr.payment_date)::int AS "month",
+    SUM(pr.amount_paid::numeric) AS "amount"
+  FROM payment_records pr
+  JOIN payment_items pi ON pi.id = pr.payment_item_id
+  LEFT JOIN fixed_categories fc ON fc.id = pi.fixed_category_id
+  LEFT JOIN debt_categories dc ON dc.id = pi.category_id
+  WHERE EXTRACT(YEAR FROM pr.payment_date) = $1
+    AND pi.project_id IS NOT NULL
+    AND (
+      pi.item_name ILIKE '%租金%' OR pi.item_name ILIKE '%房租%' OR
+      COALESCE(fc.category_name, '') ILIKE '%租金%' OR
+      COALESCE(fc.category_name, '') ILIKE '%房租%' OR
+      COALESCE(dc.category_name, '') ILIKE '%租金%' OR
+      COALESCE(dc.category_name, '') ILIKE '%房租%'
+    )
+  GROUP BY pi.project_id, month
 `
 
 function toContractInfo(row: ContractRow): RentalContractInfo {
@@ -77,14 +88,14 @@ function toContractInfo(row: ContractRow): RentalContractInfo {
   }
 }
 
-// 將每個 project 每月的收款分配到該 project 的所有 contract
-// 簡化規則：同 project 多合約時按 monthlyAmount 比例分配收款
+// 將每個 project 每月的「租金類付款」分配到該 project 的所有 contract
+// 簡化規則：同 project 多合約時按 baseAmount 比例分配
 function distributePayments(
   contracts: Array<ContractRow>,
-  revenues: RevenueRow[]
+  payments: PaymentRow[]
 ): MonthlyPayment[] {
   const byProjectMonth = new Map<string, number>()
-  for (const r of revenues) {
+  for (const r of payments) {
     byProjectMonth.set(`${r.projectId}-${r.month}`, Number(r.amount))
   }
 
@@ -122,14 +133,14 @@ router.get(
     const year = parsed.data ?? new Date().getFullYear()
 
     const { pool } = await import("../db")
-    const [contractsResult, revenuesResult] = await Promise.all([
+    const [contractsResult, paymentsResult] = await Promise.all([
       pool.query<ContractRow>(CONTRACTS_SQL),
-      pool.query<RevenueRow>(REVENUES_BY_PROJECT_MONTH_SQL, [year]),
+      pool.query<PaymentRow>(RENT_PAYMENTS_SQL, [year]),
     ])
 
     const contractRows = contractsResult.rows
     const contracts = contractRows.map(toContractInfo)
-    const payments = distributePayments(contractRows, revenuesResult.rows)
+    const payments = distributePayments(contractRows, paymentsResult.rows)
 
     const matrix = buildRentalMatrix(contracts, payments, year)
     res.json(matrix)
