@@ -1,0 +1,147 @@
+/**
+ * 財務健康度摘要卡（首頁置頂）
+ * 一目了然：本月應付/已付/逾期 + 年度滯納金損失
+ */
+
+import { useQuery } from "@tanstack/react-query"
+import { Link } from "wouter"
+import { AlertTriangle, CheckCircle2, TrendingDown, ArrowRight } from "lucide-react"
+import { Card, CardContent } from "@/components/ui/card"
+
+type UrgencyLevel = "critical" | "high" | "medium" | "low"
+
+interface PriorityResult {
+  unpaidAmount: number
+  urgency: UrgencyLevel
+  daysOverdue: number
+  lateFeeEstimate: number
+}
+
+interface PriorityReport {
+  totalUnpaid: number
+  counts: Record<UrgencyLevel, number>
+  all: PriorityResult[]
+}
+
+interface AnnualLossReport {
+  totalLateFee: number
+  totalPrincipal: number
+  lossPercentage: number
+}
+
+function fmt(n: number): string {
+  return `NT$ ${Math.round(n).toLocaleString()}`
+}
+
+export function FinancialHealthSummaryCard() {
+  const { data: priority } = useQuery<PriorityReport>({
+    queryKey: ["/api/payment/priority-report?includeLow=true"],
+  })
+  const year = new Date().getFullYear()
+  const { data: annual } = useQuery<AnnualLossReport>({
+    queryKey: [`/api/late-fee/annual-loss?year=${year}`],
+  })
+
+  if (!priority) return null
+
+  const overdueCount = priority.all.filter((r) => r.daysOverdue > 0).length
+  const accumulatedLateFee = priority.all.reduce((s, r) => s + (r.lateFeeEstimate ?? 0), 0)
+  const yearLateFee = annual?.totalLateFee ?? 0
+
+  return (
+    <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200">
+      <CardContent className="p-3 sm:p-4">
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="text-sm sm:text-base font-semibold text-gray-900">📊 財務健康度</h2>
+          <span className="text-xs text-gray-500">{year} 年度</span>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+          <div className="bg-white/70 rounded p-2.5">
+            <div className="text-xs text-gray-500">未付總額</div>
+            <div className="text-base sm:text-lg font-bold text-gray-900">
+              {fmt(priority.totalUnpaid)}
+            </div>
+          </div>
+          <div className={`rounded p-2.5 ${overdueCount > 0 ? "bg-red-50" : "bg-white/70"}`}>
+            <div className="text-xs text-gray-500 flex items-center gap-1">
+              {overdueCount > 0 && <AlertTriangle className="h-3 w-3 text-red-600" />}
+              逾期筆數
+            </div>
+            <div
+              className={`text-base sm:text-lg font-bold ${
+                overdueCount > 0 ? "text-red-700" : "text-gray-900"
+              }`}
+            >
+              {overdueCount} 筆
+            </div>
+          </div>
+          <div
+            className={`rounded p-2.5 ${accumulatedLateFee > 0 ? "bg-amber-50" : "bg-white/70"}`}
+          >
+            <div className="text-xs text-gray-500">已產生滯納金</div>
+            <div
+              className={`text-base sm:text-lg font-bold ${
+                accumulatedLateFee > 0 ? "text-amber-700" : "text-gray-900"
+              }`}
+            >
+              {fmt(accumulatedLateFee)}
+            </div>
+          </div>
+          <div className={`rounded p-2.5 ${yearLateFee > 0 ? "bg-red-50" : "bg-green-50"}`}>
+            <div className="text-xs text-gray-500 flex items-center gap-1">
+              {yearLateFee > 0 ? (
+                <TrendingDown className="h-3 w-3 text-red-600" />
+              ) : (
+                <CheckCircle2 className="h-3 w-3 text-green-600" />
+              )}
+              年度損失
+            </div>
+            <div
+              className={`text-base sm:text-lg font-bold ${
+                yearLateFee > 0 ? "text-red-700" : "text-green-700"
+              }`}
+            >
+              {yearLateFee > 0 ? fmt(yearLateFee) : "0"}
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-3 flex flex-wrap gap-2 text-xs">
+          <Badge level="critical" count={priority.counts.critical} label="緊急" />
+          <Badge level="high" count={priority.counts.high} label="本週" />
+          <Badge level="medium" count={priority.counts.medium} label="本月" />
+          <Badge level="low" count={priority.counts.low} label="可緩" />
+        </div>
+
+        {(overdueCount > 0 || priority.counts.critical > 0) && (
+          <Link href="/cash-allocation">
+            <div className="mt-3 flex items-center justify-between bg-amber-100 hover:bg-amber-200 rounded p-2 cursor-pointer transition-colors">
+              <span className="text-xs font-medium text-amber-900">
+                有 {priority.counts.critical + priority.counts.high} 件緊急事項，立刻分配現金
+              </span>
+              <ArrowRight className="h-4 w-4 text-amber-900" />
+            </div>
+          </Link>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+const URGENCY_BADGE: Record<UrgencyLevel, string> = {
+  critical: "bg-red-100 text-red-800",
+  high: "bg-orange-100 text-orange-800",
+  medium: "bg-yellow-100 text-yellow-800",
+  low: "bg-gray-100 text-gray-700",
+}
+
+function Badge({ level, count, label }: { level: UrgencyLevel; count: number; label: string }) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full ${URGENCY_BADGE[level]}`}
+    >
+      <span className="font-semibold">{count}</span>
+      <span>{label}</span>
+    </span>
+  )
+}
