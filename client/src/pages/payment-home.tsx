@@ -35,6 +35,7 @@ import { QuickPaymentDialog } from "@/components/quick-payment-dialog"
 import { TodayFocusCard } from "@/components/today-focus-card"
 import { FinancialAssistantQuickCard } from "@/components/financial-assistant-quick-card"
 import { FinancialHealthSummaryCard } from "@/components/financial-health-summary-card"
+import { ActiveRentalsCard } from "@/components/active-rentals-card"
 
 /** API 回傳的付款項目（含關聯專案名） */
 interface PaymentItemWithProject extends PaymentItem {
@@ -341,6 +342,9 @@ export default function PaymentHome() {
 
       {/* ===== 今日焦點（破解「看到欠款就逃避」的惡性循環）===== */}
       <TodayFocusCard />
+
+      {/* ===== 本月主要租金狀態（一鍵付款）===== */}
+      <ActiveRentalsCard />
 
       {/* ===== 待處理區（可直接操作）===== */}
       {(urgentItems.length > 0 || pendingDocs > 0) && (
