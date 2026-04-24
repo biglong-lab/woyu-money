@@ -5,7 +5,7 @@
 
 import { useState } from "react"
 import { useQuery, useMutation } from "@tanstack/react-query"
-import { Calendar, CheckCircle2 } from "lucide-react"
+import { Calendar, CheckCircle2, CalendarPlus } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import {
@@ -163,6 +163,49 @@ export default function RentalMatrixPage() {
     enabled: batchOpen,
   })
 
+  const yearlyCreateMutation = useMutation<
+    { createdCount: number; skipped: number },
+    Error,
+    { projectId: number; monthlyAmount: number; contractName: string }
+  >({
+    mutationFn: (input) =>
+      apiRequest("POST", "/api/rental-batch/create-yearly-items", {
+        projectId: input.projectId,
+        year,
+        monthlyAmount: input.monthlyAmount,
+      }),
+    onSuccess: (result, input) => {
+      toast({
+        title: `已建立 ${result.createdCount} 筆月租項目`,
+        description:
+          result.skipped > 0
+            ? `${input.contractName}（${year} 年；${result.skipped} 個月已存在略過）`
+            : input.contractName,
+      })
+      queryClient.invalidateQueries({ queryKey: [`/api/rental-matrix?year=${year}`] })
+    },
+    onError: (err) =>
+      toast({ title: "建立失敗", description: err.message, variant: "destructive" }),
+  })
+
+  const handleCreateYear = (projectId: number, monthlyAmount: number, contractName: string) => {
+    if (monthlyAmount <= 0) {
+      toast({
+        title: "無法建立",
+        description: "此合約沒有月租金額參考，請先手動建立一筆作為範本",
+        variant: "destructive",
+      })
+      return
+    }
+    if (
+      !window.confirm(
+        `為「${contractName}」建立 ${year} 年缺少月份的月租項目？\n每月 NT$ ${Math.round(monthlyAmount).toLocaleString()}`
+      )
+    )
+      return
+    yearlyCreateMutation.mutate({ projectId, monthlyAmount, contractName })
+  }
+
   const cellPaidMutation = useMutation<
     { processedCount: number; totalPaid: number },
     Error,
@@ -281,10 +324,28 @@ export default function RentalMatrixPage() {
                     return (
                       <tr key={c.id} className="border-b last:border-b-0 hover:bg-gray-50">
                         <td className="p-2">
-                          <div className="font-medium">{c.contractName}</div>
-                          {c.tenantName && (
-                            <div className="text-xs text-gray-500">{c.tenantName}</div>
-                          )}
+                          <div className="flex items-center justify-between gap-1">
+                            <div>
+                              <div className="font-medium">{c.contractName}</div>
+                              {c.tenantName && (
+                                <div className="text-xs text-gray-500">{c.tenantName}</div>
+                              )}
+                            </div>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-6 px-1.5 text-[10px] shrink-0"
+                              onClick={() =>
+                                handleCreateYear(c.id, c.monthlyAmount, c.contractName)
+                              }
+                              disabled={yearlyCreateMutation.isPending}
+                              title={`為 ${year} 年建立缺少月份的月租項目`}
+                              data-testid={`create-year-${c.id}`}
+                            >
+                              <CalendarPlus className="h-3 w-3 mr-0.5" />
+                              +12
+                            </Button>
+                          </div>
                         </td>
                         {cells.map((cell) => (
                           <MatrixCell
