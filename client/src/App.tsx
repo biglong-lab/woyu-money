@@ -55,6 +55,7 @@ import HouseholdCategoryManagement from "@/pages/household-category-management"
 import IncomeSourcesManagement from "@/pages/income-sources-management"
 import IncomeWebhooksInbox from "@/pages/income-webhooks-inbox"
 import CashAllocation from "@/pages/cash-allocation"
+import LaborInsuranceWatch from "@/pages/labor-insurance-watch"
 
 function Router() {
   const [quickPaymentOpen, setQuickPaymentOpen] = useState(false)
@@ -162,6 +163,9 @@ function Router() {
 
                 {/* Cash Allocation — 現金分配助理（核心決策功能）*/}
                 <ProtectedRoute path="/cash-allocation" component={CashAllocation} />
+
+                {/* Labor Insurance Watch — 勞健保滯納金監控 */}
+                <ProtectedRoute path="/labor-insurance-watch" component={LaborInsuranceWatch} />
 
                 {/* Feature Showcase */}
                 <ProtectedRoute path="/features" component={FeatureShowcase} />

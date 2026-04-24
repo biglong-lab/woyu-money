@@ -59,7 +59,7 @@
   - 明示拖延成本：每筆顯示「已產生滯納金 + 每拖一天再多 $XXX」
   - 呼叫既有 API：`POST /api/payment/records`（和 quick-payment 相同模式）
   - 空狀態：逐層顯示成就感文案
-- [~] **第 5 步：勞健保滯納金監控（核心 + API 完成，前端進行中）**
+- [x] **第 5 步：勞健保滯納金監控（全部完成）**
   - 5a：`shared/late-fee-tracker.ts`（229 行）+ 35 個單元測試
     - `isLaborInsurance`、`calculateUnpaidLateFee`、`calculatePaidLateFee`
     - `aggregateAnnualLoss`、`getReminderLevel`（20/25/28 三層）
@@ -71,7 +71,7 @@
     - Zod 驗證 year 範圍 2000-2100
   - 5b：`tests/integration/late-fee.test.ts`（12 個整合測試）
   - 5b：掛載至 `server/routes/index.ts`
-  - 5c（下輪）：前端頁面 `/labor-insurance-watch`
+  - 5c：`client/src/pages/labor-insurance-watch.tsx`（前端儀表頁）+ App.tsx 路由 → **第 5 步全部完成**
 - [ ] 第 6 步：LINE 雙向互動（資料不斷鏈）
 - [ ] 第 7 步：租金月度矩陣視圖
 - [ ] 第 8 步：批次建立與複製
