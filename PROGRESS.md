@@ -2,12 +2,114 @@
 
 ## 專案狀態：開發中
 
-**最後更新**: 2026-04-12
+**最後更新**: 2026-04-25
 **最新提交**: `a7bb6db` — 已推送至 GitHub
 
 ---
 
-## 目前階段：手機端 UX 優化
+## 🎯 當前階段：財務決策助理改造（Loop 推進中）
+
+**核心目標**：把系統從「讓人焦慮的記帳工具」改造為「主動幫我省力的財務決策助理」。
+
+### 10 步實施計畫進度
+
+- [x] **第 1 步：優先付款清單 CLI 腳本**（今日止血工具）
+  - 新增 `shared/payment-priority.ts` — 5 維度優先級演算法（495 行）
+  - 新增 `scripts/priority-payment-list.ts` — CLI 腳本（205 行）
+  - 新增 `tests/unit/payment-priority.test.ts` — 43 個單元測試（462 行）
+  - 9 種分類規則：勞健保/稅/銀行貸款/信用卡/水電/保險/租金/廠商/其他
+  - 每類別自帶：滯納金率、違約後果權重、彈性空間
+  - 輸出 Markdown：critical/high/medium/low 分群 + 預算缺口計算
+  - **覆蓋率：97.87% (Stmts) / 84.37% (Branch) / 100% (Funcs)**
+  - 使用：`npx tsx scripts/priority-payment-list.ts --budget 300000`
+- [x] **第 2 步：智能優先級演算法 Service 層**（server/services/payment-priority.service.ts）
+  - 新增 `server/services/payment-priority.service.ts`（268 行）
+  - 新增 `tests/unit/payment-priority-service.test.ts`（24 個單元測試，402 行）
+  - 純函式：`buildPriorityReport`、`buildAllocation`、`mapRawRowsToInputs`
+  - 依賴注入：`getPriorityReportWith(fetcher, opts)`、`suggestAllocationWith(fetcher, input)`
+  - 公開 API：`getPriorityReport()`、`suggestAllocation({ availableBudget })`
+  - 現金分配演算法：critical/high 強制 suggested，medium/low 依預算決定，含 shortage/surplus
+  - DB 查詢延遲載入（`await import("../db")`），單元測試不觸發連線
+  - **覆蓋率：100% (Stmts/Branch/Funcs/Lines 全滿)**
+- [x] **第 3 步：現金分配引擎（全部完成）**
+  - **後端 API**：
+    - `server/routes/payment-allocation.ts`（72 行）
+    - `tests/integration/payment-allocation.test.ts`（14 個整合測試，252 行）
+    - Endpoints：
+      - `GET /api/payment/priority-report?includeLow=true`
+      - `POST /api/payment/allocation-suggest`（body: `{ availableBudget, asOf? }`）
+    - Zod 驗證 + 整合測試使用 `vi.mock` 隔離 service，不依賴 DB
+    - 路由覆蓋率 100% (Stmts/Funcs/Lines)
+  - **前端頁面** `/cash-allocation`：
+    - `client/src/pages/cash-allocation.tsx`（383 行）
+    - 表單輸入可動用金額 → 呼叫 `POST /api/payment/allocation-suggest`
+    - 摘要卡：可動用金額 / 必須支付 / 可延後 + 缺口/餘額警示
+    - 依 urgency 分 4 群顯示（critical/high/medium/low）
+    - 每筆項目顯示：到期日、滯納金累積、每日新增滯納金、原因說明
+    - 響應式設計（手機 + 桌面）
+    - 掛載至 App.tsx 路由 `/cash-allocation`
+- [x] **第 4 步：首頁今日焦點改版（破解逃避心理）**
+  - 新增 `client/src/components/today-focus-card.tsx`（473 行，獨立可重用元件）
+  - 嵌入 `client/src/pages/payment-home.tsx` 頂部（「快速動作區」之後）
+  - 核心互動：
+    - 預設只顯示 1 件事（最該付的）
+    - 「✅ 已付款」→ Dialog 確認日期 → 標記為已付 → 自動顯示下一件
+    - 「⏰ 晚點再看」→ 本 session 內跳過，可復原
+    - 漸進揭露：本日（critical）→ 本週（+high）→ 本月（+medium）→ 全部（+low）
+  - 明示拖延成本：每筆顯示「已產生滯納金 + 每拖一天再多 $XXX」
+  - 呼叫既有 API：`POST /api/payment/records`（和 quick-payment 相同模式）
+  - 空狀態：逐層顯示成就感文案
+- [x] **第 5 步：勞健保滯納金監控（全部完成）**
+  - 5a：`shared/late-fee-tracker.ts`（229 行）+ 35 個單元測試
+    - `isLaborInsurance`、`calculateUnpaidLateFee`、`calculatePaidLateFee`
+    - `aggregateAnnualLoss`、`getReminderLevel`（20/25/28 三層）
+  - 5a：`server/services/late-fee.service.ts`（247 行，DI）
+    - 純函式 + 注入式 + 公開 API
+  - 5b：**`server/routes/late-fee.ts`**（65 行，API endpoints）
+    - `GET /api/late-fee/annual-loss?year=YYYY` — 年度損失報告
+    - `GET /api/late-fee/reminder-status` — 今日提醒狀態
+    - Zod 驗證 year 範圍 2000-2100
+  - 5b：`tests/integration/late-fee.test.ts`（12 個整合測試）
+  - 5b：掛載至 `server/routes/index.ts`
+  - 5c：`client/src/pages/labor-insurance-watch.tsx`（前端儀表頁）+ App.tsx 路由 → **第 5 步全部完成**
+- [~] **第 6 步：LINE 雙向互動（純函式完成，webhook 待 token）**
+  - `shared/line-bot-utils.ts`：每日推播訊息建構 + 回覆解析（1 / 1 延 3 / help）
+  - 21 個單元測試全通過
+  - webhook route 需 `LINE_BOT_CHANNEL_ACCESS_TOKEN`，等使用者提供後補上
+- [x] **第 7 步：租金月度矩陣（全部完成）**
+  - `shared/rental-matrix.ts` + 12 單元測試
+  - `server/routes/rental-matrix.ts`：GET /api/rental-matrix?year=YYYY
+  - `client/src/pages/rental-matrix.tsx`：合約×12月份表格（5 狀態色碼）
+  - 掛載至 App.tsx 路由 `/rental-matrix`
+  - payments mapping 骨架（下階段由 rental 模組補精確付款來源）
+- [x] **第 8 步：批次建立與複製（完成）**
+  - `server/routes/rental-batch.ts`：月度 preview + 批次標記已付（交易保護）
+  - rental-matrix 頁面加「本月全部已付」按鈕 + 確認 Dialog
+  - 一鍵處理所有本月租金類別項目（含金額預覽）
+  - 「複製上月」與「整年建立」功能留後續迭代（核心痛點已解決）
+- [x] **第 9 步：現金流決策中心（全部完成）**
+  - `shared/revenue-forecaster.ts` + 11 單元測試
+  - `server/routes/cashflow-forecast.ts`：GET /api/cashflow/forecast?monthsAhead=6
+  - `client/src/pages/cashflow-decision-center.tsx`：月度卡片 + 缺口警示 + 信心度 + 行動建議
+  - 可切換預估範圍 3/6/12 月
+- [x] **第 10 步：收據自動對應（全部完成）**
+  - `shared/receipt-matcher.ts` + 11 單元測試
+  - `server/routes/receipt-match.ts`：POST /api/receipt-match/suggest
+  - `client/src/pages/receipt-match-helper.tsx`：輸入收據 → 顯示匹配建議 → 一鍵標記已付
+  - 掛載 `/receipt-match-helper`
+
+---
+
+## 🎯 規劃完成總結
+
+- 第 1-5 步：完全完成
+- 第 6 步：LINE 訊息 builder + 回覆解析完成（webhook 等 token）
+- 第 7-10 步：完全完成
+- 剩餘：第 6 步 webhook route（提供 `LINE_BOT_CHANNEL_ACCESS_TOKEN` 後即可上線）
+
+---
+
+## 先前階段：手機端 UX 優化
 
 ### 已完成
 - [x] Replit → 本地環境遷移（PostgreSQL、檔案儲存、Vite 設定）

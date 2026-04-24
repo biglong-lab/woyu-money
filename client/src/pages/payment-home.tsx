@@ -6,11 +6,11 @@
  * 3. 本月摘要
  * 4. 最近動態
  */
-import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
+import { useQuery } from "@tanstack/react-query"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Badge } from "@/components/ui/badge"
 import {
   DollarSign,
   CheckCircle2,
@@ -26,206 +26,201 @@ import {
   FileText,
   Inbox,
   Loader2,
-} from "lucide-react";
-import { Link } from "wouter";
-import { useState, useMemo, useCallback } from "react";
-import type { PaymentItem, PaymentRecord, PaymentSchedule } from "@shared/schema";
-import { QuickAddDrawer, useQuickCameraUpload } from "@/components/quick-add-drawer";
-import { QuickPaymentDialog } from "@/components/quick-payment-dialog";
+} from "lucide-react"
+import { Link } from "wouter"
+import { useState, useMemo, useCallback } from "react"
+import type { PaymentItem, PaymentRecord, PaymentSchedule } from "@shared/schema"
+import { QuickAddDrawer, useQuickCameraUpload } from "@/components/quick-add-drawer"
+import { QuickPaymentDialog } from "@/components/quick-payment-dialog"
+import { TodayFocusCard } from "@/components/today-focus-card"
 
 /** API 回傳的付款項目（含關聯專案名） */
 interface PaymentItemWithProject extends PaymentItem {
-  projectName?: string;
+  projectName?: string
 }
 
 /** API 回傳的專案統計摘要 */
 interface ProjectStatsOverall {
-  totalPlanned?: string | number;
-  totalPaid?: string | number;
-  totalUnpaid?: string | number;
+  totalPlanned?: string | number
+  totalPaid?: string | number
+  totalUnpaid?: string | number
 }
 
 /** API 回傳的單一專案統計 */
 interface ProjectStatItem {
-  id: number;
-  projectName?: string;
-  projectType?: string;
-  completionRate?: number;
-  totalPaid?: string | number;
-  totalPlanned?: string | number;
+  id: number
+  projectName?: string
+  projectType?: string
+  completionRate?: number
+  totalPaid?: string | number
+  totalPlanned?: string | number
 }
 
 /** API 回傳的專案統計資料結構 */
 interface ProjectStatsResponse {
-  projects?: ProjectStatItem[];
+  projects?: ProjectStatItem[]
 }
 
 /** API 回傳的排程（含關聯名稱） */
 interface ScheduleWithNames extends PaymentSchedule {
-  itemName?: string;
-  projectName?: string;
+  itemName?: string
+  projectName?: string
 }
 
 /** API 回傳的付款記錄（含關聯名稱） */
 interface RecordWithNames extends PaymentRecord {
-  itemName?: string;
-  projectName?: string;
-  amount?: string;
+  itemName?: string
+  projectName?: string
+  amount?: string
 }
 
 /** 緊急待辦項目（帶到期日與天數差） */
 interface UrgentItem extends PaymentItemWithProject {
-  dueDate: Date;
-  diffDays: number;
+  dueDate: Date
+  diffDays: number
 }
 
 /** 單據收件箱統計 */
 interface InboxStats {
-  pending?: number;
-  processing?: number;
-  recognized?: number;
-  total?: number;
+  pending?: number
+  processing?: number
+  recognized?: number
+  total?: number
 }
 
 export default function PaymentHome() {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [showQuickAdd, setShowQuickAdd] = useState(false);
-  const [showQuickPay, setShowQuickPay] = useState(false);
-  const { openCamera, isUploading } = useQuickCameraUpload();
+  const [searchQuery, setSearchQuery] = useState("")
+  const [showQuickAdd, setShowQuickAdd] = useState(false)
+  const [showQuickPay, setShowQuickPay] = useState(false)
+  const { openCamera, isUploading } = useQuickCameraUpload()
 
   // API 查詢
   const { data: overallStats } = useQuery({
     queryKey: ["/api/payment/project/stats"],
-  });
+  })
 
   const { data: paymentItems } = useQuery({
     queryKey: ["/api/payment/items"],
-  });
+  })
 
   const { data: projectStatsData } = useQuery({
     queryKey: ["/api/payment/projects/stats"],
-  });
+  })
 
   const { data: recentRecords } = useQuery({
     queryKey: ["/api/payment/records"],
     select: (data: RecordWithNames[]) => (Array.isArray(data) ? data.slice(0, 5) : []),
-  });
+  })
 
   const { data: scheduleData } = useQuery({
     queryKey: ["/api/payment-schedules"],
-  });
+  })
 
   const { data: inboxStats } = useQuery<InboxStats>({
     queryKey: ["/api/document-inbox/stats"],
-  });
+  })
 
   // 安全的資料取出
-  const stats = (overallStats as ProjectStatsOverall) || {};
-  const items: PaymentItemWithProject[] = Array.isArray(paymentItems) ? paymentItems : [];
-  const projectStatsTyped = projectStatsData as ProjectStatsResponse | undefined;
+  const stats = (overallStats as ProjectStatsOverall) || {}
+  const items: PaymentItemWithProject[] = Array.isArray(paymentItems) ? paymentItems : []
+  const projectStatsTyped = projectStatsData as ProjectStatsResponse | undefined
   const projectStats: ProjectStatItem[] = Array.isArray(projectStatsTyped?.projects)
     ? projectStatsTyped.projects
-    : [];
-  const schedules: ScheduleWithNames[] = Array.isArray(scheduleData) ? scheduleData : [];
-  const pendingDocs = (inboxStats?.pending || 0) + (inboxStats?.recognized || 0);
+    : []
+  const schedules: ScheduleWithNames[] = Array.isArray(scheduleData) ? scheduleData : []
+  const pendingDocs = (inboxStats?.pending || 0) + (inboxStats?.recognized || 0)
 
   // 格式化函數
   const formatCurrency = useCallback((value: string | number | null | undefined) => {
-    const num = parseFloat(String(value || "0"));
-    return isNaN(num) ? "0" : Math.round(num).toLocaleString();
-  }, []);
+    const num = parseFloat(String(value || "0"))
+    return isNaN(num) ? "0" : Math.round(num).toLocaleString()
+  }, [])
 
   // 計算緊急待辦（逾期 + 3日內到期）
   const urgentItems = useMemo(() => {
-    const now = new Date();
-    const threeDaysLater = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
+    const now = new Date()
+    const threeDaysLater = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000)
 
     return items
       .filter((item: PaymentItemWithProject) => {
-        if (item.isDeleted || item.status === "completed") return false;
-        const paid = parseFloat(item.paidAmount || "0");
-        const total = parseFloat(item.totalAmount || "0");
-        if (paid >= total) return false;
+        if (item.isDeleted || item.status === "completed") return false
+        const paid = parseFloat(item.paidAmount || "0")
+        const total = parseFloat(item.totalAmount || "0")
+        if (paid >= total) return false
 
         const dueDate = item.endDate
           ? new Date(item.endDate)
           : item.startDate
-          ? new Date(item.startDate)
-          : null;
-        if (!dueDate) return false;
+            ? new Date(item.startDate)
+            : null
+        if (!dueDate) return false
 
-        return dueDate <= threeDaysLater;
+        return dueDate <= threeDaysLater
       })
       .map((item: PaymentItemWithProject) => {
-        const dueDate = item.endDate
-          ? new Date(item.endDate)
-          : new Date(item.startDate);
-        const diffDays = Math.ceil(
-          (dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
-        );
-        return { ...item, dueDate, diffDays } as UrgentItem;
+        const dueDate = item.endDate ? new Date(item.endDate) : new Date(item.startDate)
+        const diffDays = Math.ceil((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+        return { ...item, dueDate, diffDays } as UrgentItem
       })
       .sort((a: UrgentItem, b: UrgentItem) => a.diffDays - b.diffDays)
-      .slice(0, 5);
-  }, [items]);
+      .slice(0, 5)
+  }, [items])
 
   // 本月摘要
   const monthlySummary = useMemo(() => {
-    const now = new Date();
-    const currentMonth = now.getMonth();
-    const currentYear = now.getFullYear();
+    const now = new Date()
+    const currentMonth = now.getMonth()
+    const currentYear = now.getFullYear()
 
     const thisMonthItems = items.filter((item: PaymentItemWithProject) => {
-      if (!item?.startDate) return false;
-      const d = new Date(item.startDate);
-      return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
-    });
+      if (!item?.startDate) return false
+      const d = new Date(item.startDate)
+      return d.getMonth() === currentMonth && d.getFullYear() === currentYear
+    })
 
     const totalDue = thisMonthItems.reduce(
       (sum: number, item: PaymentItemWithProject) => sum + parseFloat(item.totalAmount || "0"),
       0
-    );
+    )
     const totalPaid = thisMonthItems.reduce(
       (sum: number, item: PaymentItemWithProject) => sum + parseFloat(item.paidAmount || "0"),
       0
-    );
+    )
 
     return {
       totalDue,
       totalPaid,
       remaining: totalDue - totalPaid,
       itemCount: thisMonthItems.length,
-    };
-  }, [items]);
+    }
+  }, [items])
 
   // 近期排程時間線
   const upcomingSchedules = useMemo(() => {
-    const now = new Date();
+    const now = new Date()
     return schedules
       .filter((s: ScheduleWithNames) => {
-        const d = new Date(s.scheduledDate);
-        return d >= now && s.status !== "completed";
+        const d = new Date(s.scheduledDate)
+        return d >= now && s.status !== "completed"
       })
       .sort(
         (a: ScheduleWithNames, b: ScheduleWithNames) =>
-          new Date(a.scheduledDate).getTime() -
-          new Date(b.scheduledDate).getTime()
+          new Date(a.scheduledDate).getTime() - new Date(b.scheduledDate).getTime()
       )
-      .slice(0, 6);
-  }, [schedules]);
+      .slice(0, 6)
+  }, [schedules])
 
   // 全域搜尋
   const searchResults = useMemo(() => {
-    if (!searchQuery.trim()) return [];
-    const q = searchQuery.toLowerCase();
+    if (!searchQuery.trim()) return []
+    const q = searchQuery.toLowerCase()
     return items
       .filter(
         (item: PaymentItemWithProject) =>
-          item.itemName?.toLowerCase().includes(q) ||
-          item.projectName?.toLowerCase().includes(q)
+          item.itemName?.toLowerCase().includes(q) || item.projectName?.toLowerCase().includes(q)
       )
-      .slice(0, 5);
-  }, [items, searchQuery]);
+      .slice(0, 5)
+  }, [items, searchQuery])
 
   const getDueBadge = (diffDays: number) => {
     if (diffDays < 0) {
@@ -233,27 +228,24 @@ export default function PaymentHome() {
         <Badge variant="destructive" className="text-xs">
           逾期 {Math.abs(diffDays)} 天
         </Badge>
-      );
+      )
     }
     if (diffDays === 0) {
       return (
         <Badge variant="destructive" className="text-xs">
           今日到期
         </Badge>
-      );
+      )
     }
     return (
-      <Badge
-        variant="outline"
-        className="text-xs border-orange-300 text-orange-700 bg-orange-50"
-      >
+      <Badge variant="outline" className="text-xs border-orange-300 text-orange-700 bg-orange-50">
         {diffDays} 天後到期
       </Badge>
-    );
-  };
+    )
+  }
 
   // 待處理總數（緊急 + 待歸檔單據）
-  const totalPending = urgentItems.length + pendingDocs;
+  const totalPending = urgentItems.length + pendingDocs
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -261,9 +253,7 @@ export default function PaymentHome() {
       <div>
         <div className="flex items-end justify-between mb-3">
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
-              浯島財務
-            </h1>
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900">浯島財務</h1>
             <p className="text-xs sm:text-sm text-gray-500">
               {new Date().toLocaleDateString("zh-TW", {
                 month: "long",
@@ -291,9 +281,7 @@ export default function PaymentHome() {
             ) : (
               <Camera className="w-8 h-8" />
             )}
-            <span className="text-sm font-semibold">
-              {isUploading ? "上傳中..." : "拍單據"}
-            </span>
+            <span className="text-sm font-semibold">{isUploading ? "上傳中..." : "拍單據"}</span>
           </button>
           <button
             onClick={() => setShowQuickAdd(true)}
@@ -327,19 +315,11 @@ export default function PaymentHome() {
         {searchResults.length > 0 && (
           <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-30 max-h-[250px] overflow-y-auto">
             {searchResults.map((item: PaymentItemWithProject) => (
-              <Link
-                key={item.id}
-                href="/payment-records"
-                onClick={() => setSearchQuery("")}
-              >
+              <Link key={item.id} href="/payment-records" onClick={() => setSearchQuery("")}>
                 <div className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 border-b border-gray-50">
                   <div>
-                    <p className="text-sm font-medium text-gray-900">
-                      {item.itemName}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {item.projectName || "無專案"}
-                    </p>
+                    <p className="text-sm font-medium text-gray-900">{item.itemName}</p>
+                    <p className="text-xs text-gray-500">{item.projectName || "無專案"}</p>
                   </div>
                   <span className="text-sm font-semibold text-gray-700">
                     ${formatCurrency(item.totalAmount)}
@@ -351,12 +331,13 @@ export default function PaymentHome() {
         )}
       </div>
 
+      {/* ===== 今日焦點（破解「看到欠款就逃避」的惡性循環）===== */}
+      <TodayFocusCard />
+
       {/* ===== 待處理區（可直接操作）===== */}
       {(urgentItems.length > 0 || pendingDocs > 0) && (
         <div className="space-y-3">
-          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
-            待處理
-          </h2>
+          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">待處理</h2>
 
           {/* 待歸檔單據提示 */}
           {pendingDocs > 0 && (
@@ -371,9 +352,7 @@ export default function PaymentHome() {
                       <p className="text-sm font-medium text-purple-900">
                         {pendingDocs} 張單據待處理
                       </p>
-                      <p className="text-xs text-purple-600">
-                        點擊查看並歸檔
-                      </p>
+                      <p className="text-xs text-purple-600">點擊查看並歸檔</p>
                     </div>
                   </div>
                   <ArrowRight className="w-4 h-4 text-purple-400" />
@@ -385,8 +364,7 @@ export default function PaymentHome() {
           {/* 緊急付款項目 — 可直接點擊付款 */}
           {urgentItems.map((item: UrgentItem) => {
             const remaining =
-              parseFloat(item.totalAmount || "0") -
-              parseFloat(item.paidAmount || "0");
+              parseFloat(item.totalAmount || "0") - parseFloat(item.paidAmount || "0")
             return (
               <Card
                 key={item.id}
@@ -402,8 +380,7 @@ export default function PaymentHome() {
                         {getDueBadge(item.diffDays)}
                       </div>
                       <p className="text-xs text-gray-500 mt-0.5">
-                        {item.projectName || "無專案"} · 待付 $
-                        {formatCurrency(remaining)}
+                        {item.projectName || "無專案"} · 待付 ${formatCurrency(remaining)}
                       </p>
                     </div>
                     <Button
@@ -416,7 +393,7 @@ export default function PaymentHome() {
                   </div>
                 </CardContent>
               </Card>
-            );
+            )
           })}
         </div>
       )}
@@ -426,9 +403,7 @@ export default function PaymentHome() {
         <CardContent className="p-4">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-semibold text-gray-700">本月摘要</h3>
-            <span className="text-xs text-gray-400">
-              {monthlySummary.itemCount} 筆項目
-            </span>
+            <span className="text-xs text-gray-400">{monthlySummary.itemCount} 筆項目</span>
           </div>
           <div className="grid grid-cols-3 gap-3">
             <div className="text-center p-2 bg-blue-50 rounded-xl">
@@ -458,10 +433,7 @@ export default function PaymentHome() {
                 style={{
                   width: `${
                     monthlySummary.totalDue > 0
-                      ? Math.min(
-                          (monthlySummary.totalPaid / monthlySummary.totalDue) * 100,
-                          100
-                        )
+                      ? Math.min((monthlySummary.totalPaid / monthlySummary.totalDue) * 100, 100)
                       : 0
                   }%`,
                 }}
@@ -493,9 +465,7 @@ export default function PaymentHome() {
             </div>
             <div>
               <p className="text-[10px] text-gray-500">已完成</p>
-              <p className="text-sm font-bold text-gray-900">
-                ${formatCurrency(stats.totalPaid)}
-              </p>
+              <p className="text-sm font-bold text-gray-900">${formatCurrency(stats.totalPaid)}</p>
             </div>
           </div>
         </Card>
@@ -519,9 +489,7 @@ export default function PaymentHome() {
             </div>
             <div>
               <p className="text-[10px] text-gray-500">專案數</p>
-              <p className="text-sm font-bold text-gray-900">
-                {projectStats.length}
-              </p>
+              <p className="text-sm font-bold text-gray-900">{projectStats.length}</p>
             </div>
           </div>
         </Card>
@@ -546,7 +514,10 @@ export default function PaymentHome() {
           <CardContent className="px-4 pb-4">
             <div className="space-y-2">
               {upcomingSchedules.map((schedule: ScheduleWithNames) => (
-                <div key={schedule.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-gray-50">
+                <div
+                  key={schedule.id}
+                  className="flex items-center justify-between p-2 rounded-lg hover:bg-gray-50"
+                >
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
                       <span className="text-xs font-medium text-blue-700">
@@ -558,10 +529,10 @@ export default function PaymentHome() {
                         {schedule.itemName || "付款項目"}
                       </p>
                       <p className="text-xs text-gray-500">
-                        {new Date(schedule.scheduledDate).toLocaleDateString(
-                          "zh-TW",
-                          { month: "short", day: "numeric" }
-                        )}
+                        {new Date(schedule.scheduledDate).toLocaleDateString("zh-TW", {
+                          month: "short",
+                          day: "numeric",
+                        })}
                         {schedule.projectName ? ` · ${schedule.projectName}` : ""}
                       </p>
                     </div>
@@ -591,7 +562,7 @@ export default function PaymentHome() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
             {projectStats.slice(0, 6).map((project: ProjectStatItem) => {
-              const rate = Math.min(project.completionRate || 0, 100);
+              const rate = Math.min(project.completionRate || 0, 100)
               return (
                 <Card key={project.id} className="hover:shadow-md transition-shadow">
                   <CardContent className="p-3">
@@ -606,9 +577,7 @@ export default function PaymentHome() {
                           {project.projectName || "未命名"}
                         </span>
                       </div>
-                      <span className="text-xs text-blue-600 font-medium">
-                        {rate}%
-                      </span>
+                      <span className="text-xs text-blue-600 font-medium">{rate}%</span>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-1.5 mb-2">
                       <div
@@ -622,7 +591,7 @@ export default function PaymentHome() {
                     </div>
                   </CardContent>
                 </Card>
-              );
+              )
             })}
           </div>
         </div>
@@ -671,5 +640,5 @@ export default function PaymentHome() {
       <QuickAddDrawer open={showQuickAdd} onOpenChange={setShowQuickAdd} />
       <QuickPaymentDialog open={showQuickPay} onOpenChange={setShowQuickPay} />
     </div>
-  );
+  )
 }

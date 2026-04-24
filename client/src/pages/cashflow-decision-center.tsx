@@ -1,0 +1,198 @@
+/**
+ * 現金流決策中心（第 9 步）
+ * 未來 3~6 個月收支預估 + 缺口警示 + 行動建議
+ */
+
+import { useState } from "react"
+import { useQuery } from "@tanstack/react-query"
+import { TrendingUp, AlertTriangle, CheckCircle2, Calendar } from "lucide-react"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+
+type Basis = "last_year_same_month" | "recent_average" | "overall_average" | "no_data"
+type Confidence = "high" | "medium" | "low"
+
+interface ForecastMonth {
+  year: number
+  month: number
+  estimated: number
+  basis: Basis
+  confidence: Confidence
+}
+
+interface GapItem {
+  year: number
+  month: number
+  estimatedIncome: number
+  estimatedExpense: number
+  net: number
+  gap?: number
+  recommendation?: string
+}
+
+interface ForecastResponse {
+  generatedAt: string
+  monthsAhead: number
+  forecast: {
+    months: ForecastMonth[]
+    trend: { growthRate: number; recentAvg: number; lastYearAvg: number }
+  }
+  gapAnalysis: GapItem[]
+  hasShortage: boolean
+}
+
+function fmt(n: number): string {
+  return `NT$ ${Math.round(n).toLocaleString()}`
+}
+
+const CONFIDENCE_META: Record<Confidence, { label: string; color: string }> = {
+  high: { label: "高信心", color: "bg-green-100 text-green-800" },
+  medium: { label: "中信心", color: "bg-yellow-100 text-yellow-800" },
+  low: { label: "低信心", color: "bg-gray-100 text-gray-700" },
+}
+
+const BASIS_LABEL: Record<Basis, string> = {
+  last_year_same_month: "去年同月 × 成長率",
+  recent_average: "近期平均",
+  overall_average: "整體平均",
+  no_data: "無歷史資料",
+}
+
+function MonthCard({ forecast, gap }: { forecast: ForecastMonth; gap: GapItem }) {
+  const hasGap = gap.gap !== undefined && gap.gap > 0
+  const cls = hasGap ? "border-red-300 bg-red-50" : "border-green-200 bg-green-50"
+  const conf = CONFIDENCE_META[forecast.confidence]
+  return (
+    <div className={`rounded-lg border-l-4 p-3 ${cls}`}>
+      <div className="flex items-center justify-between mb-2">
+        <div className="font-semibold text-sm">
+          {forecast.year}/{String(forecast.month).padStart(2, "0")}
+        </div>
+        <Badge className={`text-xs ${conf.color}`} variant="outline">
+          {conf.label}
+        </Badge>
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
+        <div>
+          <div className="text-gray-500">預估收入</div>
+          <div className="font-semibold text-green-700">{fmt(gap.estimatedIncome)}</div>
+        </div>
+        <div>
+          <div className="text-gray-500">預估支出</div>
+          <div className="font-semibold text-red-700">{fmt(gap.estimatedExpense)}</div>
+        </div>
+        <div>
+          <div className="text-gray-500">淨額</div>
+          <div className={`font-bold ${gap.net >= 0 ? "text-gray-900" : "text-red-700"}`}>
+            {fmt(gap.net)}
+          </div>
+        </div>
+      </div>
+      <div className="mt-2 text-xs text-gray-500">來源：{BASIS_LABEL[forecast.basis]}</div>
+      {hasGap && gap.recommendation && (
+        <div className="mt-2 flex items-start gap-2 text-xs text-red-800 bg-red-100 rounded p-2">
+          <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+          <div>
+            <div className="font-semibold">缺口 {fmt(gap.gap ?? 0)}</div>
+            <div>{gap.recommendation}</div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+export default function CashflowDecisionCenterPage() {
+  const [monthsAhead, setMonthsAhead] = useState(6)
+  const { data, isLoading } = useQuery<ForecastResponse>({
+    queryKey: [`/api/cashflow/forecast?monthsAhead=${monthsAhead}`],
+  })
+
+  return (
+    <div className="space-y-4 sm:space-y-6">
+      <div>
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 flex items-center gap-2">
+          <TrendingUp className="h-7 w-7 text-blue-600" />
+          現金流決策中心
+        </h1>
+        <p className="mt-1 text-sm text-gray-600">
+          基於歷史營收推算未來 {monthsAhead} 月現金流，讓你提前規劃資金調度
+        </p>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div>
+              <CardTitle className="text-base sm:text-lg">未來 {monthsAhead} 月預估</CardTitle>
+              {data && (
+                <CardDescription className="text-xs">
+                  成長趨勢：
+                  {data.forecast.trend.growthRate >= 0 ? "+" : ""}
+                  {(data.forecast.trend.growthRate * 100).toFixed(1)}% / 近期月均{" "}
+                  {fmt(data.forecast.trend.recentAvg)}
+                </CardDescription>
+              )}
+            </div>
+            <div className="flex gap-1">
+              {[3, 6, 12].map((n) => (
+                <Button
+                  key={n}
+                  variant={n === monthsAhead ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setMonthsAhead(n)}
+                  className="text-xs"
+                >
+                  {n} 月
+                </Button>
+              ))}
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {isLoading && <div className="text-sm text-gray-500">載入中...</div>}
+          {data && data.hasShortage && (
+            <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded p-3 text-sm text-red-800">
+              <AlertTriangle className="h-5 w-5 shrink-0 mt-0.5" />
+              <div>
+                <div className="font-semibold">偵測到未來月份有現金缺口</div>
+                <div className="text-xs mt-0.5">請檢視紅色月份的行動建議，儘早準備資金。</div>
+              </div>
+            </div>
+          )}
+          {data && !data.hasShortage && (
+            <div className="flex items-start gap-2 bg-green-50 border border-green-200 rounded p-3 text-sm text-green-800">
+              <CheckCircle2 className="h-5 w-5 shrink-0 mt-0.5" />
+              <div className="font-semibold">預估收入足以覆蓋所有支出，現金流健康</div>
+            </div>
+          )}
+          {data && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {data.forecast.months.map((f, i) => (
+                <MonthCard key={`${f.year}-${f.month}`} forecast={f} gap={data.gapAnalysis[i]} />
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="bg-gray-50 border-dashed">
+        <CardContent className="pt-6 text-xs text-gray-600 space-y-1">
+          <div className="flex items-center gap-2">
+            <Calendar className="h-4 w-4" />
+            <span>高信心：有去年同月資料可對比（旺淡季已納入考量）</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Calendar className="h-4 w-4" />
+            <span>中信心：僅近期 3 個月平均可參考</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Calendar className="h-4 w-4" />
+            <span>低信心：資料不足，建議至少累積一年歷史再決策</span>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
