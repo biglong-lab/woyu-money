@@ -2,105 +2,96 @@
  * QuickPaymentDialog - 快速付款對話框
  * 3 步驟完成付款：搜尋項目 → 確認金額 → 完成
  */
-import { useState, useMemo } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
+import { useState, useMemo } from "react"
+import { useQuery, useMutation } from "@tanstack/react-query"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
+import { Label } from "@/components/ui/label"
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-import {
-  Search,
-  DollarSign,
-  CheckCircle2,
-  ArrowRight,
-  Loader2,
-} from "lucide-react";
+} from "@/components/ui/select"
+import { useToast } from "@/hooks/use-toast"
+import { apiRequest, queryClient } from "@/lib/queryClient"
+import { localDateISO } from "@/lib/utils"
+import { Search, DollarSign, CheckCircle2, ArrowRight, Loader2 } from "lucide-react"
 
 interface QuickPaymentDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
+  open: boolean
+  onOpenChange: (open: boolean) => void
 }
 
-type Step = "search" | "confirm" | "done";
+type Step = "search" | "confirm" | "done"
 
 // 付款項目型別（包含 JOIN 欄位）
 interface PaymentItemWithDetails {
-  id: number;
-  itemName: string;
-  totalAmount: string;
-  paidAmount: string;
-  status: string;
-  isDeleted: boolean;
-  projectName?: string;
-  categoryName?: string;
+  id: number
+  itemName: string
+  totalAmount: string
+  paidAmount: string
+  status: string
+  isDeleted: boolean
+  projectName?: string
+  categoryName?: string
 }
 
 // API 回應型別
 interface PaymentItemsResponse {
-  items?: PaymentItemWithDetails[];
+  items?: PaymentItemWithDetails[]
 }
 
 // 付款表單資料
 interface PaymentFormData {
-  itemId: number;
-  amountPaid: string;
-  paymentDate: string;
-  paymentMethod: string;
+  itemId: number
+  amountPaid: string
+  paymentDate: string
+  paymentMethod: string
 }
 
 export function QuickPaymentDialog({ open, onOpenChange }: QuickPaymentDialogProps) {
-  const { toast } = useToast();
-  const [step, setStep] = useState<Step>("search");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedItem, setSelectedItem] = useState<PaymentItemWithDetails | null>(null);
-  const [amount, setAmount] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState("bank_transfer");
-  const [paymentDate, setPaymentDate] = useState(
-    new Date().toISOString().split("T")[0]
-  );
+  const { toast } = useToast()
+  const [step, setStep] = useState<Step>("search")
+  const [searchQuery, setSearchQuery] = useState("")
+  const [selectedItem, setSelectedItem] = useState<PaymentItemWithDetails | null>(null)
+  const [amount, setAmount] = useState("")
+  const [paymentMethod, setPaymentMethod] = useState("bank_transfer")
+  const [paymentDate, setPaymentDate] = useState(localDateISO())
 
   // 查詢所有付款項目（使用 includeAll 取得完整陣列）
-  const { data: paymentItemsData, isLoading } = useQuery<PaymentItemsResponse | PaymentItemWithDetails[]>({
+  const { data: paymentItemsData, isLoading } = useQuery<
+    PaymentItemsResponse | PaymentItemWithDetails[]
+  >({
     queryKey: ["/api/payment/items?includeAll=true"],
     enabled: open,
-  });
+  })
 
   // 處理 API 回傳格式（可能是陣列或物件）
   const paymentItems = Array.isArray(paymentItemsData)
     ? paymentItemsData
-    : (paymentItemsData?.items || []);
+    : paymentItemsData?.items || []
 
   // 篩選待付款項目
   const filteredItems = useMemo(() => {
     const pendingItems = paymentItems.filter((item: PaymentItemWithDetails) => {
-      const paid = parseFloat(item.paidAmount || "0");
-      const total = parseFloat(item.totalAmount || "0");
-      return paid < total && item.status !== "completed" && !item.isDeleted;
-    });
+      const paid = parseFloat(item.paidAmount || "0")
+      const total = parseFloat(item.totalAmount || "0")
+      return paid < total && item.status !== "completed" && !item.isDeleted
+    })
 
-    if (!searchQuery.trim()) return pendingItems.slice(0, 10);
+    if (!searchQuery.trim()) return pendingItems.slice(0, 10)
 
-    const query = searchQuery.toLowerCase();
-    return pendingItems.filter((item: PaymentItemWithDetails) =>
-      item.itemName?.toLowerCase().includes(query) ||
-      item.projectName?.toLowerCase().includes(query) ||
-      item.categoryName?.toLowerCase().includes(query)
-    );
-  }, [paymentItems, searchQuery]);
+    const query = searchQuery.toLowerCase()
+    return pendingItems.filter(
+      (item: PaymentItemWithDetails) =>
+        item.itemName?.toLowerCase().includes(query) ||
+        item.projectName?.toLowerCase().includes(query) ||
+        item.categoryName?.toLowerCase().includes(query)
+    )
+  }, [paymentItems, searchQuery])
 
   // 建立付款記錄
   const paymentMutation = useMutation<unknown, Error, PaymentFormData>({
@@ -110,54 +101,54 @@ export function QuickPaymentDialog({ open, onOpenChange }: QuickPaymentDialogPro
         amountPaid: data.amountPaid,
         paymentDate: data.paymentDate,
         paymentMethod: data.paymentMethod,
-      });
+      })
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/payment/items"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/payment/records"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/payment/project/stats"] });
-      setStep("done");
+      queryClient.invalidateQueries({ queryKey: ["/api/payment/items"] })
+      queryClient.invalidateQueries({ queryKey: ["/api/payment/records"] })
+      queryClient.invalidateQueries({ queryKey: ["/api/payment/project/stats"] })
+      setStep("done")
     },
     onError: (error: Error) => {
       toast({
         title: "付款失敗",
         description: error.message,
         variant: "destructive",
-      });
+      })
     },
-  });
+  })
 
   const handleSelectItem = (item: PaymentItemWithDetails) => {
-    setSelectedItem(item);
-    const remaining = parseFloat(item.totalAmount || "0") - parseFloat(item.paidAmount || "0");
-    setAmount(remaining.toString());
-    setStep("confirm");
-  };
+    setSelectedItem(item)
+    const remaining = parseFloat(item.totalAmount || "0") - parseFloat(item.paidAmount || "0")
+    setAmount(remaining.toString())
+    setStep("confirm")
+  }
 
   const handleConfirmPayment = () => {
-    if (!selectedItem || !amount) return;
+    if (!selectedItem || !amount) return
     paymentMutation.mutate({
       itemId: selectedItem.id,
       amountPaid: amount,
       paymentDate,
       paymentMethod,
-    });
-  };
+    })
+  }
 
   const handleClose = () => {
-    setStep("search");
-    setSearchQuery("");
-    setSelectedItem(null);
-    setAmount("");
-    setPaymentMethod("bank_transfer");
-    setPaymentDate(new Date().toISOString().split("T")[0]);
-    onOpenChange(false);
-  };
+    setStep("search")
+    setSearchQuery("")
+    setSelectedItem(null)
+    setAmount("")
+    setPaymentMethod("bank_transfer")
+    setPaymentDate(localDateISO())
+    onOpenChange(false)
+  }
 
   const formatCurrency = (value: string | number) => {
-    const num = parseFloat(value?.toString() || "0");
-    return isNaN(num) ? "0" : num.toLocaleString();
-  };
+    const num = parseFloat(value?.toString() || "0")
+    return isNaN(num) ? "0" : num.toLocaleString()
+  }
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -178,15 +169,13 @@ export function QuickPaymentDialog({ open, onOpenChange }: QuickPaymentDialogPro
                   step === s
                     ? "bg-blue-600 text-white"
                     : i < ["search", "confirm", "done"].indexOf(step)
-                    ? "bg-green-100 text-green-700"
-                    : "bg-gray-100 text-gray-400"
+                      ? "bg-green-100 text-green-700"
+                      : "bg-gray-100 text-gray-400"
                 }`}
               >
                 {i + 1}
               </div>
-              {i < 2 && (
-                <ArrowRight className="w-4 h-4 text-gray-300" />
-              )}
+              {i < 2 && <ArrowRight className="w-4 h-4 text-gray-300" />}
             </div>
           ))}
         </div>
@@ -213,8 +202,7 @@ export function QuickPaymentDialog({ open, onOpenChange }: QuickPaymentDialogPro
               ) : filteredItems.length > 0 ? (
                 filteredItems.map((item: PaymentItemWithDetails) => {
                   const remaining =
-                    parseFloat(item.totalAmount || "0") -
-                    parseFloat(item.paidAmount || "0");
+                    parseFloat(item.totalAmount || "0") - parseFloat(item.paidAmount || "0")
                   return (
                     <button
                       key={item.id}
@@ -223,9 +211,7 @@ export function QuickPaymentDialog({ open, onOpenChange }: QuickPaymentDialogPro
                     >
                       <div className="flex justify-between items-start">
                         <div className="min-w-0">
-                          <p className="font-medium text-gray-900 truncate">
-                            {item.itemName}
-                          </p>
+                          <p className="font-medium text-gray-900 truncate">{item.itemName}</p>
                           <p className="text-xs text-gray-500 mt-0.5">
                             {item.projectName || "無專案"}
                             {item.categoryName ? ` / ${item.categoryName}` : ""}
@@ -239,7 +225,7 @@ export function QuickPaymentDialog({ open, onOpenChange }: QuickPaymentDialogPro
                         </div>
                       </div>
                     </button>
-                  );
+                  )
                 })
               ) : (
                 <div className="text-center py-8 text-gray-400">
@@ -265,9 +251,7 @@ export function QuickPaymentDialog({ open, onOpenChange }: QuickPaymentDialogPro
               <div>
                 <Label htmlFor="amount">付款金額</Label>
                 <div className="relative mt-1">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-                    $
-                  </span>
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">$</span>
                   <Input
                     id="amount"
                     type="number"
@@ -308,11 +292,7 @@ export function QuickPaymentDialog({ open, onOpenChange }: QuickPaymentDialogPro
             </div>
 
             <div className="flex gap-2">
-              <Button
-                variant="outline"
-                className="flex-1"
-                onClick={() => setStep("search")}
-              >
+              <Button variant="outline" className="flex-1" onClick={() => setStep("search")}>
                 上一步
               </Button>
               <Button
@@ -348,7 +328,7 @@ export function QuickPaymentDialog({ open, onOpenChange }: QuickPaymentDialogPro
         )}
       </DialogContent>
     </Dialog>
-  );
+  )
 }
 
-export default QuickPaymentDialog;
+export default QuickPaymentDialog

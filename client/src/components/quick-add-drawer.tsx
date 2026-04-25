@@ -5,139 +5,134 @@
  * 2. 選擇專案和到期日（選填）
  * 3. 可附加拍照上傳單據
  */
-import { useState, useRef, useCallback } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useState, useRef, useCallback } from "react"
+import { useMutation, useQuery } from "@tanstack/react-query"
 import {
   Drawer,
   DrawerContent,
   DrawerHeader,
   DrawerTitle,
   DrawerFooter,
-} from "@/components/ui/drawer";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
+} from "@/components/ui/drawer"
+import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
+import { Label } from "@/components/ui/label"
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-import {
-  Camera,
-  CheckCircle2,
-  Loader2,
-  ImagePlus,
-  X,
-} from "lucide-react";
+} from "@/components/ui/select"
+import { useToast } from "@/hooks/use-toast"
+import { apiRequest, queryClient } from "@/lib/queryClient"
+import { localDateISO, formatNT } from "@/lib/utils"
+import { Camera, CheckCircle2, Loader2, ImagePlus, X } from "lucide-react"
 
 interface QuickAddDrawerProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
+  open: boolean
+  onOpenChange: (open: boolean) => void
 }
 
 /** 專案列表項目 */
 interface ProjectItem {
-  id: number;
-  projectName: string;
+  id: number
+  projectName: string
 }
 
 export function QuickAddDrawer({ open, onOpenChange }: QuickAddDrawerProps) {
-  const { toast } = useToast();
-  const cameraRef = useRef<HTMLInputElement>(null);
-  const [itemName, setItemName] = useState("");
-  const [totalAmount, setTotalAmount] = useState("");
-  const [projectId, setProjectId] = useState<string>("");
-  const [endDate, setEndDate] = useState("");
-  const [attachedFile, setAttachedFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [isDone, setIsDone] = useState(false);
+  const { toast } = useToast()
+  const cameraRef = useRef<HTMLInputElement>(null)
+  const [itemName, setItemName] = useState("")
+  const [totalAmount, setTotalAmount] = useState("")
+  const [projectId, setProjectId] = useState<string>("")
+  const [endDate, setEndDate] = useState("")
+  const [attachedFile, setAttachedFile] = useState<File | null>(null)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [isDone, setIsDone] = useState(false)
 
   // 查詢專案列表
   const { data: projectsData } = useQuery<ProjectItem[]>({
     queryKey: ["/api/payment/projects"],
     enabled: open,
-  });
-  const projects: ProjectItem[] = Array.isArray(projectsData) ? projectsData : [];
+  })
+  const projects: ProjectItem[] = Array.isArray(projectsData) ? projectsData : []
 
   // 建立付款項目
   const createMutation = useMutation({
     mutationFn: async () => {
-      const today = new Date().toISOString().split("T")[0];
+      const today = localDateISO()
       const payload: Record<string, unknown> = {
         itemName,
         totalAmount,
         startDate: today,
         paymentType: "single",
         itemType: "project",
-      };
-      if (projectId) payload.projectId = parseInt(projectId);
-      if (endDate) payload.endDate = endDate;
+      }
+      if (projectId) payload.projectId = parseInt(projectId)
+      if (endDate) payload.endDate = endDate
 
-      const result = await apiRequest<{ id: number }>("POST", "/api/payment/items", payload);
+      const result = await apiRequest<{ id: number }>("POST", "/api/payment/items", payload)
 
       // 如果有附加照片，上傳到單據收件箱
       if (attachedFile) {
-        const formData = new FormData();
-        formData.append("file", attachedFile);
-        formData.append("documentType", "bill");
-        formData.append("notes", `快速記帳: ${itemName}`);
-        await apiRequest("POST", "/api/document-inbox/upload", formData);
+        const formData = new FormData()
+        formData.append("file", attachedFile)
+        formData.append("documentType", "bill")
+        formData.append("notes", `快速記帳: ${itemName}`)
+        await apiRequest("POST", "/api/document-inbox/upload", formData)
       }
 
-      return result;
+      return result
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/payment/items"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/payment/project/stats"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/payment/projects/stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/payment/items"] })
+      queryClient.invalidateQueries({ queryKey: ["/api/payment/project/stats"] })
+      queryClient.invalidateQueries({ queryKey: ["/api/payment/projects/stats"] })
       if (attachedFile) {
-        queryClient.invalidateQueries({ queryKey: ["/api/document-inbox"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/document-inbox"] })
       }
-      setIsDone(true);
+      setIsDone(true)
     },
     onError: (error: Error) => {
       toast({
         title: "記帳失敗",
         description: error.message,
         variant: "destructive",
-      });
+      })
     },
-  });
+  })
 
   const handlePhotoCapture = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setAttachedFile(file);
-    setPreviewUrl(URL.createObjectURL(file));
-  }, []);
+    const file = e.target.files?.[0]
+    if (!file) return
+    setAttachedFile(file)
+    setPreviewUrl(URL.createObjectURL(file))
+  }, [])
 
   const removePhoto = useCallback(() => {
-    setAttachedFile(null);
-    if (previewUrl) URL.revokeObjectURL(previewUrl);
-    setPreviewUrl(null);
-    if (cameraRef.current) cameraRef.current.value = "";
-  }, [previewUrl]);
+    setAttachedFile(null)
+    if (previewUrl) URL.revokeObjectURL(previewUrl)
+    setPreviewUrl(null)
+    if (cameraRef.current) cameraRef.current.value = ""
+  }, [previewUrl])
 
   const handleSubmit = () => {
-    if (!itemName.trim() || !totalAmount) return;
-    createMutation.mutate();
-  };
+    if (!itemName.trim() || !totalAmount) return
+    createMutation.mutate()
+  }
 
   const handleClose = () => {
-    setItemName("");
-    setTotalAmount("");
-    setProjectId("");
-    setEndDate("");
-    removePhoto();
-    setIsDone(false);
-    onOpenChange(false);
-  };
+    setItemName("")
+    setTotalAmount("")
+    setProjectId("")
+    setEndDate("")
+    removePhoto()
+    setIsDone(false)
+    onOpenChange(false)
+  }
 
-  const canSubmit = itemName.trim().length > 0 && parseFloat(totalAmount) > 0;
+  const canSubmit = itemName.trim().length > 0 && parseFloat(totalAmount) > 0
 
   return (
     <Drawer open={open} onOpenChange={handleClose}>
@@ -151,7 +146,7 @@ export function QuickAddDrawer({ open, onOpenChange }: QuickAddDrawerProps) {
             <div className="text-center">
               <h3 className="text-lg font-semibold text-gray-900">記帳完成</h3>
               <p className="text-sm text-gray-500 mt-1">
-                已建立「{itemName}」${parseFloat(totalAmount).toLocaleString()}
+                已建立「{itemName}」{formatNT(totalAmount)}
               </p>
             </div>
             <Button onClick={handleClose} className="w-full max-w-xs">
@@ -286,7 +281,7 @@ export function QuickAddDrawer({ open, onOpenChange }: QuickAddDrawerProps) {
         )}
       </DrawerContent>
     </Drawer>
-  );
+  )
 }
 
 /**
@@ -294,52 +289,52 @@ export function QuickAddDrawer({ open, onOpenChange }: QuickAddDrawerProps) {
  * 不需要選擇文件類型，直接拍照上傳到單據收件箱
  */
 export function useQuickCameraUpload() {
-  const { toast } = useToast();
-  const cameraRef = useRef<HTMLInputElement | null>(null);
+  const { toast } = useToast()
+  const cameraRef = useRef<HTMLInputElement | null>(null)
 
   const uploadMutation = useMutation({
     mutationFn: async (file: File) => {
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("documentType", "bill");
-      formData.append("notes", "");
-      return apiRequest("POST", "/api/document-inbox/upload", formData);
+      const formData = new FormData()
+      formData.append("file", file)
+      formData.append("documentType", "bill")
+      formData.append("notes", "")
+      return apiRequest("POST", "/api/document-inbox/upload", formData)
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/document-inbox"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/document-inbox/stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/document-inbox"] })
+      queryClient.invalidateQueries({ queryKey: ["/api/document-inbox/stats"] })
       toast({
         title: "上傳成功",
         description: "單據已上傳，AI 正在辨識中...",
-      });
+      })
     },
     onError: (error: Error) => {
       toast({
         title: "上傳失敗",
         description: error.message,
         variant: "destructive",
-      });
+      })
     },
-  });
+  })
 
   const openCamera = useCallback(() => {
     // 動態建立 input 避免 DOM 殘留
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = "image/*";
-    input.capture = "environment";
+    const input = document.createElement("input")
+    input.type = "file"
+    input.accept = "image/*"
+    input.capture = "environment"
     input.onchange = (e) => {
-      const file = (e.target as HTMLInputElement).files?.[0];
-      if (file) uploadMutation.mutate(file);
-    };
-    input.click();
-    cameraRef.current = input;
-  }, [uploadMutation]);
+      const file = (e.target as HTMLInputElement).files?.[0]
+      if (file) uploadMutation.mutate(file)
+    }
+    input.click()
+    cameraRef.current = input
+  }, [uploadMutation])
 
   return {
     openCamera,
     isUploading: uploadMutation.isPending,
-  };
+  }
 }
 
-export default QuickAddDrawer;
+export default QuickAddDrawer

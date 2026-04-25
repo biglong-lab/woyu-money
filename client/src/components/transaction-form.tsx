@@ -1,110 +1,125 @@
-import { useState } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
-import { PlusIcon, MinusIcon, SaveIcon, XIcon } from "lucide-react";
-import type { DebtCategory, InsertPaymentItem, PaymentItem } from "@shared/schema";
-import { insertPaymentItemSchema } from "@shared/schema";
-import { z } from "zod";
+import { useState } from "react"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { useMutation, useQuery } from "@tanstack/react-query"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Textarea } from "@/components/ui/textarea"
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form"
+import { apiRequest, queryClient } from "@/lib/queryClient"
+import { localDateISO } from "@/lib/utils"
+import { useToast } from "@/hooks/use-toast"
+import { PlusIcon, MinusIcon, SaveIcon, XIcon } from "lucide-react"
+import type { DebtCategory, InsertPaymentItem, PaymentItem } from "@shared/schema"
+import { insertPaymentItemSchema } from "@shared/schema"
+import { z } from "zod"
 
 // 廠商型別定義
-type Vendor = { 
-  id: number; 
-  vendorName: string;
-};
-
-interface TransactionFormProps {
-  show?: boolean;
-  onClose?: () => void;
-  editingDebt?: PaymentItem;
+type Vendor = {
+  id: number
+  vendorName: string
 }
 
-export default function TransactionForm({ show = true, onClose, editingDebt }: TransactionFormProps) {
-  const [transactionType, setTransactionType] = useState<"income" | "expense">("expense");
-  const { toast } = useToast();
+interface TransactionFormProps {
+  show?: boolean
+  onClose?: () => void
+  editingDebt?: PaymentItem
+}
+
+export default function TransactionForm({
+  show = true,
+  onClose,
+  editingDebt,
+}: TransactionFormProps) {
+  const [transactionType, setTransactionType] = useState<"income" | "expense">("expense")
+  const { toast } = useToast()
 
   const { data: categories } = useQuery<DebtCategory[]>({
     queryKey: ["/api/categories"],
-  });
+  })
 
   const { data: vendors } = useQuery<Vendor[]>({
     queryKey: ["/api/vendors"],
-  });
+  })
 
   const form = useForm<z.infer<typeof insertPaymentItemSchema>>({
     resolver: zodResolver(insertPaymentItemSchema),
-    defaultValues: editingDebt ? {
-      itemName: editingDebt.itemName || "",
-      totalAmount: editingDebt.totalAmount || "",
-      categoryId: editingDebt.categoryId || undefined,
-      projectId: editingDebt.projectId || undefined,
-      notes: editingDebt.notes || "",
-      paymentType: editingDebt.paymentType || "single",
-      installmentCount: editingDebt.installmentCount || 1,
-      startDate: editingDebt.startDate ? editingDebt.startDate.split('T')[0] : new Date().toISOString().split('T')[0],
-    } : {
-      itemName: "",
-      totalAmount: "",
-      categoryId: undefined,
-      projectId: undefined,
-      notes: "",
-      paymentType: "single",
-      installmentCount: 1,
-      startDate: new Date().toISOString().split('T')[0],
-    },
-  });
+    defaultValues: editingDebt
+      ? {
+          itemName: editingDebt.itemName || "",
+          totalAmount: editingDebt.totalAmount || "",
+          categoryId: editingDebt.categoryId || undefined,
+          projectId: editingDebt.projectId || undefined,
+          notes: editingDebt.notes || "",
+          paymentType: editingDebt.paymentType || "single",
+          installmentCount: editingDebt.installmentCount || 1,
+          startDate: editingDebt.startDate ? editingDebt.startDate.split("T")[0] : localDateISO(),
+        }
+      : {
+          itemName: "",
+          totalAmount: "",
+          categoryId: undefined,
+          projectId: undefined,
+          notes: "",
+          paymentType: "single",
+          installmentCount: 1,
+          startDate: localDateISO(),
+        },
+  })
 
   const createDebtMutation = useMutation({
     mutationFn: async (data: InsertPaymentItem) => {
       if (editingDebt) {
-        return await apiRequest("PUT", `/api/debts/${editingDebt.id}`, data);
+        return await apiRequest("PUT", `/api/debts/${editingDebt.id}`, data)
       } else {
-        return await apiRequest("POST", "/api/debts", data);
+        return await apiRequest("POST", "/api/debts", data)
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/debts"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/stats/debts"] });
-      form.reset();
+      queryClient.invalidateQueries({ queryKey: ["/api/debts"] })
+      queryClient.invalidateQueries({ queryKey: ["/api/stats/debts"] })
+      form.reset()
       toast({
         title: "成功",
         description: editingDebt ? "付款項目已更新" : "付款項目已新增",
-      });
-      onClose?.();
+      })
+      onClose?.()
     },
     onError: (error: Error) => {
       toast({
         title: "錯誤",
         description: error.message || (editingDebt ? "更新付款項目失敗" : "新增付款項目失敗"),
         variant: "destructive",
-      });
+      })
     },
-  });
+  })
 
   const onSubmit = (data: InsertPaymentItem) => {
-    createDebtMutation.mutate(data);
-  };
+    createDebtMutation.mutate(data)
+  }
 
-  if (!show) return null;
+  if (!show) return null
 
   return (
     <Card className="border border-slate-200 shadow-sm">
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>{editingDebt ? "編輯付款項目" : "新增付款項目"}</CardTitle>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onClose}
-          className="h-6 w-6 p-0"
-        >
+        <Button variant="ghost" size="sm" onClick={onClose} className="h-6 w-6 p-0">
           <XIcon className="h-4 w-4" />
         </Button>
       </CardHeader>
@@ -157,13 +172,10 @@ export default function TransactionForm({ show = true, onClose, editingDebt }: T
                   <FormLabel>金額</FormLabel>
                   <FormControl>
                     <div className="relative">
-                      <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-500">NT$</span>
-                      <Input
-                        type="number"
-                        placeholder="0"
-                        className="pl-12"
-                        {...field}
-                      />
+                      <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-500">
+                        NT$
+                      </span>
+                      <Input type="number" placeholder="0" className="pl-12" {...field} />
                     </div>
                   </FormControl>
                   <FormMessage />
@@ -177,7 +189,10 @@ export default function TransactionForm({ show = true, onClose, editingDebt }: T
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>分類</FormLabel>
-                  <Select onValueChange={(value) => field.onChange(parseInt(value))} value={field.value?.toString()}>
+                  <Select
+                    onValueChange={(value) => field.onChange(parseInt(value))}
+                    value={field.value?.toString()}
+                  >
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="選擇分類" />
@@ -202,7 +217,10 @@ export default function TransactionForm({ show = true, onClose, editingDebt }: T
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>廠商/歸屬</FormLabel>
-                  <Select onValueChange={(value) => field.onChange(parseInt(value))} value={field.value?.toString()}>
+                  <Select
+                    onValueChange={(value) => field.onChange(parseInt(value))}
+                    value={field.value?.toString()}
+                  >
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="選擇廠商" />
@@ -248,11 +266,7 @@ export default function TransactionForm({ show = true, onClose, editingDebt }: T
                 <FormItem>
                   <FormLabel>到期日</FormLabel>
                   <FormControl>
-                    <Input
-                      type="date"
-                      {...field}
-                      value={field.value || ""}
-                    />
+                    <Input type="date" {...field} value={field.value || ""} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -260,12 +274,7 @@ export default function TransactionForm({ show = true, onClose, editingDebt }: T
             />
 
             <div className="flex gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                className="flex-1"
-                onClick={onClose}
-              >
+              <Button type="button" variant="outline" className="flex-1" onClick={onClose}>
                 取消
               </Button>
               <Button
@@ -281,5 +290,5 @@ export default function TransactionForm({ show = true, onClose, editingDebt }: T
         </Form>
       </CardContent>
     </Card>
-  );
+  )
 }
