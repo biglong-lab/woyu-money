@@ -8,7 +8,7 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest"
-import { cn, formatCurrency, localDateISO } from "../../client/src/lib/utils"
+import { cn, formatCurrency, formatNT, localDateISO } from "../../client/src/lib/utils"
 
 describe("cn (className merger)", () => {
   it("應合併多個 class names", () => {
@@ -41,6 +41,41 @@ describe("formatCurrency", () => {
 
   it("無效輸入應回傳 $0", () => {
     expect(formatCurrency("abc")).toBe("$0")
+  })
+})
+
+describe("formatNT (台幣格式)", () => {
+  it("整數應加千分位", () => {
+    expect(formatNT(12345)).toBe("NT$ 12,345")
+  })
+
+  it("應四捨五入小數", () => {
+    expect(formatNT(123.7)).toBe("NT$ 124")
+    expect(formatNT(123.4)).toBe("NT$ 123")
+  })
+
+  it("字串輸入應自動解析", () => {
+    expect(formatNT("12500")).toBe("NT$ 12,500")
+    expect(formatNT("12500.50")).toBe("NT$ 12,501")
+  })
+
+  it("0 應回傳 NT$ 0", () => {
+    expect(formatNT(0)).toBe("NT$ 0")
+  })
+
+  it("無效輸入應回傳 NT$ 0", () => {
+    expect(formatNT("abc")).toBe("NT$ 0")
+    expect(formatNT(null)).toBe("NT$ 0")
+    expect(formatNT(undefined)).toBe("NT$ 0")
+    expect(formatNT(NaN)).toBe("NT$ 0")
+  })
+
+  it("負數應正確顯示", () => {
+    expect(formatNT(-1500)).toBe("NT$ -1,500")
+  })
+
+  it("大數字應加多層千分位", () => {
+    expect(formatNT(1_234_567)).toBe("NT$ 1,234,567")
   })
 })
 
