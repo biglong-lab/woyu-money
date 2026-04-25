@@ -37,6 +37,7 @@ import {
 } from "@/components/ui/dialog"
 import { apiRequest, queryClient } from "@/lib/queryClient"
 import { useToast } from "@/hooks/use-toast"
+import { useCopyAmount } from "@/hooks/use-copy-amount"
 
 // ─────────────────────────────────────────────
 // 型別
@@ -438,19 +439,8 @@ export function TodayFocusCard() {
 
   const handleResetSkipped = () => setSkippedIds(new Set())
 
-  // 一鍵複製金額（給轉帳貼到網銀用）
-  const handleCopyAmount = async (amount: number, label?: string) => {
-    try {
-      await navigator.clipboard.writeText(String(Math.round(amount)))
-      toast({
-        title: "已複製金額",
-        description: label ? `${label}: ${formatCurrency(amount)}` : formatCurrency(amount),
-        duration: 1500,
-      })
-    } catch {
-      toast({ title: "複製失敗", variant: "destructive" })
-    }
-  }
+  // 一鍵複製金額（給轉帳貼到網銀用）— 使用統一 hook
+  const handleCopyAmount = useCopyAmount()
 
   // 複製今日清單為 LINE 風格訊息
   const handleCopyDigest = async () => {

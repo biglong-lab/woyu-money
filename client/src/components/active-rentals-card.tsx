@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { apiRequest, queryClient } from "@/lib/queryClient"
 import { useToast } from "@/hooks/use-toast"
+import { useCopyAmount } from "@/hooks/use-copy-amount"
 
 type CellStatus = "paid" | "partial" | "unpaid" | "upcoming" | "out_of_contract"
 
@@ -48,6 +49,7 @@ export function ActiveRentalsCard() {
   const year = new Date().getFullYear()
   const month = new Date().getMonth() + 1
   const { toast } = useToast()
+  const copyAmount = useCopyAmount()
   const [pendingId, setPendingId] = useState<number | null>(null)
 
   const { data, isLoading } = useQuery<MatrixData>({
@@ -75,20 +77,6 @@ export function ActiveRentalsCard() {
     onError: (err) =>
       toast({ title: "標記失敗", description: err.message, variant: "destructive" }),
   })
-
-  // 一鍵複製金額（給轉帳貼到網銀用）
-  const copyAmount = async (amount: number, label?: string) => {
-    try {
-      await navigator.clipboard.writeText(String(Math.round(amount)))
-      toast({
-        title: "已複製金額",
-        description: label ? `${label}: ${fmt(amount)}` : fmt(amount),
-        duration: 1500,
-      })
-    } catch {
-      toast({ title: "複製失敗", variant: "destructive" })
-    }
-  }
 
   if (isLoading) {
     return (
