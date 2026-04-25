@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge"
 import { apiRequest, queryClient } from "@/lib/queryClient"
 import { formatNT, friendlyApiError } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
+import { useOnlineStatus } from "@/hooks/use-online-status"
 import { useCopyAmount } from "@/hooks/use-copy-amount"
 import { shareOrCopy } from "@/lib/share-or-copy"
 
@@ -47,6 +48,7 @@ export function ActiveRentalsCard() {
   const year = new Date().getFullYear()
   const month = new Date().getMonth() + 1
   const { toast } = useToast()
+  const isOnline = useOnlineStatus()
   const copyAmount = useCopyAmount()
   const [pendingId, setPendingId] = useState<number | null>(null)
 
@@ -254,13 +256,16 @@ export function ActiveRentalsCard() {
             size="sm"
             className="mt-2 w-full text-xs h-8 border-green-300 text-green-700 hover:bg-green-50"
             onClick={handleBatchMarkPaid}
-            disabled={batchMarkPaidMutation.isPending}
+            disabled={batchMarkPaidMutation.isPending || !isOnline}
+            title={!isOnline ? "離線中無法批次標記，請等網路恢復" : undefined}
             data-testid="batch-mark-all-paid"
           >
             <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
             {batchMarkPaidMutation.isPending
               ? "處理中..."
-              : `🚀 一鍵全部標記已付（${pendingCount} 筆 ${formatNT(monthExpected - monthPaid)}）`}
+              : !isOnline
+                ? "離線中"
+                : `🚀 一鍵全部標記已付（${pendingCount} 筆 ${formatNT(monthExpected - monthPaid)}）`}
           </Button>
         )}
       </CardHeader>
