@@ -218,15 +218,27 @@ export default function PaymentHome() {
       .slice(0, 6)
   }, [schedules])
 
-  // 全域搜尋
+  // 全域搜尋（支援文字 + 金額）
   const searchResults = useMemo(() => {
     if (!searchQuery.trim()) return []
     const q = searchQuery.toLowerCase()
+    // 嘗試解析成數字（移除千分位逗號）
+    const cleanedNum = q.replace(/[,\s$]/g, "")
+    const numericQuery = /^\d+$/.test(cleanedNum) ? parseFloat(cleanedNum) : NaN
     return items
-      .filter(
-        (item: PaymentItemWithProject) =>
+      .filter((item: PaymentItemWithProject) => {
+        // 文字搜尋
+        const textMatch =
           item.itemName?.toLowerCase().includes(q) || item.projectName?.toLowerCase().includes(q)
-      )
+        // 金額搜尋（容許 ±5% 誤差）
+        const amountMatch = Number.isFinite(numericQuery)
+          ? (() => {
+              const amt = parseFloat(item.totalAmount || "0")
+              return Math.abs(amt - numericQuery) / numericQuery <= 0.05
+            })()
+          : false
+        return textMatch || amountMatch
+      })
       .slice(0, 5)
   }, [items, searchQuery])
 
