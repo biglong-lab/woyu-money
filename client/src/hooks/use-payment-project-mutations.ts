@@ -17,10 +17,11 @@ import {
   editItemSchema,
 } from "@/components/payment-project-types"
 
-/** 批量狀態更新回應型別 */
+/** 批量狀態更新回應型別（伺服器回傳 batchUpdatePaymentItems 的結果） */
 interface BatchStatusResponse {
   ok?: boolean
   success?: boolean
+  updatedCount?: number
 }
 
 /** 圖片上傳回應型別 */
@@ -139,26 +140,29 @@ export function usePaymentProjectMutations(params: UsePaymentProjectMutationsPar
 
       try {
         const itemIds = Array.from(selectedItems)
-        const response = (await apiRequest("PATCH", "/api/payment/items/batch-status", {
+        // 後端使用 POST /api/batch/update，body shape: { action, itemIds, data }
+        const response = (await apiRequest("POST", "/api/batch/update", {
+          action: "updateStatus",
           itemIds,
-          status,
-          userInfo: "批量更新",
+          data: { status },
         })) as BatchStatusResponse
 
-        if (response.ok !== false) {
+        if (response.success !== false && response.ok !== false) {
           invalidatePaymentQueries(queryClient)
           setSelectedItems(new Set())
           setIsAllSelected(false)
 
+          const statusLabel =
+            status === "paid" ? "已付清" : status === "partial" ? "部分付款" : status
           toast({
             title: "批量更新成功",
-            description: `已更新 ${itemIds.length} 個項目的狀態為 ${status}`,
+            description: `已將 ${response.updatedCount ?? itemIds.length} 個項目標記為${statusLabel}`,
           })
         }
-      } catch {
+      } catch (error) {
         toast({
           title: "批量更新失敗",
-          description: "請稍後再試",
+          description: error instanceof Error ? error.message : "請稍後再試",
           variant: "destructive",
         })
       }
