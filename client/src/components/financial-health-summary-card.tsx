@@ -197,19 +197,33 @@ export function FinancialHealthSummaryCard() {
                     : `（剩 ${nextItem.daysUntilDue} 天 · ${nextItem.dueDate}）`}
                 </span>
               </div>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  copyAmount(nextItem.unpaidAmount, nextItem.itemName)
-                }}
-                className="mt-0.5 inline-flex items-center gap-1 font-bold text-sm hover:underline cursor-pointer"
-                title="點擊複製金額（轉帳用）"
-                data-testid="copy-next-item-amount"
-              >
-                {formatNT(nextItem.unpaidAmount)}
-                <Copy className="h-3 w-3 opacity-50" />
-              </button>
+              <div className="mt-0.5 flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    copyAmount(nextItem.unpaidAmount, nextItem.itemName)
+                  }}
+                  className="inline-flex items-center gap-1 font-bold text-sm hover:underline cursor-pointer"
+                  title="點擊複製金額（轉帳用）"
+                  data-testid="copy-next-item-amount"
+                >
+                  {formatNT(nextItem.unpaidAmount)}
+                  <Copy className="h-3 w-3 opacity-50" />
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    window.dispatchEvent(new CustomEvent("open-quick-payment"))
+                  }}
+                  className="text-xs font-medium px-2 py-0.5 rounded bg-white border hover:bg-gray-50 active:scale-95 transition-all"
+                  title="開啟快速付款"
+                  data-testid="next-item-pay-now"
+                >
+                  立即付款 →
+                </button>
+              </div>
             </div>
           </div>
         )}
