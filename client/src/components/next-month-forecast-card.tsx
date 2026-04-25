@@ -8,9 +8,10 @@
 
 import { useQuery } from "@tanstack/react-query"
 import { Link } from "wouter"
-import { TrendingUp, ArrowRight, AlertTriangle } from "lucide-react"
+import { TrendingUp, ArrowRight, AlertTriangle, Copy } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { formatNT } from "@/lib/utils"
+import { useToast } from "@/hooks/use-toast"
 
 interface ForecastMonth {
   year: number
@@ -36,6 +37,7 @@ interface ForecastData {
 }
 
 export function NextMonthForecastCard() {
+  const { toast } = useToast()
   const { data, isLoading } = useQuery<ForecastData>({
     queryKey: ["/api/cashflow/forecast?monthsAhead=1"],
   })
@@ -96,7 +98,32 @@ export function NextMonthForecastCard() {
           {hasGap && (
             <div className="mt-2 flex items-center gap-1.5 text-xs text-red-800 bg-red-100 rounded px-2 py-1.5">
               <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-              <span>預估缺口 {formatNT(gap.gap ?? 0)}，建議先做現金準備</span>
+              <span className="flex-1">預估缺口 {formatNT(gap.gap ?? 0)}，建議先做現金準備</span>
+              <button
+                type="button"
+                onClick={async (e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  const text =
+                    `📊 ${gap.year}/${String(gap.month).padStart(2, "0")} 現金流提醒\n\n` +
+                    `預估收入：${formatNT(gap.estimatedIncome)}\n` +
+                    `預估支出：${formatNT(gap.estimatedExpense)}\n` +
+                    `預估缺口：${formatNT(gap.gap ?? 0)}\n\n` +
+                    `💡 建議提前準備現金或安排融資`
+                  try {
+                    await navigator.clipboard.writeText(text)
+                    toast({ title: "已複製通知", description: "可貼到 LINE / 備忘錄" })
+                  } catch {
+                    toast({ title: "複製失敗", variant: "destructive" })
+                  }
+                }}
+                className="text-red-700 hover:underline flex items-center gap-1 shrink-0"
+                title="複製通知文字"
+                data-testid="copy-shortage-notice"
+              >
+                <Copy className="h-3 w-3" />
+                通知
+              </button>
             </div>
           )}
         </CardContent>
