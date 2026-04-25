@@ -344,6 +344,44 @@ function saveCompleted(state: { date: string; count: number; amount: number }) {
   }
 }
 
+// 連續記錄 streak（培養習慣）
+const STREAK_KEY = "today-focus:streak"
+interface StreakState {
+  lastDate: string
+  days: number
+}
+function loadStreak(): StreakState {
+  try {
+    const raw = localStorage.getItem(STREAK_KEY)
+    if (raw) {
+      const parsed = JSON.parse(raw) as StreakState
+      const today = new Date().toISOString().slice(0, 10)
+      const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10)
+      // 最後付款日是昨天或今天 → 維持；否則歸零（中斷）
+      if (parsed.lastDate === today || parsed.lastDate === yesterday) {
+        return parsed
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return { lastDate: "", days: 0 }
+}
+function saveStreak(state: StreakState) {
+  try {
+    localStorage.setItem(STREAK_KEY, JSON.stringify(state))
+  } catch {
+    // ignore
+  }
+}
+function bumpStreak(prev: StreakState): StreakState {
+  const today = new Date().toISOString().slice(0, 10)
+  const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10)
+  if (prev.lastDate === today) return prev // 今天已計
+  if (prev.lastDate === yesterday) return { lastDate: today, days: prev.days + 1 }
+  return { lastDate: today, days: 1 } // 中斷後重啟
+}
+
 export function TodayFocusCard() {
   const { toast } = useToast()
   const [scope, setScope] = useState<ViewScope>("today")
@@ -351,6 +389,7 @@ export function TodayFocusCard() {
   const [payDialogOpen, setPayDialogOpen] = useState(false)
   const [payingItem, setPayingItem] = useState<PriorityResult | null>(null)
   const [completed, setCompleted] = useState(loadCompleted)
+  const [streak, setStreak] = useState(loadStreak)
 
   const { data: report, isLoading } = useQuery<PriorityReport>({
     queryKey: ["/api/payment/priority-report?includeLow=true"],
@@ -402,6 +441,10 @@ export function TodayFocusCard() {
           : { date: today, count: 1, amount: variables.amountPaid }
       setCompleted(next)
       saveCompleted(next)
+      // 更新 streak
+      const nextStreak = bumpStreak(streak)
+      setStreak(nextStreak)
+      saveStreak(nextStreak)
       toast({ title: "已標記為已付款", description: "正在載入下一筆..." })
       setPayDialogOpen(false)
       setPayingItem(null)
@@ -485,9 +528,18 @@ export function TodayFocusCard() {
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle className="text-lg sm:text-xl flex items-center gap-2">
+            <CardTitle className="text-lg sm:text-xl flex items-center gap-2 flex-wrap">
               <Sparkles className="h-5 w-5 text-amber-600" />
               今日焦點
+              {streak.days >= 2 && (
+                <span
+                  className="inline-flex items-center gap-1 text-xs font-semibold text-orange-700 bg-orange-100 px-2 py-0.5 rounded-full"
+                  title={`連續 ${streak.days} 天有付款記錄，繼續保持！`}
+                  data-testid="streak-badge"
+                >
+                  🔥 連續 {streak.days} 天
+                </span>
+              )}
             </CardTitle>
             <CardDescription className="text-xs sm:text-sm mt-1">
               專注在最該處理的 1 件事，完成後自動顯示下一件
