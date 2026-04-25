@@ -426,6 +426,37 @@ function saveStreak(state: StreakState) {
     // ignore
   }
 }
+// Skipped IDs 持久化（同日有效）
+const SKIPPED_KEY = "today-focus:skipped"
+interface SkippedState {
+  date: string
+  ids: number[]
+}
+function loadSkipped(): Set<number> {
+  try {
+    const raw = localStorage.getItem(SKIPPED_KEY)
+    if (raw) {
+      const parsed = JSON.parse(raw) as SkippedState
+      const today = localDateISO(0)
+      // 只在同一天有效，跨日自動清空
+      if (parsed.date === today && Array.isArray(parsed.ids)) {
+        return new Set(parsed.ids)
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return new Set()
+}
+function saveSkipped(ids: Set<number>) {
+  try {
+    const state: SkippedState = { date: localDateISO(0), ids: Array.from(ids) }
+    localStorage.setItem(SKIPPED_KEY, JSON.stringify(state))
+  } catch {
+    // ignore
+  }
+}
+
 function bumpStreak(prev: StreakState): StreakState {
   const today = localDateISO(0)
   const yesterday = localDateISO(-1)
@@ -437,7 +468,7 @@ function bumpStreak(prev: StreakState): StreakState {
 export function TodayFocusCard() {
   const { toast } = useToast()
   const [scope, setScope] = useState<ViewScope>("today")
-  const [skippedIds, setSkippedIds] = useState<Set<number>>(new Set())
+  const [skippedIds, setSkippedIds] = useState<Set<number>>(loadSkipped)
   const [payDialogOpen, setPayDialogOpen] = useState(false)
   const [payingItem, setPayingItem] = useState<PriorityResult | null>(null)
   const [completed, setCompleted] = useState(loadCompleted)
@@ -538,10 +569,17 @@ export function TodayFocusCard() {
 
   const handleDefer = () => {
     if (!current) return
-    setSkippedIds((prev) => new Set(prev).add(current.id))
+    setSkippedIds((prev) => {
+      const next = new Set(prev).add(current.id)
+      saveSkipped(next)
+      return next
+    })
   }
 
-  const handleResetSkipped = () => setSkippedIds(new Set())
+  const handleResetSkipped = () => {
+    setSkippedIds(new Set())
+    saveSkipped(new Set())
+  }
 
   // 一鍵複製金額（給轉帳貼到網銀用）— 使用統一 hook
   const handleCopyAmount = useCopyAmount()
