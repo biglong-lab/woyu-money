@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { apiRequest, queryClient } from "@/lib/queryClient"
 import { useToast } from "@/hooks/use-toast"
+import { useCopyAmount } from "@/hooks/use-copy-amount"
 
 type ReminderLevel = "none" | "early" | "warning" | "final"
 type LateFeeStatus = "unpaid" | "paid_late" | "paid_on_time"
@@ -95,6 +96,7 @@ const STATUS_META: Record<LateFeeStatus, { label: string; color: string }> = {
 
 function ReminderCard() {
   const { toast } = useToast()
+  const copyAmount = useCopyAmount()
   const [pendingId, setPendingId] = useState<number | null>(null)
   const { data, isLoading } = useQuery<ReminderStatus>({
     queryKey: ["/api/late-fee/reminder-status"],
@@ -190,7 +192,18 @@ function ReminderCard() {
                     </div>
                   </div>
                   <div className="text-right shrink-0">
-                    <div className="font-semibold">{formatCurrency(item.unpaidAmount)}</div>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        copyAmount(item.unpaidAmount, item.itemName)
+                      }}
+                      className="font-semibold hover:text-blue-600 hover:underline cursor-pointer"
+                      title="點擊複製金額（轉帳用）"
+                      data-testid={`copy-labor-amount-${item.id}`}
+                    >
+                      {formatCurrency(item.unpaidAmount)}
+                    </button>
                     {item.lateFee > 0 && (
                       <div className="text-xs text-red-700">
                         +{formatCurrency(item.lateFee)} 滯納金
