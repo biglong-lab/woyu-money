@@ -192,6 +192,7 @@ export default function ReceiptMatchHelperPage() {
                 placeholder="例如：12,000"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
+                onFocus={(e) => e.target.select()}
                 autoFocus
               />
               {amount && parseFloat(amount.replace(/[,\s]/g, "")) > 0 && (
