@@ -1,36 +1,65 @@
 // 單據歸檔 Dialog
-import { useState, useEffect, useMemo } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { useState, useEffect, useMemo } from "react"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import { Badge } from "@/components/ui/badge"
 import {
-  FileText, CreditCard, Receipt, Loader2, Archive,
-  Search, ChevronDown, Check, Building2, Calendar, DollarSign
-} from "lucide-react";
-import { format } from "date-fns";
-import type { DocumentInbox, PaymentProject, PaymentItem as BasePaymentItem } from "@shared/schema";
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import {
+  FileText,
+  CreditCard,
+  Receipt,
+  Loader2,
+  Archive,
+  Search,
+  ChevronDown,
+  Check,
+  Building2,
+  Calendar,
+  DollarSign,
+} from "lucide-react"
+import { format } from "date-fns"
+import { localDateISO } from "@/lib/utils"
+import type { DocumentInbox, PaymentProject, PaymentItem as BasePaymentItem } from "@shared/schema"
 
 // 擴展 PaymentItem 型別以包含 JOIN 查詢返回的額外欄位
 interface ExtendedPaymentItem extends BasePaymentItem {
-  vendor?: string | null;
-  dueDate?: string | null;
+  vendor?: string | null
+  dueDate?: string | null
 }
 
 export interface DocumentInboxArchiveDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  document: DocumentInbox | null;
-  projects: PaymentProject[];
-  paymentItems: ExtendedPaymentItem[];
-  onArchive: (type: string, data: Record<string, unknown>) => void;
-  isPending: boolean;
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  document: DocumentInbox | null
+  projects: PaymentProject[]
+  paymentItems: ExtendedPaymentItem[]
+  onArchive: (type: string, data: Record<string, unknown>) => void
+  isPending: boolean
 }
 
 export default function DocumentInboxArchiveDialog({
@@ -42,82 +71,83 @@ export default function DocumentInboxArchiveDialog({
   onArchive,
   isPending,
 }: DocumentInboxArchiveDialogProps) {
-  const [archiveType, setArchiveType] = useState<string>('');
-  const [formData, setFormData] = useState<Record<string, string | number>>({});
-  const [selectedProjectFilter, setSelectedProjectFilter] = useState<string>('all');
-  const [itemSearch, setItemSearch] = useState('');
-  const [itemPickerOpen, setItemPickerOpen] = useState(false);
+  const [archiveType, setArchiveType] = useState<string>("")
+  const [formData, setFormData] = useState<Record<string, string | number>>({})
+  const [selectedProjectFilter, setSelectedProjectFilter] = useState<string>("all")
+  const [itemSearch, setItemSearch] = useState("")
+  const [itemPickerOpen, setItemPickerOpen] = useState(false)
 
   // 篩選付款項目
   const filteredPaymentItems = useMemo(() => {
-    let items = paymentItems.filter(i => i.status !== 'paid');
+    let items = paymentItems.filter((i) => i.status !== "paid")
 
-    if (selectedProjectFilter !== 'all') {
-      items = items.filter(i => i.projectId?.toString() === selectedProjectFilter);
+    if (selectedProjectFilter !== "all") {
+      items = items.filter((i) => i.projectId?.toString() === selectedProjectFilter)
     }
 
     if (itemSearch.trim()) {
-      const searchLower = itemSearch.toLowerCase();
-      items = items.filter(i =>
-        i.itemName?.toLowerCase().includes(searchLower) ||
-        i.vendor?.toLowerCase().includes(searchLower)
-      );
+      const searchLower = itemSearch.toLowerCase()
+      items = items.filter(
+        (i) =>
+          i.itemName?.toLowerCase().includes(searchLower) ||
+          i.vendor?.toLowerCase().includes(searchLower)
+      )
     }
 
-    return items;
-  }, [paymentItems, selectedProjectFilter, itemSearch]);
+    return items
+  }, [paymentItems, selectedProjectFilter, itemSearch])
 
   // 已選擇的付款項目
   const selectedItem = useMemo(() => {
-    if (!formData.paymentItemId) return null;
-    return paymentItems.find(i => i.id === formData.paymentItemId);
-  }, [paymentItems, formData.paymentItemId]);
+    if (!formData.paymentItemId) return null
+    return paymentItems.find((i) => i.id === formData.paymentItemId)
+  }, [paymentItems, formData.paymentItemId])
 
   // 取得專案名稱
   const getProjectName = (projectId: number | null) => {
-    if (!projectId) return '無專案';
-    const project = projects.find(p => p.id === projectId);
-    return project?.projectName || '未知專案';
-  };
+    if (!projectId) return "無專案"
+    const project = projects.find((p) => p.id === projectId)
+    return project?.projectName || "未知專案"
+  }
 
   // 重置表單
   useEffect(() => {
     if (document && open) {
-      const recognizedAmount = document.recognizedAmount ? String(document.recognizedAmount) : '';
-      const recognizedDate = document.recognizedDate ? String(document.recognizedDate) : '';
+      const recognizedAmount = document.recognizedAmount ? String(document.recognizedAmount) : ""
+      const recognizedDate = document.recognizedDate ? String(document.recognizedDate) : ""
 
       setFormData({
-        itemName: document.recognizedDescription || document.recognizedVendor || '',
+        itemName: document.recognizedDescription || document.recognizedVendor || "",
         totalAmount: recognizedAmount,
         dueDate: recognizedDate,
-        projectId: '',
-        categoryId: '',
-        paymentItemId: '',
+        projectId: "",
+        categoryId: "",
+        paymentItemId: "",
         amount: recognizedAmount,
-        paymentDate: recognizedDate || new Date().toISOString().split('T')[0],
-        paymentMethod: 'bank_transfer',
-        invoiceNumber: document.recognizedInvoiceNumber || '',
-        invoiceDate: recognizedDate || new Date().toISOString().split('T')[0],
-        vendorName: document.recognizedVendor || '',
-        category: document.recognizedCategory || '',
-        description: document.recognizedDescription || '',
-        notes: document.notes || '',
-      });
-      setSelectedProjectFilter('all');
-      setItemSearch('');
+        paymentDate: recognizedDate || localDateISO(),
+        paymentMethod: "bank_transfer",
+        invoiceNumber: document.recognizedInvoiceNumber || "",
+        invoiceDate: recognizedDate || localDateISO(),
+        vendorName: document.recognizedVendor || "",
+        category: document.recognizedCategory || "",
+        description: document.recognizedDescription || "",
+        notes: document.notes || "",
+      })
+      setSelectedProjectFilter("all")
+      setItemSearch("")
 
       // 依文件類型自動選擇歸檔類型
-      if (document.documentType === 'bill') {
-        setArchiveType('payment-item');
-      } else if (document.documentType === 'payment') {
-        setArchiveType('payment-record');
-      } else if (document.documentType === 'invoice') {
-        setArchiveType('invoice');
+      if (document.documentType === "bill") {
+        setArchiveType("payment-item")
+      } else if (document.documentType === "payment") {
+        setArchiveType("payment-record")
+      } else if (document.documentType === "invoice") {
+        setArchiveType("invoice")
       }
     }
-  }, [document, open]);
+  }, [document, open])
 
-  if (!document) return null;
+  if (!document) return null
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -158,12 +188,12 @@ export default function DocumentInboxArchiveDialog({
           </div>
 
           {/* 付款項目表單 */}
-          {archiveType === 'payment-item' && (
+          {archiveType === "payment-item" && (
             <div className="space-y-3">
               <div>
                 <Label>項目名稱</Label>
                 <Input
-                  value={String(formData.itemName || '')}
+                  value={String(formData.itemName || "")}
                   onChange={(e) => setFormData({ ...formData, itemName: e.target.value })}
                   data-testid="input-item-name"
                 />
@@ -172,7 +202,7 @@ export default function DocumentInboxArchiveDialog({
                 <Label>金額</Label>
                 <Input
                   type="number"
-                  value={String(formData.totalAmount || '')}
+                  value={String(formData.totalAmount || "")}
                   onChange={(e) => setFormData({ ...formData, totalAmount: e.target.value })}
                   data-testid="input-total-amount"
                 />
@@ -181,7 +211,7 @@ export default function DocumentInboxArchiveDialog({
                 <Label>到期日</Label>
                 <Input
                   type="date"
-                  value={String(formData.dueDate || '')}
+                  value={String(formData.dueDate || "")}
                   onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
                   data-testid="input-due-date"
                 />
@@ -208,7 +238,7 @@ export default function DocumentInboxArchiveDialog({
           )}
 
           {/* 付款記錄表單 */}
-          {archiveType === 'payment-record' && (
+          {archiveType === "payment-record" && (
             <div className="space-y-3">
               {/* 專案篩選 */}
               <div>
@@ -219,8 +249,8 @@ export default function DocumentInboxArchiveDialog({
                 <Select
                   value={selectedProjectFilter}
                   onValueChange={(v) => {
-                    setSelectedProjectFilter(v);
-                    setFormData({ ...formData, paymentItemId: '' });
+                    setSelectedProjectFilter(v)
+                    setFormData({ ...formData, paymentItemId: "" })
                   }}
                 >
                   <SelectTrigger>
@@ -255,8 +285,8 @@ export default function DocumentInboxArchiveDialog({
                         <div className="flex flex-col items-start text-left">
                           <span className="font-medium">{selectedItem.itemName}</span>
                           <span className="text-xs text-muted-foreground">
-                            {getProjectName(selectedItem.projectId)} |
-                            待付: ${parseFloat(selectedItem.totalAmount || '0').toLocaleString()}
+                            {getProjectName(selectedItem.projectId)} | 待付: $
+                            {parseFloat(selectedItem.totalAmount || "0").toLocaleString()}
                           </span>
                         </div>
                       ) : (
@@ -277,27 +307,29 @@ export default function DocumentInboxArchiveDialog({
                           <div className="py-6 text-center text-sm">
                             <p>找不到符合的付款項目</p>
                             <p className="text-muted-foreground mt-1">
-                              {selectedProjectFilter !== 'all' && '試試看選擇「全部專案」'}
+                              {selectedProjectFilter !== "all" && "試試看選擇「全部專案」"}
                             </p>
                           </div>
                         </CommandEmpty>
                         <CommandGroup heading={`符合項目 (${filteredPaymentItems.length})`}>
                           <ScrollArea className="h-[300px]">
                             {filteredPaymentItems.map((item) => {
-                              const remaining = parseFloat(item.totalAmount || '0') - parseFloat(item.paidAmount || '0');
-                              const isOverdue = item.dueDate && new Date(item.dueDate) < new Date();
+                              const remaining =
+                                parseFloat(item.totalAmount || "0") -
+                                parseFloat(item.paidAmount || "0")
+                              const isOverdue = item.dueDate && new Date(item.dueDate) < new Date()
 
                               return (
                                 <CommandItem
                                   key={item.id}
-                                  value={`${item.itemName} ${item.vendor || ''}`}
+                                  value={`${item.itemName} ${item.vendor || ""}`}
                                   onSelect={() => {
                                     setFormData({
                                       ...formData,
                                       paymentItemId: item.id,
                                       amount: remaining.toString(),
-                                    });
-                                    setItemPickerOpen(false);
+                                    })
+                                    setItemPickerOpen(false)
                                   }}
                                   className="flex flex-col items-start py-3 cursor-pointer"
                                 >
@@ -307,7 +339,9 @@ export default function DocumentInboxArchiveDialog({
                                     )}
                                     <span className="font-medium flex-1">{item.itemName}</span>
                                     {isOverdue && (
-                                      <Badge variant="destructive" className="text-xs">逾期</Badge>
+                                      <Badge variant="destructive" className="text-xs">
+                                        逾期
+                                      </Badge>
                                     )}
                                   </div>
                                   <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1 ml-6">
@@ -322,12 +356,12 @@ export default function DocumentInboxArchiveDialog({
                                     {item.dueDate && (
                                       <span className="flex items-center gap-1">
                                         <Calendar className="h-3 w-3" />
-                                        {format(new Date(item.dueDate), 'MM/dd')}
+                                        {format(new Date(item.dueDate), "MM/dd")}
                                       </span>
                                     )}
                                   </div>
                                 </CommandItem>
-                              );
+                              )
                             })}
                           </ScrollArea>
                         </CommandGroup>
@@ -346,16 +380,24 @@ export default function DocumentInboxArchiveDialog({
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">應付總額</span>
-                    <span className="font-medium">${parseFloat(selectedItem.totalAmount || '0').toLocaleString()}</span>
+                    <span className="font-medium">
+                      ${parseFloat(selectedItem.totalAmount || "0").toLocaleString()}
+                    </span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">已付金額</span>
-                    <span className="font-medium">${parseFloat(selectedItem.paidAmount || '0').toLocaleString()}</span>
+                    <span className="font-medium">
+                      ${parseFloat(selectedItem.paidAmount || "0").toLocaleString()}
+                    </span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">剩餘待付</span>
                     <span className="font-medium text-primary">
-                      ${(parseFloat(selectedItem.totalAmount || '0') - parseFloat(selectedItem.paidAmount || '0')).toLocaleString()}
+                      $
+                      {(
+                        parseFloat(selectedItem.totalAmount || "0") -
+                        parseFloat(selectedItem.paidAmount || "0")
+                      ).toLocaleString()}
                     </span>
                   </div>
                 </div>
@@ -365,7 +407,7 @@ export default function DocumentInboxArchiveDialog({
                 <Label>本次付款金額</Label>
                 <Input
                   type="number"
-                  value={String(formData.amount || '')}
+                  value={String(formData.amount || "")}
                   onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
                 />
               </div>
@@ -373,14 +415,14 @@ export default function DocumentInboxArchiveDialog({
                 <Label>付款日期</Label>
                 <Input
                   type="date"
-                  value={String(formData.paymentDate || '')}
+                  value={String(formData.paymentDate || "")}
                   onChange={(e) => setFormData({ ...formData, paymentDate: e.target.value })}
                 />
               </div>
               <div>
                 <Label>付款方式</Label>
                 <Select
-                  value={String(formData.paymentMethod || '')}
+                  value={String(formData.paymentMethod || "")}
                   onValueChange={(v) => setFormData({ ...formData, paymentMethod: v })}
                 >
                   <SelectTrigger>
@@ -398,12 +440,12 @@ export default function DocumentInboxArchiveDialog({
           )}
 
           {/* 發票表單 */}
-          {archiveType === 'invoice' && (
+          {archiveType === "invoice" && (
             <div className="space-y-3">
               <div>
                 <Label>發票號碼</Label>
                 <Input
-                  value={String(formData.invoiceNumber || '')}
+                  value={String(formData.invoiceNumber || "")}
                   onChange={(e) => setFormData({ ...formData, invoiceNumber: e.target.value })}
                 />
               </div>
@@ -411,14 +453,14 @@ export default function DocumentInboxArchiveDialog({
                 <Label>發票日期</Label>
                 <Input
                   type="date"
-                  value={String(formData.invoiceDate || '')}
+                  value={String(formData.invoiceDate || "")}
                   onChange={(e) => setFormData({ ...formData, invoiceDate: e.target.value })}
                 />
               </div>
               <div>
                 <Label>廠商名稱</Label>
                 <Input
-                  value={String(formData.vendorName || '')}
+                  value={String(formData.vendorName || "")}
                   onChange={(e) => setFormData({ ...formData, vendorName: e.target.value })}
                 />
               </div>
@@ -426,21 +468,21 @@ export default function DocumentInboxArchiveDialog({
                 <Label>金額</Label>
                 <Input
                   type="number"
-                  value={String(formData.totalAmount || '')}
+                  value={String(formData.totalAmount || "")}
                   onChange={(e) => setFormData({ ...formData, totalAmount: e.target.value })}
                 />
               </div>
               <div>
                 <Label>分類</Label>
                 <Input
-                  value={String(formData.category || '')}
+                  value={String(formData.category || "")}
                   onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                 />
               </div>
               <div>
                 <Label>說明</Label>
                 <Textarea
-                  value={String(formData.description || '')}
+                  value={String(formData.description || "")}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   rows={2}
                 />
@@ -460,7 +502,7 @@ export default function DocumentInboxArchiveDialog({
           <div>
             <Label>歸檔備註</Label>
             <Textarea
-              value={String(formData.notes || '')}
+              value={String(formData.notes || "")}
               onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
               placeholder="可補充歸檔說明..."
               rows={2}
@@ -474,7 +516,11 @@ export default function DocumentInboxArchiveDialog({
           </Button>
           <Button
             onClick={() => onArchive(archiveType, formData)}
-            disabled={isPending || !archiveType || (archiveType === 'payment-record' && !formData.paymentItemId)}
+            disabled={
+              isPending ||
+              !archiveType ||
+              (archiveType === "payment-record" && !formData.paymentItemId)
+            }
             data-testid="btn-confirm-archive"
           >
             {isPending ? (
@@ -492,5 +538,5 @@ export default function DocumentInboxArchiveDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  );
+  )
 }

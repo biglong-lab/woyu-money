@@ -1,90 +1,106 @@
-import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useForm } from "react-hook-form";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { Plus, Camera, Wallet, TrendingDown, TrendingUp, Calendar } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
-import type { HouseholdExpense } from "@shared/schema/household";
-import type { DebtCategory } from "@shared/schema/category";
+import { useState } from "react"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { useForm } from "react-hook-form"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Badge } from "@/components/ui/badge"
+import { Plus, Camera, Wallet, TrendingDown, TrendingUp, Calendar } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
+import { apiRequest } from "@/lib/queryClient"
+import { localDateISO } from "@/lib/utils"
+import type { HouseholdExpense } from "@shared/schema/household"
+import type { DebtCategory } from "@shared/schema/category"
 
 // API 回應型別定義
 interface MonthlyBudgetResponse {
-  amount: string | number;
+  amount: string | number
 }
 
 interface MonthlyStatsResponse {
-  totalSpent: number;
-  categoryBreakdown: Record<string, number>;
+  totalSpent: number
+  categoryBreakdown: Record<string, number>
 }
 
 interface HouseholdCategory {
-  id: number;
-  categoryName: string;
-  color: string;
+  id: number
+  categoryName: string
+  color: string
 }
 
 interface ExpenseWithCategory extends HouseholdExpense {
-  categoryName?: string;
-  receiptPhoto?: string;
+  categoryName?: string
+  receiptPhoto?: string
 }
 
 // 表單型別定義
 interface QuickAddFormData {
-  amount: string;
-  categoryId: string;
-  description: string;
-  paymentMethod: string;
-  date: string;
+  amount: string
+  categoryId: string
+  description: string
+  paymentMethod: string
+  date: string
 }
 
 interface BudgetFormData {
-  monthlyBudget: string;
+  monthlyBudget: string
 }
 
 interface AddExpensePayload {
-  amount: number;
-  categoryId: number;
-  description: string;
-  paymentMethod: string;
-  date: string;
+  amount: number
+  categoryId: number
+  description: string
+  paymentMethod: string
+  date: string
 }
 
 interface SetBudgetPayload {
-  amount: number;
-  month: string;
+  amount: number
+  month: string
 }
 
 export default function HouseholdBudget() {
   const { data: monthlyBudget, isLoading: isLoadingBudget } = useQuery<MonthlyBudgetResponse>({
     queryKey: ["/api/household/budget"],
-  });
+  })
 
   const { data: dailyExpenses, isLoading: isLoadingExpenses } = useQuery<ExpenseWithCategory[]>({
     queryKey: ["/api/household/expenses"],
-  });
+  })
 
   const { data: monthlyStats, isLoading: isLoadingStats } = useQuery<MonthlyStatsResponse>({
     queryKey: ["/api/household/stats"],
-  });
+  })
 
   // Load household categories from the category management system
-  const { data: householdCategories = [], isLoading: isLoadingCategories } = useQuery<HouseholdCategory[]>({
+  const { data: householdCategories = [], isLoading: isLoadingCategories } = useQuery<
+    HouseholdCategory[]
+  >({
     queryKey: ["/api/categories/household"],
     staleTime: 10 * 60 * 1000, // Cache for 10 minutes
-  });
+  })
 
-  const { toast } = useToast();
-  const [showQuickAdd, setShowQuickAdd] = useState(false);
-  const [showBudgetSetup, setShowBudgetSetup] = useState(false);
-  const queryClient = useQueryClient();
+  const { toast } = useToast()
+  const [showQuickAdd, setShowQuickAdd] = useState(false)
+  const [showBudgetSetup, setShowBudgetSetup] = useState(false)
+  const queryClient = useQueryClient()
 
   // 快速記帳表單
   const quickAddForm = useForm<QuickAddFormData>({
@@ -93,16 +109,16 @@ export default function HouseholdBudget() {
       categoryId: "",
       description: "",
       paymentMethod: "cash",
-      date: new Date().toISOString().split('T')[0],
+      date: localDateISO(),
     },
-  });
+  })
 
   // 預算設定表單
   const budgetForm = useForm<BudgetFormData>({
     defaultValues: {
       monthlyBudget: monthlyBudget?.amount?.toString() || "",
     },
-  });
+  })
 
   // 快速記帳
   const addExpenseMutation = useMutation({
@@ -110,28 +126,28 @@ export default function HouseholdBudget() {
       const formattedData: AddExpensePayload = {
         ...data,
         amount: parseFloat(data.amount),
-        categoryId: parseInt(data.categoryId)
-      };
-      return await apiRequest("/api/household/expenses", "POST", formattedData);
+        categoryId: parseInt(data.categoryId),
+      }
+      return await apiRequest("/api/household/expenses", "POST", formattedData)
     },
     onSuccess: () => {
       toast({
         title: "記帳成功",
         description: "支出已記錄",
-      });
-      queryClient.invalidateQueries({ queryKey: ["/api/household/expenses"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/household/stats"] });
-      setShowQuickAdd(false);
-      quickAddForm.reset();
+      })
+      queryClient.invalidateQueries({ queryKey: ["/api/household/expenses"] })
+      queryClient.invalidateQueries({ queryKey: ["/api/household/stats"] })
+      setShowQuickAdd(false)
+      quickAddForm.reset()
     },
     onError: () => {
       toast({
         title: "記帳失敗",
         description: "請重試",
         variant: "destructive",
-      });
+      })
     },
-  });
+  })
 
   // 設定預算
   const setBudgetMutation = useMutation({
@@ -139,26 +155,26 @@ export default function HouseholdBudget() {
       const budgetData: SetBudgetPayload = {
         amount: parseFloat(data.monthlyBudget),
         month: new Date().toISOString().slice(0, 7), // YYYY-MM
-      };
-      return await apiRequest("/api/household/budget", "POST", budgetData);
+      }
+      return await apiRequest("/api/household/budget", "POST", budgetData)
     },
     onSuccess: () => {
       toast({
         title: "預算設定成功",
         description: "每月預算已更新",
-      });
-      queryClient.invalidateQueries({ queryKey: ["/api/household/budget"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/household/stats"] });
-      setShowBudgetSetup(false);
+      })
+      queryClient.invalidateQueries({ queryKey: ["/api/household/budget"] })
+      queryClient.invalidateQueries({ queryKey: ["/api/household/stats"] })
+      setShowBudgetSetup(false)
     },
     onError: () => {
       toast({
         title: "設定失敗",
         description: "請重試",
         variant: "destructive",
-      });
+      })
     },
-  });
+  })
 
   const onQuickAdd = (data: QuickAddFormData) => {
     if (!data.categoryId || !data.amount) {
@@ -166,33 +182,36 @@ export default function HouseholdBudget() {
         title: "請填寫必要欄位",
         description: "請選擇分類並輸入金額",
         variant: "destructive",
-      });
-      return;
+      })
+      return
     }
-    addExpenseMutation.mutate(data);
-  };
+    addExpenseMutation.mutate(data)
+  }
 
   const onSetBudget = (data: BudgetFormData) => {
-    setBudgetMutation.mutate(data);
-  };
+    setBudgetMutation.mutate(data)
+  }
 
   // 計算本月統計
-  const currentMonth = new Date().toISOString().slice(0, 7);
-  const thisMonthExpenses = Array.isArray(dailyExpenses) 
-    ? dailyExpenses.filter(expense => expense.date?.startsWith(currentMonth))
-    : [];
-  
-  const totalSpent = thisMonthExpenses.reduce((sum, expense) => sum + parseFloat(expense.amount?.toString() || '0'), 0);
-  const budgetAmount = parseFloat(monthlyBudget?.amount?.toString() || '0');
-  const remaining = budgetAmount - totalSpent;
-  const spentPercentage = budgetAmount > 0 ? (totalSpent / budgetAmount) * 100 : 0;
+  const currentMonth = new Date().toISOString().slice(0, 7)
+  const thisMonthExpenses = Array.isArray(dailyExpenses)
+    ? dailyExpenses.filter((expense) => expense.date?.startsWith(currentMonth))
+    : []
+
+  const totalSpent = thisMonthExpenses.reduce(
+    (sum, expense) => sum + parseFloat(expense.amount?.toString() || "0"),
+    0
+  )
+  const budgetAmount = parseFloat(monthlyBudget?.amount?.toString() || "0")
+  const remaining = budgetAmount - totalSpent
+  const spentPercentage = budgetAmount > 0 ? (totalSpent / budgetAmount) * 100 : 0
 
   if (isLoadingBudget || isLoadingExpenses || isLoadingStats) {
     return (
       <div className="h-screen flex items-center justify-center">
         <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
       </div>
-    );
+    )
   }
 
   return (
@@ -214,9 +233,7 @@ export default function HouseholdBudget() {
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>快速記帳</DialogTitle>
-                <DialogDescription>
-                  快速記錄今天的支出
-                </DialogDescription>
+                <DialogDescription>快速記錄今天的支出</DialogDescription>
               </DialogHeader>
               <form onSubmit={quickAddForm.handleSubmit(onQuickAdd)} className="space-y-4">
                 <div>
@@ -231,7 +248,9 @@ export default function HouseholdBudget() {
                 </div>
                 <div>
                   <Label htmlFor="categoryId">分類</Label>
-                  <Select onValueChange={(value: string) => quickAddForm.setValue("categoryId", value)}>
+                  <Select
+                    onValueChange={(value: string) => quickAddForm.setValue("categoryId", value)}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="選擇分類" />
                     </SelectTrigger>
@@ -239,7 +258,7 @@ export default function HouseholdBudget() {
                       {householdCategories.map((category: HouseholdCategory) => (
                         <SelectItem key={category.id} value={category.id.toString()}>
                           <span className="flex items-center gap-2">
-                            <div 
+                            <div
                               className="w-3 h-3 rounded-full"
                               style={{ backgroundColor: category.color }}
                             />
@@ -260,7 +279,9 @@ export default function HouseholdBudget() {
                 </div>
                 <div>
                   <Label htmlFor="paymentMethod">付款方式</Label>
-                  <Select onValueChange={(value: string) => quickAddForm.setValue("paymentMethod", value)}>
+                  <Select
+                    onValueChange={(value: string) => quickAddForm.setValue("paymentMethod", value)}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="選擇付款方式" />
                     </SelectTrigger>
@@ -298,7 +319,7 @@ export default function HouseholdBudget() {
               </form>
             </DialogContent>
           </Dialog>
-          
+
           <Dialog open={showBudgetSetup} onOpenChange={setShowBudgetSetup}>
             <DialogTrigger asChild>
               <Button variant="outline" className="flex items-center gap-2">
@@ -309,9 +330,7 @@ export default function HouseholdBudget() {
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>設定每月預算</DialogTitle>
-                <DialogDescription>
-                  設定每月生活費預算，建立預算概念
-                </DialogDescription>
+                <DialogDescription>設定每月生活費預算，建立預算概念</DialogDescription>
               </DialogHeader>
               <form onSubmit={budgetForm.handleSubmit(onSetBudget)} className="space-y-4">
                 <div>
@@ -349,7 +368,7 @@ export default function HouseholdBudget() {
             <div className="text-2xl font-bold">NT$ {budgetAmount.toLocaleString()}</div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">已花費</CardTitle>
@@ -357,27 +376,27 @@ export default function HouseholdBudget() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-red-600">NT$ {totalSpent.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">
-              {spentPercentage.toFixed(1)}% 的預算
-            </p>
+            <p className="text-xs text-muted-foreground">{spentPercentage.toFixed(1)}% 的預算</p>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">剩餘預算</CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className={`text-2xl font-bold ${remaining >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+            <div
+              className={`text-2xl font-bold ${remaining >= 0 ? "text-green-600" : "text-red-600"}`}
+            >
               NT$ {remaining.toLocaleString()}
             </div>
             <p className="text-xs text-muted-foreground">
-              {remaining >= 0 ? '還可以花' : '已超支'}
+              {remaining >= 0 ? "還可以花" : "已超支"}
             </p>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">記帳次數</CardTitle>
@@ -385,9 +404,7 @@ export default function HouseholdBudget() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{thisMonthExpenses.length}</div>
-            <p className="text-xs text-muted-foreground">
-              本月記錄
-            </p>
+            <p className="text-xs text-muted-foreground">本月記錄</p>
           </CardContent>
         </Card>
       </div>
@@ -400,17 +417,24 @@ export default function HouseholdBudget() {
           </CardHeader>
           <CardContent>
             <div className="w-full bg-gray-200 rounded-full h-4">
-              <div 
+              <div
                 className={`h-4 rounded-full transition-all duration-300 ${
-                  spentPercentage > 100 ? 'bg-red-500' : 
-                  spentPercentage > 80 ? 'bg-yellow-500' : 'bg-green-500'
+                  spentPercentage > 100
+                    ? "bg-red-500"
+                    : spentPercentage > 80
+                      ? "bg-yellow-500"
+                      : "bg-green-500"
                 }`}
                 style={{ width: `${Math.min(spentPercentage, 100)}%` }}
               />
             </div>
             <div className="flex justify-between mt-2 text-sm text-muted-foreground">
               <span>已使用 {spentPercentage.toFixed(1)}%</span>
-              <span>{remaining >= 0 ? `還有 NT$ ${remaining.toLocaleString()}` : `超支 NT$ ${Math.abs(remaining).toLocaleString()}`}</span>
+              <span>
+                {remaining >= 0
+                  ? `還有 NT$ ${remaining.toLocaleString()}`
+                  : `超支 NT$ ${Math.abs(remaining).toLocaleString()}`}
+              </span>
             </div>
           </CardContent>
         </Card>
@@ -420,38 +444,49 @@ export default function HouseholdBudget() {
       <Card>
         <CardHeader>
           <CardTitle>最近記錄</CardTitle>
-          <CardDescription>
-            本月已記錄 {thisMonthExpenses.length} 筆支出
-          </CardDescription>
+          <CardDescription>本月已記錄 {thisMonthExpenses.length} 筆支出</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            {thisMonthExpenses.length > 0 ? thisMonthExpenses.slice(0, 10).map((expense: ExpenseWithCategory, index: number) => {
-              const category = householdCategories.find((cat: HouseholdCategory) => cat.id === expense.categoryId);
-              return (
-                <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <div 
-                      className="w-4 h-4 rounded-full"
-                      style={{ backgroundColor: category?.color || '#gray' }}
-                    />
-                    <div>
-                      <div className="font-medium">{category?.categoryName || expense.categoryName || '其他'}</div>
-                      <div className="text-sm text-muted-foreground">{expense.date}</div>
-                      {expense.description && (
-                        <div className="text-sm text-muted-foreground">{expense.description}</div>
+            {thisMonthExpenses.length > 0 ? (
+              thisMonthExpenses.slice(0, 10).map((expense: ExpenseWithCategory, index: number) => {
+                const category = householdCategories.find(
+                  (cat: HouseholdCategory) => cat.id === expense.categoryId
+                )
+                return (
+                  <div
+                    key={index}
+                    className="flex items-center justify-between p-3 border rounded-lg"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="w-4 h-4 rounded-full"
+                        style={{ backgroundColor: category?.color || "#gray" }}
+                      />
+                      <div>
+                        <div className="font-medium">
+                          {category?.categoryName || expense.categoryName || "其他"}
+                        </div>
+                        <div className="text-sm text-muted-foreground">{expense.date}</div>
+                        {expense.description && (
+                          <div className="text-sm text-muted-foreground">{expense.description}</div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-medium text-red-600">
+                        -NT$ {parseInt(expense.amount?.toString() || "0").toLocaleString()}
+                      </div>
+                      {expense.receiptPhoto && (
+                        <Badge variant="outline" className="text-xs">
+                          有發票
+                        </Badge>
                       )}
                     </div>
                   </div>
-                  <div className="text-right">
-                    <div className="font-medium text-red-600">-NT$ {parseInt(expense.amount?.toString() || '0').toLocaleString()}</div>
-                    {expense.receiptPhoto && (
-                      <Badge variant="outline" className="text-xs">有發票</Badge>
-                    )}
-                  </div>
-                </div>
-              );
-            }) : (
+                )
+              })
+            ) : (
               <div className="text-center py-6 text-muted-foreground">
                 還沒有記錄，點擊"快速記帳"開始記錄支出
               </div>
@@ -460,5 +495,5 @@ export default function HouseholdBudget() {
         </CardContent>
       </Card>
     </div>
-  );
+  )
 }
