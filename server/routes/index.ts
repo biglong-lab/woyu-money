@@ -51,12 +51,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // 全域 API 認證保護（排除公開端點）
   app.use("/api", (req, res, next) => {
     // 公開端點白名單（不需要認證）
+    // 註：LINE OAuth 起點是 /api/auth/line（line-auth.ts），
+    // 回呼是 /api/line/callback（admin.ts）；舊有 "/api/line/login" 為 typo 從未存在過
     const publicPaths = [
       "/api/login",
       "/api/register",
       "/api/logout",
       "/api/user",
-      "/api/line/login",
+      "/api/auth/line",
       "/api/line/callback",
     ]
     // Webhook 接收端點：以 /api/income/webhook/ 開頭的 POST 請求不需 session 認證
