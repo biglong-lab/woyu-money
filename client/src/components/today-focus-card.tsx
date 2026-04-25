@@ -295,6 +295,12 @@ function PaidDialog({ item, open, onOpenChange, onConfirm, isPending }: PaidDial
                 value={amountInput}
                 onChange={(e) => setAmountInput(e.target.value)}
                 onFocus={(e) => e.target.select()}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !isInvalid && !isPending) {
+                    e.preventDefault()
+                    onConfirm(paymentDate, parsedAmount)
+                  }
+                }}
                 className="border rounded pl-12 pr-2 py-2 text-base font-bold w-full"
                 data-testid="input-paid-amount"
               />
