@@ -127,7 +127,7 @@ export function RecentPaymentsCard() {
   const handleUndo = (rec: PaymentRecordWithNames) => {
     if (
       !window.confirm(
-        `確定要撤銷「${rec.itemName ?? "未命名"}」的付款記錄嗎？\n（此操作會刪除該筆 payment_record）`
+        `確定要撤銷「${rec.itemName ?? "未命名"}」的付款記錄嗎？\n撤銷後該筆款項會回到待付狀態`
       )
     )
       return

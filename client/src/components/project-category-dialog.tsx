@@ -144,7 +144,7 @@ export function ProjectCategoryDialog({ open, onOpenChange }: ProjectCategoryDia
   }
 
   const handleDelete = (id: number) => {
-    if (confirm("確定要刪除這個分類嗎？")) {
+    if (confirm("確定要刪除這個分類嗎？\n刪除後無法復原")) {
       deleteCategoryMutation.mutate(id)
     }
   }

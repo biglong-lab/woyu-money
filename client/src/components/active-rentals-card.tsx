@@ -99,11 +99,7 @@ export function ActiveRentalsCard() {
   })
 
   const handleBatchMarkPaid = () => {
-    if (
-      !window.confirm(
-        `確定為 ${month} 月所有未付租金標記為已付？\n（這將為符合條件的租金項目建立付款記錄）`
-      )
-    )
+    if (!window.confirm(`確定為 ${month} 月所有未付租金標記為已付？\n會自動為每筆租金建立付款記錄`))
       return
     batchMarkPaidMutation.mutate()
   }
