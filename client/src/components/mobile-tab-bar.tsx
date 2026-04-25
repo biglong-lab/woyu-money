@@ -293,6 +293,14 @@ export function MobileTabBar() {
   )
 
   const toggleMenu = (menu: "payment" | "view" | "more" | "quick") => {
+    // 觸覺回饋（Android Chrome 支援；iOS Safari 會 silently no-op）
+    if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+      try {
+        navigator.vibrate(10)
+      } catch {
+        // 部分瀏覽器在無使用者手勢時會 throw，忽略即可
+      }
+    }
     setOpenMenu((prev) => (prev === menu ? null : menu))
   }
 
