@@ -145,6 +145,15 @@ export function QuickPaymentDialog({ open, onOpenChange }: QuickPaymentDialogPro
     onOpenChange(false)
   }
 
+  // 再付一筆：保留 dialog 開啟、保留付款方式與日期，重置選擇與搜尋
+  const handlePayAgain = () => {
+    setStep("search")
+    setSearchQuery("")
+    setSelectedItem(null)
+    setAmount("")
+    // 保留 paymentMethod 與 paymentDate（連續付款常用相同方式與日期）
+  }
+
   const formatCurrency = (value: string | number) => {
     const num = parseFloat(value?.toString() || "0")
     return isNaN(num) ? "0" : num.toLocaleString()
@@ -326,9 +335,14 @@ export function QuickPaymentDialog({ open, onOpenChange }: QuickPaymentDialogPro
                 已為「{selectedItem?.itemName}」記錄 ${formatCurrency(amount)} 的付款
               </p>
             </div>
-            <Button onClick={handleClose} className="w-full">
-              完成
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={handlePayAgain} className="flex-1">
+                再付一筆
+              </Button>
+              <Button onClick={handleClose} className="flex-1">
+                完成
+              </Button>
+            </div>
           </div>
         )}
       </DialogContent>
