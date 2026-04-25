@@ -37,6 +37,15 @@ interface MonthlyRow {
 }
 
 // 合約列：有租金項目的 active project，排除「雜項無分類」(id=1)
+// 重要：只看 item_name 是「租金/房租/租約/租賃」的項目，
+// 不能用 project_type='rental' 短路（會把該 project 所有雜費也當租金）
+const RENT_ITEM_FILTER = `
+  pi.item_name ILIKE '%租金%'
+  OR pi.item_name ILIKE '%房租%'
+  OR pi.item_name ILIKE '%租約%'
+  OR pi.item_name ILIKE '%租賃%'
+`
+
 const CONTRACTS_SQL = `
   SELECT
     pp.id,
@@ -49,18 +58,13 @@ const CONTRACTS_SQL = `
   WHERE pp.is_active = true
     AND COALESCE(pp.is_deleted, false) = false
     AND pp.id != 1
-    AND (
-      pp.project_type = 'rental'
-      OR pi.item_name ILIKE '%租金%'
-      OR pi.item_name ILIKE '%房租%'
-      OR pi.item_name ILIKE '%租約%'
-      OR pi.item_name ILIKE '%租賃%'
-    )
+    AND (${RENT_ITEM_FILTER})
   GROUP BY pp.id, pp.project_name
   ORDER BY pp.project_name
 `
 
 // 每月應付/已付（依 project_id + start_date 月份聚合）
+// 同樣只算租金項目，避免把雜費（如水肥、洗滌、暫繳款、保險）誤入計算
 const MONTHLY_SQL = `
   SELECT
     pi.project_id AS "projectId",
@@ -72,13 +76,7 @@ const MONTHLY_SQL = `
   WHERE pi.is_deleted = false
     AND pp.id != 1
     AND EXTRACT(YEAR FROM pi.start_date) = $1
-    AND (
-      pp.project_type = 'rental'
-      OR pi.item_name ILIKE '%租金%'
-      OR pi.item_name ILIKE '%房租%'
-      OR pi.item_name ILIKE '%租約%'
-      OR pi.item_name ILIKE '%租賃%'
-    )
+    AND (${RENT_ITEM_FILTER})
   GROUP BY pi.project_id, month
 `
 
