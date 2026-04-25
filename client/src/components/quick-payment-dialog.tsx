@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
+import { useOnlineStatus } from "@/hooks/use-online-status"
 import { apiRequest, queryClient } from "@/lib/queryClient"
 import { localDateISO, friendlyApiError } from "@/lib/utils"
 import { Search, DollarSign, CheckCircle2, ArrowRight, Loader2 } from "lucide-react"
@@ -54,6 +55,7 @@ interface PaymentFormData {
 
 export function QuickPaymentDialog({ open, onOpenChange }: QuickPaymentDialogProps) {
   const { toast } = useToast()
+  const isOnline = useOnlineStatus()
   const [step, setStep] = useState<Step>("search")
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedItem, setSelectedItem] = useState<PaymentItemWithDetails | null>(null)
@@ -359,12 +361,13 @@ export function QuickPaymentDialog({ open, onOpenChange }: QuickPaymentDialogPro
               <Button
                 className="flex-1"
                 onClick={handleConfirmPayment}
-                disabled={paymentMutation.isPending || !amount}
+                disabled={paymentMutation.isPending || !amount || !isOnline}
+                title={!isOnline ? "離線中無法提交，請等網路恢復" : undefined}
               >
                 {paymentMutation.isPending ? (
                   <Loader2 className="w-4 h-4 animate-spin mr-2" />
                 ) : null}
-                確認付款
+                {!isOnline ? "離線中" : "確認付款"}
               </Button>
             </div>
           </div>
