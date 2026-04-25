@@ -14,6 +14,7 @@ import AppBreadcrumb from "@/components/app-breadcrumb"
 import QuickActionFAB from "@/components/quick-action-fab"
 import QuickPaymentDialog from "@/components/quick-payment-dialog"
 import { AiAssistantSheet } from "@/components/ai-assistant-sheet"
+import { ScrollToTopButton } from "@/components/scroll-to-top-button"
 import NotFound from "@/pages/not-found"
 import AuthPage from "@/pages/auth-page"
 
@@ -209,6 +210,8 @@ function Router() {
             </div>
             {/* AI 助手側邊抽屜 */}
             <AiAssistantSheet open={aiSheetOpen} onOpenChange={setAiSheetOpen} />
+            {/* 滾動回頂部按鈕（行動版 + 桌面版皆顯示） */}
+            <ScrollToTopButton />
             {/* 手機版底部導航欄 */}
             <MobileTabBar />
           </Route>
