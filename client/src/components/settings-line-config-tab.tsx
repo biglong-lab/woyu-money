@@ -1,52 +1,60 @@
 // LINE 設定 Tab 面板
-import { useEffect } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { CheckCircle2, FileText, Upload, Loader2, TestTube } from "lucide-react";
+import { useEffect } from "react"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { z } from "zod"
+import { CheckCircle2, FileText, Upload, Loader2, TestTube } from "lucide-react"
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { apiRequest } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Switch } from "@/components/ui/switch"
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form"
+import { apiRequest } from "@/lib/queryClient"
+import { useToast } from "@/hooks/use-toast"
 
 const lineConfigSchema = z.object({
   channelId: z.string().min(1, "Channel ID不能為空"),
   channelSecret: z.string().min(1, "Channel Secret不能為空"),
   callbackUrl: z.string().url("請輸入有效的URL"),
   isEnabled: z.boolean(),
-});
+})
 
-type LineConfigFormData = z.infer<typeof lineConfigSchema>;
+type LineConfigFormData = z.infer<typeof lineConfigSchema>
 
 interface LineConfig {
-  id?: number;
-  channelId?: string;
-  channelSecret?: string;
-  callbackUrl?: string;
-  isEnabled?: boolean;
+  id?: number
+  channelId?: string
+  channelSecret?: string
+  callbackUrl?: string
+  isEnabled?: boolean
 }
 
 interface GenerateCallbackResponse {
-  callbackUrl?: string;
+  callbackUrl?: string
 }
 
 interface TestConnectionResponse {
-  success: boolean;
-  message?: string;
+  success: boolean
+  message?: string
 }
 
 export default function SettingsLineConfigTab() {
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
+  const { toast } = useToast()
+  const queryClient = useQueryClient()
 
   const { data: lineConfig } = useQuery<LineConfig>({
     queryKey: ["/api/line-config"],
-  });
+  })
 
   const lineConfigForm = useForm<LineConfigFormData>({
     resolver: zodResolver(lineConfigSchema),
@@ -56,7 +64,7 @@ export default function SettingsLineConfigTab() {
       callbackUrl: "",
       isEnabled: false,
     },
-  });
+  })
 
   // 載入 LINE 設定
   useEffect(() => {
@@ -66,76 +74,80 @@ export default function SettingsLineConfigTab() {
         channelSecret: lineConfig.channelSecret || "",
         callbackUrl: lineConfig.callbackUrl || "",
         isEnabled: lineConfig.isEnabled || false,
-      });
+      })
     }
-  }, [lineConfig, lineConfigForm]);
+  }, [lineConfig, lineConfigForm])
 
   // 儲存 LINE 設定
   const saveLineConfigMutation = useMutation({
     mutationFn: async (data: LineConfigFormData) => {
       if (lineConfig && lineConfig.id) {
-        return await apiRequest("PUT", `/api/line-config/${lineConfig.id}`, data);
+        return await apiRequest("PUT", `/api/line-config/${lineConfig.id}`, data)
       } else {
-        return await apiRequest("POST", "/api/line-config", data);
+        return await apiRequest("POST", "/api/line-config", data)
       }
     },
     onSuccess: () => {
-      toast({ title: "設定已儲存", description: "LINE配置已成功保存到資料庫" });
-      queryClient.invalidateQueries({ queryKey: ["/api/line-config"] });
+      toast({ title: "設定已儲存", description: "LINE配置已成功保存到資料庫" })
+      queryClient.invalidateQueries({ queryKey: ["/api/line-config"] })
     },
     onError: (error: Error) => {
-      toast({ title: "儲存失敗", description: error.message, variant: "destructive" });
+      toast({ title: "儲存失敗", description: error.message, variant: "destructive" })
     },
-  });
+  })
 
   // 自動生成 Callback URL
   const generateCallbackUrlMutation = useMutation({
     mutationFn: async () => {
-      const timestamp = Date.now();
+      const timestamp = Date.now()
       const response = await fetch(`/api/line-config/generate-callback?t=${timestamp}`, {
         method: "GET",
         credentials: "include",
-        headers: { "Cache-Control": "no-cache", "Pragma": "no-cache" },
-      });
+        headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
+      })
       if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`HTTP ${response.status}: ${errorText}`);
+        const errorText = await response.text()
+        throw new Error(`HTTP ${response.status}: ${errorText}`)
       }
-      return await response.json() as GenerateCallbackResponse;
+      return (await response.json()) as GenerateCallbackResponse
     },
     onSuccess: (data) => {
       if (data && data.callbackUrl) {
-        lineConfigForm.setValue("callbackUrl", data.callbackUrl);
-        toast({ title: "已生成Callback URL", description: `已自動填入: ${data.callbackUrl}` });
+        lineConfigForm.setValue("callbackUrl", data.callbackUrl)
+        toast({ title: "已生成Callback URL", description: `已自動填入: ${data.callbackUrl}` })
       } else {
-        throw new Error("未收到有效的Callback URL");
+        throw new Error("未收到有效的Callback URL")
       }
     },
     onError: (error: Error) => {
-      toast({ title: "生成失敗", description: error.message || "無法生成Callback URL", variant: "destructive" });
+      toast({
+        title: "生成失敗",
+        description: error.message || "無法生成Callback URL",
+        variant: "destructive",
+      })
     },
-  });
+  })
 
   // 測試 LINE 連線
   const testLineConnectionMutation = useMutation({
     mutationFn: async (data: LineConfigFormData) => {
-      return await apiRequest("POST", "/api/line-config/test", data) as TestConnectionResponse;
+      return (await apiRequest("POST", "/api/line-config/test", data)) as TestConnectionResponse
     },
     onSuccess: (result) => {
       toast({
         title: result.success ? "連線成功" : "連線失敗",
         description: result.message || (result.success ? "LINE API連線正常" : "LINE API連線失敗"),
         variant: result.success ? "default" : "destructive",
-      });
+      })
     },
     onError: (error: Error) => {
       toast({
         title: "測試失敗",
         description: "無法連接到LINE API服務，請檢查網路連線或稍後再試",
         variant: "destructive",
-      });
+      })
     },
-  });
+  })
 
   return (
     <Card>
@@ -144,14 +156,14 @@ export default function SettingsLineConfigTab() {
           <CheckCircle2 className="w-5 h-5" />
           LINE登入設定
         </CardTitle>
-        <CardDescription>
-          配置LINE登入功能的相關參數
-        </CardDescription>
+        <CardDescription>配置LINE登入功能的相關參數</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         <Form {...lineConfigForm}>
-          <form onSubmit={lineConfigForm.handleSubmit((data) => saveLineConfigMutation.mutate(data))} className="space-y-6">
-
+          <form
+            onSubmit={lineConfigForm.handleSubmit((data) => saveLineConfigMutation.mutate(data))}
+            className="space-y-6"
+          >
             {/* 基本設定 */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <FormField
@@ -159,13 +171,13 @@ export default function SettingsLineConfigTab() {
                 name="channelId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Channel ID</FormLabel>
+                    <FormLabel>
+                      Channel ID <span className="text-red-500">*</span>
+                    </FormLabel>
                     <FormControl>
                       <Input placeholder="輸入LINE Channel ID" {...field} />
                     </FormControl>
-                    <FormDescription>
-                      從LINE Developers Console取得的Channel ID
-                    </FormDescription>
+                    <FormDescription>從LINE Developers Console取得的Channel ID</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -176,13 +188,13 @@ export default function SettingsLineConfigTab() {
                 name="channelSecret"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Channel Secret</FormLabel>
+                    <FormLabel>
+                      Channel Secret <span className="text-red-500">*</span>
+                    </FormLabel>
                     <FormControl>
                       <Input type="password" placeholder="輸入Channel Secret" {...field} />
                     </FormControl>
-                    <FormDescription>
-                      從LINE Developers Console取得的Channel Secret
-                    </FormDescription>
+                    <FormDescription>從LINE Developers Console取得的Channel Secret</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -194,7 +206,9 @@ export default function SettingsLineConfigTab() {
               name="callbackUrl"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Callback URL</FormLabel>
+                  <FormLabel>
+                    Callback URL <span className="text-red-500">*</span>
+                  </FormLabel>
                   <div className="flex gap-2">
                     <FormControl>
                       <Input placeholder="https://yourdomain.com/api/line/callback" {...field} />
@@ -213,7 +227,8 @@ export default function SettingsLineConfigTab() {
                     </Button>
                   </div>
                   <FormDescription>
-                    LINE登入完成後的回調URL，必須與LINE Developers Console中設定的一致。點擊「自動生成」可根據當前域名自動產生URL。
+                    LINE登入完成後的回調URL，必須與LINE Developers
+                    Console中設定的一致。點擊「自動生成」可根據當前域名自動產生URL。
                   </FormDescription>
                   {field.value && (
                     <div className="flex gap-2">
@@ -222,8 +237,8 @@ export default function SettingsLineConfigTab() {
                         variant="outline"
                         size="sm"
                         onClick={() => {
-                          navigator.clipboard.writeText(field.value);
-                          toast({ title: "已複製", description: "Callback URL已複製到剪貼板" });
+                          navigator.clipboard.writeText(field.value)
+                          toast({ title: "已複製", description: "Callback URL已複製到剪貼板" })
                         }}
                       >
                         複製URL
@@ -241,18 +256,11 @@ export default function SettingsLineConfigTab() {
               render={({ field }) => (
                 <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
                   <div className="space-y-0.5">
-                    <FormLabel className="text-base">
-                      啟用LINE登入
-                    </FormLabel>
-                    <FormDescription>
-                      開啟後用戶可以使用LINE帳號登入系統
-                    </FormDescription>
+                    <FormLabel className="text-base">啟用LINE登入</FormLabel>
+                    <FormDescription>開啟後用戶可以使用LINE帳號登入系統</FormDescription>
                   </div>
                   <FormControl>
-                    <Switch
-                      checked={field.value}
-                      onCheckedChange={field.onChange}
-                    />
+                    <Switch checked={field.value} onCheckedChange={field.onChange} />
                   </FormControl>
                 </FormItem>
               )}
@@ -265,9 +273,12 @@ export default function SettingsLineConfigTab() {
                 重要：請更新LINE Developer Console設定
               </h4>
               <div className="text-sm text-red-800 dark:text-red-200 space-y-2">
-                <p>如果看到「access.line.me 拒絕連線」錯誤，請確認在LINE Console中使用以下最新的Callback URL：</p>
+                <p>
+                  如果看到「access.line.me 拒絕連線」錯誤，請確認在LINE
+                  Console中使用以下最新的Callback URL：
+                </p>
                 <div className="mt-2 p-3 bg-red-100 dark:bg-red-900 rounded border font-mono text-xs break-all">
-                  {lineConfigForm.watch('callbackUrl') || '請先生成 Callback URL'}
+                  {lineConfigForm.watch("callbackUrl") || "請先生成 Callback URL"}
                 </div>
                 <div className="flex gap-2 mt-2">
                   <Button
@@ -275,10 +286,13 @@ export default function SettingsLineConfigTab() {
                     variant="outline"
                     size="sm"
                     onClick={() => {
-                      const url = lineConfigForm.watch('callbackUrl');
+                      const url = lineConfigForm.watch("callbackUrl")
                       if (url) {
-                        navigator.clipboard.writeText(url);
-                        toast({ title: "已複製", description: "請將此URL貼到LINE Console的Callback URL設定中" });
+                        navigator.clipboard.writeText(url)
+                        toast({
+                          title: "已複製",
+                          description: "請將此URL貼到LINE Console的Callback URL設定中",
+                        })
                       }
                     }}
                   >
@@ -288,7 +302,7 @@ export default function SettingsLineConfigTab() {
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() => window.open('https://developers.line.biz/console/', '_blank')}
+                    onClick={() => window.open("https://developers.line.biz/console/", "_blank")}
                   >
                     開啟LINE Console
                   </Button>
@@ -312,8 +326,8 @@ export default function SettingsLineConfigTab() {
                   variant="outline"
                   type="button"
                   onClick={() => {
-                    const formData = lineConfigForm.getValues();
-                    testLineConnectionMutation.mutate(formData);
+                    const formData = lineConfigForm.getValues()
+                    testLineConnectionMutation.mutate(formData)
                   }}
                   disabled={testLineConnectionMutation.isPending}
                 >
@@ -325,7 +339,9 @@ export default function SettingsLineConfigTab() {
                   測試連線
                 </Button>
                 <Button type="submit" disabled={saveLineConfigMutation.isPending}>
-                  {saveLineConfigMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                  {saveLineConfigMutation.isPending && (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  )}
                   儲存設定
                 </Button>
               </div>
@@ -336,9 +352,7 @@ export default function SettingsLineConfigTab() {
         {/* 設定說明 */}
         <Card className="border-blue-200 bg-blue-50 dark:bg-blue-950 dark:border-blue-800">
           <CardHeader>
-            <CardTitle className="text-lg text-blue-800 dark:text-blue-200">
-              設定說明
-            </CardTitle>
+            <CardTitle className="text-lg text-blue-800 dark:text-blue-200">設定說明</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
@@ -347,7 +361,9 @@ export default function SettingsLineConfigTab() {
             </div>
             <div className="space-y-2">
               <p className="font-medium">2. 取得憑證：</p>
-              <p className="ml-4">在Console中建立新的LINE Login頻道，取得Channel ID和Channel Secret</p>
+              <p className="ml-4">
+                在Console中建立新的LINE Login頻道，取得Channel ID和Channel Secret
+              </p>
             </div>
             <div className="space-y-2">
               <p className="font-medium">3. 設定Callback URL：</p>
@@ -361,5 +377,5 @@ export default function SettingsLineConfigTab() {
         </Card>
       </CardContent>
     </Card>
-  );
+  )
 }
