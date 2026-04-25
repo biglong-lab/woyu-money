@@ -1,14 +1,26 @@
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Trash2, TrendingUp, AlertTriangle, CheckCircle } from "lucide-react";
-import { UseFormReturn } from "react-hook-form";
-import { z } from "zod";
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Plus, Trash2, TrendingUp, AlertTriangle, CheckCircle } from "lucide-react"
+import { UseFormReturn } from "react-hook-form"
+import { z } from "zod"
 
 // 租約表單驗證 Schema（與主頁面共用）
 export const rentalContractSchema = z.object({
@@ -22,20 +34,24 @@ export const rentalContractSchema = z.object({
   bufferMonths: z.number().min(0, "緩衝期月數不能為負數").default(0),
   bufferIncludedInTerm: z.boolean().default(true),
   notes: z.string().optional(),
-  priceTiers: z.array(z.object({
-    yearStart: z.number().min(1),
-    yearEnd: z.number().min(1),
-    monthlyAmount: z.number().min(0),
-  })).min(1, "請至少添加一個價格階段"),
-});
+  priceTiers: z
+    .array(
+      z.object({
+        yearStart: z.number().min(1),
+        yearEnd: z.number().min(1),
+        monthlyAmount: z.number().min(0),
+      })
+    )
+    .min(1, "請至少添加一個價格階段"),
+})
 
-export type RentalContractForm = z.infer<typeof rentalContractSchema>;
+export type RentalContractForm = z.infer<typeof rentalContractSchema>
 
 // 價格階層資料
 export interface PriceTier {
-  yearStart: number;
-  yearEnd: number;
-  monthlyAmount: number;
+  yearStart: number
+  yearEnd: number
+  monthlyAmount: number
 }
 
 // 智慧調整表單 Schema
@@ -44,59 +60,59 @@ export const smartAdjustSchema = z.object({
   adjustmentValue: z.number(),
   effectiveDate: z.string(),
   reason: z.string().optional(),
-});
+})
 
-export type SmartAdjustForm = z.infer<typeof smartAdjustSchema>;
+export type SmartAdjustForm = z.infer<typeof smartAdjustSchema>
 
 // 智慧調整預覽結果（寬鬆型別，與主頁面相容）
 export interface AdjustmentPreview {
-  affectedItems: number;
-  totalAdjustment?: number;
-  currentAmount?: number;
-  newAmount?: number;
-  effectiveDate?: string;
+  affectedItems: number
+  totalAdjustment?: number
+  currentAmount?: number
+  newAmount?: number
+  effectiveDate?: string
 }
 
 // 租約相關的基礎型別（最小必要欄位）
 export interface RentalContractBase {
-  id: number;
-  contractName: string;
-  projectId?: number;
-  startDate?: string;
-  endDate?: string;
-  totalYears?: number;
-  baseAmount?: string | number;
-  isActive?: boolean | null;
-  notes?: string | null;
-  hasBufferPeriod?: boolean | null;
-  bufferMonths?: number | null;
-  bufferIncludedInTerm?: boolean | null;
+  id: number
+  contractName: string
+  projectId?: number
+  startDate?: string
+  endDate?: string
+  totalYears?: number
+  baseAmount?: string | number
+  isActive?: boolean | null
+  notes?: string | null
+  hasBufferPeriod?: boolean | null
+  bufferMonths?: number | null
+  bufferIncludedInTerm?: boolean | null
 }
 
 // 專案基礎型別
 export interface ProjectBase {
-  id: number;
-  projectName: string;
-  projectType?: string;
-  description?: string | null;
-  isActive?: boolean | null;
+  id: number
+  projectName: string
+  projectType?: string
+  description?: string | null
+  isActive?: boolean | null
 }
 
 // ==========================================
 // 建立/編輯租約對話框
 // ==========================================
 interface RentalContractDialogProps {
-  readonly isOpen: boolean;
-  readonly onOpenChange: (open: boolean) => void;
-  readonly editingContract: RentalContractBase | null;
-  readonly form: UseFormReturn<RentalContractForm>;
-  readonly projects: ProjectBase[];
-  readonly priceTiers: PriceTier[];
-  readonly onAddPriceTier: () => void;
-  readonly onRemovePriceTier: (index: number) => void;
-  readonly onUpdatePriceTier: (index: number, field: keyof PriceTier, value: number) => void;
-  readonly onSubmit: (data: RentalContractForm) => void;
-  readonly isSubmitting: boolean;
+  readonly isOpen: boolean
+  readonly onOpenChange: (open: boolean) => void
+  readonly editingContract: RentalContractBase | null
+  readonly form: UseFormReturn<RentalContractForm>
+  readonly projects: ProjectBase[]
+  readonly priceTiers: PriceTier[]
+  readonly onAddPriceTier: () => void
+  readonly onRemovePriceTier: (index: number) => void
+  readonly onUpdatePriceTier: (index: number, field: keyof PriceTier, value: number) => void
+  readonly onSubmit: (data: RentalContractForm) => void
+  readonly isSubmitting: boolean
 }
 
 export function RentalContractDialog({
@@ -126,18 +142,23 @@ export function RentalContractDialog({
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 md:space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="contractName">租約名稱</Label>
+              <Label htmlFor="contractName">
+                租約名稱 <span className="text-red-500">*</span>
+              </Label>
               <Input
                 id="contractName"
                 {...form.register("contractName")}
                 placeholder="輸入租約名稱"
+                autoFocus
               />
               {form.formState.errors.contractName && (
                 <p className="text-sm text-red-600">{form.formState.errors.contractName.message}</p>
               )}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="projectId">選擇專案</Label>
+              <Label htmlFor="projectId">
+                選擇專案 <span className="text-red-500">*</span>
+              </Label>
               <Select onValueChange={(value) => form.setValue("projectId", parseInt(value))}>
                 <SelectTrigger>
                   <SelectValue placeholder="選擇專案" />
@@ -158,7 +179,9 @@ export function RentalContractDialog({
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="startDate" className="text-sm font-medium">開始日期</Label>
+              <Label htmlFor="startDate" className="text-sm font-medium">
+                開始日期 <span className="text-red-500">*</span>
+              </Label>
               <Input
                 id="startDate"
                 type="date"
@@ -170,19 +193,18 @@ export function RentalContractDialog({
               )}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="endDate" className="text-sm font-medium">結束日期</Label>
-              <Input
-                id="endDate"
-                type="date"
-                {...form.register("endDate")}
-                className="w-full"
-              />
+              <Label htmlFor="endDate" className="text-sm font-medium">
+                結束日期 <span className="text-red-500">*</span>
+              </Label>
+              <Input id="endDate" type="date" {...form.register("endDate")} className="w-full" />
               {form.formState.errors.endDate && (
                 <p className="text-xs text-red-600">{form.formState.errors.endDate.message}</p>
               )}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="totalYears" className="text-sm font-medium">總年數</Label>
+              <Label htmlFor="totalYears" className="text-sm font-medium">
+                總年數 <span className="text-red-500">*</span>
+              </Label>
               <Input
                 id="totalYears"
                 type="number"
@@ -197,13 +219,16 @@ export function RentalContractDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="baseAmount">基礎金額</Label>
+            <Label htmlFor="baseAmount">
+              基礎金額 <span className="text-red-500">*</span>
+            </Label>
             <Input
               id="baseAmount"
               type="number"
               step="0.01"
               {...form.register("baseAmount", { valueAsNumber: true })}
               placeholder="基礎租金金額"
+              onFocus={(e) => e.target.select()}
             />
             {form.formState.errors.baseAmount && (
               <p className="text-sm text-red-600">{form.formState.errors.baseAmount.message}</p>
@@ -217,9 +242,9 @@ export function RentalContractDialog({
                 id="hasBufferPeriod"
                 checked={form.watch("hasBufferPeriod")}
                 onCheckedChange={(checked) => {
-                  form.setValue("hasBufferPeriod", !!checked);
+                  form.setValue("hasBufferPeriod", !!checked)
                   if (!checked) {
-                    form.setValue("bufferMonths", 0);
+                    form.setValue("bufferMonths", 0)
                   }
                 }}
               />
@@ -242,7 +267,9 @@ export function RentalContractDialog({
                       placeholder="免租金月數"
                     />
                     {form.formState.errors.bufferMonths && (
-                      <p className="text-sm text-red-600">{form.formState.errors.bufferMonths.message}</p>
+                      <p className="text-sm text-red-600">
+                        {form.formState.errors.bufferMonths.message}
+                      </p>
                     )}
                   </div>
                 </div>
@@ -260,7 +287,8 @@ export function RentalContractDialog({
                         className="w-4 h-4"
                       />
                       <Label htmlFor="bufferIncluded" className="text-sm">
-                        包含在租期內（緩衝期{form.watch("bufferMonths") || 0}個月免租金 + 租約{form.watch("totalYears") || 0}年 = 租期{form.watch("totalYears") || 0}年）
+                        包含在租期內（緩衝期{form.watch("bufferMonths") || 0}個月免租金 + 租約
+                        {form.watch("totalYears") || 0}年 = 租期{form.watch("totalYears") || 0}年）
                       </Label>
                     </div>
                     <div className="flex items-center space-x-2">
@@ -273,7 +301,9 @@ export function RentalContractDialog({
                         className="w-4 h-4"
                       />
                       <Label htmlFor="bufferNotIncluded" className="text-sm">
-                        未包含在租期內（緩衝期{form.watch("bufferMonths") || 0}個月免租金 + 租約{form.watch("totalYears") || 0}年 = 租期{form.watch("totalYears") || 0}年+{form.watch("bufferMonths") || 0}個月）
+                        未包含在租期內（緩衝期{form.watch("bufferMonths") || 0}個月免租金 + 租約
+                        {form.watch("totalYears") || 0}年 = 租期{form.watch("totalYears") || 0}年+
+                        {form.watch("bufferMonths") || 0}個月）
                       </Label>
                     </div>
                   </div>
@@ -301,7 +331,9 @@ export function RentalContractDialog({
                       <Input
                         type="number"
                         value={tier.yearStart}
-                        onChange={(e) => onUpdatePriceTier(index, "yearStart", parseInt(e.target.value))}
+                        onChange={(e) =>
+                          onUpdatePriceTier(index, "yearStart", parseInt(e.target.value))
+                        }
                         placeholder="開始年"
                       />
                     </div>
@@ -310,7 +342,9 @@ export function RentalContractDialog({
                       <Input
                         type="number"
                         value={tier.yearEnd}
-                        onChange={(e) => onUpdatePriceTier(index, "yearEnd", parseInt(e.target.value))}
+                        onChange={(e) =>
+                          onUpdatePriceTier(index, "yearEnd", parseInt(e.target.value))
+                        }
                         placeholder="結束年"
                       />
                     </div>
@@ -320,7 +354,9 @@ export function RentalContractDialog({
                         type="number"
                         step="0.01"
                         value={tier.monthlyAmount}
-                        onChange={(e) => onUpdatePriceTier(index, "monthlyAmount", parseFloat(e.target.value))}
+                        onChange={(e) =>
+                          onUpdatePriceTier(index, "monthlyAmount", parseFloat(e.target.value))
+                        }
                         placeholder="月租金"
                       />
                     </div>
@@ -343,12 +379,7 @@ export function RentalContractDialog({
 
           <div className="space-y-2">
             <Label htmlFor="notes">備註</Label>
-            <Textarea
-              id="notes"
-              {...form.register("notes")}
-              placeholder="租約相關備註"
-              rows={3}
-            />
+            <Textarea id="notes" {...form.register("notes")} placeholder="租約相關備註" rows={3} />
           </div>
 
           <div className="flex justify-end gap-2">
@@ -362,26 +393,26 @@ export function RentalContractDialog({
         </form>
       </DialogContent>
     </Dialog>
-  );
+  )
 }
 
 // ==========================================
 // 智慧調整對話框
 // ==========================================
 interface SmartAdjustDialogProps {
-  readonly isOpen: boolean;
-  readonly onOpenChange: (open: boolean) => void;
-  readonly selectedContract: RentalContractBase | null;
+  readonly isOpen: boolean
+  readonly onOpenChange: (open: boolean) => void
+  readonly selectedContract: RentalContractBase | null
   readonly adjustForm: UseFormReturn<{
-    adjustmentType: string;
-    adjustmentValue: number;
-    effectiveDate: string;
-    reason: string;
-  }>;
-  readonly adjustmentPreview: AdjustmentPreview | null;
-  readonly onPreview: () => void;
-  readonly onConfirm: () => void;
-  readonly isSubmitting: boolean;
+    adjustmentType: string
+    adjustmentValue: number
+    effectiveDate: string
+    reason: string
+  }>
+  readonly adjustmentPreview: AdjustmentPreview | null
+  readonly onPreview: () => void
+  readonly onConfirm: () => void
+  readonly isSubmitting: boolean
 }
 
 export function SmartAdjustDialog({
@@ -437,23 +468,26 @@ export function SmartAdjustDialog({
             </div>
             <div className="space-y-2">
               <Label>
-                {adjustForm.watch("adjustmentType") === "percentage" ? "調整百分比 (%)" : "調整金額 (NT$)"}
+                {adjustForm.watch("adjustmentType") === "percentage"
+                  ? "調整百分比 (%)"
+                  : "調整金額 (NT$)"}
               </Label>
               <Input
                 type="number"
                 step="0.01"
                 {...adjustForm.register("adjustmentValue", { valueAsNumber: true })}
-                placeholder={adjustForm.watch("adjustmentType") === "percentage" ? "如：5 表示增加5%" : "如：1000 表示增加1000元"}
+                placeholder={
+                  adjustForm.watch("adjustmentType") === "percentage"
+                    ? "如：5 表示增加5%"
+                    : "如：1000 表示增加1000元"
+                }
               />
             </div>
           </div>
 
           <div className="space-y-2">
             <Label>生效日期</Label>
-            <Input
-              type="date"
-              {...adjustForm.register("effectiveDate")}
-            />
+            <Input type="date" {...adjustForm.register("effectiveDate")} />
           </div>
 
           <div className="space-y-2">
@@ -476,8 +510,12 @@ export function SmartAdjustDialog({
               <CheckCircle className="h-4 w-4" />
               <AlertTitle>預覽結果</AlertTitle>
               <AlertDescription>
-                <span className="block">將調整 {adjustmentPreview.affectedItems} 個未來付款項目</span>
-                <span className="block">調整總金額：NT${(adjustmentPreview.totalAdjustment ?? 0).toLocaleString()}</span>
+                <span className="block">
+                  將調整 {adjustmentPreview.affectedItems} 個未來付款項目
+                </span>
+                <span className="block">
+                  調整總金額：NT${(adjustmentPreview.totalAdjustment ?? 0).toLocaleString()}
+                </span>
               </AlertDescription>
             </Alert>
           )}
@@ -486,16 +524,12 @@ export function SmartAdjustDialog({
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               取消
             </Button>
-            <Button
-              type="button"
-              onClick={onConfirm}
-              disabled={!adjustmentPreview || isSubmitting}
-            >
+            <Button type="button" onClick={onConfirm} disabled={!adjustmentPreview || isSubmitting}>
               確認調整
             </Button>
           </div>
         </form>
       </DialogContent>
     </Dialog>
-  );
+  )
 }
