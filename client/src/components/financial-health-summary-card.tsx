@@ -45,7 +45,27 @@ export function FinancialHealthSummaryCard() {
     queryKey: [`/api/late-fee/annual-loss?year=${year}`],
   })
 
-  if (!priority) return null
+  if (!priority) {
+    // 載入中骨架（避免突然出現造成 layout shift）
+    return (
+      <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200">
+        <CardContent className="p-3 sm:p-4 animate-pulse">
+          <div className="h-4 w-32 bg-gray-200 rounded mb-3" />
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="h-16 bg-gray-200/70 rounded" />
+            ))}
+          </div>
+          <div className="mt-3 h-2 bg-gray-200 rounded-full" />
+          <div className="mt-2 flex gap-2">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="h-5 w-16 bg-gray-200 rounded-full" />
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
 
   const overdueCount = priority.all.filter((r) => r.daysOverdue > 0).length
   const accumulatedLateFee = priority.all.reduce((s, r) => s + (r.lateFeeEstimate ?? 0), 0)
