@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { apiRequest, queryClient } from "@/lib/queryClient"
 import { useToast } from "@/hooks/use-toast"
+import { useCopyAmount } from "@/hooks/use-copy-amount"
 
 type Basis = "last_year_same_month" | "recent_average" | "overall_average" | "no_data"
 type Confidence = "high" | "medium" | "low"
@@ -88,6 +89,7 @@ interface MonthDetailData {
 
 function MonthDetail({ year, month }: { year: number; month: number }) {
   const { toast } = useToast()
+  const copyAmount = useCopyAmount()
   const [pendingId, setPendingId] = useState<number | null>(null)
   const queryKey = [`/api/cashflow/month-detail?year=${year}&month=${month}`]
   const { data, isLoading } = useQuery<MonthDetailData>({ queryKey })
@@ -130,7 +132,18 @@ function MonthDetail({ year, month }: { year: number; month: number }) {
                 )}
               </span>
             </div>
-            <span className="shrink-0 font-medium">{fmt(item.unpaidAmount)}</span>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                copyAmount(item.unpaidAmount, item.itemName)
+              }}
+              className="shrink-0 font-medium hover:text-blue-600 hover:underline cursor-pointer"
+              title="點擊複製金額"
+              data-testid={`copy-cashflow-amount-${item.id}`}
+            >
+              {fmt(item.unpaidAmount)}
+            </button>
             <Button
               size="sm"
               className="bg-green-600 hover:bg-green-700 text-[10px] h-6 px-2 shrink-0"
