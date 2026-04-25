@@ -357,7 +357,14 @@ export default function RentalMatrixPage() {
                           />
                         ))}
                         <td className="p-2 text-right text-xs text-gray-700">
-                          {formatNT(expected)}
+                          <button
+                            type="button"
+                            onClick={() => copyAmount(expected, `${c.contractName} ${year} 年應付`)}
+                            className="hover:text-blue-600 hover:underline cursor-pointer"
+                            title="點擊複製此合約年度應付總額"
+                          >
+                            {formatNT(expected)}
+                          </button>
                         </td>
                       </tr>
                     )
@@ -382,7 +389,16 @@ export default function RentalMatrixPage() {
                         </td>
                       )
                     })}
-                    <td className="p-2 text-right text-sm">{formatNT(data.totals.expected)}</td>
+                    <td className="p-2 text-right text-sm">
+                      <button
+                        type="button"
+                        onClick={() => copyAmount(data.totals.expected, `${year} 年應付總額`)}
+                        className="hover:text-blue-600 hover:underline cursor-pointer"
+                        title="點擊複製年度應付總額"
+                      >
+                        {formatNT(data.totals.expected)}
+                      </button>
+                    </td>
                   </tr>
                   {/* 每月已付小計 */}
                   <tr className="font-semibold bg-green-50">
@@ -398,7 +414,14 @@ export default function RentalMatrixPage() {
                       )
                     })}
                     <td className="p-2 text-right text-sm text-green-700">
-                      {formatNT(data.totals.paid)}
+                      <button
+                        type="button"
+                        onClick={() => copyAmount(data.totals.paid, `${year} 年已付總額`)}
+                        className="hover:text-blue-600 hover:underline cursor-pointer"
+                        title="點擊複製年度已付總額"
+                      >
+                        {formatNT(data.totals.paid)}
+                      </button>
                     </td>
                   </tr>
                 </tfoot>
