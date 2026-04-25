@@ -584,8 +584,22 @@ export default function CashAllocationPage() {
         </CardContent>
       </Card>
 
-      {/* 空狀態提示 */}
-      {!result && !mutation.isPending && (
+      {/* 已全付清 → 慶祝畫面（不需要輸入金額） */}
+      {priority && priority.totalUnpaid === 0 && !result && (
+        <Card className="border-green-300 bg-gradient-to-br from-green-50 to-emerald-50">
+          <CardContent className="pt-10 pb-10 text-center">
+            <div className="text-6xl mb-3">✨</div>
+            <h3 className="text-xl sm:text-2xl font-bold text-green-700">
+              目前沒有需要分配的付款項目
+            </h3>
+            <p className="mt-2 text-sm text-green-600">全部都已付清或還未到期，繼續保持！</p>
+            <p className="mt-3 text-xs text-gray-500">下次有新的待付款項時，這裡會顯示分配建議</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* 空狀態提示（有未付但尚未輸入金額） */}
+      {!result && !mutation.isPending && priority && priority.totalUnpaid > 0 && (
         <Card className="bg-gray-50">
           <CardContent className="pt-6 text-center text-gray-600">
             <p className="text-sm">
