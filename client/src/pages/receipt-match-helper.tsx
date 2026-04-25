@@ -5,7 +5,8 @@
 
 import { useState } from "react"
 import { useMutation } from "@tanstack/react-query"
-import { Receipt, CheckCircle2, ArrowRight } from "lucide-react"
+import { Link } from "wouter"
+import { Receipt, CheckCircle2, ArrowRight, Plus } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -260,8 +261,16 @@ export default function ReceiptMatchHelperPage() {
           </CardHeader>
           <CardContent className="space-y-2">
             {result.candidates.length === 0 ? (
-              <div className="text-sm text-gray-600 py-4">
-                沒有符合的既有項目。可能需要新建付款項目。
+              <div className="space-y-3 py-2">
+                <div className="text-sm text-gray-600">
+                  沒有符合的既有項目。可能是新支出，需要新建付款項目。
+                </div>
+                <Link href="/general-payment-management">
+                  <Button variant="outline" size="sm" className="text-xs">
+                    <Plus className="h-3 w-3 mr-1" />
+                    前往新建付款項目
+                  </Button>
+                </Link>
               </div>
             ) : (
               result.candidates.map((c) => (
