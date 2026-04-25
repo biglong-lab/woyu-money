@@ -29,7 +29,7 @@ import {
   X,
 } from "lucide-react"
 import { Link } from "wouter"
-import { useState, useMemo, useCallback } from "react"
+import { useState, useMemo, useCallback, useEffect, useRef } from "react"
 import type { PaymentItem, PaymentRecord, PaymentSchedule } from "@shared/schema"
 import { QuickAddDrawer, useQuickCameraUpload } from "@/components/quick-add-drawer"
 import { QuickPaymentDialog } from "@/components/quick-payment-dialog"
@@ -97,10 +97,27 @@ interface InboxStats {
 
 export default function PaymentHome() {
   useDocumentTitle()
+  const searchInputRef = useRef<HTMLInputElement>(null)
   const [searchQuery, setSearchQuery] = useState("")
   const [showQuickAdd, setShowQuickAdd] = useState(false)
   const [showQuickPay, setShowQuickPay] = useState(false)
   const { openCamera, isUploading } = useQuickCameraUpload()
+
+  // 鍵盤快捷鍵：按 "/" 聚焦搜尋（不在 input 中時）
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key !== "/") return
+      const target = e.target as HTMLElement | null
+      const tag = target?.tagName
+      // 已在 input/textarea/contenteditable 中時不攔截
+      if (tag === "INPUT" || tag === "TEXTAREA" || target?.isContentEditable) return
+      e.preventDefault()
+      searchInputRef.current?.focus()
+      searchInputRef.current?.select()
+    }
+    window.addEventListener("keydown", handler)
+    return () => window.removeEventListener("keydown", handler)
+  }, [])
 
   // API 查詢
   const { data: overallStats } = useQuery({
@@ -327,7 +344,8 @@ export default function PaymentHome() {
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
         <Input
-          placeholder="搜尋項目或專案..."
+          ref={searchInputRef}
+          placeholder="搜尋項目或專案、輸入金額（按 / 快速聚焦）"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           onKeyDown={(e) => {
