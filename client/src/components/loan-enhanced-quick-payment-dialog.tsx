@@ -4,32 +4,32 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
+} from "@/components/ui/dialog"
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import type { LoanInvestmentRecord, QuickPaymentFormData } from "./loan-enhanced-types";
+} from "@/components/ui/select"
+import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
+import { Textarea } from "@/components/ui/textarea"
+import { Label } from "@/components/ui/label"
+import type { LoanInvestmentRecord, QuickPaymentFormData } from "./loan-enhanced-types"
 
 // ==========================================
 // 借貸投資管理 - 快速還款 Dialog
 // ==========================================
 
 export interface LoanEnhancedQuickPaymentDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  record: LoanInvestmentRecord | null;
-  formData: QuickPaymentFormData;
-  onFormChange: (data: QuickPaymentFormData) => void;
-  onSubmit: () => void;
-  isPending: boolean;
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  record: LoanInvestmentRecord | null
+  formData: QuickPaymentFormData
+  onFormChange: (data: QuickPaymentFormData) => void
+  onSubmit: () => void
+  isPending: boolean
 }
 
 export function LoanEnhancedQuickPaymentDialog({
@@ -46,28 +46,30 @@ export function LoanEnhancedQuickPaymentDialog({
     key: K,
     value: QuickPaymentFormData[K]
   ) => {
-    onFormChange({ ...formData, [key]: value });
-  };
+    onFormChange({ ...formData, [key]: value })
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>快速還款記錄</DialogTitle>
-          <DialogDescription>
-            為 {record?.itemName} 記錄還款
-          </DialogDescription>
+          <DialogDescription>為 {record?.itemName} 記錄還款</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
           <div>
-            <Label htmlFor="paymentAmount">還款金額 *</Label>
+            <Label htmlFor="paymentAmount">
+              還款金額 <span className="text-red-500">*</span>
+            </Label>
             <Input
               id="paymentAmount"
               type="number"
               value={formData.amount}
               onChange={(e) => updateField("amount", e.target.value)}
               placeholder="0"
+              onFocus={(e) => e.target.select()}
+              autoFocus
             />
           </div>
 
@@ -136,14 +138,11 @@ export function LoanEnhancedQuickPaymentDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             取消
           </Button>
-          <Button
-            onClick={onSubmit}
-            disabled={isPending || !formData.amount}
-          >
+          <Button onClick={onSubmit} disabled={isPending || !formData.amount}>
             {isPending ? "記錄中..." : "記錄還款"}
           </Button>
         </div>
       </DialogContent>
     </Dialog>
-  );
+  )
 }

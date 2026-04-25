@@ -1,22 +1,29 @@
 // 一般付款管理 - 付款對話框元件
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { UseFormReturn, FieldValues } from "react-hook-form";
-import { useToast } from "@/hooks/use-toast";
-import type { PaymentItem } from "./general-payment-types";
+import { useState } from "react"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import { Label } from "@/components/ui/label"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form"
+import { UseFormReturn, FieldValues } from "react-hook-form"
+import { useToast } from "@/hooks/use-toast"
+import type { PaymentItem } from "./general-payment-types"
 
 export interface GeneralPaymentPaymentDialogProps {
-  isOpen: boolean;
-  onOpenChange: (open: boolean) => void;
-  paymentForm: UseFormReturn<FieldValues>;
-  paymentItem: PaymentItem | null;
-  onSubmit: (data: FieldValues, receiptFile: File | null) => void;
-  isPending: boolean;
+  isOpen: boolean
+  onOpenChange: (open: boolean) => void
+  paymentForm: UseFormReturn<FieldValues>
+  paymentItem: PaymentItem | null
+  onSubmit: (data: FieldValues, receiptFile: File | null) => void
+  isPending: boolean
 }
 
 export function GeneralPaymentPaymentDialog({
@@ -27,52 +34,52 @@ export function GeneralPaymentPaymentDialog({
   onSubmit,
   isPending,
 }: GeneralPaymentPaymentDialogProps) {
-  const { toast } = useToast();
-  const [receiptFile, setReceiptFile] = useState<File | null>(null);
-  const [receiptPreview, setReceiptPreview] = useState<string | null>(null);
+  const { toast } = useToast()
+  const [receiptFile, setReceiptFile] = useState<File | null>(null)
+  const [receiptPreview, setReceiptPreview] = useState<string | null>(null)
 
   // 圖片上傳處理
   const handleReceiptUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
+    const file = event.target.files?.[0]
     if (file) {
       if (file.size > 5 * 1024 * 1024) {
         toast({
           title: "文件過大",
           description: "請選擇小於5MB的圖片文件",
           variant: "destructive",
-        });
-        return;
+        })
+        return
       }
 
-      if (!file.type.startsWith('image/')) {
+      if (!file.type.startsWith("image/")) {
         toast({
           title: "文件格式錯誤",
           description: "請選擇圖片文件",
           variant: "destructive",
-        });
-        return;
+        })
+        return
       }
 
-      setReceiptFile(file);
+      setReceiptFile(file)
 
-      const reader = new FileReader();
+      const reader = new FileReader()
       reader.onload = (e) => {
-        setReceiptPreview(e.target?.result as string);
-      };
-      reader.readAsDataURL(file);
+        setReceiptPreview(e.target?.result as string)
+      }
+      reader.readAsDataURL(file)
     }
-  };
+  }
 
   const removeReceiptFile = () => {
-    setReceiptFile(null);
-    setReceiptPreview(null);
-  };
+    setReceiptFile(null)
+    setReceiptPreview(null)
+  }
 
   const handleFormSubmit = (data: FieldValues) => {
-    onSubmit(data, receiptFile);
+    onSubmit(data, receiptFile)
     // 清除本地檔案狀態
-    removeReceiptFile();
-  };
+    removeReceiptFile()
+  }
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -81,10 +88,23 @@ export function GeneralPaymentPaymentDialog({
           <DialogTitle>付款記錄</DialogTitle>
           {paymentItem && (
             <div className="text-sm text-gray-600 space-y-1">
-              <p><strong>項目：</strong>{paymentItem.itemName}</p>
-              <p><strong>總金額：</strong>NT$ {parseFloat(paymentItem.totalAmount).toLocaleString()}</p>
-              <p><strong>已付金額：</strong>NT$ {parseFloat(paymentItem.paidAmount || "0").toLocaleString()}</p>
-              <p><strong>待付金額：</strong>NT$ {(parseFloat(paymentItem.totalAmount) - parseFloat(paymentItem.paidAmount || "0")).toLocaleString()}</p>
+              <p>
+                <strong>項目：</strong>
+                {paymentItem.itemName}
+              </p>
+              <p>
+                <strong>總金額：</strong>NT$ {parseFloat(paymentItem.totalAmount).toLocaleString()}
+              </p>
+              <p>
+                <strong>已付金額：</strong>NT${" "}
+                {parseFloat(paymentItem.paidAmount || "0").toLocaleString()}
+              </p>
+              <p>
+                <strong>待付金額：</strong>NT${" "}
+                {(
+                  parseFloat(paymentItem.totalAmount) - parseFloat(paymentItem.paidAmount || "0")
+                ).toLocaleString()}
+              </p>
             </div>
           )}
         </DialogHeader>
@@ -95,9 +115,18 @@ export function GeneralPaymentPaymentDialog({
               name="paymentAmount"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>付款金額</FormLabel>
+                  <FormLabel>
+                    付款金額 <span className="text-red-500">*</span>
+                  </FormLabel>
                   <FormControl>
-                    <Input {...field} type="number" step="0.01" placeholder="輸入付款金額" />
+                    <Input
+                      {...field}
+                      type="number"
+                      step="0.01"
+                      placeholder="輸入付款金額"
+                      onFocus={(e) => e.target.select()}
+                      autoFocus
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -108,7 +137,9 @@ export function GeneralPaymentPaymentDialog({
               name="paymentDate"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>付款日期</FormLabel>
+                  <FormLabel>
+                    付款日期 <span className="text-red-500">*</span>
+                  </FormLabel>
                   <FormControl>
                     <Input {...field} type="date" />
                   </FormControl>
@@ -164,18 +195,12 @@ export function GeneralPaymentPaymentDialog({
                   </div>
                 )}
 
-                <p className="text-xs text-gray-500">
-                  支援格式：JPG, PNG, GIF（最大 5MB）
-                </p>
+                <p className="text-xs text-gray-500">支援格式：JPG, PNG, GIF（最大 5MB）</p>
               </div>
             </div>
 
             <div className="flex justify-end gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-              >
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 取消
               </Button>
               <Button type="submit" disabled={isPending}>
@@ -186,5 +211,5 @@ export function GeneralPaymentPaymentDialog({
         </Form>
       </DialogContent>
     </Dialog>
-  );
+  )
 }
