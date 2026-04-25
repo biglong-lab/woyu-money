@@ -701,6 +701,29 @@ export function TodayFocusCard() {
           </div>
         </div>
         <ScopeTabs scope={scope} onChange={setScope} counts={scopeCounts} />
+        {/* 今日進度條（完成成就感） */}
+        {scope === "today" &&
+          completed.count > 0 &&
+          (() => {
+            const total = completed.count + visibleItems.length
+            const pct = total > 0 ? (completed.count / total) * 100 : 0
+            return (
+              <div className="mt-2 px-1">
+                <div className="flex items-center justify-between text-[10px] text-gray-500 mb-0.5">
+                  <span>
+                    今日進度 {completed.count}/{total}
+                  </span>
+                  <span className="font-medium text-green-700">{Math.round(pct)}%</span>
+                </div>
+                <div className="h-1.5 rounded-full bg-gray-200 overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-green-400 to-emerald-500 transition-all"
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+              </div>
+            )
+          })()}
       </CardHeader>
       <CardContent className="space-y-3">
         {current ? (
