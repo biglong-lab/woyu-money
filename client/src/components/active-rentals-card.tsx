@@ -285,13 +285,20 @@ export function ActiveRentalsCard() {
                 <Button
                   size="sm"
                   className="bg-green-600 hover:bg-green-700 text-xs h-7 shrink-0"
-                  onClick={() =>
+                  onClick={() => {
+                    const due = cell.expectedAmount - cell.paidAmount
+                    if (
+                      !window.confirm(
+                        `確定為「${contract.contractName}」標記 ${formatNT(due)} 為已付？`
+                      )
+                    )
+                      return
                     markPaidMutation.mutate({
                       projectId: cell.contractId,
                       contractName: contract.contractName,
                       expected: cell.expectedAmount,
                     })
-                  }
+                  }}
                   disabled={pendingId === cell.contractId}
                   data-testid={`active-rental-paid-${cell.contractId}`}
                 >
