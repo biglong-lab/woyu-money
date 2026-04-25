@@ -115,6 +115,13 @@ export function RecentPaymentsCard() {
     { today: [], yesterday: [], this_week: [], earlier: [] }
   )
 
+  // 今日達成（成就感正向回饋）
+  const todayCount = grouped.today.length
+  const todayTotal = grouped.today.reduce(
+    (s, rec) => s + Number(rec.amountPaid ?? rec.amount ?? 0),
+    0
+  )
+
   const handleUndo = (rec: PaymentRecordWithNames) => {
     if (
       !window.confirm(
@@ -139,6 +146,11 @@ export function RecentPaymentsCard() {
             </span>
           </Link>
         </div>
+        {todayCount > 0 && (
+          <div className="mt-1.5 text-xs font-medium text-green-700 bg-green-50 rounded px-2 py-1 border border-green-200">
+            🎉 今天已完成 {todayCount} 件付款 · 共 {fmt(todayTotal)}
+          </div>
+        )}
       </CardHeader>
       <CardContent className="space-y-3">
         {(["today", "yesterday", "this_week", "earlier"] as DateGroup[]).map((group) => {
