@@ -20,6 +20,7 @@ import { useOnlineStatus } from "@/hooks/use-online-status"
 import { apiRequest, queryClient } from "@/lib/queryClient"
 import { localDateISO, friendlyApiError, formatNT } from "@/lib/utils"
 import { Search, DollarSign, CheckCircle2, ArrowRight, Loader2 } from "lucide-react"
+import { ReceiptUploadButton } from "@/components/receipt-upload-button"
 
 interface QuickPaymentDialogProps {
   open: boolean
@@ -51,6 +52,7 @@ interface PaymentFormData {
   amountPaid: string
   paymentDate: string
   paymentMethod: string
+  receiptImageUrl?: string | null
 }
 
 export function QuickPaymentDialog({ open, onOpenChange }: QuickPaymentDialogProps) {
@@ -62,6 +64,7 @@ export function QuickPaymentDialog({ open, onOpenChange }: QuickPaymentDialogPro
   const [amount, setAmount] = useState("")
   const [paymentMethod, setPaymentMethod] = useState("bank_transfer")
   const [paymentDate, setPaymentDate] = useState(localDateISO())
+  const [receiptUrl, setReceiptUrl] = useState<string | null>(null)
 
   // 查詢所有付款項目（使用 includeAll 取得完整陣列）
   const { data: paymentItemsData, isLoading } = useQuery<
@@ -104,6 +107,7 @@ export function QuickPaymentDialog({ open, onOpenChange }: QuickPaymentDialogPro
         amount: data.amountPaid,
         paymentDate: data.paymentDate,
         paymentMethod: data.paymentMethod,
+        ...(data.receiptImageUrl ? { receiptImageUrl: data.receiptImageUrl } : {}),
       })
     },
     onSuccess: () => {
@@ -135,6 +139,7 @@ export function QuickPaymentDialog({ open, onOpenChange }: QuickPaymentDialogPro
       amountPaid: amount,
       paymentDate,
       paymentMethod,
+      receiptImageUrl: receiptUrl,
     })
   }
 
@@ -145,6 +150,7 @@ export function QuickPaymentDialog({ open, onOpenChange }: QuickPaymentDialogPro
     setAmount("")
     setPaymentMethod("bank_transfer")
     setPaymentDate(localDateISO())
+    setReceiptUrl(null)
     onOpenChange(false)
   }
 
@@ -154,6 +160,7 @@ export function QuickPaymentDialog({ open, onOpenChange }: QuickPaymentDialogPro
     setSearchQuery("")
     setSelectedItem(null)
     setAmount("")
+    setReceiptUrl(null)
     // 保留 paymentMethod 與 paymentDate（連續付款常用相同方式與日期）
   }
 
@@ -352,6 +359,14 @@ export function QuickPaymentDialog({ open, onOpenChange }: QuickPaymentDialogPro
                   onChange={(e) => setPaymentDate(e.target.value)}
                   className="mt-1"
                 />
+              </div>
+
+              {/* 收據上傳（選填） */}
+              <div>
+                <Label className="block mb-2">
+                  付款憑證 <span className="text-gray-400 text-xs">（選填）</span>
+                </Label>
+                <ReceiptUploadButton value={receiptUrl} onChange={setReceiptUrl} />
               </div>
             </div>
 
