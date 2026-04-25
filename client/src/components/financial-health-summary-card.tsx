@@ -70,6 +70,11 @@ export function FinancialHealthSummaryCard() {
   const accumulatedLateFee = priority.all.reduce((s, r) => s + (r.lateFeeEstimate ?? 0), 0)
   const yearLateFee = annual?.totalLateFee ?? 0
 
+  // 本月還剩天數（給時間壓迫感）
+  const today = new Date()
+  const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate()
+  const daysLeftInMonth = lastDayOfMonth - today.getDate()
+
   // 找最緊急的：有逾期就顯示最久逾期，否則顯示最近到期
   const mostOverdue = priority.all
     .filter((r) => r.daysOverdue > 0)
@@ -84,7 +89,17 @@ export function FinancialHealthSummaryCard() {
       <CardContent className="p-3 sm:p-4">
         <div className="flex items-center justify-between mb-2">
           <h2 className="text-sm sm:text-base font-semibold text-gray-900">📊 財務健康度</h2>
-          <span className="text-xs text-gray-500">{year} 年度</span>
+          <span className="text-xs text-gray-500">
+            {year}/{today.getMonth() + 1}
+            {daysLeftInMonth > 0 && (
+              <span
+                className={`ml-1.5 ${daysLeftInMonth <= 5 ? "text-red-600 font-semibold" : "text-gray-500"}`}
+                title={`本月還剩 ${daysLeftInMonth} 天`}
+              >
+                · 剩 {daysLeftInMonth} 天
+              </span>
+            )}
+          </span>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
           <Link href="/cash-allocation">
