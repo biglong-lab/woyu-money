@@ -1,6 +1,6 @@
 /** 價格階段 Tab 內容 */
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Table,
   TableBody,
@@ -8,13 +8,14 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
-import { Calendar } from "lucide-react";
-import type { PriceTier } from "./types";
+} from "@/components/ui/table"
+import { Calendar } from "lucide-react"
+import { formatNT } from "@/lib/utils"
+import type { PriceTier } from "./types"
 
 interface PricingTabProps {
-  priceTiers: PriceTier[] | undefined;
-  isLoading: boolean;
+  priceTiers: PriceTier[] | undefined
+  isLoading: boolean
 }
 
 /** 顯示合約的價格階段設定 */
@@ -34,7 +35,7 @@ export function PricingTab({ priceTiers, isLoading }: PricingTabProps) {
         )}
       </CardContent>
     </Card>
-  );
+  )
 }
 
 /** 價格階段表格 */
@@ -57,14 +58,12 @@ function PriceTiersTable({ priceTiers }: { priceTiers: PriceTier[] }) {
             </TableCell>
             <TableCell>{tier.yearStart}</TableCell>
             <TableCell>{tier.yearEnd}</TableCell>
-            <TableCell className="font-medium">
-              {parseInt(tier.monthlyAmount).toLocaleString()} 元
-            </TableCell>
+            <TableCell className="font-medium">{formatNT(parseInt(tier.monthlyAmount))}</TableCell>
           </TableRow>
         ))}
       </TableBody>
     </Table>
-  );
+  )
 }
 
 /** 無價格階段時的空狀態 */
@@ -74,5 +73,5 @@ function EmptyPricingState() {
       <Calendar className="h-12 w-12 mx-auto mb-4 text-gray-400" />
       <p>未設定價格階段，使用基礎月租金</p>
     </div>
-  );
+  )
 }
