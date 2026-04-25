@@ -309,10 +309,12 @@ export function QuickAddDrawer({ open, onOpenChange }: QuickAddDrawerProps) {
               {/* 專案 + 到期日 — 同一行 */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <Label className="text-sm font-medium">專案</Label>
+                  <Label className="text-sm font-medium">
+                    專案 <span className="text-gray-400 font-normal">（選填）</span>
+                  </Label>
                   <Select value={projectId} onValueChange={setProjectId}>
                     <SelectTrigger className="mt-1 h-11">
-                      <SelectValue placeholder="選擇專案" />
+                      <SelectValue placeholder="不指定" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">不指定</SelectItem>
@@ -326,7 +328,7 @@ export function QuickAddDrawer({ open, onOpenChange }: QuickAddDrawerProps) {
                 </div>
                 <div>
                   <Label htmlFor="qa-date" className="text-sm font-medium">
-                    到期日
+                    到期日 <span className="text-gray-400 font-normal">（選填）</span>
                   </Label>
                   <Input
                     id="qa-date"
