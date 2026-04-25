@@ -190,7 +190,13 @@ export default function ReceiptMatchHelperPage() {
                 placeholder="例如：12,000"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
+                autoFocus
               />
+              {amount && parseFloat(amount.replace(/[,\s]/g, "")) > 0 && (
+                <div className="text-xs text-blue-700 font-medium">
+                  = NT$ {Math.round(parseFloat(amount.replace(/[,\s]/g, ""))).toLocaleString()}
+                </div>
+              )}
             </div>
             <div className="space-y-1">
               <Label htmlFor="date">日期</Label>
