@@ -207,6 +207,8 @@ const cellPaidBodySchema = z.object({
     .optional(),
 })
 
+// 只看 item_name 含租金/房租/租約/租賃，不能用 project_type='rental' 短路
+// （否則該 project 的雜費——洗滌、水肥、暫繳款、保險——會被誤當租金處理）
 const PROJECT_MONTH_RENT_ITEMS_SQL = `
   SELECT
     pi.id,
@@ -214,7 +216,6 @@ const PROJECT_MONTH_RENT_ITEMS_SQL = `
     pi.total_amount AS "totalAmount",
     COALESCE(pi.paid_amount, 0) AS "paidAmount"
   FROM payment_items pi
-  LEFT JOIN payment_projects pp ON pp.id = pi.project_id
   WHERE pi.is_deleted = false
     AND pi.project_id = $1
     AND EXTRACT(YEAR FROM pi.start_date) = $2
@@ -222,8 +223,7 @@ const PROJECT_MONTH_RENT_ITEMS_SQL = `
     AND COALESCE(pi.status, 'pending') != 'paid'
     AND (pi.total_amount::numeric - COALESCE(pi.paid_amount, 0)::numeric) > 0
     AND (
-      pp.project_type = 'rental'
-      OR pi.item_name ILIKE '%租金%'
+      pi.item_name ILIKE '%租金%'
       OR pi.item_name ILIKE '%房租%'
       OR pi.item_name ILIKE '%租約%'
       OR pi.item_name ILIKE '%租賃%'
