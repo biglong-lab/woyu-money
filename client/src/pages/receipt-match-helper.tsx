@@ -198,7 +198,7 @@ export default function ReceiptMatchHelperPage() {
               />
               {amount && parseFloat(amount.replace(/[,\s]/g, "")) > 0 && (
                 <div className="text-xs text-blue-700 font-medium">
-                  = NT$ {Math.round(parseFloat(amount.replace(/[,\s]/g, ""))).toLocaleString()}
+                  = {formatNT(parseFloat(amount.replace(/[,\s]/g, "")))}
                 </div>
               )}
             </div>
