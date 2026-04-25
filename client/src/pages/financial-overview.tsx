@@ -171,13 +171,15 @@ export default function FinancialOverview() {
     setActiveFilters(filters)
   }, [])
 
+  // 點擊項目 → 跳到付款紀錄頁並用 itemId 篩選（檢視該項目的所有付款歷史）
   const handleItemClick = useCallback(
     (item: PaymentItem) => {
-      setLocation(`/payment/items/${item.id}`)
+      setLocation(`/payment-records?itemId=${item.id}`)
     },
     [setLocation]
   )
 
+  // 快速付款 → 跳到專案付款頁，附帶 pay/amount query 讓對方頁開啟付款 dialog
   const handleQuickPay = useCallback(
     (item: PaymentItem) => {
       const pendingAmount = parseFloat(item.totalAmount || "0") - parseFloat(item.paidAmount || "0")
