@@ -25,6 +25,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
+import { useOnlineStatus } from "@/hooks/use-online-status"
 import { apiRequest, queryClient } from "@/lib/queryClient"
 import { localDateISO, formatNT, friendlyApiError } from "@/lib/utils"
 import { Camera, CheckCircle2, Loader2, ImagePlus, X } from "lucide-react"
@@ -96,6 +97,7 @@ function saveRecentItem(
 
 export function QuickAddDrawer({ open, onOpenChange }: QuickAddDrawerProps) {
   const { toast } = useToast()
+  const isOnline = useOnlineStatus()
   const cameraRef = useRef<HTMLInputElement>(null)
   const nameInputRef = useRef<HTMLInputElement>(null)
   const [itemName, setItemName] = useState("")
@@ -408,13 +410,14 @@ export function QuickAddDrawer({ open, onOpenChange }: QuickAddDrawerProps) {
             <DrawerFooter className="pt-2">
               <Button
                 onClick={handleSubmit}
-                disabled={!canSubmit || createMutation.isPending}
+                disabled={!canSubmit || createMutation.isPending || !isOnline}
                 className="w-full h-12 text-base font-medium"
+                title={!isOnline ? "離線中無法提交，請等網路恢復" : undefined}
               >
                 {createMutation.isPending ? (
                   <Loader2 className="w-5 h-5 animate-spin mr-2" />
                 ) : null}
-                建立付款項目
+                {!isOnline ? "離線中" : "建立付款項目"}
               </Button>
             </DrawerFooter>
           </>
