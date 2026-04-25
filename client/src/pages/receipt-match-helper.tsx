@@ -17,6 +17,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient"
 import { localDateISO, formatNT, friendlyApiError } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 import { useDocumentTitle } from "@/hooks/use-document-title"
+import { ReceiptUploadButton } from "@/components/receipt-upload-button"
 
 type Confidence = "high" | "medium" | "low"
 
@@ -113,6 +114,7 @@ export default function ReceiptMatchHelperPage() {
   const [vendor, setVendor] = useState("")
   const [ocrText, setOcrText] = useState("")
   const [result, setResult] = useState<MatchResult | null>(null)
+  const [receiptUrl, setReceiptUrl] = useState<string | null>(null)
   const { toast } = useToast()
 
   const suggestMutation = useMutation<MatchResult, Error, SuggestPayload>({
@@ -127,6 +129,7 @@ export default function ReceiptMatchHelperPage() {
       apiRequest("POST", `/api/payment/items/${data.itemId}/payments`, {
         amount: data.amountPaid,
         paymentDate: receiptDate || localDateISO(),
+        ...(receiptUrl ? { receiptImageUrl: receiptUrl } : {}),
       }),
     onSuccess: () => {
       toast({ title: "已標記為已付款" })
@@ -135,6 +138,7 @@ export default function ReceiptMatchHelperPage() {
       setReceiptDate("")
       setVendor("")
       setOcrText("")
+      setReceiptUrl(null)
       queryClient.invalidateQueries({ queryKey: ["/api/payment/priority-report?includeLow=true"] })
       queryClient.invalidateQueries({ queryKey: ["/api/payment/items"] })
     },
@@ -232,6 +236,13 @@ export default function ReceiptMatchHelperPage() {
                 onChange={(e) => setOcrText(e.target.value)}
                 rows={3}
               />
+            </div>
+            <div className="space-y-1 sm:col-span-2">
+              <Label className="block">付款憑證（選填）</Label>
+              <p className="text-xs text-muted-foreground mb-2">
+                上傳收據後，標記為已付時會自動連結
+              </p>
+              <ReceiptUploadButton value={receiptUrl} onChange={setReceiptUrl} />
             </div>
             <div className="sm:col-span-2">
               <Button type="submit" disabled={suggestMutation.isPending}>

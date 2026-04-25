@@ -30,6 +30,7 @@ import { localDateISO, formatNT, friendlyApiError } from "@/lib/utils"
 import { shareOrCopy } from "@/lib/share-or-copy"
 import { useToast } from "@/hooks/use-toast"
 import { useDocumentTitle } from "@/hooks/use-document-title"
+import { MarkPaidConfirmDialog } from "@/components/mark-paid-confirm-dialog"
 
 const BUDGET_PRESETS = [50000, 100000, 200000, 300000, 500000, 1000000]
 const BUDGET_KEY = "cash-allocation:lastBudget"
@@ -350,6 +351,7 @@ export default function CashAllocationPage() {
   const [budgetInput, setBudgetInput] = useState("")
   const [result, setResult] = useState<AllocationResult | null>(null)
   const [pendingId, setPendingId] = useState<number | null>(null)
+  const [paidDialogItem, setPaidDialogItem] = useState<PriorityResult | null>(null)
   const { toast } = useToast()
 
   // 取優先級報表，用來計算智能預設金額
@@ -418,23 +420,30 @@ export default function CashAllocationPage() {
     },
   })
 
-  const markPaidMutation = useMutation<unknown, Error, PriorityResult>({
-    mutationFn: (item) =>
+  // 多了 paymentDate / receiptUrl / amountPaid，讓使用者在 dialog 中可調整 + 附憑證
+  const markPaidMutation = useMutation<
+    unknown,
+    Error,
+    { item: PriorityResult; amountPaid: number; paymentDate: string; receiptUrl: string | null }
+  >({
+    mutationFn: ({ item, amountPaid, paymentDate, receiptUrl }) =>
       apiRequest("POST", `/api/payment/items/${item.id}/payments`, {
-        amount: item.unpaidAmount,
-        paymentDate: localDateISO(),
+        amount: amountPaid,
+        paymentDate,
+        ...(receiptUrl ? { receiptImageUrl: receiptUrl } : {}),
       }),
-    onMutate: (item) => setPendingId(item.id),
-    onSuccess: (_data, item) => {
+    onMutate: ({ item }) => setPendingId(item.id),
+    onSuccess: (_data, { item, amountPaid }) => {
       toast({
         title: "已標記為已付款",
-        description: `${item.itemName}（${formatNT(item.unpaidAmount)}）`,
+        description: `${item.itemName}（${formatNT(amountPaid)}）`,
       })
       // 重新計算分配
       const budget = parseBudgetInput(budgetInput)
       if (budget !== null) mutation.mutate(budget)
       queryClient.invalidateQueries({ queryKey: ["/api/payment/priority-report?includeLow=true"] })
       queryClient.invalidateQueries({ queryKey: ["/api/payment/items"] })
+      setPaidDialogItem(null)
     },
     onSettled: () => setPendingId(null),
     onError: (err) =>
@@ -442,7 +451,7 @@ export default function CashAllocationPage() {
   })
 
   const handleMarkPaid = (item: PriorityResult) => {
-    markPaidMutation.mutate(item)
+    setPaidDialogItem(item)
   }
 
   const handlePresetClick = (amount: number) => {
@@ -727,6 +736,25 @@ export default function CashAllocationPage() {
           )}
         </div>
       )}
+
+      {/* 標記已付確認對話框（含選填憑證上傳） */}
+      <MarkPaidConfirmDialog
+        open={!!paidDialogItem}
+        onOpenChange={(open) => !open && setPaidDialogItem(null)}
+        itemName={paidDialogItem?.itemName ?? ""}
+        defaultAmount={paidDialogItem?.unpaidAmount ?? 0}
+        description={paidDialogItem?.categoryLabel}
+        isPending={markPaidMutation.isPending}
+        onConfirm={(payload) => {
+          if (!paidDialogItem) return
+          markPaidMutation.mutate({
+            item: paidDialogItem,
+            amountPaid: payload.amountPaid,
+            paymentDate: payload.paymentDate,
+            receiptUrl: payload.receiptUrl,
+          })
+        }}
+      />
     </div>
   )
 }
