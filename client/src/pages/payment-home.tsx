@@ -28,7 +28,7 @@ import {
   Loader2,
   X,
 } from "lucide-react"
-import { Link } from "wouter"
+import { Link, useLocation } from "wouter"
 import { useState, useMemo, useCallback, useEffect, useRef } from "react"
 import type { PaymentItem, PaymentRecord, PaymentSchedule } from "@shared/schema"
 import { QuickAddDrawer, useQuickCameraUpload } from "@/components/quick-add-drawer"
@@ -97,6 +97,7 @@ interface InboxStats {
 
 export default function PaymentHome() {
   useDocumentTitle()
+  const [, setLocation] = useLocation()
   const searchInputRef = useRef<HTMLInputElement>(null)
   const [searchQuery, setSearchQuery] = useState("")
   const [showQuickAdd, setShowQuickAdd] = useState(false)
@@ -345,11 +346,16 @@ export default function PaymentHome() {
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
         <Input
           ref={searchInputRef}
-          placeholder="搜尋項目或專案、輸入金額（按 / 快速聚焦）"
+          placeholder="搜尋項目或專案、輸入金額（按 / 快速聚焦，Enter 跳轉）"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Escape") setSearchQuery("")
+            if (e.key === "Enter" && searchResults.length > 0) {
+              e.preventDefault()
+              setSearchQuery("")
+              setLocation("/payment-records")
+            }
           }}
           className="pl-10 pr-10 h-10 bg-white"
           data-testid="home-search-input"
