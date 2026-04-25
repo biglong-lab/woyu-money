@@ -164,6 +164,16 @@ export function QuickAddDrawer({ open, onOpenChange }: QuickAddDrawerProps) {
     onOpenChange(false)
   }
 
+  // 「再記一筆」：清空表單但不關閉 drawer
+  const handleAddAnother = () => {
+    setItemName("")
+    setTotalAmount("")
+    setProjectId("")
+    setEndDate("")
+    removePhoto()
+    setIsDone(false)
+  }
+
   const canSubmit = itemName.trim().length > 0 && parseFloat(totalAmount) > 0
 
   return (
@@ -181,9 +191,19 @@ export function QuickAddDrawer({ open, onOpenChange }: QuickAddDrawerProps) {
                 已建立「{itemName}」{formatNT(totalAmount)}
               </p>
             </div>
-            <Button onClick={handleClose} className="w-full max-w-xs">
-              完成
-            </Button>
+            <div className="flex gap-2 w-full max-w-xs">
+              <Button
+                variant="outline"
+                onClick={handleAddAnother}
+                className="flex-1"
+                data-testid="qa-add-another"
+              >
+                ➕ 再記一筆
+              </Button>
+              <Button onClick={handleClose} className="flex-1" data-testid="qa-done">
+                完成
+              </Button>
+            </div>
           </div>
         ) : (
           <>
