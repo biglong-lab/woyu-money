@@ -6,7 +6,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { useForm, type UseFormReturn, type FieldValues } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
-import { Plus, Search, ClipboardList, FileText, PieChart } from "lucide-react"
+import { Plus, Search, ClipboardList, FileText, PieChart, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -503,9 +503,22 @@ export default function ProjectBudgetManagement() {
               placeholder="搜尋預算計劃..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
+              onKeyDown={(e) => {
+                if (e.key === "Escape") setSearchTerm("")
+              }}
+              className="pl-10 pr-9"
               data-testid="input-search"
             />
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => setSearchTerm("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded"
+                title="清除搜尋（Esc）"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
           </div>
         </div>
         <Select value={selectedProject} onValueChange={setSelectedProject}>
