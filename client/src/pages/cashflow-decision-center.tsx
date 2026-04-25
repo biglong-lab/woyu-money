@@ -161,16 +161,16 @@ function MonthDetail({ year, month }: { year: number; month: number }) {
 
 function MonthCard({ forecast, gap }: { forecast: ForecastMonth; gap: GapItem }) {
   const [expanded, setExpanded] = useState(false)
+  const copyAmount = useCopyAmount()
   const hasGap = gap.gap !== undefined && gap.gap > 0
   const hasExpense = gap.estimatedExpense > 0
   const cls = hasGap ? "border-red-300 bg-red-50" : "border-green-200 bg-green-50"
   const conf = CONFIDENCE_META[forecast.confidence]
+  const monthLabel = `${forecast.year}/${String(forecast.month).padStart(2, "0")}`
   return (
     <div className={`rounded-lg border-l-4 p-3 ${cls}`}>
       <div className="flex items-center justify-between mb-2">
-        <div className="font-semibold text-sm">
-          {forecast.year}/{String(forecast.month).padStart(2, "0")}
-        </div>
+        <div className="font-semibold text-sm">{monthLabel}</div>
         <Badge className={`text-xs ${conf.color}`} variant="outline">
           {conf.label}
         </Badge>
@@ -178,17 +178,38 @@ function MonthCard({ forecast, gap }: { forecast: ForecastMonth; gap: GapItem })
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
         <div>
           <div className="text-gray-500">預估收入</div>
-          <div className="font-semibold text-green-700">{formatNT(gap.estimatedIncome)}</div>
+          <button
+            type="button"
+            onClick={() => copyAmount(gap.estimatedIncome, `${monthLabel} 預估收入`)}
+            className="font-semibold text-green-700 hover:underline cursor-pointer"
+            title="點擊複製金額"
+          >
+            {formatNT(gap.estimatedIncome)}
+          </button>
         </div>
         <div>
           <div className="text-gray-500">預估支出</div>
-          <div className="font-semibold text-red-700">{formatNT(gap.estimatedExpense)}</div>
+          <button
+            type="button"
+            onClick={() => copyAmount(gap.estimatedExpense, `${monthLabel} 預估支出`)}
+            className="font-semibold text-red-700 hover:underline cursor-pointer"
+            title="點擊複製金額"
+          >
+            {formatNT(gap.estimatedExpense)}
+          </button>
         </div>
         <div>
           <div className="text-gray-500">淨額</div>
-          <div className={`font-bold ${gap.net >= 0 ? "text-gray-900" : "text-red-700"}`}>
+          <button
+            type="button"
+            onClick={() => copyAmount(gap.net, `${monthLabel} 淨額`)}
+            className={`font-bold hover:underline cursor-pointer ${
+              gap.net >= 0 ? "text-gray-900" : "text-red-700"
+            }`}
+            title="點擊複製金額"
+          >
             {formatNT(gap.net)}
-          </div>
+          </button>
         </div>
       </div>
       <div className="mt-2 text-xs text-gray-500">來源：{BASIS_LABEL[forecast.basis]}</div>
@@ -196,7 +217,14 @@ function MonthCard({ forecast, gap }: { forecast: ForecastMonth; gap: GapItem })
         <div className="mt-2 flex items-start gap-2 text-xs text-red-800 bg-red-100 rounded p-2">
           <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
           <div>
-            <div className="font-semibold">缺口 {formatNT(gap.gap ?? 0)}</div>
+            <button
+              type="button"
+              onClick={() => copyAmount(gap.gap ?? 0, `${monthLabel} 缺口`)}
+              className="font-semibold hover:underline cursor-pointer"
+              title="點擊複製缺口金額（要籌的錢）"
+            >
+              缺口 {formatNT(gap.gap ?? 0)}
+            </button>
             <div>{gap.recommendation}</div>
           </div>
         </div>
