@@ -333,21 +333,29 @@ export default function PaymentHome() {
           </button>
           <button
             onClick={() => setShowQuickAdd(true)}
-            className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-700 text-white shadow-lg active:scale-95 transition-transform"
+            className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-700 text-white shadow-lg active:scale-95 transition-transform relative"
+            title="鍵盤快捷鍵：N"
           >
             <FileText className="w-8 h-8" />
             <span className="text-sm font-semibold">手動記帳</span>
+            <kbd className="hidden md:inline-block absolute top-2 right-2 px-1.5 py-0.5 bg-white/20 rounded text-[10px] font-mono">
+              N
+            </kbd>
           </button>
         </div>
 
         {/* 快速付款按鈕 — 次要但常用 */}
         <Button
           variant="outline"
-          className="w-full mt-2 h-11 gap-2 text-green-700 border-green-200 bg-green-50 hover:bg-green-100"
+          className="w-full mt-2 h-11 gap-2 text-green-700 border-green-200 bg-green-50 hover:bg-green-100 relative"
           onClick={() => setShowQuickPay(true)}
+          title="鍵盤快捷鍵：P"
         >
           <DollarSign className="w-4 h-4" />
           記錄已付款
+          <kbd className="hidden md:inline-block absolute right-3 top-1/2 -translate-y-1/2 px-1.5 py-0.5 bg-green-100 border border-green-200 rounded text-[10px] font-mono text-green-800">
+            P
+          </kbd>
         </Button>
       </div>
 
