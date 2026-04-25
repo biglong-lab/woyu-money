@@ -1,16 +1,17 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Building2, DollarSign, Clock, AlertTriangle } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Building2, DollarSign, Clock, AlertTriangle } from "lucide-react"
+import { formatNT } from "@/lib/utils"
 
 // 統計資料介面
 export interface RentalStatsData {
-  activeContracts?: number;
-  monthlyRevenue?: number;
-  pendingPayments?: number;
-  overduePayments?: number;
+  activeContracts?: number
+  monthlyRevenue?: number
+  pendingPayments?: number
+  overduePayments?: number
 }
 
 interface RentalStatsCardsProps {
-  readonly stats: RentalStatsData;
+  readonly stats: RentalStatsData
 }
 
 // 租金管理系統 - 統計卡片元件
@@ -23,7 +24,9 @@ export function RentalStatsCards({ stats }: RentalStatsCardsProps) {
           <Building2 className="h-4 w-4 text-blue-500" />
         </CardHeader>
         <CardContent>
-          <div className="text-xl md:text-2xl font-bold text-gray-900">{stats.activeContracts || 0}</div>
+          <div className="text-xl md:text-2xl font-bold text-gray-900">
+            {stats.activeContracts || 0}
+          </div>
           <p className="text-xs text-gray-500 mt-1">個合約</p>
         </CardContent>
       </Card>
@@ -34,7 +37,7 @@ export function RentalStatsCards({ stats }: RentalStatsCardsProps) {
         </CardHeader>
         <CardContent>
           <div className="text-lg md:text-2xl font-bold text-gray-900">
-            NT${(stats.monthlyRevenue || 0).toLocaleString()}
+            {formatNT(stats.monthlyRevenue || 0)}
           </div>
           <p className="text-xs text-gray-500 mt-1">本月預計</p>
         </CardContent>
@@ -45,7 +48,9 @@ export function RentalStatsCards({ stats }: RentalStatsCardsProps) {
           <Clock className="h-4 w-4 text-orange-500" />
         </CardHeader>
         <CardContent>
-          <div className="text-xl md:text-2xl font-bold text-orange-600">{stats.pendingPayments || 0}</div>
+          <div className="text-xl md:text-2xl font-bold text-orange-600">
+            {stats.pendingPayments || 0}
+          </div>
           <p className="text-xs text-gray-500 mt-1">筆待處理</p>
         </CardContent>
       </Card>
@@ -55,10 +60,12 @@ export function RentalStatsCards({ stats }: RentalStatsCardsProps) {
           <AlertTriangle className="h-4 w-4 text-red-500" />
         </CardHeader>
         <CardContent>
-          <div className="text-xl md:text-2xl font-bold text-red-600">{stats.overduePayments || 0}</div>
+          <div className="text-xl md:text-2xl font-bold text-red-600">
+            {stats.overduePayments || 0}
+          </div>
           <p className="text-xs text-gray-500 mt-1">需緊急處理</p>
         </CardContent>
       </Card>
     </div>
-  );
+  )
 }
