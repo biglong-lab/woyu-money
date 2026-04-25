@@ -195,9 +195,15 @@ export function QuickPaymentDialog({ open, onOpenChange }: QuickPaymentDialogPro
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <Input
-                placeholder="搜尋項目名稱、專案..."
+                placeholder="搜尋項目名稱、專案...（Enter 選第一個）"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && filteredItems.length > 0) {
+                    e.preventDefault()
+                    handleSelectItem(filteredItems[0])
+                  }
+                }}
                 className="pl-10"
                 autoFocus
               />
