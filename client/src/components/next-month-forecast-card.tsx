@@ -13,6 +13,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { formatNT } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 import { useCopyAmount } from "@/hooks/use-copy-amount"
+import { shareOrCopy } from "@/lib/share-or-copy"
 
 interface ForecastMonth {
   year: number
@@ -141,20 +142,10 @@ export function NextMonthForecastCard() {
                     `預估支出：${formatNT(gap.estimatedExpense)}\n` +
                     `預估缺口：${formatNT(gap.gap ?? 0)}\n\n` +
                     `💡 建議提前準備現金或安排融資`
-                  // 手機：用 native share UI（LINE/Messages 等）；桌面：fallback clipboard
-                  if (navigator.share) {
-                    try {
-                      await navigator.share({ title, text })
-                      return
-                    } catch {
-                      // 使用者取消分享 → 不顯示錯誤
-                      return
-                    }
-                  }
-                  try {
-                    await navigator.clipboard.writeText(text)
+                  const result = await shareOrCopy({ title, text })
+                  if (result === "copied") {
                     toast({ title: "已複製通知", description: "可貼到 LINE / 備忘錄" })
-                  } catch {
+                  } else if (result === "failed") {
                     toast({ title: "複製失敗", variant: "destructive" })
                   }
                 }}
