@@ -76,6 +76,20 @@ export function ActiveRentalsCard() {
       toast({ title: "標記失敗", description: err.message, variant: "destructive" }),
   })
 
+  // 一鍵複製金額（給轉帳貼到網銀用）
+  const copyAmount = async (amount: number, label?: string) => {
+    try {
+      await navigator.clipboard.writeText(String(Math.round(amount)))
+      toast({
+        title: "已複製金額",
+        description: label ? `${label}: ${fmt(amount)}` : fmt(amount),
+        duration: 1500,
+      })
+    } catch {
+      toast({ title: "複製失敗", variant: "destructive" })
+    }
+  }
+
   if (isLoading) {
     return (
       <Card>
@@ -172,7 +186,16 @@ export function ActiveRentalsCard() {
                   </Badge>
                 </div>
                 <div className="text-xs text-gray-600 mt-0.5">
-                  應付 {fmt(cell.expectedAmount)}
+                  應付{" "}
+                  <button
+                    type="button"
+                    onClick={() => copyAmount(cell.expectedAmount, contract.contractName)}
+                    className="font-medium hover:text-blue-600 hover:underline cursor-pointer"
+                    title="點擊複製數字（轉帳用）"
+                    data-testid={`copy-amount-${cell.contractId}`}
+                  >
+                    {fmt(cell.expectedAmount)}
+                  </button>
                   {cell.paidAmount > 0 && cell.status !== "paid" && (
                     <span className="ml-1">/ 已付 {fmt(cell.paidAmount)}</span>
                   )}
