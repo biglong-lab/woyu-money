@@ -40,31 +40,47 @@ interface ProjectItem {
   projectName: string
 }
 
-// 最近使用的項目名稱（localStorage 持久化）
-const RECENT_NAMES_KEY = "quick-add:recent-names"
-const MAX_RECENT_NAMES = 6
+// 最近使用的項目（localStorage 持久化，包含名稱 + 金額）
+const RECENT_ITEMS_KEY = "quick-add:recent-items"
+const RECENT_NAMES_KEY_OLD = "quick-add:recent-names" // 舊格式（v5.1）
+const MAX_RECENT_ITEMS = 6
 
-function loadRecentNames(): string[] {
-  try {
-    const raw = localStorage.getItem(RECENT_NAMES_KEY)
-    if (!raw) return []
-    const parsed = JSON.parse(raw)
-    return Array.isArray(parsed) ? parsed.slice(0, MAX_RECENT_NAMES) : []
-  } catch {
-    return []
-  }
+interface RecentItem {
+  name: string
+  amount: string
 }
 
-function saveRecentName(name: string): string[] {
-  if (!name.trim()) return loadRecentNames()
+function loadRecentItems(): RecentItem[] {
   try {
-    const current = loadRecentNames()
-    const filtered = current.filter((n) => n !== name)
-    const updated = [name, ...filtered].slice(0, MAX_RECENT_NAMES)
-    localStorage.setItem(RECENT_NAMES_KEY, JSON.stringify(updated))
+    const raw = localStorage.getItem(RECENT_ITEMS_KEY)
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      if (Array.isArray(parsed)) return parsed.slice(0, MAX_RECENT_ITEMS)
+    }
+    // 從舊格式遷移
+    const oldRaw = localStorage.getItem(RECENT_NAMES_KEY_OLD)
+    if (oldRaw) {
+      const old = JSON.parse(oldRaw)
+      if (Array.isArray(old)) {
+        return old.slice(0, MAX_RECENT_ITEMS).map((name: string) => ({ name, amount: "" }))
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return []
+}
+
+function saveRecentItem(name: string, amount: string): RecentItem[] {
+  if (!name.trim()) return loadRecentItems()
+  try {
+    const current = loadRecentItems()
+    const filtered = current.filter((item) => item.name !== name)
+    const updated = [{ name, amount }, ...filtered].slice(0, MAX_RECENT_ITEMS)
+    localStorage.setItem(RECENT_ITEMS_KEY, JSON.stringify(updated))
     return updated
   } catch {
-    return loadRecentNames()
+    return loadRecentItems()
   }
 }
 
@@ -79,7 +95,7 @@ export function QuickAddDrawer({ open, onOpenChange }: QuickAddDrawerProps) {
   const [attachedFile, setAttachedFile] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [isDone, setIsDone] = useState(false)
-  const [recentNames, setRecentNames] = useState<string[]>(loadRecentNames)
+  const [recentItems, setRecentItems] = useState<RecentItem[]>(loadRecentItems)
 
   // 查詢專案列表
   const { data: projectsData } = useQuery<ProjectItem[]>({
@@ -122,9 +138,9 @@ export function QuickAddDrawer({ open, onOpenChange }: QuickAddDrawerProps) {
       if (attachedFile) {
         queryClient.invalidateQueries({ queryKey: ["/api/document-inbox"] })
       }
-      // 儲存到最近使用清單
-      const updated = saveRecentName(itemName.trim())
-      setRecentNames(updated)
+      // 儲存到最近使用清單（含金額）
+      const updated = saveRecentItem(itemName.trim(), totalAmount)
+      setRecentItems(updated)
       setIsDone(true)
     },
     onError: (error: Error) => {
@@ -229,19 +245,27 @@ export function QuickAddDrawer({ open, onOpenChange }: QuickAddDrawerProps) {
                   className="mt-1 h-12 text-base"
                   autoFocus
                 />
-                {/* 最近使用 chips（避免每次重打） */}
-                {recentNames.length > 0 && (
+                {/* 最近使用 chips（點擊同時填入名稱與上次金額） */}
+                {recentItems.length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     <span className="text-xs text-gray-500 self-center">最近：</span>
-                    {recentNames.map((name) => (
+                    {recentItems.map((item) => (
                       <button
-                        key={name}
+                        key={item.name}
                         type="button"
-                        onClick={() => setItemName(name)}
+                        onClick={() => {
+                          setItemName(item.name)
+                          if (item.amount) setTotalAmount(item.amount)
+                        }}
                         className="text-xs px-2 py-1 rounded-full bg-gray-100 hover:bg-blue-100 hover:text-blue-700 transition-colors active:scale-95"
-                        data-testid={`recent-name-${name}`}
+                        title={
+                          item.amount
+                            ? `上次金額：NT$ ${parseFloat(item.amount).toLocaleString()}`
+                            : ""
+                        }
+                        data-testid={`recent-name-${item.name}`}
                       >
-                        {name}
+                        {item.name}
                       </button>
                     ))}
                   </div>
