@@ -30,9 +30,16 @@ const SHORTCUT_GROUPS: ShortcutGroup[] = [
     items: [{ keys: ["?"], description: "顯示鍵盤快捷鍵（再按一次關閉）" }],
   },
   {
+    title: "首頁",
+    items: [
+      { keys: ["/"], description: "聚焦搜尋" },
+      { keys: ["N"], description: "開啟快速記帳" },
+      { keys: ["P"], description: "開啟快速付款" },
+    ],
+  },
+  {
     title: "搜尋",
     items: [
-      { keys: ["/"], description: "聚焦首頁搜尋" },
       { keys: ["⌘", "K"], description: "聚焦財務總覽搜尋（Mac）" },
       { keys: ["Ctrl", "K"], description: "聚焦財務總覽搜尋（Win）" },
       { keys: ["Esc"], description: "清除目前搜尋字串" },
