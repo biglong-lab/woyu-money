@@ -1,17 +1,33 @@
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui/button"
 import {
-  Dialog, DialogContent, DialogDescription, DialogFooter,
-  DialogHeader, DialogTitle, DialogTrigger,
-} from "@/components/ui/dialog";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
 import {
-  Form, FormControl, FormField, FormItem, FormLabel, FormMessage,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus } from "lucide-react";
-import { UseFormReturn } from "react-hook-form";
-import type { PaymentItem, PaymentProject, DebtCategory, InsertPaymentItem } from "@shared/schema";
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Plus } from "lucide-react"
+import { UseFormReturn } from "react-hook-form"
+import type { PaymentItem, PaymentProject, DebtCategory, InsertPaymentItem } from "@shared/schema"
 
 // ========================================
 // 新增/編輯付款項目對話框元件
@@ -19,23 +35,23 @@ import type { PaymentItem, PaymentProject, DebtCategory, InsertPaymentItem } fro
 
 interface PaymentItemDialogProps {
   /** 對話框是否開啟 */
-  open: boolean;
+  open: boolean
   /** 開關狀態變更處理 */
-  onOpenChange: (open: boolean) => void;
+  onOpenChange: (open: boolean) => void
   /** 正在編輯的項目（null 表示新增模式） */
-  editingItem: PaymentItem | null;
+  editingItem: PaymentItem | null
   /** 表單實例 */
-  form: UseFormReturn<InsertPaymentItem>;
+  form: UseFormReturn<InsertPaymentItem>
   /** 表單提交處理 */
-  onSubmit: (data: InsertPaymentItem) => void;
+  onSubmit: (data: InsertPaymentItem) => void
   /** 重置編輯狀態 */
-  onResetEditing: () => void;
+  onResetEditing: () => void
   /** 是否正在處理中 */
-  isPending: boolean;
+  isPending: boolean
   /** 專案列表 */
-  projects: PaymentProject[];
+  projects: PaymentProject[]
   /** 分類列表 */
-  categories: DebtCategory[];
+  categories: DebtCategory[]
 }
 
 /** 新增或編輯付款項目對話框 */
@@ -55,9 +71,9 @@ export function PaymentItemDialog({
       open={open}
       onOpenChange={(isOpen) => {
         if (!isOpen) {
-          onResetEditing();
+          onResetEditing()
         }
-        onOpenChange(isOpen);
+        onOpenChange(isOpen)
       }}
     >
       <DialogTrigger asChild>
@@ -68,13 +84,9 @@ export function PaymentItemDialog({
       </DialogTrigger>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>
-            {editingItem ? "編輯付款項目" : "建立付款項目"}
-          </DialogTitle>
+          <DialogTitle>{editingItem ? "編輯付款項目" : "建立付款項目"}</DialogTitle>
           <DialogDescription>
-            {editingItem
-              ? "編輯現有的付款項目資訊"
-              : "建立新的付款項目並設定相關資訊"}
+            {editingItem ? "編輯現有的付款項目資訊" : "建立新的付款項目並設定相關資訊"}
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -86,7 +98,9 @@ export function PaymentItemDialog({
                 name="projectId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>專案 *</FormLabel>
+                    <FormLabel>
+                      專案 <span className="text-red-500">*</span>
+                    </FormLabel>
                     <FormControl>
                       <Select
                         onValueChange={(value) => field.onChange(parseInt(value))}
@@ -113,7 +127,9 @@ export function PaymentItemDialog({
                 name="categoryId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>分類 *</FormLabel>
+                    <FormLabel>
+                      分類 <span className="text-red-500">*</span>
+                    </FormLabel>
                     <FormControl>
                       <Select
                         onValueChange={(value) => field.onChange(parseInt(value))}
@@ -143,9 +159,11 @@ export function PaymentItemDialog({
               name="itemName"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>項目名稱 *</FormLabel>
+                  <FormLabel>
+                    項目名稱 <span className="text-red-500">*</span>
+                  </FormLabel>
                   <FormControl>
-                    <Input placeholder="輸入項目名稱" {...field} />
+                    <Input placeholder="輸入項目名稱" autoFocus {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -158,9 +176,11 @@ export function PaymentItemDialog({
               name="totalAmount"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>總金額 *</FormLabel>
+                  <FormLabel>
+                    總金額 <span className="text-red-500">*</span>
+                  </FormLabel>
                   <FormControl>
-                    <Input placeholder="輸入總金額" {...field} />
+                    <Input placeholder="輸入總金額" onFocus={(e) => e.target.select()} {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -174,7 +194,9 @@ export function PaymentItemDialog({
                 name="paymentType"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>付款類型 *</FormLabel>
+                    <FormLabel>
+                      付款類型 <span className="text-red-500">*</span>
+                    </FormLabel>
                     <FormControl>
                       <Select onValueChange={field.onChange} value={field.value}>
                         <SelectTrigger>
@@ -225,9 +247,11 @@ export function PaymentItemDialog({
                 name="startDate"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>開始日期 *</FormLabel>
+                    <FormLabel>
+                      開始日期 <span className="text-red-500">*</span>
+                    </FormLabel>
                     <FormControl>
-                      <Input type="date" {...field} value={field.value || ''} />
+                      <Input type="date" {...field} value={field.value || ""} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -240,7 +264,7 @@ export function PaymentItemDialog({
                   <FormItem>
                     <FormLabel>結束日期</FormLabel>
                     <FormControl>
-                      <Input type="date" {...field} value={field.value || ''} />
+                      <Input type="date" {...field} value={field.value || ""} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -256,7 +280,11 @@ export function PaymentItemDialog({
                 <FormItem>
                   <FormLabel>備註</FormLabel>
                   <FormControl>
-                    <Textarea placeholder="輸入備註資訊（選填）" {...field} value={field.value || ''} />
+                    <Textarea
+                      placeholder="輸入備註資訊（選填）"
+                      {...field}
+                      value={field.value || ""}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -265,14 +293,12 @@ export function PaymentItemDialog({
 
             <DialogFooter>
               <Button type="submit" disabled={isPending}>
-                {isPending
-                  ? "處理中..."
-                  : editingItem ? "更新項目" : "建立項目"}
+                {isPending ? "處理中..." : editingItem ? "更新項目" : "建立項目"}
               </Button>
             </DialogFooter>
           </form>
         </Form>
       </DialogContent>
     </Dialog>
-  );
+  )
 }
