@@ -13,6 +13,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient"
 import { formatNT, friendlyApiError } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 import { useCopyAmount } from "@/hooks/use-copy-amount"
+import { shareOrCopy } from "@/lib/share-or-copy"
 
 type CellStatus = "paid" | "partial" | "unpaid" | "upcoming" | "out_of_contract"
 
@@ -175,12 +176,13 @@ export function ActiveRentalsCard() {
     const text =
       `🏠 ${month} 月租金待繳（${pending.length} 件 / 共 ${formatNT(sumDue)}）：\n\n` +
       lines.join("\n")
-    try {
-      await navigator.clipboard.writeText(text)
+    const result = await shareOrCopy({ title: `${month} 月租金待繳清單`, text })
+    if (result === "copied") {
       toast({ title: "已複製清單", description: "可貼到 LINE / 備忘錄" })
-    } catch {
+    } else if (result === "failed") {
       toast({ title: "複製失敗", variant: "destructive" })
     }
+    // shared / cancelled 不顯示 toast
   }
 
   return (

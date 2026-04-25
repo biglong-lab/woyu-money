@@ -37,6 +37,7 @@ import {
 } from "@/components/ui/dialog"
 import { apiRequest, queryClient } from "@/lib/queryClient"
 import { localDateISO, formatNT, friendlyApiError } from "@/lib/utils"
+import { shareOrCopy } from "@/lib/share-or-copy"
 import { useToast } from "@/hooks/use-toast"
 import { useCopyAmount } from "@/hooks/use-copy-amount"
 
@@ -643,10 +644,10 @@ export function TodayFocusCard() {
       `📅 ${dateStr} 待付款清單（${items.length} 件）：\n\n` +
       lines.join("\n\n") +
       `\n\n💰 合計：${formatNT(total)}`
-    try {
-      await navigator.clipboard.writeText(text)
+    const result = await shareOrCopy({ title: `${dateStr} 待付款清單`, text })
+    if (result === "copied") {
       toast({ title: "已複製到剪貼簿", description: "可貼到 LINE / 備忘錄" })
-    } catch {
+    } else if (result === "failed") {
       toast({
         title: "複製失敗",
         description: "瀏覽器不支援，請手動截圖",
