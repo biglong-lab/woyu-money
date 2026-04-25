@@ -37,6 +37,7 @@ import {
 } from "@/components/ui/dialog"
 import { apiRequest, queryClient } from "@/lib/queryClient"
 import { localDateISO, formatNT, friendlyApiError } from "@/lib/utils"
+import { ReceiptUploadButton } from "@/components/receipt-upload-button"
 import { shareOrCopy } from "@/lib/share-or-copy"
 import { useToast } from "@/hooks/use-toast"
 import { useOnlineStatus } from "@/hooks/use-online-status"
@@ -241,7 +242,7 @@ interface PaidDialogProps {
   item: PriorityResult | null
   open: boolean
   onOpenChange: (open: boolean) => void
-  onConfirm: (paymentDate: string, amountPaid: number) => void
+  onConfirm: (paymentDate: string, amountPaid: number, receiptUrl: string | null) => void
   isPending: boolean
 }
 
@@ -249,6 +250,7 @@ function PaidDialog({ item, open, onOpenChange, onConfirm, isPending }: PaidDial
   const isOnline = useOnlineStatus()
   const [paymentDate, setPaymentDate] = useState(todayISODate())
   const [amountInput, setAmountInput] = useState("")
+  const [receiptUrl, setReceiptUrl] = useState<string | null>(null)
 
   // 開啟時自動帶入應付金額
   useMemo(() => {
@@ -307,7 +309,7 @@ function PaidDialog({ item, open, onOpenChange, onConfirm, isPending }: PaidDial
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !isInvalid && !isPending && isOnline) {
                     e.preventDefault()
-                    onConfirm(paymentDate, parsedAmount)
+                    onConfirm(paymentDate, parsedAmount, receiptUrl)
                   }
                 }}
                 className="border rounded pl-12 pr-2 py-2 text-base font-bold w-full"
@@ -362,13 +364,20 @@ function PaidDialog({ item, open, onOpenChange, onConfirm, isPending }: PaidDial
               data-testid="input-payment-date"
             />
           </div>
+          {/* 收據上傳（選填） */}
+          <div className="flex justify-between items-center text-sm gap-2">
+            <span className="text-gray-600">
+              付款憑證 <span className="text-gray-400 text-xs">（選填）</span>
+            </span>
+            <ReceiptUploadButton value={receiptUrl} onChange={setReceiptUrl} compact />
+          </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isPending}>
             取消
           </Button>
           <Button
-            onClick={() => onConfirm(paymentDate, parsedAmount)}
+            onClick={() => onConfirm(paymentDate, parsedAmount, receiptUrl)}
             disabled={isPending || isInvalid || !isOnline}
             title={!isOnline ? "離線中無法提交，請等網路恢復" : undefined}
             data-testid="button-confirm-paid"
@@ -563,13 +572,14 @@ export function TodayFocusCard() {
   const markPaidMutation = useMutation<
     unknown,
     Error,
-    { itemId: number; amountPaid: number; paymentDate: string }
+    { itemId: number; amountPaid: number; paymentDate: string; receiptUrl?: string | null }
   >({
     mutationFn: async (data) => {
       // 改用正確端點：自動更新 paidAmount + status + 建立 payment_record
       return apiRequest("POST", `/api/payment/items/${data.itemId}/payments`, {
         amount: data.amountPaid,
         paymentDate: data.paymentDate,
+        ...(data.receiptUrl ? { receiptImageUrl: data.receiptUrl } : {}),
       })
     },
     onSuccess: (_data, variables) => {
@@ -613,12 +623,17 @@ export function TodayFocusCard() {
     setPayDialogOpen(true)
   }
 
-  const handleConfirmPaid = (paymentDate: string, amountPaid: number) => {
+  const handleConfirmPaid = (
+    paymentDate: string,
+    amountPaid: number,
+    receiptUrl: string | null
+  ) => {
     if (!payingItem) return
     markPaidMutation.mutate({
       itemId: payingItem.id,
       amountPaid,
       paymentDate,
+      receiptUrl,
     })
   }
 
