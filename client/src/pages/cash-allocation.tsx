@@ -27,6 +27,7 @@ import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { apiRequest, queryClient } from "@/lib/queryClient"
 import { localDateISO, formatNT, friendlyApiError } from "@/lib/utils"
+import { shareOrCopy } from "@/lib/share-or-copy"
 import { useToast } from "@/hooks/use-toast"
 import { useDocumentTitle } from "@/hooks/use-document-title"
 
@@ -657,10 +658,13 @@ export default function CashAllocationPage() {
               size="sm"
               className="text-xs"
               onClick={async () => {
-                try {
-                  await navigator.clipboard.writeText(result.markdown)
+                const r = await shareOrCopy({
+                  title: "現金分配建議清單",
+                  text: result.markdown,
+                })
+                if (r === "copied") {
                   toast({ title: "已複製建議清單", description: "可貼到 LINE / 備忘錄" })
-                } catch {
+                } else if (r === "failed") {
                   toast({
                     title: "複製失敗",
                     description: "瀏覽器不支援",
