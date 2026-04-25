@@ -1,36 +1,59 @@
 // 現金流預測 - 主元件
-import { useState } from 'react';
-import { TrendingUp, TrendingDown, Calendar, DollarSign, AlertTriangle, Settings2 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Label } from '@/components/ui/label';
+import { useState } from "react"
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
-} from 'recharts';
-import type { CashflowForecastProps, CategoryVisibility } from './types';
-import { CATEGORY_COLORS, CATEGORY_LABELS, formatCurrency } from './types';
-import { useCashflowData } from './use-cashflow-data';
-import { DetailPopover, PaidDetailPopover } from './detail-popovers';
+  TrendingUp,
+  TrendingDown,
+  Calendar,
+  DollarSign,
+  AlertTriangle,
+  Settings2,
+} from "lucide-react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Label } from "@/components/ui/label"
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Legend,
+} from "recharts"
+import type { CashflowForecastProps, CategoryVisibility } from "./types"
+import { CATEGORY_COLORS, CATEGORY_LABELS, formatCurrency } from "./types"
+import { useCashflowData } from "./use-cashflow-data"
+import { DetailPopover, PaidDetailPopover } from "./detail-popovers"
+import { formatNT } from "@/lib/utils"
 
-const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?: Array<{ color: string; name: string; value: number }>; label?: string }) => {
+const CustomTooltip = ({
+  active,
+  payload,
+  label,
+}: {
+  active?: boolean
+  payload?: Array<{ color: string; name: string; value: number }>
+  label?: string
+}) => {
   if (active && payload && payload.length) {
     return (
       <div className="bg-white p-3 border rounded-lg shadow-lg">
         <p className="font-medium mb-2">{label}</p>
         {payload.map((entry, index: number) => (
           <p key={index} className="text-sm" style={{ color: entry.color }}>
-            {entry.name}: ${entry.value.toLocaleString()}
+            {entry.name}: {formatNT(entry.value)}
           </p>
         ))}
         <p className="text-sm font-medium mt-1 pt-1 border-t">
-          總計: ${payload.reduce((sum: number, p) => sum + p.value, 0).toLocaleString()}
+          總計: {formatNT(payload.reduce((sum: number, p) => sum + p.value, 0))}
         </p>
       </div>
-    );
+    )
   }
-  return null;
-};
+  return null
+}
 
 export default function CashflowForecast({
   items,
@@ -38,19 +61,28 @@ export default function CashflowForecast({
   budgetPlans = [],
   paymentRecords = [],
   monthsToForecast = 6,
-  className = '',
+  className = "",
 }: CashflowForecastProps) {
   const [visibility, setVisibility] = useState<CategoryVisibility>({
-    budget: true, scheduled: true, estimated: true, recurring: true, paid: true,
-  });
+    budget: true,
+    scheduled: true,
+    estimated: true,
+    recurring: true,
+    paid: true,
+  })
 
   const toggleCategory = (category: keyof CategoryVisibility) => {
-    setVisibility(prev => ({ ...prev, [category]: !prev[category] }));
-  };
+    setVisibility((prev) => ({ ...prev, [category]: !prev[category] }))
+  }
 
   const { forecastData, stats } = useCashflowData({
-    items, schedules, budgetPlans, paymentRecords, monthsToForecast, visibility,
-  });
+    items,
+    schedules,
+    budgetPlans,
+    paymentRecords,
+    monthsToForecast,
+    visibility,
+  })
 
   return (
     <div className={`space-y-4 ${className}`}>
@@ -71,8 +103,14 @@ export default function CashflowForecast({
                     onCheckedChange={() => toggleCategory(category)}
                     data-testid={`checkbox-${category}`}
                   />
-                  <Label htmlFor={`toggle-${category}`} className="flex items-center gap-1 sm:gap-1.5 cursor-pointer text-xs sm:text-sm">
-                    <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-sm flex-shrink-0" style={{ backgroundColor: CATEGORY_COLORS[category] }} />
+                  <Label
+                    htmlFor={`toggle-${category}`}
+                    className="flex items-center gap-1 sm:gap-1.5 cursor-pointer text-xs sm:text-sm"
+                  >
+                    <div
+                      className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-sm flex-shrink-0"
+                      style={{ backgroundColor: CATEGORY_COLORS[category] }}
+                    />
                     <span className="whitespace-nowrap">{CATEGORY_LABELS[category]}</span>
                   </Label>
                 </div>
@@ -89,7 +127,9 @@ export default function CashflowForecast({
             <div className="flex items-center justify-between">
               <div className="min-w-0">
                 <p className="text-xs sm:text-sm text-gray-600">未來{monthsToForecast}個月</p>
-                <p className="text-lg sm:text-2xl font-bold text-gray-900 truncate">${stats.totalForecast.toLocaleString()}</p>
+                <p className="text-lg sm:text-2xl font-bold text-gray-900 truncate">
+                  {formatNT(stats.totalForecast)}
+                </p>
               </div>
               <DollarSign className="h-6 w-6 sm:h-8 sm:w-8 text-blue-500 flex-shrink-0" />
             </div>
@@ -100,7 +140,9 @@ export default function CashflowForecast({
             <div className="flex items-center justify-between">
               <div className="min-w-0">
                 <p className="text-xs sm:text-sm text-gray-600">月均支出</p>
-                <p className="text-lg sm:text-2xl font-bold text-gray-900 truncate">${Math.round(stats.avgMonthly).toLocaleString()}</p>
+                <p className="text-lg sm:text-2xl font-bold text-gray-900 truncate">
+                  {formatNT(stats.avgMonthly)}
+                </p>
               </div>
               <Calendar className="h-6 w-6 sm:h-8 sm:w-8 text-green-500 flex-shrink-0" />
             </div>
@@ -111,8 +153,12 @@ export default function CashflowForecast({
             <div className="flex items-center justify-between">
               <div className="min-w-0">
                 <p className="text-xs sm:text-sm text-gray-600">支出高峰</p>
-                <p className="text-lg sm:text-2xl font-bold text-orange-600">{stats.maxMonth?.monthLabel}</p>
-                <p className="text-[10px] sm:text-xs text-gray-500 truncate">${stats.maxMonth?.total.toLocaleString()}</p>
+                <p className="text-lg sm:text-2xl font-bold text-orange-600">
+                  {stats.maxMonth?.monthLabel}
+                </p>
+                <p className="text-[10px] sm:text-xs text-gray-500 truncate">
+                  {stats.maxMonth ? formatNT(stats.maxMonth.total) : "-"}
+                </p>
               </div>
               <AlertTriangle className="h-6 w-6 sm:h-8 sm:w-8 text-orange-500 flex-shrink-0" />
             </div>
@@ -123,13 +169,18 @@ export default function CashflowForecast({
             <div className="flex items-center justify-between">
               <div className="min-w-0">
                 <p className="text-xs sm:text-sm text-gray-600">下月趨勢</p>
-                <p className={`text-lg sm:text-2xl font-bold ${stats.trend >= 0 ? 'text-red-600' : 'text-green-600'}`}>
-                  {stats.trend >= 0 ? '+' : ''}{stats.trendPercent.toFixed(0)}%
+                <p
+                  className={`text-lg sm:text-2xl font-bold ${stats.trend >= 0 ? "text-red-600" : "text-green-600"}`}
+                >
+                  {stats.trend >= 0 ? "+" : ""}
+                  {stats.trendPercent.toFixed(0)}%
                 </p>
               </div>
-              {stats.trend >= 0
-                ? <TrendingUp className="h-6 w-6 sm:h-8 sm:w-8 text-red-500 flex-shrink-0" />
-                : <TrendingDown className="h-6 w-6 sm:h-8 sm:w-8 text-green-500 flex-shrink-0" />}
+              {stats.trend >= 0 ? (
+                <TrendingUp className="h-6 w-6 sm:h-8 sm:w-8 text-red-500 flex-shrink-0" />
+              ) : (
+                <TrendingDown className="h-6 w-6 sm:h-8 sm:w-8 text-green-500 flex-shrink-0" />
+              )}
             </div>
           </CardContent>
         </Card>
@@ -151,12 +202,37 @@ export default function CashflowForecast({
                 <XAxis dataKey="monthLabel" tick={{ fontSize: 12 }} />
                 <YAxis tickFormatter={formatCurrency} tick={{ fontSize: 11 }} width={50} />
                 <Tooltip content={<CustomTooltip />} />
-                <Legend wrapperStyle={{ fontSize: '12px' }} />
-                {visibility.paid && <Bar dataKey="paid" name="已付款" stackId="a" fill={CATEGORY_COLORS.paid} />}
-                {visibility.budget && <Bar dataKey="budget" name="預算" stackId="a" fill={CATEGORY_COLORS.budget} />}
-                {visibility.scheduled && <Bar dataKey="scheduled" name="已排程" stackId="a" fill={CATEGORY_COLORS.scheduled} />}
-                {visibility.estimated && <Bar dataKey="estimated" name="預估到期" stackId="a" fill={CATEGORY_COLORS.estimated} />}
-                {visibility.recurring && <Bar dataKey="recurring" name="月付固定" stackId="a" fill={CATEGORY_COLORS.recurring} />}
+                <Legend wrapperStyle={{ fontSize: "12px" }} />
+                {visibility.paid && (
+                  <Bar dataKey="paid" name="已付款" stackId="a" fill={CATEGORY_COLORS.paid} />
+                )}
+                {visibility.budget && (
+                  <Bar dataKey="budget" name="預算" stackId="a" fill={CATEGORY_COLORS.budget} />
+                )}
+                {visibility.scheduled && (
+                  <Bar
+                    dataKey="scheduled"
+                    name="已排程"
+                    stackId="a"
+                    fill={CATEGORY_COLORS.scheduled}
+                  />
+                )}
+                {visibility.estimated && (
+                  <Bar
+                    dataKey="estimated"
+                    name="預估到期"
+                    stackId="a"
+                    fill={CATEGORY_COLORS.estimated}
+                  />
+                )}
+                {visibility.recurring && (
+                  <Bar
+                    dataKey="recurring"
+                    name="月付固定"
+                    stackId="a"
+                    fill={CATEGORY_COLORS.recurring}
+                  />
+                )}
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -168,7 +244,9 @@ export default function CashflowForecast({
         <CardHeader className="px-3 sm:px-6 pb-2 sm:pb-4">
           <CardTitle className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 text-base sm:text-lg">
             <span>月度明細</span>
-            <span className="text-xs sm:text-sm font-normal text-gray-500">點擊金額查看詳細項目</span>
+            <span className="text-xs sm:text-sm font-normal text-gray-500">
+              點擊金額查看詳細項目
+            </span>
           </CardTitle>
         </CardHeader>
         <CardContent className="px-2 sm:px-6">
@@ -177,45 +255,162 @@ export default function CashflowForecast({
               <thead>
                 <tr className="border-b">
                   <th className="text-left py-2 px-3 w-24">月份</th>
-                  {visibility.paid && <th className="text-right py-2 px-3 w-28" style={{ color: CATEGORY_COLORS.paid }}>已付款</th>}
-                  {visibility.budget && <th className="text-right py-2 px-3 w-28" style={{ color: CATEGORY_COLORS.budget }}>預算</th>}
-                  {visibility.scheduled && <th className="text-right py-2 px-3 w-28" style={{ color: CATEGORY_COLORS.scheduled }}>已排程</th>}
-                  {visibility.estimated && <th className="text-right py-2 px-3 w-28" style={{ color: CATEGORY_COLORS.estimated }}>預估到期</th>}
-                  {visibility.recurring && <th className="text-right py-2 px-3 w-28" style={{ color: CATEGORY_COLORS.recurring }}>月付固定</th>}
+                  {visibility.paid && (
+                    <th
+                      className="text-right py-2 px-3 w-28"
+                      style={{ color: CATEGORY_COLORS.paid }}
+                    >
+                      已付款
+                    </th>
+                  )}
+                  {visibility.budget && (
+                    <th
+                      className="text-right py-2 px-3 w-28"
+                      style={{ color: CATEGORY_COLORS.budget }}
+                    >
+                      預算
+                    </th>
+                  )}
+                  {visibility.scheduled && (
+                    <th
+                      className="text-right py-2 px-3 w-28"
+                      style={{ color: CATEGORY_COLORS.scheduled }}
+                    >
+                      已排程
+                    </th>
+                  )}
+                  {visibility.estimated && (
+                    <th
+                      className="text-right py-2 px-3 w-28"
+                      style={{ color: CATEGORY_COLORS.estimated }}
+                    >
+                      預估到期
+                    </th>
+                  )}
+                  {visibility.recurring && (
+                    <th
+                      className="text-right py-2 px-3 w-28"
+                      style={{ color: CATEGORY_COLORS.recurring }}
+                    >
+                      月付固定
+                    </th>
+                  )}
                   <th className="text-right py-2 px-3 w-28 font-bold">總計</th>
                 </tr>
               </thead>
               <tbody>
                 {forecastData.map((month, index) => (
-                  <tr key={month.month} className={`border-b hover:bg-gray-50 ${index === 0 ? 'bg-blue-50' : ''}`}>
+                  <tr
+                    key={month.month}
+                    className={`border-b hover:bg-gray-50 ${index === 0 ? "bg-blue-50" : ""}`}
+                  >
                     <td className="py-2 px-3 font-medium w-24">
                       <div className="flex items-center gap-1">
                         {month.monthLabel}
-                        {index === 0 && <Badge className="text-xs" variant="outline">本月</Badge>}
+                        {index === 0 && (
+                          <Badge className="text-xs" variant="outline">
+                            本月
+                          </Badge>
+                        )}
                       </div>
                     </td>
                     {visibility.paid && (
                       <td className="text-right py-2 px-3 w-28">
-                        <PaidDetailPopover paidCurrent={month.details.paidCurrent} paidCarryOver={month.details.paidCarryOver} totalAmount={month.paid} />
+                        <PaidDetailPopover
+                          paidCurrent={month.details.paidCurrent}
+                          paidCarryOver={month.details.paidCarryOver}
+                          totalAmount={month.paid}
+                        />
                       </td>
                     )}
-                    {visibility.budget && <td className="text-right py-2 px-3 w-28"><DetailPopover details={month.details.budget} category="budget" amount={month.budget} /></td>}
-                    {visibility.scheduled && <td className="text-right py-2 px-3 w-28"><DetailPopover details={month.details.scheduled} category="scheduled" amount={month.scheduled} /></td>}
-                    {visibility.estimated && <td className="text-right py-2 px-3 w-28"><DetailPopover details={month.details.estimated} category="estimated" amount={month.estimated} /></td>}
-                    {visibility.recurring && <td className="text-right py-2 px-3 w-28"><DetailPopover details={month.details.recurring} category="recurring" amount={month.recurring} /></td>}
-                    <td className="text-right py-2 px-3 w-28 font-bold">${month.total.toLocaleString()}</td>
+                    {visibility.budget && (
+                      <td className="text-right py-2 px-3 w-28">
+                        <DetailPopover
+                          details={month.details.budget}
+                          category="budget"
+                          amount={month.budget}
+                        />
+                      </td>
+                    )}
+                    {visibility.scheduled && (
+                      <td className="text-right py-2 px-3 w-28">
+                        <DetailPopover
+                          details={month.details.scheduled}
+                          category="scheduled"
+                          amount={month.scheduled}
+                        />
+                      </td>
+                    )}
+                    {visibility.estimated && (
+                      <td className="text-right py-2 px-3 w-28">
+                        <DetailPopover
+                          details={month.details.estimated}
+                          category="estimated"
+                          amount={month.estimated}
+                        />
+                      </td>
+                    )}
+                    {visibility.recurring && (
+                      <td className="text-right py-2 px-3 w-28">
+                        <DetailPopover
+                          details={month.details.recurring}
+                          category="recurring"
+                          amount={month.recurring}
+                        />
+                      </td>
+                    )}
+                    <td className="text-right py-2 px-3 w-28 font-bold">
+                      ${month.total.toLocaleString()}
+                    </td>
                   </tr>
                 ))}
               </tbody>
               <tfoot>
                 <tr className="bg-gray-100 font-bold">
                   <td className="py-2 px-3 w-24">合計</td>
-                  {visibility.paid && <td className="text-right py-2 px-3 w-28" style={{ color: CATEGORY_COLORS.paid }}>${forecastData.reduce((sum, m) => sum + m.paid, 0).toLocaleString()}</td>}
-                  {visibility.budget && <td className="text-right py-2 px-3 w-28" style={{ color: CATEGORY_COLORS.budget }}>${forecastData.reduce((sum, m) => sum + m.budget, 0).toLocaleString()}</td>}
-                  {visibility.scheduled && <td className="text-right py-2 px-3 w-28" style={{ color: CATEGORY_COLORS.scheduled }}>${forecastData.reduce((sum, m) => sum + m.scheduled, 0).toLocaleString()}</td>}
-                  {visibility.estimated && <td className="text-right py-2 px-3 w-28" style={{ color: CATEGORY_COLORS.estimated }}>${forecastData.reduce((sum, m) => sum + m.estimated, 0).toLocaleString()}</td>}
-                  {visibility.recurring && <td className="text-right py-2 px-3 w-28" style={{ color: CATEGORY_COLORS.recurring }}>${forecastData.reduce((sum, m) => sum + m.recurring, 0).toLocaleString()}</td>}
-                  <td className="text-right py-2 px-3 w-28">${stats.totalForecast.toLocaleString()}</td>
+                  {visibility.paid && (
+                    <td
+                      className="text-right py-2 px-3 w-28"
+                      style={{ color: CATEGORY_COLORS.paid }}
+                    >
+                      ${forecastData.reduce((sum, m) => sum + m.paid, 0).toLocaleString()}
+                    </td>
+                  )}
+                  {visibility.budget && (
+                    <td
+                      className="text-right py-2 px-3 w-28"
+                      style={{ color: CATEGORY_COLORS.budget }}
+                    >
+                      ${forecastData.reduce((sum, m) => sum + m.budget, 0).toLocaleString()}
+                    </td>
+                  )}
+                  {visibility.scheduled && (
+                    <td
+                      className="text-right py-2 px-3 w-28"
+                      style={{ color: CATEGORY_COLORS.scheduled }}
+                    >
+                      ${forecastData.reduce((sum, m) => sum + m.scheduled, 0).toLocaleString()}
+                    </td>
+                  )}
+                  {visibility.estimated && (
+                    <td
+                      className="text-right py-2 px-3 w-28"
+                      style={{ color: CATEGORY_COLORS.estimated }}
+                    >
+                      ${forecastData.reduce((sum, m) => sum + m.estimated, 0).toLocaleString()}
+                    </td>
+                  )}
+                  {visibility.recurring && (
+                    <td
+                      className="text-right py-2 px-3 w-28"
+                      style={{ color: CATEGORY_COLORS.recurring }}
+                    >
+                      ${forecastData.reduce((sum, m) => sum + m.recurring, 0).toLocaleString()}
+                    </td>
+                  )}
+                  <td className="text-right py-2 px-3 w-28">
+                    ${stats.totalForecast.toLocaleString()}
+                  </td>
                 </tr>
               </tfoot>
             </table>
@@ -223,5 +418,5 @@ export default function CashflowForecast({
         </CardContent>
       </Card>
     </div>
-  );
+  )
 }
