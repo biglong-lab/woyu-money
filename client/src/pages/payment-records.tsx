@@ -34,7 +34,6 @@ import {
   Download,
   Image,
 } from "lucide-react"
-import { apiRequest } from "@/lib/queryClient"
 import { PaymentItemDetails } from "@/components/payment-item-details"
 import { useCopyAmount } from "@/hooks/use-copy-amount"
 import type { PaymentItem } from "@shared/schema"
@@ -118,7 +117,6 @@ export default function PaymentRecords() {
     projectFilter: "all",
     categoryFilter: "all",
   })
-  const [previewImage, setPreviewImage] = useState<string | null>(null)
 
   // Handle URL parameters for filtering
   useEffect(() => {
