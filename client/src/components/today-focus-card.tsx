@@ -302,7 +302,13 @@ function PaidDialog({ item, open, onOpenChange, onConfirm, isPending }: PaidDial
 // 子元件：空狀態
 // ─────────────────────────────────────────────
 
-function EmptyState({ scope }: { scope: ViewScope }) {
+function EmptyState({
+  scope,
+  nextUpcoming,
+}: {
+  scope: ViewScope
+  nextUpcoming?: PriorityResult | null
+}) {
   const messages: Record<ViewScope, string> = {
     today: "🎉 今天沒有緊急事項，可以稍微放鬆",
     week: "✅ 本週沒有待處理項目",
@@ -313,6 +319,16 @@ function EmptyState({ scope }: { scope: ViewScope }) {
     <div className="rounded-lg border border-green-200 bg-green-50 p-6 text-center">
       <CheckCircle2 className="h-12 w-12 mx-auto text-green-600 mb-2" />
       <div className="text-sm text-gray-700">{messages[scope]}</div>
+      {nextUpcoming && scope === "today" && (
+        <div className="mt-4 pt-3 border-t border-green-200 text-xs">
+          <div className="text-gray-500 mb-1">下一個截止</div>
+          <div className="font-semibold text-gray-900">{nextUpcoming.itemName}</div>
+          <div className="text-gray-700 mt-0.5">{formatCurrency(nextUpcoming.unpaidAmount)}</div>
+          <div className="text-gray-500 mt-0.5">
+            {nextUpcoming.dueDate}（{nextUpcoming.daysUntilDue} 天後）
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -400,6 +416,15 @@ export function TodayFocusCard() {
     if (!report) return []
     return filterByScope(report.all, scope).filter((item) => !skippedIds.has(item.id))
   }, [report, scope, skippedIds])
+
+  // 下一個即將到期項目（給 today 空狀態 preview 用）
+  const nextUpcoming = useMemo(() => {
+    if (!report) return null
+    const upcoming = report.all
+      .filter((r) => !skippedIds.has(r.id) && r.daysUntilDue > 0)
+      .sort((a, b) => a.daysUntilDue - b.daysUntilDue)
+    return upcoming[0] ?? null
+  }, [report, skippedIds])
 
   // 各 scope 的計數（供 tab 顯示）
   const scopeCounts: Record<ViewScope, number> = useMemo(() => {
@@ -600,7 +625,7 @@ export function TodayFocusCard() {
             onCopyAmount={handleCopyAmount}
           />
         ) : (
-          <EmptyState scope={scope} />
+          <EmptyState scope={scope} nextUpcoming={nextUpcoming} />
         )}
 
         {skippedIds.size > 0 && (
