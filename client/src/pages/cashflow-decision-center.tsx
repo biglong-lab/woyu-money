@@ -42,6 +42,9 @@ interface GapItem {
   net: number
   gap?: number
   recommendation?: string
+  isHighExpense?: boolean
+  expenseRatio?: number
+  basisLabel?: string
 }
 
 interface ForecastResponse {
@@ -189,13 +192,29 @@ function MonthCard({ forecast, gap }: { forecast: ForecastMonth; gap: GapItem })
   const copyAmount = useCopyAmount()
   const hasGap = gap.gap !== undefined && gap.gap > 0
   const hasExpense = gap.estimatedExpense > 0
-  const cls = hasGap ? "border-red-300 bg-red-50" : "border-green-200 bg-green-50"
+  const isHighExpense = gap.isHighExpense === true
+  // 顏色優先級：缺口（紅深）→ 大額月（橘）→ 健康（綠）
+  const cls = hasGap
+    ? "border-red-300 bg-red-50"
+    : isHighExpense
+      ? "border-orange-300 bg-orange-50"
+      : "border-green-200 bg-green-50"
   const conf = CONFIDENCE_META[forecast.confidence]
   const monthLabel = `${forecast.year}/${String(forecast.month).padStart(2, "0")}`
   return (
     <div className={`rounded-lg border-l-4 p-3 ${cls}`}>
-      <div className="flex items-center justify-between mb-2">
-        <div className="font-semibold text-sm">{monthLabel}</div>
+      <div className="flex items-center justify-between mb-2 gap-1">
+        <div className="font-semibold text-sm flex items-center gap-1.5">
+          {monthLabel}
+          {isHighExpense && !hasGap && (
+            <Badge
+              variant="outline"
+              className="text-[10px] bg-orange-100 border-orange-300 text-orange-800 font-medium"
+            >
+              大額月 {gap.expenseRatio ? `${(gap.expenseRatio * 100).toFixed(0)}%` : ""}
+            </Badge>
+          )}
+        </div>
         <Badge className={`text-xs ${conf.color}`} variant="outline">
           {conf.label}
         </Badge>

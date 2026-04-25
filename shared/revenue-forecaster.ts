@@ -52,6 +52,12 @@ export interface GapAnalysis {
   net: number
   gap?: number
   recommendation?: string
+  /** 該月開銷是否為「大額月」（> 12 個月平均 × 1.5） */
+  isHighExpense?: boolean
+  /** 該月開銷與平均的比例（例：1.8 = 比平均高 80%） */
+  expenseRatio?: number
+  /** 預估依據說明（給前端顯示用） */
+  basisLabel?: string
 }
 
 // ─────────────────────────────────────────────
@@ -186,6 +192,22 @@ function buildRecommendation(gap: number): string {
   return `缺口嚴重，建議：(1) 提前籌資 (2) 分期談判 (3) 延後非緊急支出`
 }
 
+/**
+ * 預估依據說明（給前端顯示）
+ */
+function basisLabel(basis: ForecastBasis): string {
+  switch (basis) {
+    case "last_year_same_month":
+      return "去年同月參考（季節性）"
+    case "recent_average":
+      return "近 3 個月平均"
+    case "overall_average":
+      return "全期平均"
+    case "no_data":
+      return "無歷史資料"
+  }
+}
+
 export function analyzeCashflowGap(
   forecast: ForecastResult,
   expenses: MonthlyExpense[]
@@ -193,20 +215,38 @@ export function analyzeCashflowGap(
   const expMap = new Map<string, number>()
   for (const e of expenses) expMap.set(keyOf(e.year, e.month), e.amount)
 
+  // ── 計算未來月開銷的平均（用於大額警示）────
+  const expectedAmounts = forecast.months.map((fm) => expMap.get(keyOf(fm.year, fm.month)) ?? 0)
+  const validExpenses = expectedAmounts.filter((a) => a > 0)
+  const avgExpense = validExpenses.length > 0 ? average(validExpenses) : 0
+  const HIGH_EXPENSE_RATIO = 1.5 // 超過平均 1.5 倍 = 大額月
+
   return forecast.months.map((fm) => {
     const estimatedExpense = expMap.get(keyOf(fm.year, fm.month)) ?? 0
     const net = fm.estimated - estimatedExpense
+    const expenseRatio = avgExpense > 0 ? estimatedExpense / avgExpense : 0
+    const isHighExpense = expenseRatio >= HIGH_EXPENSE_RATIO
+
     const result: GapAnalysis = {
       year: fm.year,
       month: fm.month,
       estimatedIncome: fm.estimated,
       estimatedExpense,
       net,
+      expenseRatio: Math.round(expenseRatio * 100) / 100,
+      isHighExpense,
+      basisLabel: basisLabel(fm.basis),
     }
     if (net < 0) {
       const gap = -net
       result.gap = gap
-      result.recommendation = buildRecommendation(gap)
+      let rec = buildRecommendation(gap)
+      if (isHighExpense) {
+        rec = `⚠️ 此月為大額支出月（${(expenseRatio * 100).toFixed(0)}% 超平均）。${rec}`
+      }
+      result.recommendation = rec
+    } else if (isHighExpense) {
+      result.recommendation = `此月開銷較高（${(expenseRatio * 100).toFixed(0)}% 超平均），收入仍可 cover，但建議留意現金流`
     }
     return result
   })
