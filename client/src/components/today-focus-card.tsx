@@ -39,6 +39,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient"
 import { localDateISO, formatNT, friendlyApiError } from "@/lib/utils"
 import { shareOrCopy } from "@/lib/share-or-copy"
 import { useToast } from "@/hooks/use-toast"
+import { useOnlineStatus } from "@/hooks/use-online-status"
 import { useCopyAmount } from "@/hooks/use-copy-amount"
 
 // ─────────────────────────────────────────────
@@ -245,6 +246,7 @@ interface PaidDialogProps {
 }
 
 function PaidDialog({ item, open, onOpenChange, onConfirm, isPending }: PaidDialogProps) {
+  const isOnline = useOnlineStatus()
   const [paymentDate, setPaymentDate] = useState(todayISODate())
   const [amountInput, setAmountInput] = useState("")
 
@@ -303,7 +305,7 @@ function PaidDialog({ item, open, onOpenChange, onConfirm, isPending }: PaidDial
                 onChange={(e) => setAmountInput(e.target.value)}
                 onFocus={(e) => e.target.select()}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && !isInvalid && !isPending) {
+                  if (e.key === "Enter" && !isInvalid && !isPending && isOnline) {
                     e.preventDefault()
                     onConfirm(paymentDate, parsedAmount)
                   }
@@ -367,10 +369,11 @@ function PaidDialog({ item, open, onOpenChange, onConfirm, isPending }: PaidDial
           </Button>
           <Button
             onClick={() => onConfirm(paymentDate, parsedAmount)}
-            disabled={isPending || isInvalid}
+            disabled={isPending || isInvalid || !isOnline}
+            title={!isOnline ? "離線中無法提交，請等網路恢復" : undefined}
             data-testid="button-confirm-paid"
           >
-            {isPending ? "處理中..." : "確認付款"}
+            {isPending ? "處理中..." : !isOnline ? "離線中" : "確認付款"}
           </Button>
         </DialogFooter>
       </DialogContent>
