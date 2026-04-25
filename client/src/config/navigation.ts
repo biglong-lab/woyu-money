@@ -227,6 +227,12 @@ export const viewNavItems: NavItem[] = [
 // 系統管理分類（含模板管理，收合顯示）
 export const systemNavItems: NavItem[] = [
   {
+    title: "館別共用組",
+    href: "/property-groups",
+    icon: Building2,
+    description: "管理共用人事/洗滌等費用的館別群組",
+  },
+  {
     title: "分類管理",
     href: "/categories",
     icon: Layers,
@@ -387,6 +393,11 @@ export const breadcrumbConfig: Record<string, BreadcrumbItem[]> = {
   ],
 
   // 系統管理
+  "/property-groups": [
+    { title: "首頁", href: "/" },
+    { title: "系統管理" },
+    { title: "館別共用組" },
+  ],
   "/categories": [{ title: "首頁", href: "/" }, { title: "系統管理" }, { title: "分類管理" }],
   "/category-management": [
     { title: "首頁", href: "/" },
