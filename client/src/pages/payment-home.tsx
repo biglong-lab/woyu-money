@@ -26,6 +26,7 @@ import {
   FileText,
   Inbox,
   Loader2,
+  X,
 } from "lucide-react"
 import { Link } from "wouter"
 import { useState, useMemo, useCallback } from "react"
@@ -314,23 +315,50 @@ export default function PaymentHome() {
           placeholder="搜尋項目或專案..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-10 h-10 bg-white"
+          onKeyDown={(e) => {
+            if (e.key === "Escape") setSearchQuery("")
+          }}
+          className="pl-10 pr-10 h-10 bg-white"
+          data-testid="home-search-input"
         />
-        {searchResults.length > 0 && (
+        {searchQuery && (
+          <button
+            type="button"
+            onClick={() => setSearchQuery("")}
+            className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded"
+            title="清除搜尋（Esc）"
+            data-testid="home-search-clear"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
+        {searchQuery.trim() && (
           <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-30 max-h-[250px] overflow-y-auto">
-            {searchResults.map((item: PaymentItemWithProject) => (
-              <Link key={item.id} href="/payment-records" onClick={() => setSearchQuery("")}>
-                <div className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 border-b border-gray-50">
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">{item.itemName}</p>
-                    <p className="text-xs text-gray-500">{item.projectName || "無專案"}</p>
-                  </div>
-                  <span className="text-sm font-semibold text-gray-700">
-                    ${formatCurrency(item.totalAmount)}
-                  </span>
+            {searchResults.length > 0 ? (
+              <>
+                <div className="px-4 py-1.5 text-xs text-gray-500 border-b bg-gray-50">
+                  找到 {searchResults.length} 個結果
                 </div>
-              </Link>
-            ))}
+                {searchResults.map((item: PaymentItemWithProject) => (
+                  <Link key={item.id} href="/payment-records" onClick={() => setSearchQuery("")}>
+                    <div className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 border-b border-gray-50">
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">{item.itemName}</p>
+                        <p className="text-xs text-gray-500">{item.projectName || "無專案"}</p>
+                      </div>
+                      <span className="text-sm font-semibold text-gray-700">
+                        ${formatCurrency(item.totalAmount)}
+                      </span>
+                    </div>
+                  </Link>
+                ))}
+              </>
+            ) : (
+              <div className="px-4 py-6 text-center text-sm text-gray-500">
+                <Search className="w-6 h-6 mx-auto mb-2 text-gray-300" />
+                找不到符合「{searchQuery}」的項目
+              </div>
+            )}
           </div>
         )}
       </div>
