@@ -748,10 +748,12 @@ export function TodayFocusCard() {
         {skippedIds.size > 0 && (
           <button
             onClick={handleResetSkipped}
-            className="text-xs text-blue-600 hover:underline"
+            className="text-xs text-blue-600 hover:underline inline-flex items-center gap-1"
             type="button"
+            title="復原所有今日跳過項目，重新顯示完整列表"
+            data-testid="button-reset-skipped"
           >
-            已跳過 {skippedIds.size} 筆，點此復原
+            ↩️ 已跳過 {skippedIds.size} 筆，點此復原
           </button>
         )}
 
