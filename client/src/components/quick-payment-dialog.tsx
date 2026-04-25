@@ -295,6 +295,33 @@ export function QuickPaymentDialog({ open, onOpenChange }: QuickPaymentDialogPro
                     = NT$ {Math.round(parseFloat(amount)).toLocaleString()}
                   </div>
                 )}
+                {/* 快速金額按鈕（付清 / 半額） */}
+                {(() => {
+                  const remaining =
+                    parseFloat(selectedItem.totalAmount || "0") -
+                    parseFloat(selectedItem.paidAmount || "0")
+                  if (remaining <= 0) return null
+                  return (
+                    <div className="mt-2 flex gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setAmount(remaining.toString())}
+                        className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-700 hover:bg-green-200 active:scale-95 transition-all"
+                        title="輸入剩餘應付金額"
+                      >
+                        付清 {formatCurrency(remaining)}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setAmount(Math.round(remaining / 2).toString())}
+                        className="text-xs px-2 py-1 rounded-full bg-yellow-100 text-yellow-800 hover:bg-yellow-200 active:scale-95 transition-all"
+                        title="輸入剩餘應付的一半"
+                      >
+                        半額 {formatCurrency(Math.round(remaining / 2))}
+                      </button>
+                    </div>
+                  )
+                })()}
               </div>
 
               <div>
