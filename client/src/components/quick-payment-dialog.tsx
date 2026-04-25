@@ -258,7 +258,9 @@ export function QuickPaymentDialog({ open, onOpenChange }: QuickPaymentDialogPro
 
             <div className="space-y-3">
               <div>
-                <Label htmlFor="amount">付款金額</Label>
+                <Label htmlFor="amount">
+                  付款金額 <span className="text-red-500">*</span>
+                </Label>
                 <div className="relative mt-1">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">$</span>
                   <Input
