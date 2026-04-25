@@ -40,6 +40,34 @@ interface ProjectItem {
   projectName: string
 }
 
+// 最近使用的項目名稱（localStorage 持久化）
+const RECENT_NAMES_KEY = "quick-add:recent-names"
+const MAX_RECENT_NAMES = 6
+
+function loadRecentNames(): string[] {
+  try {
+    const raw = localStorage.getItem(RECENT_NAMES_KEY)
+    if (!raw) return []
+    const parsed = JSON.parse(raw)
+    return Array.isArray(parsed) ? parsed.slice(0, MAX_RECENT_NAMES) : []
+  } catch {
+    return []
+  }
+}
+
+function saveRecentName(name: string): string[] {
+  if (!name.trim()) return loadRecentNames()
+  try {
+    const current = loadRecentNames()
+    const filtered = current.filter((n) => n !== name)
+    const updated = [name, ...filtered].slice(0, MAX_RECENT_NAMES)
+    localStorage.setItem(RECENT_NAMES_KEY, JSON.stringify(updated))
+    return updated
+  } catch {
+    return loadRecentNames()
+  }
+}
+
 export function QuickAddDrawer({ open, onOpenChange }: QuickAddDrawerProps) {
   const { toast } = useToast()
   const cameraRef = useRef<HTMLInputElement>(null)
@@ -50,6 +78,7 @@ export function QuickAddDrawer({ open, onOpenChange }: QuickAddDrawerProps) {
   const [attachedFile, setAttachedFile] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [isDone, setIsDone] = useState(false)
+  const [recentNames, setRecentNames] = useState<string[]>(loadRecentNames)
 
   // 查詢專案列表
   const { data: projectsData } = useQuery<ProjectItem[]>({
@@ -92,6 +121,9 @@ export function QuickAddDrawer({ open, onOpenChange }: QuickAddDrawerProps) {
       if (attachedFile) {
         queryClient.invalidateQueries({ queryKey: ["/api/document-inbox"] })
       }
+      // 儲存到最近使用清單
+      const updated = saveRecentName(itemName.trim())
+      setRecentNames(updated)
       setIsDone(true)
     },
     onError: (error: Error) => {
@@ -173,6 +205,23 @@ export function QuickAddDrawer({ open, onOpenChange }: QuickAddDrawerProps) {
                   className="mt-1 h-12 text-base"
                   autoFocus
                 />
+                {/* 最近使用 chips（避免每次重打） */}
+                {recentNames.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    <span className="text-xs text-gray-500 self-center">最近：</span>
+                    {recentNames.map((name) => (
+                      <button
+                        key={name}
+                        type="button"
+                        onClick={() => setItemName(name)}
+                        className="text-xs px-2 py-1 rounded-full bg-gray-100 hover:bg-blue-100 hover:text-blue-700 transition-colors active:scale-95"
+                        data-testid={`recent-name-${name}`}
+                      >
+                        {name}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* 金額 — 第二重要 */}
