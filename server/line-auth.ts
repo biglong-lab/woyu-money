@@ -1,7 +1,24 @@
 import express from "express"
 import { storage } from "./storage"
+import { requireAuth } from "./auth"
 
 export function setupLineAuth(app: express.Express) {
+  // 解除 LINE 帳號綁定（需登入）
+  app.post("/api/auth/line/unlink", requireAuth, async (req, res) => {
+    try {
+      const userId = req.user!.id
+      await storage.updateUser(userId, {
+        lineUserId: null,
+        lineDisplayName: null,
+        linePictureUrl: null,
+      })
+      res.json({ message: "LINE 帳號解綁成功" })
+    } catch (error) {
+      console.error("LINE unlink error:", error)
+      res.status(500).json({ message: "LINE 解綁失敗" })
+    }
+  })
+
   // LINE登入授權URL
   app.get("/api/auth/line", async (req, res) => {
     try {
