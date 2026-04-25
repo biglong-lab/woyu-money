@@ -5,8 +5,9 @@
 
 import { useQuery } from "@tanstack/react-query"
 import { Link } from "wouter"
-import { AlertTriangle, CheckCircle2, TrendingDown, ArrowRight, Clock } from "lucide-react"
+import { AlertTriangle, CheckCircle2, TrendingDown, ArrowRight, Clock, Copy } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
+import { useCopyAmount } from "@/hooks/use-copy-amount"
 
 type UrgencyLevel = "critical" | "high" | "medium" | "low"
 
@@ -37,6 +38,7 @@ function fmt(n: number): string {
 }
 
 export function FinancialHealthSummaryCard() {
+  const copyAmount = useCopyAmount()
   const { data: priority } = useQuery<PriorityReport>({
     queryKey: ["/api/payment/priority-report?includeLow=true"],
   })
@@ -168,19 +170,34 @@ export function FinancialHealthSummaryCard() {
 
         {nextItem && (
           <div
-            className={`mt-3 flex items-center gap-2 rounded p-2 text-xs ${
+            className={`mt-3 flex items-start gap-2 rounded p-2 text-xs ${
               mostOverdue ? "bg-red-100 text-red-900" : "bg-blue-50 text-blue-900"
             }`}
           >
-            <Clock className="h-4 w-4 shrink-0" />
-            <div className="flex-1 min-w-0 truncate">
-              {mostOverdue ? "🔴 最久逾期：" : "⏰ 下一筆截止："}
-              <strong>{nextItem.itemName}</strong>
-              <span className="ml-1">
-                {mostOverdue
-                  ? `（已逾期 ${nextItem.daysOverdue} 天）`
-                  : `（剩 ${nextItem.daysUntilDue} 天 · ${nextItem.dueDate}）`}
-              </span>
+            <Clock className="h-4 w-4 shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <div className="truncate">
+                {mostOverdue ? "🔴 最久逾期：" : "⏰ 下一筆截止："}
+                <strong>{nextItem.itemName}</strong>
+                <span className="ml-1">
+                  {mostOverdue
+                    ? `（已逾期 ${nextItem.daysOverdue} 天）`
+                    : `（剩 ${nextItem.daysUntilDue} 天 · ${nextItem.dueDate}）`}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  copyAmount(nextItem.unpaidAmount, nextItem.itemName)
+                }}
+                className="mt-0.5 inline-flex items-center gap-1 font-bold text-sm hover:underline cursor-pointer"
+                title="點擊複製金額（轉帳用）"
+                data-testid="copy-next-item-amount"
+              >
+                {fmt(nextItem.unpaidAmount)}
+                <Copy className="h-3 w-3 opacity-50" />
+              </button>
             </div>
           </div>
         )}
