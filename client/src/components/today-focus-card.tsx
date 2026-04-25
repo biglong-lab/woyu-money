@@ -646,9 +646,10 @@ export function TodayFocusCard() {
               className="text-xs"
               onClick={handleCopyDigest}
               data-testid="copy-digest"
+              title={`複製目前 ${Math.min(visibleItems.length, 10)} 筆到剪貼簿`}
             >
               <Copy className="h-3 w-3 mr-1" />
-              複製清單
+              複製清單 ({Math.min(visibleItems.length, 10)})
             </Button>
           )}
           <Link href="/cash-allocation">
