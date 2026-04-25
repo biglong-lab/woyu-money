@@ -134,12 +134,23 @@ export function NextMonthForecastCard() {
                 onClick={async (e) => {
                   e.preventDefault()
                   e.stopPropagation()
+                  const title = `${gap.year}/${String(gap.month).padStart(2, "0")} 現金流提醒`
                   const text =
-                    `📊 ${gap.year}/${String(gap.month).padStart(2, "0")} 現金流提醒\n\n` +
+                    `📊 ${title}\n\n` +
                     `預估收入：${formatNT(gap.estimatedIncome)}\n` +
                     `預估支出：${formatNT(gap.estimatedExpense)}\n` +
                     `預估缺口：${formatNT(gap.gap ?? 0)}\n\n` +
                     `💡 建議提前準備現金或安排融資`
+                  // 手機：用 native share UI（LINE/Messages 等）；桌面：fallback clipboard
+                  if (navigator.share) {
+                    try {
+                      await navigator.share({ title, text })
+                      return
+                    } catch {
+                      // 使用者取消分享 → 不顯示錯誤
+                      return
+                    }
+                  }
                   try {
                     await navigator.clipboard.writeText(text)
                     toast({ title: "已複製通知", description: "可貼到 LINE / 備忘錄" })
@@ -148,7 +159,7 @@ export function NextMonthForecastCard() {
                   }
                 }}
                 className="text-red-700 hover:underline flex items-center gap-1 shrink-0"
-                title="複製通知文字"
+                title="分享通知（手機原生分享 / 桌面複製）"
                 data-testid="copy-shortage-notice"
               >
                 <Copy className="h-3 w-3" />
