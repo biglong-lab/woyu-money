@@ -1,29 +1,44 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Progress } from "@/components/ui/progress";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Building2, DollarSign, Calendar, TrendingUp, CheckCircle, Clock, FileText } from "lucide-react";
-import { Link } from "wouter";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Label } from "@/components/ui/label"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Progress } from "@/components/ui/progress"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import {
+  Building2,
+  DollarSign,
+  Calendar,
+  TrendingUp,
+  CheckCircle,
+  Clock,
+  FileText,
+} from "lucide-react"
+import { Link } from "wouter"
+import { formatNT } from "@/lib/utils"
 
 // 租金付款項目型別
 interface RentalPaymentItem {
-  id: number;
-  itemName: string;
-  totalAmount: string;
-  paidAmount: string | null;
-  status: string;
-  notes?: string;
-  updatedAt?: string;
-  receiptImageUrl?: string;
+  id: number
+  itemName: string
+  totalAmount: string
+  paidAmount: string | null
+  status: string
+  notes?: string
+  updatedAt?: string
+  receiptImageUrl?: string
 }
 
 interface RentalPaymentDetailDialogProps {
-  readonly isOpen: boolean;
-  readonly onOpenChange: (open: boolean) => void;
-  readonly viewingPayment: RentalPaymentItem | null;
+  readonly isOpen: boolean
+  readonly onOpenChange: (open: boolean) => void
+  readonly viewingPayment: RentalPaymentItem | null
 }
 
 // 租金付款項目詳細資訊對話框
@@ -37,9 +52,7 @@ export function RentalPaymentDetailDialog({
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>租金付款項目詳細資訊</DialogTitle>
-          <DialogDescription>
-            查看租金付款項目的完整狀態和付款記錄
-          </DialogDescription>
+          <DialogDescription>查看租金付款項目的完整狀態和付款記錄</DialogDescription>
         </DialogHeader>
 
         {viewingPayment && (
@@ -58,28 +71,26 @@ export function RentalPaymentDetailDialog({
           </Button>
           <div className="flex gap-2">
             <Button variant="outline" asChild>
-              <Link href={`/payment-records?search=${viewingPayment?.itemName || ''}`}>
+              <Link href={`/payment-records?search=${viewingPayment?.itemName || ""}`}>
                 查看完整記錄
               </Link>
             </Button>
             <Button variant="outline" asChild>
-              <Link href="/payment-project-fixed">
-                前往付款管理
-              </Link>
+              <Link href="/payment-project-fixed">前往付款管理</Link>
             </Button>
           </div>
         </div>
       </DialogContent>
     </Dialog>
-  );
+  )
 }
 
 // 付款基本資訊
 function PaymentBasicInfo({ payment }: { readonly payment: RentalPaymentItem }) {
-  const totalAmount = payment.totalAmount ? parseFloat(payment.totalAmount) : 0;
-  const paidAmount = payment.paidAmount ? parseFloat(payment.paidAmount) : 0;
-  const isPaid = payment.status === 'paid' || paidAmount >= totalAmount;
-  const progress = totalAmount > 0 ? (paidAmount / totalAmount) * 100 : 0;
+  const totalAmount = payment.totalAmount ? parseFloat(payment.totalAmount) : 0
+  const paidAmount = payment.paidAmount ? parseFloat(payment.paidAmount) : 0
+  const isPaid = payment.status === "paid" || paidAmount >= totalAmount
+  const progress = totalAmount > 0 ? (paidAmount / totalAmount) * 100 : 0
 
   return (
     <Card>
@@ -93,19 +104,19 @@ function PaymentBasicInfo({ payment }: { readonly payment: RentalPaymentItem }) 
         <div className="grid grid-cols-2 gap-4">
           <div>
             <Label className="text-sm text-gray-600">租約名稱</Label>
-            <p className="font-medium">{payment.itemName || '未命名租約'}</p>
+            <p className="font-medium">{payment.itemName || "未命名租約"}</p>
           </div>
           <div>
             <Label className="text-sm text-gray-600">付款期間</Label>
-            <p className="font-medium">{payment.notes || '租金付款'}</p>
+            <p className="font-medium">{payment.notes || "租金付款"}</p>
           </div>
           <div>
             <Label className="text-sm text-gray-600">應付金額</Label>
-            <p className="font-medium text-lg">NT${totalAmount.toLocaleString()}</p>
+            <p className="font-medium text-lg">{formatNT(totalAmount)}</p>
           </div>
           <div>
             <Label className="text-sm text-gray-600">已付金額</Label>
-            <p className="font-medium text-lg text-green-600">NT${paidAmount.toLocaleString()}</p>
+            <p className="font-medium text-lg text-green-600">{formatNT(paidAmount)}</p>
           </div>
         </div>
 
@@ -115,7 +126,7 @@ function PaymentBasicInfo({ payment }: { readonly payment: RentalPaymentItem }) 
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
               <span>已完成 {Math.round(progress)}%</span>
-              <span>剩餘 NT${(totalAmount - paidAmount).toLocaleString()}</span>
+              <span>剩餘 {formatNT(totalAmount - paidAmount)}</span>
             </div>
             <Progress value={progress} className="h-3" />
           </div>
@@ -136,7 +147,10 @@ function PaymentBasicInfo({ payment }: { readonly payment: RentalPaymentItem }) 
                 部分付款 ({Math.round((paidAmount / totalAmount) * 100)}%)
               </Badge>
             ) : (
-              <Badge variant="secondary" className="bg-orange-100 text-orange-800 border-orange-200">
+              <Badge
+                variant="secondary"
+                className="bg-orange-100 text-orange-800 border-orange-200"
+              >
                 <Clock className="w-4 h-4 mr-2" />
                 待付款
               </Badge>
@@ -145,7 +159,7 @@ function PaymentBasicInfo({ payment }: { readonly payment: RentalPaymentItem }) 
         </div>
       </CardContent>
     </Card>
-  );
+  )
 }
 
 // 付款記錄預覽
@@ -164,13 +178,15 @@ function PaymentRecordPreview({ payment }: { readonly payment: RentalPaymentItem
           <div className="flex justify-between items-center">
             <span className="text-sm text-gray-600">累計已付款</span>
             <span className="font-bold text-green-600">
-              NT${parseFloat(payment.paidAmount || "0").toLocaleString()}
+              {formatNT(parseFloat(payment.paidAmount || "0"))}
             </span>
           </div>
           <div className="flex justify-between items-center">
             <span className="text-sm text-gray-600">待付金額</span>
             <span className="font-bold text-orange-600">
-              NT${(parseFloat(payment.totalAmount || "0") - parseFloat(payment.paidAmount || "0")).toLocaleString()}
+              {formatNT(
+                parseFloat(payment.totalAmount || "0") - parseFloat(payment.paidAmount || "0")
+              )}
             </span>
           </div>
         </div>
@@ -195,14 +211,14 @@ function PaymentRecordPreview({ payment }: { readonly payment: RentalPaymentItem
                         </Badge>
                         <span className="text-xs text-gray-500">
                           {payment.updatedAt
-                            ? new Date(payment.updatedAt).toLocaleDateString('zh-TW', {
-                                year: 'numeric',
-                                month: 'long',
-                                day: 'numeric',
-                                hour: '2-digit',
-                                minute: '2-digit'
+                            ? new Date(payment.updatedAt).toLocaleDateString("zh-TW", {
+                                year: "numeric",
+                                month: "long",
+                                day: "numeric",
+                                hour: "2-digit",
+                                minute: "2-digit",
                               })
-                            : '日期未知'}
+                            : "日期未知"}
                         </span>
                       </div>
 
@@ -210,7 +226,7 @@ function PaymentRecordPreview({ payment }: { readonly payment: RentalPaymentItem
                         <div>
                           <span className="text-gray-500">付款金額：</span>
                           <span className="font-medium text-green-600">
-                            NT${parseFloat(payment.paidAmount || "0").toLocaleString()}
+                            {formatNT(parseFloat(payment.paidAmount || "0"))}
                           </span>
                         </div>
                         <div>
@@ -236,7 +252,7 @@ function PaymentRecordPreview({ payment }: { readonly payment: RentalPaymentItem
                         <div
                           className="w-20 h-20 rounded-lg border-2 border-dashed border-gray-200 overflow-hidden cursor-pointer hover:border-blue-400 transition-colors"
                           onClick={() => {
-                            window.open(payment.receiptImageUrl, '_blank');
+                            window.open(payment.receiptImageUrl, "_blank")
                           }}
                         >
                           <img
@@ -244,10 +260,11 @@ function PaymentRecordPreview({ payment }: { readonly payment: RentalPaymentItem
                             alt="收據附件"
                             className="w-full h-full object-cover"
                             onError={(e) => {
-                              const target = e.target as HTMLImageElement;
-                              target.style.display = 'none';
+                              const target = e.target as HTMLImageElement
+                              target.style.display = "none"
                               if (target.parentElement) {
-                                target.parentElement.innerHTML = '<div class="flex items-center justify-center h-full text-gray-400"><svg class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg></div>';
+                                target.parentElement.innerHTML =
+                                  '<div class="flex items-center justify-center h-full text-gray-400"><svg class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg></div>'
                               }
                             }}
                           />
@@ -258,7 +275,7 @@ function PaymentRecordPreview({ payment }: { readonly payment: RentalPaymentItem
                         </div>
                       )}
                       <p className="text-xs text-center text-gray-400 mt-1">
-                        {payment.receiptImageUrl ? '點擊查看' : '無附件'}
+                        {payment.receiptImageUrl ? "點擊查看" : "無附件"}
                       </p>
                     </div>
                   </div>
@@ -281,5 +298,5 @@ function PaymentRecordPreview({ payment }: { readonly payment: RentalPaymentItem
         </div>
       </CardContent>
     </Card>
-  );
+  )
 }
