@@ -1,18 +1,14 @@
 /**
  * 統一付款管理 - 付款概況卡片
  */
-import { Card, CardContent } from "@/components/ui/card";
-import {
-  AlertCircle,
-  Calendar,
-  CheckCircle,
-  DollarSign,
-} from "lucide-react";
-import type { PaymentStats } from "./types";
+import { Card, CardContent } from "@/components/ui/card"
+import { AlertCircle, Calendar, CheckCircle, DollarSign } from "lucide-react"
+import { formatNT } from "@/lib/utils"
+import type { PaymentStats } from "./types"
 
 interface SummaryCardsProps {
   /** 付款統計資料 */
-  stats: PaymentStats;
+  stats: PaymentStats
 }
 
 /** 概況卡片設定 */
@@ -57,34 +53,27 @@ const CARD_CONFIG = [
     iconColor: "text-green-600",
     textColor: "text-green-700",
   },
-];
+]
 
 /** 付款概況四張卡片 */
 export function SummaryCards({ stats }: SummaryCardsProps) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
       {CARD_CONFIG.map((card) => (
-        <Card
-          key={card.key}
-          className={`border ${card.borderColor} shadow-sm ${card.bgColor}`}
-        >
+        <Card key={card.key} className={`border ${card.borderColor} shadow-sm ${card.bgColor}`}>
           <CardContent className="p-6">
             <div className="space-y-3">
               <div className="flex items-center gap-3">
                 <card.icon className={`w-5 h-5 ${card.iconColor}`} />
-                <p className="text-sm font-medium text-gray-700 tracking-wide">
-                  {card.label}
-                </p>
+                <p className="text-sm font-medium text-gray-700 tracking-wide">{card.label}</p>
               </div>
-              <p
-                className={`text-2xl font-bold ${card.textColor} leading-none`}
-              >
-                NT$ {stats[card.field].toLocaleString()}
+              <p className={`text-2xl font-bold ${card.textColor} leading-none`}>
+                {formatNT(stats[card.field])}
               </p>
             </div>
           </CardContent>
         </Card>
       ))}
     </div>
-  );
+  )
 }
