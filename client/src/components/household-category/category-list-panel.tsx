@@ -1,7 +1,7 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Edit, Trash2, BarChart3 } from "lucide-react";
-import type { DebtCategory } from "../../../../shared/schema/category";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Edit, Trash2, BarChart3 } from "lucide-react"
+import type { DebtCategory } from "../../../../shared/schema/category"
 
 // ============================================================
 // 分類列表面板 - 顯示左側可選取的分類清單
@@ -9,17 +9,17 @@ import type { DebtCategory } from "../../../../shared/schema/category";
 
 interface CategoryListPanelProps {
   /** 分類資料陣列 */
-  categories: DebtCategory[];
+  categories: DebtCategory[]
   /** 是否載入中 */
-  isLoading: boolean;
+  isLoading: boolean
   /** 目前選取的分類 */
-  selectedCategory: DebtCategory | null;
+  selectedCategory: DebtCategory | null
   /** 選取分類的回呼 */
-  onSelectCategory: (category: DebtCategory) => void;
+  onSelectCategory: (category: DebtCategory) => void
   /** 編輯分類的回呼 */
-  onEditCategory: (category: DebtCategory) => void;
+  onEditCategory: (category: DebtCategory) => void
   /** 刪除分類的回呼 */
-  onDeleteCategory: (id: number) => void;
+  onDeleteCategory: (id: number) => void
 }
 
 export function CategoryListPanel({
@@ -58,17 +58,15 @@ export function CategoryListPanel({
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="font-medium">{category.categoryName}</h3>
-                    <p className="text-sm text-gray-500">
-                      {category.categoryType}
-                    </p>
+                    <p className="text-sm text-gray-500">{category.categoryType}</p>
                   </div>
                   <div className="flex space-x-1">
                     <Button
                       size="sm"
                       variant="ghost"
                       onClick={(e) => {
-                        e.stopPropagation();
-                        onEditCategory(category);
+                        e.stopPropagation()
+                        onEditCategory(category)
                       }}
                     >
                       <Edit className="h-4 w-4" />
@@ -77,9 +75,9 @@ export function CategoryListPanel({
                       size="sm"
                       variant="ghost"
                       onClick={(e) => {
-                        e.stopPropagation();
-                        if (confirm("確定要刪除此分類嗎？")) {
-                          onDeleteCategory(category.id);
+                        e.stopPropagation()
+                        if (confirm("確定要刪除此分類嗎？\n刪除後無法復原")) {
+                          onDeleteCategory(category.id)
                         }
                       }}
                     >
@@ -93,5 +91,5 @@ export function CategoryListPanel({
         </div>
       </CardContent>
     </Card>
-  );
+  )
 }
