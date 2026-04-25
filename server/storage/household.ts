@@ -1,4 +1,5 @@
 import { db } from "../db"
+import { localMonthTPE } from "@shared/date-utils"
 import {
   householdBudgets,
   householdExpenses,
@@ -383,7 +384,7 @@ interface HouseholdStatsResult {
 }
 
 export async function getHouseholdStats(): Promise<HouseholdStatsResult> {
-  const currentMonth = new Date().toISOString().slice(0, 7)
+  const currentMonth = localMonthTPE()
 
   const budget = await getHouseholdBudget(currentMonth)
 

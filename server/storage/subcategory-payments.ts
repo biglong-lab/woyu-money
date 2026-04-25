@@ -1,4 +1,5 @@
 import { db } from "../db"
+import { localDateTPE } from "@shared/date-utils"
 import {
   paymentItems,
   paymentRecords,
@@ -365,7 +366,7 @@ export async function executeUnifiedPayment(
     await db.insert(paymentRecords).values({
       itemId: item.id,
       amountPaid: allocatedAmount.toFixed(2),
-      paymentDate: new Date().toISOString().split("T")[0],
+      paymentDate: localDateTPE(),
       paymentMethod: "unified_payment",
       notes: notes || `統一付款分配 - ${item.itemName}`,
     })
