@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiRequest } from "@/lib/queryClient"
-import { localDateISO } from "@/lib/utils"
+import { localDateISO, formatNT } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 import {
   Dialog,
@@ -524,7 +524,7 @@ export default function LoanPaymentHistory({ recordId, recordTitle }: LoanPaymen
                       </span>
 
                       <span className="text-lg font-bold text-green-600">
-                        NT$ {parseFloat(payment.amount).toLocaleString()}
+                        {formatNT(parseFloat(payment.amount))}
                       </span>
 
                       {payment.isEarlyPayment && (
@@ -650,7 +650,7 @@ export default function LoanPaymentHistory({ recordId, recordTitle }: LoanPaymen
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-green-600">
-                  NT$ {parseFloat(stats.totalAmount || "0").toLocaleString()}
+                  {formatNT(parseFloat(stats.totalAmount || "0"))}
                 </div>
               </CardContent>
             </Card>
@@ -689,9 +689,7 @@ export default function LoanPaymentHistory({ recordId, recordTitle }: LoanPaymen
                       <div key={index} className="flex justify-between items-center">
                         <span>{getPaymentMethodLabel(method.method)}</span>
                         <div className="text-right">
-                          <div className="font-semibold">
-                            NT$ {parseFloat(method.amount).toLocaleString()}
-                          </div>
+                          <div className="font-semibold">{formatNT(parseFloat(method.amount))}</div>
                           <div className="text-sm text-gray-500">{method.count} 次</div>
                         </div>
                       </div>
