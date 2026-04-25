@@ -14,6 +14,7 @@ import {
   Keyboard,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { getDisplayName, getDisplayInitial } from "@/lib/utils"
 import {
   Sheet,
   SheetContent,
@@ -277,18 +278,18 @@ export default function TopNavigation() {
                   >
                     <Avatar className="w-6 h-6">
                       <AvatarFallback className="bg-blue-100 text-blue-700 text-xs font-medium">
-                        {user.username?.charAt(0).toUpperCase() || "U"}
+                        {getDisplayInitial(user)}
                       </AvatarFallback>
                     </Avatar>
                     <span className="hidden lg:inline text-sm font-medium truncate max-w-24">
-                      {user.username}
+                      {getDisplayName(user)}
                     </span>
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
                   <DropdownMenuLabel className="font-normal">
                     <div className="flex flex-col space-y-1">
-                      <p className="text-sm font-medium leading-none">{user.username}</p>
+                      <p className="text-sm font-medium leading-none">{getDisplayName(user)}</p>
                       <p className="text-xs leading-none text-muted-foreground">付款管理系統</p>
                     </div>
                   </DropdownMenuLabel>

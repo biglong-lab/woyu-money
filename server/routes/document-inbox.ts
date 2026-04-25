@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from "express"
 import { requireAuth } from "../auth"
 import { asyncHandler, AppError } from "../middleware/error-handler"
 import { localDateTPE } from "@shared/date-utils"
+import { getAuditUserInfo } from "@shared/user-display"
 import { ObjectStorageService, ObjectNotFoundError } from "../objectStorage"
 import { recognizeDocument } from "../document-ai"
 import { documentUpload, inboxDir } from "./upload-config"
@@ -44,12 +45,12 @@ function formatDate(d: Date): string {
   return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`
 }
 
-/** 取得使用者顯示名稱（優先 fullName，其次 username） */
+/** 取得使用者顯示名稱（優先 LINE 顯示名稱 → fullName → username） */
 async function resolveDisplayName(userId: number | undefined | null): Promise<string> {
   if (!userId) return "未知用戶"
   const user = await docInboxStorage.getUserDisplayName(userId)
   if (!user) return "未知用戶"
-  return user.fullName || user.username || "未知用戶"
+  return getAuditUserInfo(user)
 }
 
 /** 組合單據追蹤備註 */
@@ -124,9 +125,10 @@ router.post(
     const documentType = (req.body.documentType as "bill" | "payment" | "invoice") || "bill"
     const uploadNotes = req.body.notes || null
 
+    // 用統一 helper：優先 LINE 顯示名稱 → fullName → username
     let uploadedByUsername = "未知用戶"
-    if (req.user && req.user.username) {
-      uploadedByUsername = req.user.fullName || req.user.username || "未知用戶"
+    if (req.user) {
+      uploadedByUsername = getAuditUserInfo(req.user)
     } else if (userId) {
       uploadedByUsername = await resolveDisplayName(userId)
     }

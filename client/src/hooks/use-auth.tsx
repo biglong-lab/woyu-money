@@ -2,6 +2,7 @@ import { createContext, ReactNode, useContext } from "react"
 import { useQuery, useMutation, UseMutationResult } from "@tanstack/react-query"
 import { User, InsertUser, LoginData } from "@shared/schema"
 import { getQueryFn, apiRequest, queryClient } from "../lib/queryClient"
+import { getDisplayName } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 
 type AuthContextType = {
@@ -56,7 +57,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await queryClient.refetchQueries({ queryKey: ["/api/user"] })
       toast({
         title: "登入成功",
-        description: `歡迎回來，${user.fullName || user.username}！`,
+        description: `歡迎回來，${getDisplayName(user)}！`,
       })
     },
     onError: (error: Error) => {
@@ -70,14 +71,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const registerMutation = useMutation({
     mutationFn: async (credentials: InsertUser) => {
-      const res = await apiRequest("POST", "/api/register", credentials) as User
+      const res = (await apiRequest("POST", "/api/register", credentials)) as User
       return res
     },
     onSuccess: (user: User) => {
       queryClient.setQueryData(["/api/user"], user)
       toast({
         title: "註冊成功",
-        description: `歡迎，${user.fullName || user.username}！`,
+        description: `歡迎，${getDisplayName(user)}！`,
       })
     },
     onError: (error: Error) => {

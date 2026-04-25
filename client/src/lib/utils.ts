@@ -66,3 +66,44 @@ export function friendlyApiError(error: Error | null | undefined): string {
   }
   return error?.message?.trim() || "請稍後再試"
 }
+
+/**
+ * 取得用戶顯示名稱（優先順序考慮 LINE 登入用戶）
+ *
+ * LINE 登入的 username 會是 `line_U123abc...` 長代號無法辨識，
+ * 故優先順序：lineDisplayName → fullName → username（最後 fallback）
+ *
+ * @param user user 物件（接受任何含這些欄位的型別）
+ * @returns 適合在 UI 顯示的名稱
+ */
+export function getDisplayName(
+  user:
+    | {
+        lineDisplayName?: string | null
+        fullName?: string | null
+        username?: string | null
+      }
+    | null
+    | undefined
+): string {
+  if (!user) return "用戶"
+  return user.lineDisplayName || user.fullName || user.username || "用戶"
+}
+
+/**
+ * 取得頭像 fallback 字母（首字大寫，LINE 用戶不顯示 line_ 前綴）
+ */
+export function getDisplayInitial(
+  user:
+    | {
+        lineDisplayName?: string | null
+        fullName?: string | null
+        username?: string | null
+      }
+    | null
+    | undefined
+): string {
+  const name = getDisplayName(user)
+  // 中文字直接取第一個字（如「小明」→「小」）
+  return name.charAt(0).toUpperCase()
+}
