@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge"
 import { apiRequest, queryClient } from "@/lib/queryClient"
 import { localDateISO, formatNT } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
+import { useDocumentTitle } from "@/hooks/use-document-title"
 
 type Confidence = "high" | "medium" | "low"
 
@@ -105,6 +106,7 @@ function CandidateCard({
 }
 
 export default function ReceiptMatchHelperPage() {
+  useDocumentTitle("收據對應")
   const [amount, setAmount] = useState("")
   const [receiptDate, setReceiptDate] = useState("")
   const [vendor, setVendor] = useState("")
