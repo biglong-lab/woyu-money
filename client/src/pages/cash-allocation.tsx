@@ -372,6 +372,7 @@ export default function CashAllocationPage() {
       critical: Math.ceil(criticalSum),
       thisWeek: Math.ceil(criticalSum + highSum),
       thisMonth: Math.ceil(criticalSum + highSum + mediumSum),
+      total: Math.ceil(priority.totalUnpaid),
     }
   })()
 
@@ -558,6 +559,20 @@ export default function CashAllocationPage() {
                   title={`付清本月應付（${formatNT(smartPresets.thisMonth)}）`}
                 >
                   🟡 付清本月 {formatNT(smartPresets.thisMonth)}
+                </Button>
+              )}
+              {smartPresets.total > smartPresets.thisMonth && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handlePresetClick(smartPresets.total)}
+                  disabled={mutation.isPending}
+                  className="text-xs h-7 border-blue-300 text-blue-700 hover:bg-blue-50"
+                  data-testid="smart-preset-total"
+                  title={`付清全部待付（${formatNT(smartPresets.total)}）`}
+                >
+                  🎯 付清全部 {formatNT(smartPresets.total)}
                 </Button>
               )}
             </div>
