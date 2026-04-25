@@ -410,6 +410,14 @@ function EmptyState({
           <div className="text-gray-500 mt-0.5">
             {nextUpcoming.dueDate}（{nextUpcoming.daysUntilDue} 天後）
           </div>
+          <button
+            type="button"
+            onClick={() => window.dispatchEvent(new CustomEvent("open-quick-payment"))}
+            className="mt-2 inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded bg-white border hover:bg-gray-50 active:scale-95 transition-all"
+            title="開啟快速付款"
+          >
+            提前付款 →
+          </button>
         </div>
       )}
     </div>
