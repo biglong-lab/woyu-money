@@ -1,7 +1,8 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { TrendingUp, AlertTriangle, AlertCircle } from "lucide-react";
-import type { LoanInvestmentStats } from "./types";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { TrendingUp, AlertTriangle, AlertCircle } from "lucide-react"
+import { formatNT } from "@/lib/utils"
+import type { LoanInvestmentStats } from "./types"
 
 /**
  * 借貸投資管理 -- 統計卡片區塊
@@ -9,13 +10,12 @@ import type { LoanInvestmentStats } from "./types";
  */
 
 interface StatCardsProps {
-  stats: LoanInvestmentStats;
+  stats: LoanInvestmentStats
 }
 
 export default function StatCards({ stats }: StatCardsProps) {
   // 計算平均收益率，避免除以零
-  const avgReturnRate =
-    ((stats.expectedReturn || 0) / Math.max(stats.totalPrincipal || 1, 1)) * 100;
+  const avgReturnRate = ((stats.expectedReturn || 0) / Math.max(stats.totalPrincipal || 1, 1)) * 100
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -32,26 +32,22 @@ export default function StatCards({ stats }: StatCardsProps) {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="text-center p-4 bg-blue-50 rounded-lg">
               <div className="text-2xl font-bold text-blue-600">
-                ${stats.totalPrincipal?.toLocaleString() || "0"}
+                {formatNT(stats.totalPrincipal ?? 0)}
               </div>
               <div className="text-sm text-muted-foreground">總投入本金</div>
             </div>
             <div className="text-center p-4 bg-green-50 rounded-lg">
               <div className="text-2xl font-bold text-green-600">
-                ${stats.expectedReturn?.toLocaleString() || "0"}
+                {formatNT(stats.expectedReturn ?? 0)}
               </div>
               <div className="text-sm text-muted-foreground">預期年收益</div>
             </div>
             <div className="text-center p-4 bg-purple-50 rounded-lg">
-              <div className="text-2xl font-bold text-purple-600">
-                {avgReturnRate.toFixed(1)}%
-              </div>
+              <div className="text-2xl font-bold text-purple-600">{avgReturnRate.toFixed(1)}%</div>
               <div className="text-sm text-muted-foreground">平均收益率</div>
             </div>
             <div className="text-center p-4 bg-orange-50 rounded-lg">
-              <div className="text-2xl font-bold text-orange-600">
-                {stats.totalParties || 0}
-              </div>
+              <div className="text-2xl font-bold text-orange-600">{stats.totalParties || 0}</div>
               <div className="text-sm text-muted-foreground">合作對象</div>
             </div>
           </div>
@@ -97,5 +93,5 @@ export default function StatCards({ stats }: StatCardsProps) {
         </CardContent>
       </Card>
     </div>
-  );
+  )
 }
