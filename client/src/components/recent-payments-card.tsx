@@ -221,9 +221,15 @@ export function RecentPaymentsCard() {
                         {rec.projectName && <span className="ml-1">· {rec.projectName}</span>}
                       </div>
                     </div>
-                    <div className="text-sm font-semibold text-green-700 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => copyAmount(amount, rec.itemName ?? "未命名項目")}
+                      className="text-sm font-semibold text-green-700 shrink-0 hover:underline cursor-pointer"
+                      title="點擊複製金額（轉帳用）"
+                      data-testid={`copy-record-amount-${rec.id}`}
+                    >
                       {formatNT(amount)}
-                    </div>
+                    </button>
                     <Button
                       size="sm"
                       variant="ghost"
