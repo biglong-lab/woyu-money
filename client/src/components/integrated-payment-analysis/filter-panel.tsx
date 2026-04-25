@@ -1,12 +1,18 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Filter } from "lucide-react";
-import type { PaymentProject } from "./types";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Filter } from "lucide-react"
+import type { PaymentProject } from "./types"
 
 // ========================================
 // 篩選面板元件
@@ -14,33 +20,33 @@ import type { PaymentProject } from "./types";
 
 interface FilterPanelProps {
   /** 搜尋關鍵字 */
-  searchTerm: string;
+  searchTerm: string
   /** 搜尋關鍵字變更處理 */
-  onSearchTermChange: (value: string) => void;
+  onSearchTermChange: (value: string) => void
   /** 選中的專案 ID */
-  selectedProject: string;
+  selectedProject: string
   /** 專案選擇變更處理 */
-  onSelectedProjectChange: (value: string) => void;
+  onSelectedProjectChange: (value: string) => void
   /** 選中的狀態 */
-  selectedStatus: string;
+  selectedStatus: string
   /** 狀態選擇變更處理 */
-  onSelectedStatusChange: (value: string) => void;
+  onSelectedStatusChange: (value: string) => void
   /** 日期範圍 */
-  dateRange: string;
+  dateRange: string
   /** 日期範圍變更處理 */
-  onDateRangeChange: (value: string) => void;
+  onDateRangeChange: (value: string) => void
   /** 是否顯示已刪除項目 */
-  showDeletedItems: boolean;
+  showDeletedItems: boolean
   /** 已刪除項目切換處理 */
-  onShowDeletedItemsChange: (value: boolean) => void;
+  onShowDeletedItemsChange: (value: boolean) => void
   /** 已選擇的項目數量 */
-  selectedItemsCount: number;
+  selectedItemsCount: number
   /** 是否顯示批量操作 */
-  showBatchActions: boolean;
+  showBatchActions: boolean
   /** 批量操作切換處理 */
-  onShowBatchActionsToggle: () => void;
+  onShowBatchActionsToggle: () => void
   /** 專案列表 */
-  projects: PaymentProject[];
+  projects: PaymentProject[]
 }
 
 /** 篩選和搜尋面板，包含關鍵字搜尋、專案篩選、狀態篩選、日期範圍 */
@@ -62,17 +68,15 @@ export function FilterPanel({
 }: FilterPanelProps) {
   /** 是否有篩選條件套用中 */
   const hasActiveFilters =
-    searchTerm !== "" ||
-    selectedProject !== "all" ||
-    selectedStatus !== "all";
+    searchTerm !== "" || selectedProject !== "all" || selectedStatus !== "all"
 
   /** 清除所有篩選條件 */
   const handleClearFilters = () => {
-    onSearchTermChange("");
-    onSelectedProjectChange("all");
-    onSelectedStatusChange("all");
-    onDateRangeChange("current_month");
-  };
+    onSearchTermChange("")
+    onSelectedProjectChange("all")
+    onSelectedStatusChange("all")
+    onDateRangeChange("current_month")
+  }
 
   return (
     <Card>
@@ -92,6 +96,12 @@ export function FilterPanel({
               placeholder="項目名稱、專案、分類..."
               value={searchTerm}
               onChange={(e) => onSearchTermChange(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape" && searchTerm) {
+                  e.preventDefault()
+                  onSearchTermChange("")
+                }
+              }}
               className="w-full"
             />
           </div>
@@ -158,33 +168,25 @@ export function FilterPanel({
                 checked={showDeletedItems}
                 onCheckedChange={(checked) => onShowDeletedItemsChange(!!checked)}
               />
-              <Label htmlFor="showDeleted" className="text-sm">顯示已刪除項目</Label>
+              <Label htmlFor="showDeleted" className="text-sm">
+                顯示已刪除項目
+              </Label>
             </div>
 
             {selectedItemsCount > 0 && (
-              <Badge variant="secondary">
-                已選擇 {selectedItemsCount} 項
-              </Badge>
+              <Badge variant="secondary">已選擇 {selectedItemsCount} 項</Badge>
             )}
           </div>
 
           <div className="flex gap-2">
             {hasActiveFilters && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleClearFilters}
-              >
+              <Button variant="outline" size="sm" onClick={handleClearFilters}>
                 清除篩選
               </Button>
             )}
 
             {selectedItemsCount > 0 && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={onShowBatchActionsToggle}
-              >
+              <Button variant="outline" size="sm" onClick={onShowBatchActionsToggle}>
                 批量操作
               </Button>
             )}
@@ -192,5 +194,5 @@ export function FilterPanel({
         </div>
       </CardContent>
     </Card>
-  );
+  )
 }
