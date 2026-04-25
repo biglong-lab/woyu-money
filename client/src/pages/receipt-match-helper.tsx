@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { apiRequest, queryClient } from "@/lib/queryClient"
-import { localDateISO } from "@/lib/utils"
+import { localDateISO, formatNT } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 
 type Confidence = "high" | "medium" | "low"
@@ -59,10 +59,6 @@ const CONF_META: Record<Confidence, { label: string; color: string }> = {
   low: { label: "低信心", color: "bg-gray-100 text-gray-700 border-gray-300" },
 }
 
-function fmt(n: number): string {
-  return `NT$ ${Math.round(n).toLocaleString()}`
-}
-
 function CandidateCard({
   candidate,
   onMarkPaid,
@@ -84,8 +80,8 @@ function CandidateCard({
       </div>
       <div className="text-xs text-gray-700 space-y-0.5">
         <div>
-          應付 {fmt(candidate.item.totalAmount)} / 已付 {fmt(candidate.item.paidAmount)} / 未付{" "}
-          <strong>{fmt(unpaid)}</strong>
+          應付 {formatNT(candidate.item.totalAmount)} / 已付 {formatNT(candidate.item.paidAmount)} /
+          未付 <strong>{formatNT(unpaid)}</strong>
         </div>
         {candidate.item.categoryName && <div>分類：{candidate.item.categoryName}</div>}
         {candidate.reasons.length > 0 && (
