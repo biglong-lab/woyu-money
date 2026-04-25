@@ -1,58 +1,64 @@
 // 一般付款管理 - 篩選面板元件
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Filter, X, RefreshCw, ChevronDown, ChevronUp } from "lucide-react";
-import type { PaymentProject, CategoryWithSource, StatusCounts } from "./general-payment-types";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Badge } from "@/components/ui/badge"
+import { Switch } from "@/components/ui/switch"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Search, Filter, X, RefreshCw, ChevronDown, ChevronUp } from "lucide-react"
+import type { PaymentProject, CategoryWithSource, StatusCounts } from "./general-payment-types"
 
 export interface GeneralPaymentFilterPanelProps {
   // 篩選狀態
-  searchTerm: string;
-  selectedProject: string;
-  selectedCategory: string;
-  selectedStatus: string;
-  selectedPaymentType: string;
-  dateRange: string;
-  selectedYear: number | null;
-  selectedMonth: number | null;
-  startDate: string;
-  endDate: string;
-  priorityFilter: string;
-  showPaidItems: boolean;
-  sortBy: string;
-  sortOrder: "asc" | "desc";
-  isPriorityFilterOpen: boolean;
+  searchTerm: string
+  selectedProject: string
+  selectedCategory: string
+  selectedStatus: string
+  selectedPaymentType: string
+  dateRange: string
+  selectedYear: number | null
+  selectedMonth: number | null
+  startDate: string
+  endDate: string
+  priorityFilter: string
+  showPaidItems: boolean
+  sortBy: string
+  sortOrder: "asc" | "desc"
+  isPriorityFilterOpen: boolean
 
   // 資料
-  projects: PaymentProject[];
-  allCategories: CategoryWithSource[];
-  filteredCount: number;
-  totalCount: number;
-  statusCounts: StatusCounts;
+  projects: PaymentProject[]
+  allCategories: CategoryWithSource[]
+  filteredCount: number
+  totalCount: number
+  statusCounts: StatusCounts
 
   // 回調
-  onSearchTermChange: (value: string) => void;
-  onSelectedProjectChange: (value: string) => void;
-  onSelectedCategoryChange: (value: string) => void;
-  onSelectedStatusChange: (value: string) => void;
-  onSelectedPaymentTypeChange: (value: string) => void;
-  onDateRangeChange: (value: string) => void;
-  onSelectedYearChange: (value: number | null) => void;
-  onSelectedMonthChange: (value: number | null) => void;
-  onStartDateChange: (value: string) => void;
-  onEndDateChange: (value: string) => void;
-  onPriorityFilterChange: (value: string) => void;
-  onShowPaidItemsChange: (value: boolean) => void;
-  onSortByChange: (value: string) => void;
-  onSortOrderChange: (value: "asc" | "desc") => void;
-  onIsPriorityFilterOpenChange: (value: boolean) => void;
-  onResetAllFilters: () => void;
-  onClearAllFilters: () => void;
-  onRefreshData: () => void;
-  onApplyQuickFilter: (filterType: string) => void;
+  onSearchTermChange: (value: string) => void
+  onSelectedProjectChange: (value: string) => void
+  onSelectedCategoryChange: (value: string) => void
+  onSelectedStatusChange: (value: string) => void
+  onSelectedPaymentTypeChange: (value: string) => void
+  onDateRangeChange: (value: string) => void
+  onSelectedYearChange: (value: number | null) => void
+  onSelectedMonthChange: (value: number | null) => void
+  onStartDateChange: (value: string) => void
+  onEndDateChange: (value: string) => void
+  onPriorityFilterChange: (value: string) => void
+  onShowPaidItemsChange: (value: boolean) => void
+  onSortByChange: (value: string) => void
+  onSortOrderChange: (value: "asc" | "desc") => void
+  onIsPriorityFilterOpenChange: (value: boolean) => void
+  onResetAllFilters: () => void
+  onClearAllFilters: () => void
+  onRefreshData: () => void
+  onApplyQuickFilter: (filterType: string) => void
 }
 
 export function GeneralPaymentFilterPanel({
@@ -188,6 +194,12 @@ export function GeneralPaymentFilterPanel({
                 placeholder="搜尋項目名稱或備註..."
                 value={searchTerm}
                 onChange={(e) => onSearchTermChange(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape" && searchTerm) {
+                    e.preventDefault()
+                    onSearchTermChange("")
+                  }
+                }}
                 className="pl-10"
               />
             </div>
@@ -213,7 +225,10 @@ export function GeneralPaymentFilterPanel({
               <SelectContent>
                 <SelectItem value="all">所有分類</SelectItem>
                 {allCategories.map((category) => (
-                  <SelectItem key={`${category.categoryType}-${category.id}`} value={category.id.toString()}>
+                  <SelectItem
+                    key={`${category.categoryType}-${category.id}`}
+                    value={category.id.toString()}
+                  >
                     <div className="flex items-center justify-between w-full">
                       <span>{category.categoryName}</span>
                       <span className="text-xs text-gray-500 ml-2">{category.source}</span>
@@ -251,10 +266,7 @@ export function GeneralPaymentFilterPanel({
               </SelectContent>
             </Select>
 
-            <Button
-              variant="outline"
-              onClick={onClearAllFilters}
-            >
+            <Button variant="outline" onClick={onClearAllFilters}>
               清除篩選
             </Button>
           </div>
@@ -269,25 +281,32 @@ export function GeneralPaymentFilterPanel({
           <div className="grid gap-4 grid-cols-1 md:grid-cols-8 items-end">
             <div className="flex flex-col space-y-1">
               <label className="text-sm font-medium">年份</label>
-              <Select value={selectedYear?.toString() || "all"} onValueChange={(value) => onSelectedYearChange(value === "all" ? null : parseInt(value))}>
+              <Select
+                value={selectedYear?.toString() || "all"}
+                onValueChange={(value) =>
+                  onSelectedYearChange(value === "all" ? null : parseInt(value))
+                }
+              >
                 <SelectTrigger className="bg-blue-50 border-blue-200">
                   <SelectValue placeholder="選擇年份" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">所有年份</SelectItem>
-                  {Array.from({length: 12}, (_, i) => new Date().getFullYear() - 2 + i).map(year => {
-                    const currentYear = new Date().getFullYear();
-                    const isCurrentYear = year === currentYear;
-                    return (
-                      <SelectItem
-                        key={year}
-                        value={year.toString()}
-                        className={isCurrentYear ? "bg-blue-100 font-semibold text-blue-800" : ""}
-                      >
-                        {year}年 {isCurrentYear && "本年"}
-                      </SelectItem>
-                    );
-                  })}
+                  {Array.from({ length: 12 }, (_, i) => new Date().getFullYear() - 2 + i).map(
+                    (year) => {
+                      const currentYear = new Date().getFullYear()
+                      const isCurrentYear = year === currentYear
+                      return (
+                        <SelectItem
+                          key={year}
+                          value={year.toString()}
+                          className={isCurrentYear ? "bg-blue-100 font-semibold text-blue-800" : ""}
+                        >
+                          {year}年 {isCurrentYear && "本年"}
+                        </SelectItem>
+                      )
+                    }
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -296,26 +315,43 @@ export function GeneralPaymentFilterPanel({
               <label className="text-sm font-medium">月份</label>
               <Select
                 value={selectedMonth !== null ? selectedMonth.toString() : "all"}
-                onValueChange={(value) => onSelectedMonthChange(value === "all" ? null : parseInt(value))}
+                onValueChange={(value) =>
+                  onSelectedMonthChange(value === "all" ? null : parseInt(value))
+                }
               >
                 <SelectTrigger className="bg-green-50 border-green-200">
                   <SelectValue placeholder="選擇月份" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">所有月份</SelectItem>
-                  {Array.from({length: 12}, (_, i) => i + 1).map(month => {
-                    const currentMonth = new Date().getMonth() + 1;
-                    const isCurrentMonth = month === currentMonth;
-                    const monthNames = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
+                  {Array.from({ length: 12 }, (_, i) => i + 1).map((month) => {
+                    const currentMonth = new Date().getMonth() + 1
+                    const isCurrentMonth = month === currentMonth
+                    const monthNames = [
+                      "1月",
+                      "2月",
+                      "3月",
+                      "4月",
+                      "5月",
+                      "6月",
+                      "7月",
+                      "8月",
+                      "9月",
+                      "10月",
+                      "11月",
+                      "12月",
+                    ]
                     return (
                       <SelectItem
                         key={month}
                         value={month.toString()}
-                        className={isCurrentMonth ? "bg-green-100 font-semibold text-green-800" : ""}
+                        className={
+                          isCurrentMonth ? "bg-green-100 font-semibold text-green-800" : ""
+                        }
                       >
                         {monthNames[month - 1]} {isCurrentMonth && "本月"}
                       </SelectItem>
-                    );
+                    )
                   })}
                 </SelectContent>
               </Select>
@@ -340,7 +376,10 @@ export function GeneralPaymentFilterPanel({
 
             <div className="flex flex-col space-y-1">
               <label className="text-sm font-medium">排序順序</label>
-              <Select value={sortOrder} onValueChange={(value: "asc" | "desc") => onSortOrderChange(value)}>
+              <Select
+                value={sortOrder}
+                onValueChange={(value: "asc" | "desc") => onSortOrderChange(value)}
+              >
                 <SelectTrigger className="bg-purple-50 border-purple-200">
                   <SelectValue placeholder="排序順序" />
                 </SelectTrigger>
@@ -378,10 +417,16 @@ export function GeneralPaymentFilterPanel({
             onClick={() => onIsPriorityFilterOpenChange(!isPriorityFilterOpen)}
           >
             <div className="flex items-center gap-2">
-              <span className="bg-orange-100 text-orange-800 px-2 py-1 rounded text-xs">第三行</span>
+              <span className="bg-orange-100 text-orange-800 px-2 py-1 rounded text-xs">
+                第三行
+              </span>
               優先級與進階篩選
             </div>
-            {isPriorityFilterOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            {isPriorityFilterOpen ? (
+              <ChevronUp className="w-4 h-4" />
+            ) : (
+              <ChevronDown className="w-4 h-4" />
+            )}
           </div>
 
           {isPriorityFilterOpen && (
@@ -406,12 +451,14 @@ export function GeneralPaymentFilterPanel({
                   checked={showPaidItems}
                   onCheckedChange={onShowPaidItemsChange}
                 />
-                <label htmlFor="show-paid" className="text-sm">顯示已付款</label>
+                <label htmlFor="show-paid" className="text-sm">
+                  顯示已付款
+                </label>
               </div>
             </div>
           )}
         </div>
       </CardContent>
     </Card>
-  );
+  )
 }

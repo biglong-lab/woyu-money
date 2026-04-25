@@ -1,35 +1,51 @@
 // 月付管理 - 篩選面板元件
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Filter, X, ChevronDown, ChevronUp, AlertTriangle, Star, Clock, RotateCcw } from "lucide-react";
-import type { PaymentProject, DebtCategory, FixedCategory } from "./monthly-payment-types";
+import { Card } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
+  Search,
+  Filter,
+  X,
+  ChevronDown,
+  ChevronUp,
+  AlertTriangle,
+  Star,
+  Clock,
+  RotateCcw,
+} from "lucide-react"
+import type { PaymentProject, DebtCategory, FixedCategory } from "./monthly-payment-types"
 
 export interface MonthlyPaymentFilterPanelProps {
   // 篩選狀態
-  searchTerm: string;
-  filterProject: string;
-  filterStatus: string;
-  filterCategory: string;
-  sortBy: string;
-  sortOrder: string;
-  showAdvancedFilters: boolean;
+  searchTerm: string
+  filterProject: string
+  filterStatus: string
+  filterCategory: string
+  sortBy: string
+  sortOrder: string
+  showAdvancedFilters: boolean
 
   // 資料
-  projects: PaymentProject[];
-  categories: DebtCategory[];
-  fixedCategories: FixedCategory[];
+  projects: PaymentProject[]
+  categories: DebtCategory[]
+  fixedCategories: FixedCategory[]
 
   // 回調
-  onSearchTermChange: (value: string) => void;
-  onFilterProjectChange: (value: string) => void;
-  onFilterStatusChange: (value: string) => void;
-  onFilterCategoryChange: (value: string) => void;
-  onSortByChange: (value: string) => void;
-  onSortOrderChange: (value: string) => void;
-  onShowAdvancedFiltersChange: (value: boolean) => void;
-  onResetFilters: () => void;
+  onSearchTermChange: (value: string) => void
+  onFilterProjectChange: (value: string) => void
+  onFilterStatusChange: (value: string) => void
+  onFilterCategoryChange: (value: string) => void
+  onSortByChange: (value: string) => void
+  onSortOrderChange: (value: string) => void
+  onShowAdvancedFiltersChange: (value: boolean) => void
+  onResetFilters: () => void
 }
 
 export function MonthlyPaymentFilterPanel({
@@ -61,6 +77,12 @@ export function MonthlyPaymentFilterPanel({
           placeholder="搜尋項目名稱、分類或專案..."
           value={searchTerm}
           onChange={(e) => onSearchTermChange(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Escape" && searchTerm) {
+              e.preventDefault()
+              onSearchTermChange("")
+            }
+          }}
           className="pl-10 pr-4"
         />
         {searchTerm && (
@@ -143,11 +165,7 @@ export function MonthlyPaymentFilterPanel({
         </Button>
 
         {/* 重置篩選 */}
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onResetFilters}
-        >
+        <Button variant="ghost" size="sm" onClick={onResetFilters}>
           <RotateCcw className="w-4 h-4 mr-1" />
           重置
         </Button>
@@ -161,9 +179,7 @@ export function MonthlyPaymentFilterPanel({
 
             {/* 分類篩選 */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                分類篩選
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">分類篩選</label>
               <Select value={filterCategory} onValueChange={onFilterCategoryChange}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="所有分類" />
@@ -211,21 +227,21 @@ export function MonthlyPaymentFilterPanel({
         </Card>
       )}
     </div>
-  );
+  )
 }
 
 // 篩選結果統計與快捷按鈕
 export interface FilterStatsBarProps {
-  filteredCount: number;
-  totalMonthlyCount: number;
-  isBatchMode: boolean;
-  filterStatus: string;
-  sortBy: string;
-  sortOrder: string;
-  onToggleBatchMode: () => void;
-  onFilterStatusChange: (value: string) => void;
-  onSortByChange: (value: string) => void;
-  onSortOrderChange: (value: string) => void;
+  filteredCount: number
+  totalMonthlyCount: number
+  isBatchMode: boolean
+  filterStatus: string
+  sortBy: string
+  sortOrder: string
+  onToggleBatchMode: () => void
+  onFilterStatusChange: (value: string) => void
+  onSortByChange: (value: string) => void
+  onSortOrderChange: (value: string) => void
 }
 
 export function FilterStatsBar({
@@ -245,9 +261,7 @@ export function FilterStatsBar({
       <div className="flex items-center gap-3">
         <span>
           顯示 {filteredCount} 個項目
-          {totalMonthlyCount !== filteredCount &&
-            ` (共 ${totalMonthlyCount} 個)`
-          }
+          {totalMonthlyCount !== filteredCount && ` (共 ${totalMonthlyCount} 個)`}
         </span>
         <Button
           variant={isBatchMode ? "default" : "outline"}
@@ -275,8 +289,8 @@ export function FilterStatsBar({
           variant={sortBy === "amount" && sortOrder === "desc" ? "default" : "outline"}
           size="sm"
           onClick={() => {
-            onSortByChange("amount");
-            onSortOrderChange("desc");
+            onSortByChange("amount")
+            onSortOrderChange("desc")
           }}
           className="h-7 text-xs"
         >
@@ -287,8 +301,8 @@ export function FilterStatsBar({
           variant={sortBy === "startDate" ? "default" : "outline"}
           size="sm"
           onClick={() => {
-            onSortByChange("startDate");
-            onSortOrderChange("asc");
+            onSortByChange("startDate")
+            onSortOrderChange("asc")
           }}
           className="h-7 text-xs"
         >
@@ -297,5 +311,5 @@ export function FilterStatsBar({
         </Button>
       </div>
     </div>
-  );
+  )
 }
