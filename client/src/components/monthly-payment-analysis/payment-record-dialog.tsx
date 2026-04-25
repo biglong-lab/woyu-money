@@ -1,4 +1,4 @@
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui/button"
 import {
   Dialog,
   DialogContent,
@@ -6,7 +6,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
+} from "@/components/ui/dialog"
 import {
   Form,
   FormControl,
@@ -14,33 +14,33 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
+} from "@/components/ui/form"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import { Label } from "@/components/ui/label"
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { Upload, X } from "lucide-react";
-import type { UseFormReturn } from "react-hook-form";
-import type { PaymentItem, PaymentRecordInput } from "./types";
+} from "@/components/ui/select"
+import { Upload, X } from "lucide-react"
+import type { UseFormReturn } from "react-hook-form"
+import type { PaymentItem, PaymentRecordInput } from "./types"
 
 interface PaymentRecordDialogProps {
-  readonly isOpen: boolean;
-  readonly onOpenChange: (open: boolean) => void;
-  readonly selectedItem: PaymentItem | null;
-  readonly form: UseFormReturn<PaymentRecordInput>;
-  readonly onSubmit: (data: PaymentRecordInput) => void;
-  readonly isPending: boolean;
+  readonly isOpen: boolean
+  readonly onOpenChange: (open: boolean) => void
+  readonly selectedItem: PaymentItem | null
+  readonly form: UseFormReturn<PaymentRecordInput>
+  readonly onSubmit: (data: PaymentRecordInput) => void
+  readonly isPending: boolean
   // 圖片相關
-  readonly imagePreview: string | null;
-  readonly selectedImageName: string | undefined;
-  readonly onImageSelect: (event: React.ChangeEvent<HTMLInputElement>) => void;
-  readonly onImageRemove: () => void;
+  readonly imagePreview: string | null
+  readonly selectedImageName: string | undefined
+  readonly onImageSelect: (event: React.ChangeEvent<HTMLInputElement>) => void
+  readonly onImageRemove: () => void
 }
 
 // 付款記錄對話框
@@ -61,28 +61,27 @@ export function PaymentRecordDialog({
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>記錄付款</DialogTitle>
-          <DialogDescription>
-            為「{selectedItem?.itemName}」記錄付款
-          </DialogDescription>
+          <DialogDescription>為「{selectedItem?.itemName}」記錄付款</DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
-          <form
-            onSubmit={form.handleSubmit(onSubmit)}
-            className="space-y-4"
-          >
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             {/* 付款金額 */}
             <FormField
               control={form.control}
               name="amount"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>付款金額</FormLabel>
+                  <FormLabel>
+                    付款金額 <span className="text-red-500">*</span>
+                  </FormLabel>
                   <FormControl>
                     <Input
                       type="number"
                       step="0.01"
                       placeholder="0.00"
+                      onFocus={(e) => e.target.select()}
+                      autoFocus
                       {...field}
                     />
                   </FormControl>
@@ -97,7 +96,9 @@ export function PaymentRecordDialog({
               name="paymentDate"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>付款日期</FormLabel>
+                  <FormLabel>
+                    付款日期 <span className="text-red-500">*</span>
+                  </FormLabel>
                   <FormControl>
                     <Input type="date" {...field} />
                   </FormControl>
@@ -113,10 +114,7 @@ export function PaymentRecordDialog({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>付款方式</FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    defaultValue={field.value}
-                  >
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="選擇付款方式" />
@@ -143,11 +141,7 @@ export function PaymentRecordDialog({
                 <FormItem>
                   <FormLabel>備註 (選填)</FormLabel>
                   <FormControl>
-                    <Textarea
-                      placeholder="付款相關備註..."
-                      {...field}
-                      rows={3}
-                    />
+                    <Textarea placeholder="付款相關備註..." {...field} rows={3} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -174,9 +168,7 @@ export function PaymentRecordDialog({
                     >
                       <X className="h-4 w-4" />
                     </Button>
-                    <p className="text-sm text-gray-600 mt-2 text-center">
-                      {selectedImageName}
-                    </p>
+                    <p className="text-sm text-gray-600 mt-2 text-center">{selectedImageName}</p>
                   </div>
                 ) : (
                   <div className="text-center">
@@ -203,11 +195,7 @@ export function PaymentRecordDialog({
             </div>
 
             <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-              >
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 取消
               </Button>
               <Button type="submit" disabled={isPending}>
@@ -218,5 +206,5 @@ export function PaymentRecordDialog({
         </Form>
       </DialogContent>
     </Dialog>
-  );
+  )
 }
