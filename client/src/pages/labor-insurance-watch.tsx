@@ -13,6 +13,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient"
 import { localDateISO, formatNT, friendlyApiError } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 import { useCopyAmount } from "@/hooks/use-copy-amount"
+import { MarkPaidConfirmDialog } from "@/components/mark-paid-confirm-dialog"
 import { useDocumentTitle } from "@/hooks/use-document-title"
 
 type ReminderLevel = "none" | "early" | "warning" | "final"
@@ -100,25 +101,40 @@ function ReminderCard() {
     queryKey: ["/api/late-fee/reminder-status"],
   })
 
+  const [paidDialogItem, setPaidDialogItem] = useState<{
+    id: number
+    itemName: string
+    unpaidAmount: number
+    description?: string
+  } | null>(null)
+
   const markPaidMutation = useMutation<
     unknown,
     Error,
-    { id: number; itemName: string; unpaidAmount: number }
+    {
+      id: number
+      itemName: string
+      amountPaid: number
+      paymentDate: string
+      receiptUrl: string | null
+    }
   >({
     mutationFn: (input) =>
       apiRequest("POST", `/api/payment/items/${input.id}/payments`, {
-        amount: input.unpaidAmount,
-        paymentDate: localDateISO(),
+        amount: input.amountPaid,
+        paymentDate: input.paymentDate,
+        ...(input.receiptUrl ? { receiptImageUrl: input.receiptUrl } : {}),
       }),
     onMutate: (input) => setPendingId(input.id),
     onSuccess: (_data, input) => {
       toast({
         title: "已標記為已付",
-        description: `${input.itemName}（${formatNT(input.unpaidAmount)}）`,
+        description: `${input.itemName}（${formatNT(input.amountPaid)}）`,
       })
       queryClient.invalidateQueries({ queryKey: ["/api/late-fee/reminder-status"] })
       queryClient.invalidateQueries({ queryKey: ["/api/late-fee/annual-loss"] })
       queryClient.invalidateQueries({ queryKey: ["/api/payment/priority-report?includeLow=true"] })
+      setPaidDialogItem(null)
     },
     onSettled: () => setPendingId(null),
     onError: (err) =>
@@ -223,7 +239,7 @@ function ReminderCard() {
                     size="sm"
                     className="bg-green-600 hover:bg-green-700 text-xs h-7 shrink-0"
                     onClick={() =>
-                      markPaidMutation.mutate({
+                      setPaidDialogItem({
                         id: item.id,
                         itemName: item.itemName,
                         unpaidAmount: item.unpaidAmount,
@@ -241,6 +257,25 @@ function ReminderCard() {
           </>
         )}
       </CardContent>
+
+      <MarkPaidConfirmDialog
+        open={!!paidDialogItem}
+        onOpenChange={(open) => !open && setPaidDialogItem(null)}
+        itemName={paidDialogItem?.itemName ?? ""}
+        defaultAmount={paidDialogItem?.unpaidAmount ?? 0}
+        description={paidDialogItem?.description}
+        isPending={markPaidMutation.isPending}
+        onConfirm={(payload) => {
+          if (!paidDialogItem) return
+          markPaidMutation.mutate({
+            id: paidDialogItem.id,
+            itemName: paidDialogItem.itemName,
+            amountPaid: payload.amountPaid,
+            paymentDate: payload.paymentDate,
+            receiptUrl: payload.receiptUrl,
+          })
+        }}
+      />
     </Card>
   )
 }

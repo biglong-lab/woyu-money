@@ -21,6 +21,7 @@ import { localDateISO, formatNT, friendlyApiError } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 import { useCopyAmount } from "@/hooks/use-copy-amount"
 import { useDocumentTitle } from "@/hooks/use-document-title"
+import { MarkPaidConfirmDialog } from "@/components/mark-paid-confirm-dialog"
 
 type Basis = "last_year_same_month" | "recent_average" | "overall_average" | "no_data"
 type Confidence = "high" | "medium" | "low"
@@ -89,21 +90,28 @@ function MonthDetail({ year, month }: { year: number; month: number }) {
   const { toast } = useToast()
   const copyAmount = useCopyAmount()
   const [pendingId, setPendingId] = useState<number | null>(null)
+  const [paidDialogItem, setPaidDialogItem] = useState<MonthDetailItem | null>(null)
   const queryKey = [`/api/cashflow/month-detail?year=${year}&month=${month}`]
   const { data, isLoading } = useQuery<MonthDetailData>({ queryKey })
 
-  const markPaidMutation = useMutation<unknown, Error, MonthDetailItem>({
-    mutationFn: (item) =>
+  const markPaidMutation = useMutation<
+    unknown,
+    Error,
+    { item: MonthDetailItem; amountPaid: number; paymentDate: string; receiptUrl: string | null }
+  >({
+    mutationFn: ({ item, amountPaid, paymentDate, receiptUrl }) =>
       apiRequest("POST", `/api/payment/items/${item.id}/payments`, {
-        amount: item.unpaidAmount,
-        paymentDate: localDateISO(),
+        amount: amountPaid,
+        paymentDate,
+        ...(receiptUrl ? { receiptImageUrl: receiptUrl } : {}),
       }),
-    onMutate: (item) => setPendingId(item.id),
-    onSuccess: (_data, item) => {
+    onMutate: ({ item }) => setPendingId(item.id),
+    onSuccess: (_data, { item }) => {
       toast({ title: "已標記為已付", description: item.itemName })
       queryClient.invalidateQueries({ queryKey })
       queryClient.invalidateQueries({ queryKey: ["/api/cashflow/forecast"] })
       queryClient.invalidateQueries({ queryKey: ["/api/payment/priority-report?includeLow=true"] })
+      setPaidDialogItem(null)
     },
     onSettled: () => setPendingId(null),
     onError: (err) =>
@@ -144,7 +152,7 @@ function MonthDetail({ year, month }: { year: number; month: number }) {
             <Button
               size="sm"
               className="bg-green-600 hover:bg-green-700 text-[10px] h-6 px-2 shrink-0"
-              onClick={() => markPaidMutation.mutate(item)}
+              onClick={() => setPaidDialogItem(item)}
               disabled={pendingId === item.id}
               data-testid={`cashflow-mark-paid-${item.id}`}
             >
@@ -154,6 +162,24 @@ function MonthDetail({ year, month }: { year: number; month: number }) {
         ))}
         {data.count > 20 && <li className="text-gray-400 italic">…還有 {data.count - 20} 筆</li>}
       </ul>
+
+      <MarkPaidConfirmDialog
+        open={!!paidDialogItem}
+        onOpenChange={(open) => !open && setPaidDialogItem(null)}
+        itemName={paidDialogItem?.itemName ?? ""}
+        defaultAmount={paidDialogItem?.unpaidAmount ?? 0}
+        description={paidDialogItem?.projectName ?? undefined}
+        isPending={markPaidMutation.isPending}
+        onConfirm={(payload) => {
+          if (!paidDialogItem) return
+          markPaidMutation.mutate({
+            item: paidDialogItem,
+            amountPaid: payload.amountPaid,
+            paymentDate: payload.paymentDate,
+            receiptUrl: payload.receiptUrl,
+          })
+        }}
+      />
     </div>
   )
 }
