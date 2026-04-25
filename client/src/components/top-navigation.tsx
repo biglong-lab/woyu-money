@@ -3,7 +3,16 @@
  * 重構版本：使用配置化導航項目，減少重複程式碼
  */
 import { Link, useLocation } from "wouter"
-import { Home, DollarSign, Menu, LogOut, User, ChevronDown, ChevronRight } from "lucide-react"
+import {
+  Home,
+  DollarSign,
+  Menu,
+  LogOut,
+  User,
+  ChevronDown,
+  ChevronRight,
+  Keyboard,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Sheet,
@@ -290,6 +299,15 @@ export default function TopNavigation() {
                       <span>帳號設定</span>
                     </DropdownMenuItem>
                   </Link>
+                  <DropdownMenuItem
+                    onClick={() => window.dispatchEvent(new CustomEvent("open-keyboard-shortcuts"))}
+                  >
+                    <Keyboard className="mr-2 h-4 w-4" />
+                    <span>鍵盤快捷鍵</span>
+                    <kbd className="ml-auto px-1.5 py-0.5 bg-gray-100 border rounded text-[10px] font-mono">
+                      ?
+                    </kbd>
+                  </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
                     onClick={handleLogout}

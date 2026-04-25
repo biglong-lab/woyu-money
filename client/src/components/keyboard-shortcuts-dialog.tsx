@@ -64,8 +64,15 @@ export function KeyboardShortcutsDialog() {
         setOpen((prev) => !prev)
       }
     }
+    // CustomEvent 入口：讓其他元件（如導航選單）也能開啟此面板
+    const customHandler = () => setOpen(true)
+
     window.addEventListener("keydown", handler)
-    return () => window.removeEventListener("keydown", handler)
+    window.addEventListener("open-keyboard-shortcuts", customHandler)
+    return () => {
+      window.removeEventListener("keydown", handler)
+      window.removeEventListener("open-keyboard-shortcuts", customHandler)
+    }
   }, [])
 
   return (
