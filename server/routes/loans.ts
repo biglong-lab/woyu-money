@@ -1,6 +1,7 @@
 import { Router } from "express"
 import { storage } from "../storage"
 import { insertLoanInvestmentRecordSchema, insertLoanPaymentHistorySchema } from "@shared/schema"
+import { localDateTPE } from "@shared/date-utils"
 import { ZodError } from "zod"
 import OpenAI from "openai"
 import { asyncHandler, AppError } from "../middleware/error-handler"
@@ -92,7 +93,7 @@ router.post(
       recordId: recordId,
       amount: req.body.amount,
       paymentType: req.body.paymentType || "interest",
-      paymentDate: req.body.paymentDate || new Date().toISOString().split("T")[0],
+      paymentDate: req.body.paymentDate || localDateTPE(),
       paymentMethod: req.body.paymentMethod || "bank_transfer",
       paymentStatus: req.body.paymentStatus || "completed",
       notes: req.body.notes || null,

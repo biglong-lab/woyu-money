@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from "express"
 import { requireAuth } from "../auth"
 import { asyncHandler, AppError } from "../middleware/error-handler"
+import { localDateTPE } from "@shared/date-utils"
 import { ObjectStorageService, ObjectNotFoundError } from "../objectStorage"
 import { recognizeDocument } from "../document-ai"
 import { documentUpload, inboxDir } from "./upload-config"
@@ -417,7 +418,7 @@ router.post(
     const trackingNotes = buildTrackingNotes(doc, archivedByUsername, notes)
 
     const docDate = dueDate || doc.confirmedDate || doc.recognizedDate
-    const startDateValue = docDate ? docDate : new Date().toISOString().split("T")[0]
+    const startDateValue = docDate ? docDate : localDateTPE()
 
     const newItem = await docInboxStorage.archiveToPaymentItem(
       id,
@@ -479,11 +480,7 @@ router.post(
       {
         itemId: paymentItemId,
         amountPaid: amount || doc.confirmedAmount || doc.recognizedAmount || "0",
-        paymentDate:
-          paymentDate ||
-          doc.confirmedDate ||
-          doc.recognizedDate ||
-          new Date().toISOString().split("T")[0],
+        paymentDate: paymentDate || doc.confirmedDate || doc.recognizedDate || localDateTPE(),
         paymentMethod: paymentMethod || "cash",
         receiptImageUrl: doc.imagePath,
         notes: trackingNotes,
@@ -544,11 +541,7 @@ router.post(
     }
     const extractedData = (doc.aiExtractedData as AiExtractedData | null) || ({} as AiExtractedData)
 
-    const invDate =
-      invoiceDate ||
-      doc.confirmedDate ||
-      doc.recognizedDate ||
-      new Date().toISOString().split("T")[0]
+    const invDate = invoiceDate || doc.confirmedDate || doc.recognizedDate || localDateTPE()
     const parsedDate = new Date(invDate)
 
     const newInvoice = await docInboxStorage.archiveToInvoiceRecord(

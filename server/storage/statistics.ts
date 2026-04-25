@@ -9,6 +9,7 @@ import {
   type InsertPaymentItem,
 } from "@shared/schema"
 import { eq, and, sql, desc, gte, lte, lt, count, ne, or, isNull, isNotNull } from "drizzle-orm"
+import { localDateTPE } from "@shared/date-utils"
 
 // === 付款統計型別 ===
 
@@ -419,7 +420,7 @@ export async function getMonthlyPaymentAnalysis(
 
 export async function getOverduePaymentItems(): Promise<Record<string, unknown>[]> {
   try {
-    const today = new Date().toISOString().split("T")[0]
+    const today = localDateTPE()
     const currentMonthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1)
       .toISOString()
       .split("T")[0]
