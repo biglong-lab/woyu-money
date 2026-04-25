@@ -233,22 +233,43 @@ interface PaidDialogProps {
   item: PriorityResult | null
   open: boolean
   onOpenChange: (open: boolean) => void
-  onConfirm: (paymentDate: string) => void
+  onConfirm: (paymentDate: string, amountPaid: number) => void
   isPending: boolean
 }
 
 function PaidDialog({ item, open, onOpenChange, onConfirm, isPending }: PaidDialogProps) {
   const [paymentDate, setPaymentDate] = useState(todayISODate())
+  const [amountInput, setAmountInput] = useState("")
+
+  // 開啟時自動帶入應付金額
+  useMemo(() => {
+    if (item && open) {
+      setAmountInput(String(Math.round(item.unpaidAmount)))
+      setPaymentDate(todayISODate())
+    }
+  }, [item, open])
 
   if (!item) return null
+
+  const parsedAmount = parseFloat(amountInput.replace(/[,\s]/g, ""))
+  const isPartial = Number.isFinite(parsedAmount) && parsedAmount < item.unpaidAmount
+  const isInvalid = !Number.isFinite(parsedAmount) || parsedAmount <= 0
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>確認已付款</DialogTitle>
+          <DialogTitle>確認付款</DialogTitle>
           <DialogDescription>
-            將把 <strong>{item.itemName}</strong> 標記為已全額付款
+            {isPartial ? (
+              <>
+                將把 <strong>{item.itemName}</strong> 標記為<strong>部分付款</strong>
+              </>
+            ) : (
+              <>
+                將把 <strong>{item.itemName}</strong> 標記為已全額付款
+              </>
+            )}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3 py-2">
@@ -258,7 +279,29 @@ function PaidDialog({ item, open, onOpenChange, onConfirm, isPending }: PaidDial
           </div>
           <div className="flex justify-between text-sm">
             <span className="text-gray-600">應付金額</span>
-            <span className="font-bold text-lg">{formatNT(item.unpaidAmount)}</span>
+            <span className="text-gray-700">{formatNT(item.unpaidAmount)}</span>
+          </div>
+          <div className="space-y-1">
+            <label htmlFor="paid-amount" className="text-sm text-gray-600">
+              實際付款金額
+            </label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">NT$</span>
+              <input
+                id="paid-amount"
+                type="number"
+                inputMode="decimal"
+                value={amountInput}
+                onChange={(e) => setAmountInput(e.target.value)}
+                className="border rounded pl-12 pr-2 py-2 text-base font-bold w-full"
+                data-testid="input-paid-amount"
+              />
+            </div>
+            {isPartial && (
+              <div className="text-xs text-yellow-700 bg-yellow-50 rounded px-2 py-1">
+                ⚠️ 此為部分付款，剩餘 {formatNT(item.unpaidAmount - parsedAmount)} 仍會列為待付
+              </div>
+            )}
           </div>
           <div className="flex justify-between items-center text-sm">
             <label htmlFor="payment-date" className="text-gray-600">
@@ -279,8 +322,8 @@ function PaidDialog({ item, open, onOpenChange, onConfirm, isPending }: PaidDial
             取消
           </Button>
           <Button
-            onClick={() => onConfirm(paymentDate)}
-            disabled={isPending}
+            onClick={() => onConfirm(paymentDate, parsedAmount)}
+            disabled={isPending || isInvalid}
             data-testid="button-confirm-paid"
           >
             {isPending ? "處理中..." : "確認付款"}
@@ -484,11 +527,11 @@ export function TodayFocusCard() {
     setPayDialogOpen(true)
   }
 
-  const handleConfirmPaid = (paymentDate: string) => {
+  const handleConfirmPaid = (paymentDate: string, amountPaid: number) => {
     if (!payingItem) return
     markPaidMutation.mutate({
       itemId: payingItem.id,
-      amountPaid: payingItem.unpaidAmount,
+      amountPaid,
       paymentDate,
     })
   }
