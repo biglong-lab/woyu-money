@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { apiRequest, queryClient } from "@/lib/queryClient"
+import { localDateISO } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 
 type Confidence = "high" | "medium" | "low"
@@ -127,7 +128,7 @@ export default function ReceiptMatchHelperPage() {
       apiRequest("POST", "/api/payment/records", {
         itemId: data.itemId,
         amountPaid: data.amountPaid,
-        paymentDate: receiptDate || new Date().toISOString().slice(0, 10),
+        paymentDate: receiptDate || localDateISO(),
       }),
     onSuccess: () => {
       toast({ title: "已標記為已付款" })
