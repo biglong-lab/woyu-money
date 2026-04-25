@@ -71,6 +71,7 @@ function saveRecentName(name: string): string[] {
 export function QuickAddDrawer({ open, onOpenChange }: QuickAddDrawerProps) {
   const { toast } = useToast()
   const cameraRef = useRef<HTMLInputElement>(null)
+  const nameInputRef = useRef<HTMLInputElement>(null)
   const [itemName, setItemName] = useState("")
   const [totalAmount, setTotalAmount] = useState("")
   const [projectId, setProjectId] = useState<string>("")
@@ -172,6 +173,8 @@ export function QuickAddDrawer({ open, onOpenChange }: QuickAddDrawerProps) {
     setEndDate("")
     removePhoto()
     setIsDone(false)
+    // 等下個 tick 表單渲染完再聚焦
+    setTimeout(() => nameInputRef.current?.focus(), 50)
   }
 
   const canSubmit = itemName.trim().length > 0 && parseFloat(totalAmount) > 0
@@ -219,6 +222,7 @@ export function QuickAddDrawer({ open, onOpenChange }: QuickAddDrawerProps) {
                 </Label>
                 <Input
                   id="qa-name"
+                  ref={nameInputRef}
                   placeholder="例：水電費、保險、貨款..."
                   value={itemName}
                   onChange={(e) => setItemName(e.target.value)}
