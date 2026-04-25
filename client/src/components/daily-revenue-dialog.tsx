@@ -169,7 +169,9 @@ export function DailyRevenueDialog({
               name="projectId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>專案</FormLabel>
+                  <FormLabel>
+                    專案 <span className="text-red-500">*</span>
+                  </FormLabel>
                   <Select
                     value={field.value?.toString()}
                     onValueChange={(value) => field.onChange(parseInt(value))}
@@ -199,7 +201,7 @@ export function DailyRevenueDialog({
                 <FormItem>
                   <FormLabel className="flex items-center gap-2">
                     <Calendar className="h-4 w-4" />
-                    日期
+                    日期 <span className="text-red-500">*</span>
                   </FormLabel>
                   <FormControl>
                     <Input type="date" {...field} />
@@ -216,10 +218,17 @@ export function DailyRevenueDialog({
                 <FormItem>
                   <FormLabel className="flex items-center gap-2">
                     <DollarSign className="h-4 w-4" />
-                    收款金額
+                    收款金額 <span className="text-red-500">*</span>
                   </FormLabel>
                   <FormControl>
-                    <Input type="number" step="0.01" placeholder="0.00" {...field} />
+                    <Input
+                      type="number"
+                      step="0.01"
+                      placeholder="0.00"
+                      onFocus={(e) => e.target.select()}
+                      autoFocus
+                      {...field}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
