@@ -217,7 +217,13 @@ function FocusCard({ item, position, total, onMarkPaid, onDefer, onCopyAmount }:
           <CheckCircle2 className="h-4 w-4 mr-1.5" />
           已付款
         </Button>
-        <Button onClick={onDefer} variant="outline" className="flex-1" data-testid="button-defer">
+        <Button
+          onClick={onDefer}
+          variant="outline"
+          className="flex-1"
+          title="今天暫時跳過此項目，明天自動回來"
+          data-testid="button-defer"
+        >
           ⏰ 晚點再看
         </Button>
       </div>
