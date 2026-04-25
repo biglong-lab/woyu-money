@@ -1,7 +1,7 @@
-import { useState, Fragment } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState, Fragment } from "react"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Table,
   TableBody,
@@ -9,146 +9,159 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
+} from "@/components/ui/table"
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogDescription,
-} from "@/components/ui/dialog";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
-import { Trash2, RefreshCw, History, RotateCcw, AlertTriangle, Calendar, DollarSign, FolderOpen, Clock, Loader2, ChevronDown, ChevronUp } from "lucide-react";
-import { format, formatDistanceToNow } from "date-fns";
-import { zhTW } from "date-fns/locale";
-import type { PaymentItem } from "@shared/schema";
+} from "@/components/ui/dialog"
+import { Badge } from "@/components/ui/badge"
+import { Separator } from "@/components/ui/separator"
+import { useToast } from "@/hooks/use-toast"
+import { apiRequest } from "@/lib/queryClient"
+import { formatNT } from "@/lib/utils"
+import {
+  Trash2,
+  RefreshCw,
+  History,
+  RotateCcw,
+  AlertTriangle,
+  Calendar,
+  DollarSign,
+  FolderOpen,
+  Clock,
+  Loader2,
+  ChevronDown,
+  ChevronUp,
+} from "lucide-react"
+import { format, formatDistanceToNow } from "date-fns"
+import { zhTW } from "date-fns/locale"
+import type { PaymentItem } from "@shared/schema"
 
 interface AuditLog {
-  id: number;
-  tableName: string;
-  recordId: number;
-  action: string;
-  oldValues: Record<string, unknown> | null;
-  newValues: Record<string, unknown> | null;
-  changedFields: string[];
-  userInfo: string;
-  changeReason: string;
-  createdAt: string;
+  id: number
+  tableName: string
+  recordId: number
+  action: string
+  oldValues: Record<string, unknown> | null
+  newValues: Record<string, unknown> | null
+  changedFields: string[]
+  userInfo: string
+  changeReason: string
+  createdAt: string
 }
 
 interface PaymentItemWithProject extends PaymentItem {
-  projectName?: string;
-  categoryName?: string;
-  fixedCategoryName?: string;
+  projectName?: string
+  categoryName?: string
+  fixedCategoryName?: string
 }
 
 export default function RecycleBin() {
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
-  const [expandedItem, setExpandedItem] = useState<number | null>(null);
-  const [selectedItem, setSelectedItem] = useState<PaymentItemWithProject | null>(null);
-  const [isRestoreDialogOpen, setIsRestoreDialogOpen] = useState(false);
-  const [isPermanentDeleteDialogOpen, setIsPermanentDeleteDialogOpen] = useState(false);
-  const [isHistoryDialogOpen, setIsHistoryDialogOpen] = useState(false);
+  const { toast } = useToast()
+  const queryClient = useQueryClient()
+  const [expandedItem, setExpandedItem] = useState<number | null>(null)
+  const [selectedItem, setSelectedItem] = useState<PaymentItemWithProject | null>(null)
+  const [isRestoreDialogOpen, setIsRestoreDialogOpen] = useState(false)
+  const [isPermanentDeleteDialogOpen, setIsPermanentDeleteDialogOpen] = useState(false)
+  const [isHistoryDialogOpen, setIsHistoryDialogOpen] = useState(false)
 
   const { data: deletedItems = [], isLoading } = useQuery<PaymentItemWithProject[]>({
     queryKey: ["/api/payment/items/deleted"],
-  });
+  })
 
   const { data: auditLogs = [], isLoading: isLoadingLogs } = useQuery<AuditLog[]>({
     queryKey: [`/api/payment/items/${selectedItem?.id}/audit-logs`],
     enabled: !!selectedItem && isHistoryDialogOpen,
-  });
+  })
 
   const restoreMutation = useMutation({
     mutationFn: async (itemId: number) => {
       return apiRequest("POST", `/api/payment/items/${itemId}/restore`, {
         reason: "從回收站恢復",
-      });
+      })
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/payment/items"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/payment/items/deleted"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/payment/items"] })
+      queryClient.invalidateQueries({ queryKey: ["/api/payment/items/deleted"] })
       toast({
         title: "恢復成功",
         description: "項目已成功恢復到一般付款管理。",
-      });
-      setIsRestoreDialogOpen(false);
-      setSelectedItem(null);
+      })
+      setIsRestoreDialogOpen(false)
+      setSelectedItem(null)
     },
     onError: (error: Error) => {
       toast({
         title: "恢復失敗",
         description: error.message || "無法恢復項目，請稍後再試。",
         variant: "destructive",
-      });
+      })
     },
-  });
+  })
 
   const permanentDeleteMutation = useMutation({
     mutationFn: async (itemId: number) => {
       return apiRequest("DELETE", `/api/payment/items/${itemId}/permanent`, {
         reason: "永久刪除",
-      });
+      })
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/payment/items/deleted"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/payment/items/deleted"] })
       toast({
         title: "永久刪除成功",
         description: "項目已被永久刪除，無法恢復。",
-      });
-      setIsPermanentDeleteDialogOpen(false);
-      setSelectedItem(null);
+      })
+      setIsPermanentDeleteDialogOpen(false)
+      setSelectedItem(null)
     },
     onError: (error: Error) => {
       toast({
         title: "刪除失敗",
         description: error.message || "無法永久刪除項目，請稍後再試。",
         variant: "destructive",
-      });
+      })
     },
-  });
+  })
 
   const handleRestore = (item: PaymentItemWithProject) => {
-    setSelectedItem(item);
-    setIsRestoreDialogOpen(true);
-  };
+    setSelectedItem(item)
+    setIsRestoreDialogOpen(true)
+  }
 
   const handlePermanentDelete = (item: PaymentItemWithProject) => {
-    setSelectedItem(item);
-    setIsPermanentDeleteDialogOpen(true);
-  };
+    setSelectedItem(item)
+    setIsPermanentDeleteDialogOpen(true)
+  }
 
   const handleViewHistory = (item: PaymentItemWithProject) => {
-    setSelectedItem(item);
-    setIsHistoryDialogOpen(true);
-  };
+    setSelectedItem(item)
+    setIsHistoryDialogOpen(true)
+  }
 
-  const formatCurrency = (amount: string | number | null | undefined) => {
-    if (amount === null || amount === undefined) return "NT$ 0";
-    const num = typeof amount === "string" ? parseFloat(amount) : amount;
-    if (isNaN(num)) return "NT$ 0";
-    return `NT$ ${num.toLocaleString()}`;
-  };
+  // 直接使用 lib/utils 的 formatNT，全站統一格式
+  const formatCurrency = (amount: string | number | null | undefined) => formatNT(amount)
 
   const getActionBadge = (action: string) => {
-    const actionMap: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
+    const actionMap: Record<
+      string,
+      { label: string; variant: "default" | "secondary" | "destructive" | "outline" }
+    > = {
       CREATE: { label: "建立", variant: "default" },
       UPDATE: { label: "更新", variant: "secondary" },
       DELETE: { label: "刪除", variant: "destructive" },
       RESTORE: { label: "恢復", variant: "default" },
       PERMANENT_DELETE: { label: "永久刪除", variant: "destructive" },
-    };
-    const config = actionMap[action] || { label: action, variant: "outline" };
-    return <Badge variant={config.variant}>{config.label}</Badge>;
-  };
+    }
+    const config = actionMap[action] || { label: action, variant: "outline" }
+    return <Badge variant={config.variant}>{config.label}</Badge>
+  }
 
   const toggleExpand = (id: number) => {
-    setExpandedItem(expandedItem === id ? null : id);
-  };
+    setExpandedItem(expandedItem === id ? null : id)
+  }
 
   if (isLoading) {
     return (
@@ -158,7 +171,7 @@ export default function RecycleBin() {
           <p className="text-muted-foreground">載入回收站資料中...</p>
         </div>
       </div>
-    );
+    )
   }
 
   return (
@@ -170,8 +183,7 @@ export default function RecycleBin() {
             回收站
           </CardTitle>
           <CardDescription>
-            已刪除的付款項目會保留在這裡，您可以選擇恢復或永久刪除。
-            項目刪除後將保留 30 天。
+            已刪除的付款項目會保留在這裡，您可以選擇恢復或永久刪除。 項目刪除後將保留 30 天。
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -192,7 +204,7 @@ export default function RecycleBin() {
                   共 {deletedItems.length} 個已刪除項目
                 </p>
               </div>
-              
+
               <div className="rounded-md border">
                 <Table>
                   <TableHeader>
@@ -209,7 +221,10 @@ export default function RecycleBin() {
                   <TableBody>
                     {deletedItems.map((item: PaymentItemWithProject) => (
                       <Fragment key={item.id}>
-                        <TableRow className="hover:bg-muted/50" data-testid={`row-deleted-item-${item.id}`}>
+                        <TableRow
+                          className="hover:bg-muted/50"
+                          data-testid={`row-deleted-item-${item.id}`}
+                        >
                           <TableCell>
                             <Button
                               variant="ghost"
@@ -241,10 +256,12 @@ export default function RecycleBin() {
                             <div className="flex items-center gap-1 text-muted-foreground">
                               <Clock className="w-3 h-3" />
                               <span className="text-sm">
-                                {item.deletedAt ? 
-                                  formatDistanceToNow(new Date(item.deletedAt), { addSuffix: true, locale: zhTW }) : 
-                                  "未知"
-                                }
+                                {item.deletedAt
+                                  ? formatDistanceToNow(new Date(item.deletedAt), {
+                                      addSuffix: true,
+                                      locale: zhTW,
+                                    })
+                                  : "未知"}
                               </span>
                             </div>
                           </TableCell>
@@ -294,20 +311,37 @@ export default function RecycleBin() {
                                 <div>
                                   <span className="text-muted-foreground">待付金額</span>
                                   <p className="font-medium text-red-600">
-                                    {formatCurrency(parseFloat(item.totalAmount) - parseFloat(item.paidAmount || "0"))}
+                                    {formatCurrency(
+                                      parseFloat(item.totalAmount) -
+                                        parseFloat(item.paidAmount || "0")
+                                    )}
                                   </p>
                                 </div>
                                 <div>
                                   <span className="text-muted-foreground">建立時間</span>
                                   <p className="font-medium">
-                                    {item.createdAt ? format(new Date(item.createdAt), "yyyy/MM/dd") : "未知"}
+                                    {item.createdAt
+                                      ? format(new Date(item.createdAt), "yyyy/MM/dd")
+                                      : "未知"}
                                   </p>
                                 </div>
                                 <div>
                                   <span className="text-muted-foreground">狀態</span>
                                   <p>
-                                    <Badge variant={item.status === "paid" ? "default" : item.status === "partial" ? "secondary" : "outline"}>
-                                      {item.status === "paid" ? "已付款" : item.status === "partial" ? "部分付款" : "待付款"}
+                                    <Badge
+                                      variant={
+                                        item.status === "paid"
+                                          ? "default"
+                                          : item.status === "partial"
+                                            ? "secondary"
+                                            : "outline"
+                                      }
+                                    >
+                                      {item.status === "paid"
+                                        ? "已付款"
+                                        : item.status === "partial"
+                                          ? "部分付款"
+                                          : "待付款"}
                                     </Badge>
                                   </p>
                                 </div>
@@ -339,9 +373,7 @@ export default function RecycleBin() {
               <RotateCcw className="w-5 h-5 text-green-500" />
               確認恢復
             </DialogTitle>
-            <DialogDescription>
-              恢復此項目後將可在一般付款管理中查看。
-            </DialogDescription>
+            <DialogDescription>恢復此項目後將可在一般付款管理中查看。</DialogDescription>
           </DialogHeader>
           <div className="py-4">
             <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
@@ -388,9 +420,7 @@ export default function RecycleBin() {
               <AlertTriangle className="w-5 h-5" />
               永久刪除確認
             </DialogTitle>
-            <DialogDescription>
-              此操作無法復原，請謹慎操作。
-            </DialogDescription>
+            <DialogDescription>此操作無法復原，請謹慎操作。</DialogDescription>
           </DialogHeader>
           <div className="py-4">
             <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
@@ -437,9 +467,7 @@ export default function RecycleBin() {
               <History className="w-5 h-5" />
               操作歷史記錄
             </DialogTitle>
-            <DialogDescription>
-              「{selectedItem?.itemName}」的所有操作記錄
-            </DialogDescription>
+            <DialogDescription>「{selectedItem?.itemName}」的所有操作記錄</DialogDescription>
           </DialogHeader>
           <Separator className="my-4" />
           {isLoadingLogs ? (
@@ -461,9 +489,7 @@ export default function RecycleBin() {
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
                       {getActionBadge(log.action)}
-                      <span className="text-sm text-muted-foreground">
-                        由 {log.userInfo}
-                      </span>
+                      <span className="text-sm text-muted-foreground">由 {log.userInfo}</span>
                     </div>
                     <span className="text-sm text-muted-foreground flex items-center gap-1">
                       <Calendar className="w-3 h-3" />
@@ -489,5 +515,5 @@ export default function RecycleBin() {
         </DialogContent>
       </Dialog>
     </div>
-  );
+  )
 }

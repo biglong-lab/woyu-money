@@ -1,16 +1,17 @@
 /** 合約詳情 Tab 內容 */
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import type { ContractData } from "./types";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Label } from "@/components/ui/label"
+import { formatNT } from "@/lib/utils"
+import type { ContractData } from "./types"
 
 interface ContractDetailsTabProps {
-  contract: ContractData;
+  contract: ContractData
 }
 
 /** 合約基本資訊與付款資訊 */
 export function ContractDetailsTab({ contract }: ContractDetailsTabProps) {
-  const hasPaymentInfo = !!(contract.payeeName || contract.bankCode);
+  const hasPaymentInfo = !!(contract.payeeName || contract.bankCode)
 
   return (
     <Card>
@@ -29,10 +30,7 @@ export function ContractDetailsTab({ contract }: ContractDetailsTabProps) {
             label="結束日期"
             value={new Date(contract.endDate).toLocaleDateString("zh-TW")}
           />
-          <InfoField
-            label="基礎月租金"
-            value={`${parseInt(contract.baseAmount || "0").toLocaleString()} 元`}
-          />
+          <InfoField label="基礎月租金" value={formatNT(parseInt(contract.baseAmount || "0"))} />
           <InfoField label="租約年數" value={`${contract.totalYears} 年`} />
         </div>
 
@@ -41,23 +39,14 @@ export function ContractDetailsTab({ contract }: ContractDetailsTabProps) {
           <div className="border-t pt-4">
             <h3 className="text-lg font-medium mb-3">付款資訊</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {contract.payeeName && (
-                <InfoField label="收款人" value={contract.payeeName} />
-              )}
-              {contract.payeeUnit && (
-                <InfoField label="收款單位" value={contract.payeeUnit} />
-              )}
-              {contract.bankCode && (
-                <InfoField label="銀行代碼" value={contract.bankCode} />
-              )}
+              {contract.payeeName && <InfoField label="收款人" value={contract.payeeName} />}
+              {contract.payeeUnit && <InfoField label="收款單位" value={contract.payeeUnit} />}
+              {contract.bankCode && <InfoField label="銀行代碼" value={contract.bankCode} />}
               {contract.accountNumber && (
                 <InfoField label="銀行帳號" value={contract.accountNumber} />
               )}
               {contract.contractPaymentDay && (
-                <InfoField
-                  label="每月付款日"
-                  value={`${contract.contractPaymentDay} 號`}
-                />
+                <InfoField label="每月付款日" value={`${contract.contractPaymentDay} 號`} />
               )}
             </div>
           </div>
@@ -72,7 +61,7 @@ export function ContractDetailsTab({ contract }: ContractDetailsTabProps) {
         )}
       </CardContent>
     </Card>
-  );
+  )
 }
 
 /** 資訊欄位元件，避免重複 Label + value 結構 */
@@ -82,5 +71,5 @@ function InfoField({ label, value }: { label: string; value: string }) {
       <Label className="text-sm font-medium text-gray-600">{label}</Label>
       <p className="text-lg">{value}</p>
     </div>
-  );
+  )
 }
