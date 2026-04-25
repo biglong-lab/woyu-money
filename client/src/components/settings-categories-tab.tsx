@@ -1,40 +1,65 @@
 // 分類管理 Tab 面板
-import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { Tag, Plus, Edit, Trash2, Loader2 } from "lucide-react";
+import { useState } from "react"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { z } from "zod"
+import { Tag, Plus, Edit, Trash2, Loader2 } from "lucide-react"
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { apiRequest } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
-import type { Category } from "@/components/settings-types";
-import type { DebtCategory } from "@shared/schema";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import { Badge } from "@/components/ui/badge"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
+import { apiRequest } from "@/lib/queryClient"
+import { useToast } from "@/hooks/use-toast"
+import type { Category } from "@/components/settings-types"
+import type { DebtCategory } from "@shared/schema"
 
 const categorySchema = z.object({
   categoryName: z.string().min(1, "分類名稱不能為空"),
   description: z.string().optional(),
-});
+})
 
-type CategoryFormData = z.infer<typeof categorySchema>;
+type CategoryFormData = z.infer<typeof categorySchema>
 
 export default function SettingsCategoriesTab() {
-  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
-  const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false);
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null)
+  const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false)
+  const { toast } = useToast()
+  const queryClient = useQueryClient()
 
   const { data: categories = [], isLoading: categoriesLoading } = useQuery<DebtCategory[]>({
     queryKey: ["/api/categories"],
-  });
+  })
 
   const categoryForm = useForm<CategoryFormData>({
     resolver: zodResolver(categorySchema),
@@ -42,64 +67,64 @@ export default function SettingsCategoriesTab() {
       categoryName: editingCategory?.categoryName || "",
       description: editingCategory?.description || "",
     },
-  });
+  })
 
   // 新增分類
   const createCategoryMutation = useMutation({
     mutationFn: async (data: CategoryFormData) => {
-      return await apiRequest("POST", "/api/categories", data);
+      return await apiRequest("POST", "/api/categories", data)
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/categories"] });
-      setIsCategoryDialogOpen(false);
-      categoryForm.reset();
-      setEditingCategory(null);
-      toast({ title: "分類建立成功", description: "新分類已成功建立" });
+      queryClient.invalidateQueries({ queryKey: ["/api/categories"] })
+      setIsCategoryDialogOpen(false)
+      categoryForm.reset()
+      setEditingCategory(null)
+      toast({ title: "分類建立成功", description: "新分類已成功建立" })
     },
     onError: (error: Error) => {
-      toast({ title: "建立失敗", description: error.message, variant: "destructive" });
+      toast({ title: "建立失敗", description: error.message, variant: "destructive" })
     },
-  });
+  })
 
   // 更新分類
   const updateCategoryMutation = useMutation({
     mutationFn: async (data: CategoryFormData) => {
-      return await apiRequest("PUT", `/api/categories/${editingCategory?.id}`, data);
+      return await apiRequest("PUT", `/api/categories/${editingCategory?.id}`, data)
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/categories"] });
-      setIsCategoryDialogOpen(false);
-      categoryForm.reset();
-      setEditingCategory(null);
-      toast({ title: "分類更新成功", description: "分類已成功更新" });
+      queryClient.invalidateQueries({ queryKey: ["/api/categories"] })
+      setIsCategoryDialogOpen(false)
+      categoryForm.reset()
+      setEditingCategory(null)
+      toast({ title: "分類更新成功", description: "分類已成功更新" })
     },
     onError: (error: Error) => {
-      toast({ title: "更新失敗", description: error.message, variant: "destructive" });
+      toast({ title: "更新失敗", description: error.message, variant: "destructive" })
     },
-  });
+  })
 
   // 刪除分類
   const deleteCategoryMutation = useMutation({
     mutationFn: async (id: number) => {
-      return await apiRequest("DELETE", `/api/categories/${id}`);
+      return await apiRequest("DELETE", `/api/categories/${id}`)
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/categories"] });
-      toast({ title: "分類刪除成功", description: "分類已成功刪除" });
+      queryClient.invalidateQueries({ queryKey: ["/api/categories"] })
+      toast({ title: "分類刪除成功", description: "分類已成功刪除" })
     },
     onError: (error: Error) => {
-      toast({ title: "刪除失敗", description: error.message, variant: "destructive" });
+      toast({ title: "刪除失敗", description: error.message, variant: "destructive" })
     },
-  });
+  })
 
   const handleEditCategory = (category: Category) => {
-    setEditingCategory(category);
+    setEditingCategory(category)
     categoryForm.reset({
       categoryName: category.categoryName,
       description: category.description || "",
-    });
-    setIsCategoryDialogOpen(true);
-  };
+    })
+    setIsCategoryDialogOpen(true)
+  }
 
   return (
     <>
@@ -111,16 +136,16 @@ export default function SettingsCategoriesTab() {
                 <Tag className="w-5 h-5" />
                 分類管理
               </CardTitle>
-              <CardDescription>
-                管理付款項目的分類和子分類
-              </CardDescription>
+              <CardDescription>管理付款項目的分類和子分類</CardDescription>
             </div>
             <Dialog open={isCategoryDialogOpen} onOpenChange={setIsCategoryDialogOpen}>
               <DialogTrigger asChild>
-                <Button onClick={() => {
-                  setEditingCategory(null);
-                  categoryForm.reset({ categoryName: "", description: "" });
-                }}>
+                <Button
+                  onClick={() => {
+                    setEditingCategory(null)
+                    categoryForm.reset({ categoryName: "", description: "" })
+                  }}
+                >
                   <Plus className="w-4 h-4 mr-2" />
                   新增分類
                 </Button>
@@ -136,16 +161,17 @@ export default function SettingsCategoriesTab() {
               </div>
             ) : (
               categories.map((category) => (
-                <div key={category.id} className="flex items-center justify-between p-4 border rounded-lg">
+                <div
+                  key={category.id}
+                  className="flex items-center justify-between p-4 border rounded-lg"
+                >
                   <div className="flex-1">
                     <h3 className="font-medium">{category.categoryName}</h3>
                     {category.description && (
                       <p className="text-sm text-muted-foreground">{category.description}</p>
                     )}
                     <div className="flex items-center gap-2 mt-2">
-                      {category.isDeleted && (
-                        <Badge variant="destructive">已刪除</Badge>
-                      )}
+                      {category.isDeleted && <Badge variant="destructive">已刪除</Badge>}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -171,7 +197,9 @@ export default function SettingsCategoriesTab() {
                         </AlertDialogHeader>
                         <AlertDialogFooter>
                           <AlertDialogCancel>取消</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => deleteCategoryMutation.mutate(category.id)}>
+                          <AlertDialogAction
+                            onClick={() => deleteCategoryMutation.mutate(category.id)}
+                          >
                             刪除
                           </AlertDialogAction>
                         </AlertDialogFooter>
@@ -189,29 +217,32 @@ export default function SettingsCategoriesTab() {
       <Dialog open={isCategoryDialogOpen} onOpenChange={setIsCategoryDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>
-              {editingCategory ? "編輯分類" : "新增分類"}
-            </DialogTitle>
+            <DialogTitle>{editingCategory ? "編輯分類" : "新增分類"}</DialogTitle>
             <DialogDescription>
               {editingCategory ? "修改分類資訊" : "建立新的付款分類"}
             </DialogDescription>
           </DialogHeader>
           <Form {...categoryForm}>
-            <form onSubmit={categoryForm.handleSubmit((data) => {
-              if (editingCategory) {
-                updateCategoryMutation.mutate(data);
-              } else {
-                createCategoryMutation.mutate(data);
-              }
-            })} className="space-y-4">
+            <form
+              onSubmit={categoryForm.handleSubmit((data) => {
+                if (editingCategory) {
+                  updateCategoryMutation.mutate(data)
+                } else {
+                  createCategoryMutation.mutate(data)
+                }
+              })}
+              className="space-y-4"
+            >
               <FormField
                 control={categoryForm.control}
                 name="categoryName"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>分類名稱</FormLabel>
+                    <FormLabel>
+                      分類名稱 <span className="text-red-500">*</span>
+                    </FormLabel>
                     <FormControl>
-                      <Input placeholder="輸入分類名稱" {...field} />
+                      <Input placeholder="輸入分類名稱" autoFocus {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -225,11 +256,7 @@ export default function SettingsCategoriesTab() {
                   <FormItem>
                     <FormLabel>描述（選填）</FormLabel>
                     <FormControl>
-                      <Textarea
-                        placeholder="輸入分類描述"
-                        className="resize-none"
-                        {...field}
-                      />
+                      <Textarea placeholder="輸入分類描述" className="resize-none" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -237,10 +264,17 @@ export default function SettingsCategoriesTab() {
               />
 
               <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setIsCategoryDialogOpen(false)}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsCategoryDialogOpen(false)}
+                >
                   取消
                 </Button>
-                <Button type="submit" disabled={createCategoryMutation.isPending || updateCategoryMutation.isPending}>
+                <Button
+                  type="submit"
+                  disabled={createCategoryMutation.isPending || updateCategoryMutation.isPending}
+                >
                   {(createCategoryMutation.isPending || updateCategoryMutation.isPending) && (
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   )}
@@ -252,5 +286,5 @@ export default function SettingsCategoriesTab() {
         </DialogContent>
       </Dialog>
     </>
-  );
+  )
 }
