@@ -8,16 +8,17 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+} from "@/components/ui/alert-dialog"
+import { formatNT } from "@/lib/utils"
 
 // 批量刪除確認對話框
 export interface BatchDeleteDialogProps {
-  isOpen: boolean;
-  onOpenChange: (open: boolean) => void;
-  selectedCount: number;
-  selectedItemsTotal: number;
-  onConfirm: () => void;
-  isPending: boolean;
+  isOpen: boolean
+  onOpenChange: (open: boolean) => void
+  selectedCount: number
+  selectedItemsTotal: number
+  onConfirm: () => void
+  isPending: boolean
 }
 
 export function BatchDeleteDialog({
@@ -34,15 +35,12 @@ export function BatchDeleteDialog({
         <AlertDialogHeader>
           <AlertDialogTitle>確認批量刪除</AlertDialogTitle>
           <AlertDialogDescription>
-            您確定要將 <span className="font-bold text-red-600">{selectedCount}</span> 個項目移至回收站嗎？
+            您確定要將 <span className="font-bold text-red-600">{selectedCount}</span>{" "}
+            個項目移至回收站嗎？
             <br />
-            <span className="text-sm text-gray-500">
-              總金額: NT$ {selectedItemsTotal.toLocaleString()}
-            </span>
+            <span className="text-sm text-gray-500">總金額: {formatNT(selectedItemsTotal)}</span>
             <br />
-            <span className="text-sm text-gray-500">
-              已刪除的項目可從回收站恢復。
-            </span>
+            <span className="text-sm text-gray-500">已刪除的項目可從回收站恢復。</span>
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -57,16 +55,16 @@ export function BatchDeleteDialog({
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
-  );
+  )
 }
 
 // 批量付款確認對話框
 export interface BatchPayDialogProps {
-  isOpen: boolean;
-  onOpenChange: (open: boolean) => void;
-  selectedUnpaidCount: number;
-  onConfirm: () => void;
-  isPending: boolean;
+  isOpen: boolean
+  onOpenChange: (open: boolean) => void
+  selectedUnpaidCount: number
+  onConfirm: () => void
+  isPending: boolean
 }
 
 export function BatchPayDialog({
@@ -82,15 +80,12 @@ export function BatchPayDialog({
         <AlertDialogHeader>
           <AlertDialogTitle>確認批量付款</AlertDialogTitle>
           <AlertDialogDescription>
-            您確定要將 <span className="font-bold text-green-600">{selectedUnpaidCount}</span> 個未付款項目標記為已付款嗎？
+            您確定要將 <span className="font-bold text-green-600">{selectedUnpaidCount}</span>{" "}
+            個未付款項目標記為已付款嗎？
             <br />
-            <span className="text-sm text-gray-500">
-              付款日期將設為今天
-            </span>
+            <span className="text-sm text-gray-500">付款日期將設為今天</span>
             <br />
-            <span className="text-sm text-gray-500">
-              注意：已付款的項目不會受影響。
-            </span>
+            <span className="text-sm text-gray-500">注意：已付款的項目不會受影響。</span>
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -105,5 +100,5 @@ export function BatchPayDialog({
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
-  );
+  )
 }
