@@ -104,17 +104,27 @@ export default function PaymentHome() {
   const [showQuickPay, setShowQuickPay] = useState(false)
   const { openCamera, isUploading } = useQuickCameraUpload()
 
-  // 鍵盤快捷鍵：按 "/" 聚焦搜尋（不在 input 中時）
+  // 鍵盤快捷鍵：/ 聚焦搜尋、N 開新增、P 開付款（不在 input 中時）
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key !== "/") return
       const target = e.target as HTMLElement | null
       const tag = target?.tagName
       // 已在 input/textarea/contenteditable 中時不攔截
       if (tag === "INPUT" || tag === "TEXTAREA" || target?.isContentEditable) return
-      e.preventDefault()
-      searchInputRef.current?.focus()
-      searchInputRef.current?.select()
+      // 帶修飾鍵（Cmd/Ctrl/Alt）的不攔截，避免與系統快捷鍵衝突
+      if (e.metaKey || e.ctrlKey || e.altKey) return
+
+      if (e.key === "/") {
+        e.preventDefault()
+        searchInputRef.current?.focus()
+        searchInputRef.current?.select()
+      } else if (e.key === "n" || e.key === "N") {
+        e.preventDefault()
+        setShowQuickAdd(true)
+      } else if (e.key === "p" || e.key === "P") {
+        e.preventDefault()
+        setShowQuickPay(true)
+      }
     }
     window.addEventListener("keydown", handler)
     return () => window.removeEventListener("keydown", handler)
