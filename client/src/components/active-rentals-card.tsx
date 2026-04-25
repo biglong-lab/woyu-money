@@ -75,6 +75,39 @@ export function ActiveRentalsCard() {
       toast({ title: "標記失敗", description: err.message, variant: "destructive" }),
   })
 
+  // 一鍵批次：本月所有未付標記為已付
+  const batchMarkPaidMutation = useMutation<
+    { processedCount: number; totalPaid: number },
+    Error,
+    void
+  >({
+    mutationFn: () =>
+      apiRequest("POST", "/api/rental-batch/mark-month-paid", { year, month }) as Promise<{
+        processedCount: number
+        totalPaid: number
+      }>,
+    onSuccess: (result) => {
+      toast({
+        title: `已標記 ${result.processedCount} 筆租金為已付`,
+        description: `合計 NT$ ${Math.round(result.totalPaid).toLocaleString()}`,
+      })
+      queryClient.invalidateQueries({ queryKey: [`/api/rental-matrix?year=${year}`] })
+      queryClient.invalidateQueries({ queryKey: ["/api/payment/priority-report?includeLow=true"] })
+    },
+    onError: (err) =>
+      toast({ title: "批次標記失敗", description: err.message, variant: "destructive" }),
+  })
+
+  const handleBatchMarkPaid = () => {
+    if (
+      !window.confirm(
+        `確定為 ${month} 月所有未付租金標記為已付？\n（這將為符合條件的租金項目建立付款記錄）`
+      )
+    )
+      return
+    batchMarkPaidMutation.mutate()
+  }
+
   if (isLoading) {
     return (
       <Card>
@@ -197,6 +230,23 @@ export function ActiveRentalsCard() {
             style={{ width: `${progressPct}%` }}
           />
         </div>
+        {/* 一鍵批次：≥2 筆未付才顯示，避免單筆時誤觸 */}
+        {pendingCount >= 2 && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="mt-2 w-full text-xs h-8 border-green-300 text-green-700 hover:bg-green-50"
+            onClick={handleBatchMarkPaid}
+            disabled={batchMarkPaidMutation.isPending}
+            data-testid="batch-mark-all-paid"
+          >
+            <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
+            {batchMarkPaidMutation.isPending
+              ? "處理中..."
+              : `🚀 一鍵全部標記已付（${pendingCount} 筆 ${formatNT(monthExpected - monthPaid)}）`}
+          </Button>
+        )}
       </CardHeader>
       <CardContent className="space-y-2">
         {items.map(({ cell, contract }) => {
