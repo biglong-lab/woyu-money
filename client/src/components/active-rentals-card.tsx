@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { apiRequest, queryClient } from "@/lib/queryClient"
+import { formatNT } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 import { useCopyAmount } from "@/hooks/use-copy-amount"
 
@@ -39,10 +40,6 @@ const STATUS_BADGE: Record<CellStatus, { label: string; cls: string; icon: strin
   unpaid: { label: "未付", cls: "bg-red-100 text-red-800", icon: "🔴" },
   upcoming: { label: "未到期", cls: "bg-gray-100 text-gray-600", icon: "⚪" },
   out_of_contract: { label: "—", cls: "bg-gray-50 text-gray-400", icon: "—" },
-}
-
-function fmt(n: number): string {
-  return `NT$ ${Math.round(n).toLocaleString()}`
 }
 
 export function ActiveRentalsCard() {
@@ -142,12 +139,13 @@ export function ActiveRentalsCard() {
       .map(({ cell, contract }, i) => {
         if (!contract) return ""
         const due = cell.expectedAmount - cell.paidAmount
-        const partial = cell.paidAmount > 0 ? `（已付 ${fmt(cell.paidAmount)}）` : ""
-        return `${i + 1}. ${contract.contractName} ${fmt(due)}${partial}`
+        const partial = cell.paidAmount > 0 ? `（已付 ${formatNT(cell.paidAmount)}）` : ""
+        return `${i + 1}. ${contract.contractName} ${formatNT(due)}${partial}`
       })
       .filter(Boolean)
     const text =
-      `🏠 ${month} 月租金待繳（${pending.length} 件 / 共 ${fmt(sumDue)}）：\n\n` + lines.join("\n")
+      `🏠 ${month} 月租金待繳（${pending.length} 件 / 共 ${formatNT(sumDue)}）：\n\n` +
+      lines.join("\n")
     try {
       await navigator.clipboard.writeText(text)
       toast({ title: "已複製清單", description: "可貼到 LINE / 備忘錄" })
@@ -173,7 +171,7 @@ export function ActiveRentalsCard() {
           ) : (
             <div className="flex items-center gap-2">
               <span className="text-xs text-gray-500">
-                已付 {paidCount}/{total} · {fmt(monthPaid)} / {fmt(monthExpected)}
+                已付 {paidCount}/{total} · {formatNT(monthPaid)} / {formatNT(monthExpected)}
               </span>
               {pendingCount > 0 && (
                 <Button
@@ -226,10 +224,10 @@ export function ActiveRentalsCard() {
                     title="點擊複製數字（轉帳用）"
                     data-testid={`copy-amount-${cell.contractId}`}
                   >
-                    {fmt(cell.expectedAmount)}
+                    {formatNT(cell.expectedAmount)}
                   </button>
                   {cell.paidAmount > 0 && cell.status !== "paid" && (
-                    <span className="ml-1">/ 已付 {fmt(cell.paidAmount)}</span>
+                    <span className="ml-1">/ 已付 {formatNT(cell.paidAmount)}</span>
                   )}
                 </div>
               </div>
