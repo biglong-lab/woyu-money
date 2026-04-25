@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
 import { apiRequest, queryClient } from "@/lib/queryClient"
-import { localDateISO } from "@/lib/utils"
+import { localDateISO, friendlyApiError } from "@/lib/utils"
 import { Search, DollarSign, CheckCircle2, ArrowRight, Loader2 } from "lucide-react"
 
 interface QuickPaymentDialogProps {
@@ -110,12 +110,9 @@ export function QuickPaymentDialog({ open, onOpenChange }: QuickPaymentDialogPro
       setStep("done")
     },
     onError: (error: Error) => {
-      const friendly = !navigator.onLine
-        ? "目前離線中，請等網路恢復後重試"
-        : error.message || "請稍後再試"
       toast({
         title: "付款失敗",
-        description: friendly,
+        description: friendlyApiError(error),
         variant: "destructive",
       })
     },
