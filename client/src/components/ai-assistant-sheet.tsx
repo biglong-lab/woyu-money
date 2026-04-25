@@ -4,14 +4,13 @@
  */
 import { useRef, useEffect } from "react"
 import { Bot, Trash2, Zap } from "lucide-react"
-import {
-  Sheet, SheetContent, SheetHeader, SheetTitle,
-} from "@/components/ui/sheet"
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { AiMessageBubble } from "./ai-message-bubble"
 import { AiChatInput } from "./ai-chat-input"
 import { useAiChat } from "@/hooks/use-ai-chat"
+import { useOnlineStatus } from "@/hooks/use-online-status"
 
 // ─────────────────────────────────────────────
 // 快捷問題
@@ -36,9 +35,7 @@ function WelcomeScreen({ onQuickQuestion }: { onQuickQuestion: (q: string) => vo
       </div>
       <div>
         <h3 className="text-lg font-semibold text-gray-900">AI 財務助手</h3>
-        <p className="text-sm text-gray-500 mt-1">
-          詢問薪資計算、查詢收入、新增員工…
-        </p>
+        <p className="text-sm text-gray-500 mt-1">詢問薪資計算、查詢收入、新增員工…</p>
       </div>
 
       <div className="w-full space-y-2">
@@ -69,6 +66,7 @@ interface AiAssistantSheetProps {
 
 export function AiAssistantSheet({ open, onOpenChange }: AiAssistantSheetProps) {
   const { messages, isStreaming, sendMessage, stopStreaming, clearMessages } = useAiChat()
+  const isOnline = useOnlineStatus()
   const scrollRef = useRef<HTMLDivElement>(null)
 
   // 自動捲到最新訊息
@@ -142,18 +140,24 @@ export function AiAssistantSheet({ open, onOpenChange }: AiAssistantSheetProps) 
             {messages.length === 0 ? (
               <WelcomeScreen onQuickQuestion={(q) => sendMessage(q)} />
             ) : (
-              messages.map((msg) => (
-                <AiMessageBubble key={msg.id} message={msg} />
-              ))
+              messages.map((msg) => <AiMessageBubble key={msg.id} message={msg} />)
             )}
           </div>
         </ScrollArea>
+
+        {/* 離線提示 */}
+        {!isOnline && (
+          <div className="px-4 py-2 bg-amber-50 border-t border-amber-200 text-xs text-amber-900 text-center">
+            ⚠️ 目前離線，AI 助手暫停服務
+          </div>
+        )}
 
         {/* 輸入框 */}
         <AiChatInput
           onSend={handleSend}
           isStreaming={isStreaming}
           onStop={stopStreaming}
+          disabled={!isOnline}
         />
       </SheetContent>
     </Sheet>
