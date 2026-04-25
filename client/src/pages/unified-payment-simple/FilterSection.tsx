@@ -1,43 +1,37 @@
 /**
  * 統一付款管理 - 篩選器區域
  */
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { Target, Search, X } from "lucide-react";
-import type { PaymentProject, DebtCategory } from "./types";
+} from "@/components/ui/select"
+import { Target, Search, X } from "lucide-react"
+import type { PaymentProject, DebtCategory } from "./types"
 
 interface FilterSectionProps {
   /** 所有專案列表 */
-  projects: PaymentProject[];
+  projects: PaymentProject[]
   /** 所有分類列表 */
-  categories: DebtCategory[];
+  categories: DebtCategory[]
   /** 選中的專案 ID */
-  selectedProject: number | null;
+  selectedProject: number | null
   /** 選中的分類 ID */
-  selectedCategory: number | null;
+  selectedCategory: number | null
   /** 搜尋關鍵字 */
-  searchTerm: string;
+  searchTerm: string
   /** 專案變更回呼 */
-  onProjectChange: (id: number | null) => void;
+  onProjectChange: (id: number | null) => void
   /** 分類變更回呼 */
-  onCategoryChange: (id: number | null) => void;
+  onCategoryChange: (id: number | null) => void
   /** 搜尋變更回呼 */
-  onSearchChange: (term: string) => void;
+  onSearchChange: (term: string) => void
 }
 
 /** 篩選器區域元件 */
@@ -69,9 +63,7 @@ export function FilterSection({
             <Label>專案</Label>
             <Select
               value={selectedProject?.toString() || "none"}
-              onValueChange={(value) =>
-                onProjectChange(value === "none" ? null : parseInt(value))
-              }
+              onValueChange={(value) => onProjectChange(value === "none" ? null : parseInt(value))}
             >
               <SelectTrigger>
                 <SelectValue placeholder="選擇專案（可選）" />
@@ -92,9 +84,7 @@ export function FilterSection({
             <Label>分類</Label>
             <Select
               value={selectedCategory?.toString() || "none"}
-              onValueChange={(value) =>
-                onCategoryChange(value === "none" ? null : parseInt(value))
-              }
+              onValueChange={(value) => onCategoryChange(value === "none" ? null : parseInt(value))}
             >
               <SelectTrigger>
                 <SelectValue placeholder="選擇分類（可選）" />
@@ -102,10 +92,7 @@ export function FilterSection({
               <SelectContent>
                 <SelectItem value="none">所有分類</SelectItem>
                 {categories.map((category) => (
-                  <SelectItem
-                    key={category.id}
-                    value={category.id.toString()}
-                  >
+                  <SelectItem key={category.id} value={category.id.toString()}>
                     {category.categoryName}
                   </SelectItem>
                 ))}
@@ -122,6 +109,9 @@ export function FilterSection({
                 placeholder="搜尋項目名稱或備註..."
                 value={searchTerm}
                 onChange={(e) => onSearchChange(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") onSearchChange("")
+                }}
                 className="pl-9"
               />
               {searchTerm && (
@@ -130,6 +120,7 @@ export function FilterSection({
                   size="sm"
                   className="absolute right-1 top-1 h-8 w-8 p-0"
                   onClick={() => onSearchChange("")}
+                  title="清除搜尋（Esc）"
                 >
                   <X className="h-4 w-4" />
                 </Button>
@@ -139,5 +130,5 @@ export function FilterSection({
         </div>
       </CardContent>
     </Card>
-  );
+  )
 }
