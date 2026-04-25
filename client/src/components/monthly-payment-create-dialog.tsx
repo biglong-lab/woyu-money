@@ -1,19 +1,32 @@
 // 月付管理 - 新增對話框元件
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Plus, CreditCard } from "lucide-react";
-import { UseFormReturn, Control, FieldValues } from "react-hook-form";
-import CategorySelector from "@/components/category-selector";
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form"
+import { Plus, CreditCard } from "lucide-react"
+import { UseFormReturn, Control, FieldValues } from "react-hook-form"
+import CategorySelector from "@/components/category-selector"
 
 export interface MonthlyPaymentCreateDialogProps {
-  isOpen: boolean;
-  onOpenChange: (open: boolean) => void;
-  createForm: UseFormReturn<FieldValues>;
-  onSubmit: (data: FieldValues) => void;
-  isPending: boolean;
+  isOpen: boolean
+  onOpenChange: (open: boolean) => void
+  createForm: UseFormReturn<FieldValues>
+  onSubmit: (data: FieldValues) => void
+  isPending: boolean
 }
 
 export function MonthlyPaymentCreateDialog({
@@ -23,8 +36,8 @@ export function MonthlyPaymentCreateDialog({
   onSubmit,
   isPending,
 }: MonthlyPaymentCreateDialogProps) {
-  const watchTotalAmount = createForm.watch("totalAmount");
-  const watchInstallments = createForm.watch("installments");
+  const watchTotalAmount = createForm.watch("totalAmount")
+  const watchInstallments = createForm.watch("installments")
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -40,29 +53,59 @@ export function MonthlyPaymentCreateDialog({
           <div className="text-sm text-gray-600 bg-blue-50 p-3 rounded-lg">
             <p className="font-medium text-blue-800 mb-1">月付分期說明：</p>
             <p>* 設定期數、開始付款日期、月付金額，系統將自動創建連續月份的付款項目</p>
-            <p>* 例如：4期、2025/04/01開始、每月10000元 - 自動創建 04/01、05/01、06/01、07/01 四個付款項目</p>
+            <p>
+              * 例如：4期、2025/04/01開始、每月10000元 - 自動創建 04/01、05/01、06/01、07/01
+              四個付款項目
+            </p>
           </div>
         </DialogHeader>
         <Form {...createForm}>
           <form onSubmit={createForm.handleSubmit(onSubmit)} className="space-y-4">
             {/* 統一分類選擇組件 */}
             /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-              <CategorySelector
-              form={createForm as unknown as { control: Control<FieldValues>; watch: (name: string) => string; setValue: (name: string, value: string) => void; }}
+            <CategorySelector
+              form={
+                createForm as unknown as {
+                  control: Control<FieldValues>
+                  watch: (name: string) => string
+                  setValue: (name: string, value: string) => void
+                }
+              }
               onCategoryChange={() => {}}
             />
-
             <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={createForm.control}
                 name="itemName"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>項目名稱</FormLabel>
+                    <FormLabel>
+                      項目名稱 <span className="text-red-500">*</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="輸入付款項目名稱" autoFocus />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+            <div className="grid grid-cols-1 gap-4">
+              <FormField
+                control={createForm.control}
+                name="amount"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      月付金額 <span className="text-red-500">*</span>
+                    </FormLabel>
                     <FormControl>
                       <Input
                         {...field}
-                        placeholder="輸入付款項目名稱"
+                        type="number"
+                        step="0.01"
+                        placeholder="每月應付金額"
+                        onFocus={(e) => e.target.select()}
                       />
                     </FormControl>
                     <FormMessage />
@@ -70,30 +113,15 @@ export function MonthlyPaymentCreateDialog({
                 )}
               />
             </div>
-
-            <div className="grid grid-cols-1 gap-4">
-              <FormField
-                control={createForm.control}
-                name="amount"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>月付金額</FormLabel>
-                    <FormControl>
-                      <Input {...field} type="number" step="0.01" placeholder="每月應付金額" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
             <div className="grid grid-cols-3 gap-4">
               <FormField
                 control={createForm.control}
                 name="dueDate"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>開始日期</FormLabel>
+                    <FormLabel>
+                      開始日期 <span className="text-red-500">*</span>
+                    </FormLabel>
                     <FormControl>
                       <Input {...field} type="date" />
                     </FormControl>
@@ -106,7 +134,9 @@ export function MonthlyPaymentCreateDialog({
                 name="installments"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>幾個月</FormLabel>
+                    <FormLabel>
+                      幾個月 <span className="text-red-500">*</span>
+                    </FormLabel>
                     <FormControl>
                       <Input
                         {...field}
@@ -135,14 +165,12 @@ export function MonthlyPaymentCreateDialog({
                 )}
               />
             </div>
-
             {/* 費用計算明細 */}
             <PaymentCalculationPreview
               totalAmount={watchTotalAmount as string}
               installments={watchInstallments as string}
               startDate={createForm.watch("dueDate") as string}
             />
-
             <FormField
               control={createForm.control}
               name="notes"
@@ -156,13 +184,8 @@ export function MonthlyPaymentCreateDialog({
                 </FormItem>
               )}
             />
-
             <div className="flex justify-end gap-2 pt-4">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-              >
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 取消
               </Button>
               <Button type="submit" disabled={isPending}>
@@ -173,24 +196,28 @@ export function MonthlyPaymentCreateDialog({
         </Form>
       </DialogContent>
     </Dialog>
-  );
+  )
 }
 
 // 費用計算預覽子元件
 interface PaymentCalculationPreviewProps {
-  totalAmount: string;
-  installments: string;
-  startDate: string;
+  totalAmount: string
+  installments: string
+  startDate: string
 }
 
-function PaymentCalculationPreview({ totalAmount, installments, startDate }: PaymentCalculationPreviewProps) {
-  const monthlyAmount = parseFloat(totalAmount) || 0;
-  const installmentCount = parseInt(installments) || 0;
+function PaymentCalculationPreview({
+  totalAmount,
+  installments,
+  startDate,
+}: PaymentCalculationPreviewProps) {
+  const monthlyAmount = parseFloat(totalAmount) || 0
+  const installmentCount = parseInt(installments) || 0
 
-  if (monthlyAmount <= 0 || installmentCount <= 0) return null;
+  if (monthlyAmount <= 0 || installmentCount <= 0) return null
 
-  const totalCost = monthlyAmount * installmentCount;
-  const parsedStartDate = new Date(startDate || new Date());
+  const totalCost = monthlyAmount * installmentCount
+  const parsedStartDate = new Date(startDate || new Date())
 
   return (
     <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg space-y-3">
@@ -221,14 +248,16 @@ function PaymentCalculationPreview({ totalAmount, installments, startDate }: Pay
           <div className="text-xs text-gray-600 mb-2">付款時程預覽 (前3期)</div>
           <div className="space-y-1 text-xs">
             {Array.from({ length: Math.min(3, installmentCount) }, (_, i) => {
-              const paymentDate = new Date(parsedStartDate);
-              paymentDate.setMonth(parsedStartDate.getMonth() + i);
+              const paymentDate = new Date(parsedStartDate)
+              paymentDate.setMonth(parsedStartDate.getMonth() + i)
               return (
                 <div key={i} className="flex justify-between">
                   <span className="text-gray-600">第 {i + 1} 期:</span>
-                  <span className="font-medium">{paymentDate.toLocaleDateString()} - NT$ {monthlyAmount.toLocaleString()}</span>
+                  <span className="font-medium">
+                    {paymentDate.toLocaleDateString()} - NT$ {monthlyAmount.toLocaleString()}
+                  </span>
                 </div>
-              );
+              )
             })}
             {installmentCount > 3 && (
               <div className="text-gray-500 text-center">... 共 {installmentCount} 期</div>
@@ -239,10 +268,11 @@ function PaymentCalculationPreview({ totalAmount, installments, startDate }: Pay
         {/* 計算公式 */}
         <div className="bg-amber-50 border border-amber-200 p-2 rounded text-xs">
           <span className="text-amber-800">
-            <strong>計算公式:</strong> NT$ {monthlyAmount.toLocaleString()} x {installmentCount} 期 = NT$ {totalCost.toLocaleString()}
+            <strong>計算公式:</strong> NT$ {monthlyAmount.toLocaleString()} x {installmentCount} 期
+            = NT$ {totalCost.toLocaleString()}
           </span>
         </div>
       </div>
     </div>
-  );
+  )
 }
