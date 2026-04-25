@@ -1,6 +1,7 @@
 // 月付管理 - 主頁面（重構後）
 import { useState, useEffect, useMemo } from "react"
 import { localDateISO } from "@/lib/utils"
+import { useDocumentTitle } from "@/hooks/use-document-title"
 import { useQuery, useMutation } from "@tanstack/react-query"
 import { useForm, type UseFormReturn, type FieldValues } from "react-hook-form"
 import { Calendar } from "lucide-react"
@@ -73,6 +74,7 @@ interface UpdateFormSubmitData extends UpdatePaymentItemData {
 }
 
 export default function MonthlyPaymentManagement() {
+  useDocumentTitle("月付管理")
   const { toast } = useToast()
 
   // =========== 狀態管理 ===========

@@ -1,213 +1,223 @@
 // 單據收件箱頁面 - 主框架
-import { useState, useCallback } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useToast } from "@/hooks/use-toast";
-import { Clock } from "lucide-react";
-import type { DocumentInbox, PaymentProject, PaymentItem } from "@shared/schema";
+import { useState, useCallback } from "react"
+import { useQuery, useMutation } from "@tanstack/react-query"
+import { queryClient, apiRequest } from "@/lib/queryClient"
+import { Card, CardContent } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { useToast } from "@/hooks/use-toast"
+import { useDocumentTitle } from "@/hooks/use-document-title"
+import { Clock } from "lucide-react"
+import type { DocumentInbox, PaymentProject, PaymentItem } from "@shared/schema"
 
-import { DOCUMENT_TYPES, type InboxStats } from "@/components/document-inbox-types";
-import DocumentInboxUploadSection from "@/components/document-inbox-upload-section";
-import DocumentInboxDocumentList from "@/components/document-inbox-document-list";
-import DocumentInboxPreviewDialog from "@/components/document-inbox-preview-dialog";
-import DocumentInboxArchiveDialog from "@/components/document-inbox-archive-dialog";
+import { DOCUMENT_TYPES, type InboxStats } from "@/components/document-inbox-types"
+import DocumentInboxUploadSection from "@/components/document-inbox-upload-section"
+import DocumentInboxDocumentList from "@/components/document-inbox-document-list"
+import DocumentInboxPreviewDialog from "@/components/document-inbox-preview-dialog"
+import DocumentInboxArchiveDialog from "@/components/document-inbox-archive-dialog"
 
 // 歸檔資料型別定義
 interface ArchiveToPaymentItemData {
-  projectId?: number;
-  categoryId?: number;
-  name: string;
-  amount: number;
-  dueDate?: string;
-  notes?: string;
+  projectId?: number
+  categoryId?: number
+  name: string
+  amount: number
+  dueDate?: string
+  notes?: string
 }
 
 interface ArchiveToPaymentRecordData {
-  paymentItemId: number;
-  amount: number;
-  paymentDate: string;
-  notes?: string;
+  paymentItemId: number
+  amount: number
+  paymentDate: string
+  notes?: string
 }
 
 interface ArchiveToInvoiceData {
-  invoiceNumber: string;
-  amount: number;
-  invoiceDate: string;
-  vendorName?: string;
-  notes?: string;
+  invoiceNumber: string
+  amount: number
+  invoiceDate: string
+  vendorName?: string
+  notes?: string
 }
 
-type ArchiveData = ArchiveToPaymentItemData | ArchiveToPaymentRecordData | ArchiveToInvoiceData;
+type ArchiveData = ArchiveToPaymentItemData | ArchiveToPaymentRecordData | ArchiveToInvoiceData
 
 export default function DocumentInboxPage() {
-  const { toast } = useToast();
+  useDocumentTitle("單據收件箱")
+  const { toast } = useToast()
 
-  const [selectedType, setSelectedType] = useState<'bill' | 'payment' | 'invoice'>('bill');
-  const [filterType, setFilterType] = useState<string>('all');
-  const [filterStatus, setFilterStatus] = useState<string>('all');
-  const [selectedDoc, setSelectedDoc] = useState<DocumentInbox | null>(null);
-  const [showArchiveDialog, setShowArchiveDialog] = useState(false);
-  const [showPreviewDialog, setShowPreviewDialog] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
+  const [selectedType, setSelectedType] = useState<"bill" | "payment" | "invoice">("bill")
+  const [filterType, setFilterType] = useState<string>("all")
+  const [filterStatus, setFilterStatus] = useState<string>("all")
+  const [selectedDoc, setSelectedDoc] = useState<DocumentInbox | null>(null)
+  const [showArchiveDialog, setShowArchiveDialog] = useState(false)
+  const [showPreviewDialog, setShowPreviewDialog] = useState(false)
+  const [isUploading, setIsUploading] = useState(false)
 
   // 建構查詢 URL
   const getQueryUrl = () => {
-    const params = new URLSearchParams();
-    if (filterType !== 'all') params.set('documentType', filterType);
-    if (filterStatus !== 'all') params.set('status', filterStatus);
-    const queryString = params.toString();
-    return `/api/document-inbox${queryString ? `?${queryString}` : ''}`;
-  };
+    const params = new URLSearchParams()
+    if (filterType !== "all") params.set("documentType", filterType)
+    if (filterStatus !== "all") params.set("status", filterStatus)
+    const queryString = params.toString()
+    return `/api/document-inbox${queryString ? `?${queryString}` : ""}`
+  }
 
-  const queryUrl = getQueryUrl();
+  const queryUrl = getQueryUrl()
   const { data: documents = [], isLoading } = useQuery<DocumentInbox[]>({
     queryKey: [queryUrl],
     refetchInterval: 5000,
-  });
+  })
 
   const { data: stats } = useQuery<InboxStats>({
-    queryKey: ['/api/document-inbox/stats'],
+    queryKey: ["/api/document-inbox/stats"],
     refetchInterval: 10000,
-  });
+  })
 
   const { data: projects = [] } = useQuery<PaymentProject[]>({
-    queryKey: ['/api/payment/projects'],
-  });
+    queryKey: ["/api/payment/projects"],
+  })
 
   const { data: paymentItemsData = [] } = useQuery<PaymentItem[]>({
-    queryKey: ['/api/payment/items', { includeAll: 'true' }],
+    queryKey: ["/api/payment/items", { includeAll: "true" }],
     queryFn: async () => {
-      const response = await fetch('/api/payment/items?includeAll=true', { credentials: 'include' });
-      if (!response.ok) throw new Error('Failed to fetch payment items');
-      return response.json();
+      const response = await fetch("/api/payment/items?includeAll=true", { credentials: "include" })
+      if (!response.ok) throw new Error("Failed to fetch payment items")
+      return response.json()
     },
-  });
-  const paymentItems = Array.isArray(paymentItemsData) ? paymentItemsData : [];
+  })
+  const paymentItems = Array.isArray(paymentItemsData) ? paymentItemsData : []
 
   // 統一 invalidate
   const invalidateDocumentInboxQueries = () => {
     queryClient.invalidateQueries({
       predicate: (query) => {
-        const key = query.queryKey[0];
-        return typeof key === 'string' && key.startsWith('/api/document-inbox');
+        const key = query.queryKey[0]
+        return typeof key === "string" && key.startsWith("/api/document-inbox")
       },
-    });
-  };
+    })
+  }
 
   // 上傳
   const uploadMutation = useMutation({
     mutationFn: async (formData: FormData) => {
-      return apiRequest('POST', '/api/document-inbox/upload', formData);
+      return apiRequest("POST", "/api/document-inbox/upload", formData)
     },
     onSuccess: () => {
-      invalidateDocumentInboxQueries();
+      invalidateDocumentInboxQueries()
     },
     onError: (error: Error) => {
-      toast({ title: "上傳失敗", description: error.message, variant: "destructive" });
+      toast({ title: "上傳失敗", description: error.message, variant: "destructive" })
     },
-  });
+  })
 
-  const handleUpload = useCallback(async (files: FileList, notes: string) => {
-    setIsUploading(true);
-    const formData = new FormData();
-    for (const file of Array.from(files)) {
-      formData.append('file', file);
-    }
-    formData.append('documentType', selectedType);
-    if (notes) {
-      formData.append('notes', notes);
-    }
+  const handleUpload = useCallback(
+    async (files: FileList, notes: string) => {
+      setIsUploading(true)
+      const formData = new FormData()
+      for (const file of Array.from(files)) {
+        formData.append("file", file)
+      }
+      formData.append("documentType", selectedType)
+      if (notes) {
+        formData.append("notes", notes)
+      }
 
-    try {
-      await uploadMutation.mutateAsync(formData);
-      toast({
-        title: "上傳成功",
-        description: files.length > 1
-          ? `已上傳 ${files.length} 張圖片，正在進行 AI 辨識...`
-          : "正在進行 AI 辨識...",
-      });
-    } catch {
-      // mutation onError 已處理
-    }
-    setIsUploading(false);
-  }, [selectedType, uploadMutation, toast]);
+      try {
+        await uploadMutation.mutateAsync(formData)
+        toast({
+          title: "上傳成功",
+          description:
+            files.length > 1
+              ? `已上傳 ${files.length} 張圖片，正在進行 AI 辨識...`
+              : "正在進行 AI 辨識...",
+        })
+      } catch {
+        // mutation onError 已處理
+      }
+      setIsUploading(false)
+    },
+    [selectedType, uploadMutation, toast]
+  )
 
   // 重新辨識
   const reRecognizeMutation = useMutation({
     mutationFn: async (id: number) => {
-      return apiRequest('POST', `/api/document-inbox/${id}/re-recognize`);
+      return apiRequest("POST", `/api/document-inbox/${id}/re-recognize`)
     },
     onSuccess: () => {
-      invalidateDocumentInboxQueries();
-      toast({ title: "重新辨識中", description: "請稍候..." });
+      invalidateDocumentInboxQueries()
+      toast({ title: "重新辨識中", description: "請稍候..." })
     },
     onError: (error: Error) => {
-      toast({ title: "辨識失敗", description: error.message, variant: "destructive" });
+      toast({ title: "辨識失敗", description: error.message, variant: "destructive" })
     },
-  });
+  })
 
   // 刪除
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
-      return apiRequest('DELETE', `/api/document-inbox/${id}`);
+      return apiRequest("DELETE", `/api/document-inbox/${id}`)
     },
     onSuccess: () => {
-      invalidateDocumentInboxQueries();
-      toast({ title: "已刪除" });
-      setSelectedDoc(null);
-      setShowPreviewDialog(false);
+      invalidateDocumentInboxQueries()
+      toast({ title: "已刪除" })
+      setSelectedDoc(null)
+      setShowPreviewDialog(false)
     },
-  });
+  })
 
   // 歸檔
   const archiveMutation = useMutation({
     mutationFn: async ({ id, type, data }: { id: number; type: string; data: ArchiveData }) => {
-      return apiRequest('POST', `/api/document-inbox/${id}/archive-to-${type}`, data);
+      return apiRequest("POST", `/api/document-inbox/${id}/archive-to-${type}`, data)
     },
     onSuccess: (_, variables) => {
-      invalidateDocumentInboxQueries();
-      queryClient.invalidateQueries({ queryKey: ['/api/payment/items'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/payment/records'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/invoice-records'] });
+      invalidateDocumentInboxQueries()
+      queryClient.invalidateQueries({ queryKey: ["/api/payment/items"] })
+      queryClient.invalidateQueries({ queryKey: ["/api/payment/records"] })
+      queryClient.invalidateQueries({ queryKey: ["/api/invoice-records"] })
 
       const typeLabels: Record<string, string> = {
-        'payment-item': '付款項目',
-        'payment-record': '付款記錄',
-        'invoice': '發票記錄',
-      };
-      toast({ title: "歸檔成功", description: `已轉為${typeLabels[variables.type]}` });
-      setShowArchiveDialog(false);
-      setSelectedDoc(null);
+        "payment-item": "付款項目",
+        "payment-record": "付款記錄",
+        invoice: "發票記錄",
+      }
+      toast({ title: "歸檔成功", description: `已轉為${typeLabels[variables.type]}` })
+      setShowArchiveDialog(false)
+      setSelectedDoc(null)
     },
     onError: (error: Error) => {
-      toast({ title: "歸檔失敗", description: error.message, variant: "destructive" });
+      toast({ title: "歸檔失敗", description: error.message, variant: "destructive" })
     },
-  });
+  })
 
   // 更新備註
   const updateNotesMutation = useMutation({
     mutationFn: async ({ id, notes }: { id: number; notes: string }): Promise<DocumentInbox> => {
-      return apiRequest('PATCH', `/api/document-inbox/${id}/notes`, { notes }) as Promise<DocumentInbox>;
+      return apiRequest("PATCH", `/api/document-inbox/${id}/notes`, {
+        notes,
+      }) as Promise<DocumentInbox>
     },
     onSuccess: (updatedDoc: DocumentInbox) => {
-      invalidateDocumentInboxQueries();
-      setSelectedDoc(updatedDoc);
-      toast({ title: "備註已更新" });
+      invalidateDocumentInboxQueries()
+      setSelectedDoc(updatedDoc)
+      toast({ title: "備註已更新" })
     },
     onError: (error: Error) => {
-      toast({ title: "更新失敗", description: error.message, variant: "destructive" });
+      toast({ title: "更新失敗", description: error.message, variant: "destructive" })
     },
-  });
+  })
 
   return (
     <div className="container mx-auto py-6 space-y-6">
       {/* 頁面標題 */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold" data-testid="page-title">單據收件箱</h1>
+          <h1 className="text-2xl font-bold" data-testid="page-title">
+            單據收件箱
+          </h1>
           <p className="text-gray-500">快速拍照或上傳單據，AI 自動辨識分類</p>
         </div>
         {stats && stats.totalPending > 0 && (
@@ -230,14 +240,14 @@ export default function DocumentInboxPage() {
       {stats && (
         <div className="grid grid-cols-3 gap-4">
           {DOCUMENT_TYPES.map((type) => {
-            const stat = stats[type.value as keyof InboxStats];
-            if (typeof stat !== 'object') return null;
-            const Icon = type.icon;
+            const stat = stats[type.value as keyof InboxStats]
+            if (typeof stat !== "object") return null
+            const Icon = type.icon
             return (
               <Card
                 key={type.value}
-                className={`cursor-pointer hover:shadow-md transition-shadow ${filterType === type.value ? 'ring-2 ring-primary' : ''}`}
-                onClick={() => setFilterType(filterType === type.value ? 'all' : type.value)}
+                className={`cursor-pointer hover:shadow-md transition-shadow ${filterType === type.value ? "ring-2 ring-primary" : ""}`}
+                onClick={() => setFilterType(filterType === type.value ? "all" : type.value)}
                 data-testid={`stat-card-${type.value}`}
               >
                 <CardContent className="p-4">
@@ -257,7 +267,7 @@ export default function DocumentInboxPage() {
                   </div>
                 </CardContent>
               </Card>
-            );
+            )
           })}
         </div>
       )}
@@ -265,10 +275,18 @@ export default function DocumentInboxPage() {
       {/* 篩選 Tabs */}
       <Tabs value={filterStatus} onValueChange={setFilterStatus}>
         <TabsList>
-          <TabsTrigger value="all" data-testid="filter-all">全部</TabsTrigger>
-          <TabsTrigger value="processing" data-testid="filter-processing">辨識中</TabsTrigger>
-          <TabsTrigger value="recognized" data-testid="filter-recognized">待整理</TabsTrigger>
-          <TabsTrigger value="failed" data-testid="filter-failed">失敗</TabsTrigger>
+          <TabsTrigger value="all" data-testid="filter-all">
+            全部
+          </TabsTrigger>
+          <TabsTrigger value="processing" data-testid="filter-processing">
+            辨識中
+          </TabsTrigger>
+          <TabsTrigger value="recognized" data-testid="filter-recognized">
+            待整理
+          </TabsTrigger>
+          <TabsTrigger value="failed" data-testid="filter-failed">
+            失敗
+          </TabsTrigger>
         </TabsList>
       </Tabs>
 
@@ -277,8 +295,8 @@ export default function DocumentInboxPage() {
         documents={documents}
         isLoading={isLoading}
         onSelectDocument={(doc) => {
-          setSelectedDoc(doc);
-          setShowPreviewDialog(true);
+          setSelectedDoc(doc)
+          setShowPreviewDialog(true)
         }}
         onReRecognize={(id) => reRecognizeMutation.mutate(id)}
       />
@@ -292,8 +310,8 @@ export default function DocumentInboxPage() {
         onReRecognize={(id) => reRecognizeMutation.mutate(id)}
         reRecognizePending={reRecognizeMutation.isPending}
         onArchive={() => {
-          setShowPreviewDialog(false);
-          setShowArchiveDialog(true);
+          setShowPreviewDialog(false)
+          setShowArchiveDialog(true)
         }}
         onUpdateNotes={(id, notes) => updateNotesMutation.mutate({ id, notes })}
         updateNotesPending={updateNotesMutation.isPending}
@@ -308,11 +326,15 @@ export default function DocumentInboxPage() {
         paymentItems={paymentItems}
         onArchive={(type, data) => {
           if (selectedDoc) {
-            archiveMutation.mutate({ id: selectedDoc.id, type, data: data as unknown as ArchiveData });
+            archiveMutation.mutate({
+              id: selectedDoc.id,
+              type,
+              data: data as unknown as ArchiveData,
+            })
           }
         }}
         isPending={archiveMutation.isPending}
       />
     </div>
-  );
+  )
 }
