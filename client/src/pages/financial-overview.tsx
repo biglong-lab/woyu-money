@@ -171,10 +171,10 @@ export default function FinancialOverview() {
     setActiveFilters(filters)
   }, [])
 
-  // 點擊項目 → 跳到付款紀錄頁並用 itemId 篩選（檢視該項目的所有付款歷史）
+  // 點擊項目 → 跳到專案付款頁並開啟「項目詳情」對話框（可看完整資訊與所有付款記錄）
   const handleItemClick = useCallback(
     (item: PaymentItem) => {
-      setLocation(`/payment-records?itemId=${item.id}`)
+      setLocation(`/payment-project?viewItem=${item.id}`)
     },
     [setLocation]
   )
