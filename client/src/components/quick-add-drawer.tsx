@@ -367,6 +367,44 @@ export function QuickAddDrawer({ open, onOpenChange }: QuickAddDrawerProps) {
                     onChange={(e) => setEndDate(e.target.value)}
                     className="mt-1 h-11"
                   />
+                  {/* 快速日期：今天 / 月底 / 下月 5 號 */}
+                  <div className="mt-1 flex gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setEndDate(localDateISO())}
+                      className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 hover:bg-gray-200 active:scale-95 transition-all"
+                    >
+                      今天
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const d = new Date()
+                        const eom = new Date(d.getFullYear(), d.getMonth() + 1, 0)
+                        const yyyy = eom.getFullYear()
+                        const mm = String(eom.getMonth() + 1).padStart(2, "0")
+                        const dd = String(eom.getDate()).padStart(2, "0")
+                        setEndDate(`${yyyy}-${mm}-${dd}`)
+                      }}
+                      className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 hover:bg-gray-200 active:scale-95 transition-all"
+                    >
+                      月底
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const d = new Date()
+                        const next5 = new Date(d.getFullYear(), d.getMonth() + 1, 5)
+                        const yyyy = next5.getFullYear()
+                        const mm = String(next5.getMonth() + 1).padStart(2, "0")
+                        const dd = String(next5.getDate()).padStart(2, "0")
+                        setEndDate(`${yyyy}-${mm}-${dd}`)
+                      }}
+                      className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 hover:bg-gray-200 active:scale-95 transition-all"
+                    >
+                      下月 5 號
+                    </button>
+                  </div>
                 </div>
               </div>
 
