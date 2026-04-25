@@ -17,22 +17,35 @@ import { Keyboard } from "lucide-react"
 interface ShortcutItem {
   keys: string[]
   description: string
-  context?: string
 }
 
-const SHORTCUTS: ShortcutItem[] = [
-  // 全域導航
-  { keys: ["?"], description: "顯示鍵盤快捷鍵", context: "全域" },
-  { keys: ["/"], description: "聚焦首頁搜尋", context: "首頁" },
-  { keys: ["⌘", "K"], description: "聚焦財務總覽搜尋（Mac）", context: "財務總覽" },
-  { keys: ["Ctrl", "K"], description: "聚焦財務總覽搜尋（Windows）", context: "財務總覽" },
+interface ShortcutGroup {
+  title: string
+  items: ShortcutItem[]
+}
 
-  // 表單操作
-  { keys: ["Enter"], description: "提交表單（必填都填妥時）", context: "表單" },
-  { keys: ["Esc"], description: "清除搜尋 / 關閉 dialog", context: "表單/搜尋" },
-
-  // 列表操作
-  { keys: ["Enter"], description: "選第一個搜尋結果", context: "搜尋下拉" },
+const SHORTCUT_GROUPS: ShortcutGroup[] = [
+  {
+    title: "全域",
+    items: [{ keys: ["?"], description: "顯示鍵盤快捷鍵（再按一次關閉）" }],
+  },
+  {
+    title: "搜尋",
+    items: [
+      { keys: ["/"], description: "聚焦首頁搜尋" },
+      { keys: ["⌘", "K"], description: "聚焦財務總覽搜尋（Mac）" },
+      { keys: ["Ctrl", "K"], description: "聚焦財務總覽搜尋（Win）" },
+      { keys: ["Esc"], description: "清除目前搜尋字串" },
+      { keys: ["Enter"], description: "跳轉到第一個搜尋結果" },
+    ],
+  },
+  {
+    title: "表單",
+    items: [
+      { keys: ["Enter"], description: "送出表單（必填都填妥時）" },
+      { keys: ["Esc"], description: "關閉 dialog" },
+    ],
+  },
 ]
 
 export function KeyboardShortcutsDialog() {
@@ -68,26 +81,32 @@ export function KeyboardShortcutsDialog() {
             隨時開關此面板
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-2 pt-2">
-          {SHORTCUTS.map((shortcut, i) => (
-            <div
-              key={i}
-              className="flex items-center justify-between gap-3 py-1.5 border-b last:border-b-0"
-            >
-              <div className="flex-1 min-w-0">
-                <div className="text-sm text-gray-900">{shortcut.description}</div>
-                {shortcut.context && (
-                  <div className="text-xs text-gray-400 mt-0.5">{shortcut.context}</div>
-                )}
+        <div className="space-y-4 pt-2">
+          {SHORTCUT_GROUPS.map((group) => (
+            <div key={group.title}>
+              <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
+                {group.title}
               </div>
-              <div className="flex gap-1 shrink-0">
-                {shortcut.keys.map((key, j) => (
-                  <kbd
-                    key={j}
-                    className="px-2 py-1 bg-gray-100 border border-gray-300 rounded text-xs font-mono shadow-sm"
+              <div className="space-y-1">
+                {group.items.map((shortcut, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center justify-between gap-3 py-1 border-b border-gray-100 last:border-b-0"
                   >
-                    {key}
-                  </kbd>
+                    <div className="flex-1 min-w-0 text-sm text-gray-900">
+                      {shortcut.description}
+                    </div>
+                    <div className="flex gap-1 shrink-0">
+                      {shortcut.keys.map((key, j) => (
+                        <kbd
+                          key={j}
+                          className="px-2 py-1 bg-gray-100 border border-gray-300 rounded text-xs font-mono shadow-sm"
+                        >
+                          {key}
+                        </kbd>
+                      ))}
+                    </div>
+                  </div>
                 ))}
               </div>
             </div>
