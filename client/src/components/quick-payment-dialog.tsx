@@ -39,6 +39,8 @@ interface PaymentItemWithDetails {
   isDeleted: boolean
   projectName?: string
   categoryName?: string
+  startDate?: string
+  endDate?: string | null
 }
 
 // API 回應型別
@@ -80,22 +82,63 @@ export function QuickPaymentDialog({ open, onOpenChange }: QuickPaymentDialogPro
     : paymentItemsData?.items || []
 
   // 篩選待付款項目
+  // 預設只顯示「已逾期 + 30 天內到期」的緊急項目，依 due date 排序
+  // 搜尋時則不限日期（讓使用者能找未來項目補登）
   const filteredItems = useMemo(() => {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
     const pendingItems = paymentItems.filter((item: PaymentItemWithDetails) => {
       const paid = parseFloat(item.paidAmount || "0")
       const total = parseFloat(item.totalAmount || "0")
       return paid < total && item.status !== "completed" && !item.isDeleted
     })
 
-    if (!searchQuery.trim()) return pendingItems.slice(0, 10)
+    // 取 due date（優先 endDate，否則 startDate）
+    const getDueDate = (item: PaymentItemWithDetails): Date | null => {
+      const dateStr = item.endDate || item.startDate
+      if (!dateStr) return null
+      const d = new Date(dateStr)
+      if (isNaN(d.getTime())) return null
+      d.setHours(0, 0, 0, 0)
+      return d
+    }
 
-    const query = searchQuery.toLowerCase()
-    return pendingItems.filter(
-      (item: PaymentItemWithDetails) =>
-        item.itemName?.toLowerCase().includes(query) ||
-        item.projectName?.toLowerCase().includes(query) ||
-        item.categoryName?.toLowerCase().includes(query)
-    )
+    // 依 due date 排序（最早到期 = 最上面，逾期最久的優先）
+    const sortByDue = (items: PaymentItemWithDetails[]) => {
+      return [...items].sort((a, b) => {
+        const da = getDueDate(a)
+        const db = getDueDate(b)
+        if (!da && !db) return 0
+        if (!da) return 1 // 無日期排後面
+        if (!db) return -1
+        return da.getTime() - db.getTime()
+      })
+    }
+
+    if (searchQuery.trim()) {
+      // 搜尋模式：全部待付項目，只用文字過濾，依日期排序
+      const query = searchQuery.toLowerCase()
+      const matched = pendingItems.filter(
+        (item: PaymentItemWithDetails) =>
+          item.itemName?.toLowerCase().includes(query) ||
+          item.projectName?.toLowerCase().includes(query) ||
+          item.categoryName?.toLowerCase().includes(query)
+      )
+      return sortByDue(matched).slice(0, 50)
+    }
+
+    // 無搜尋：預設只顯示「已逾期 + 30 天內到期」
+    const cutoffDate = new Date(today)
+    cutoffDate.setDate(cutoffDate.getDate() + 30)
+
+    const urgent = pendingItems.filter((item) => {
+      const due = getDueDate(item)
+      if (!due) return false // 無日期不顯示在「快速付款」（避免雜訊）
+      return due <= cutoffDate // 已逾期 或 30 天內到期
+    })
+
+    return sortByDue(urgent).slice(0, 20)
   }, [paymentItems, searchQuery])
 
   // 建立付款記錄
@@ -228,22 +271,58 @@ export function QuickPaymentDialog({ open, onOpenChange }: QuickPaymentDialogPro
                 filteredItems.map((item: PaymentItemWithDetails) => {
                   const remaining =
                     parseFloat(item.totalAmount || "0") - parseFloat(item.paidAmount || "0")
+                  // 計算到期狀態
+                  const today = new Date()
+                  today.setHours(0, 0, 0, 0)
+                  const dueStr = item.endDate || item.startDate
+                  const due = dueStr ? new Date(dueStr) : null
+                  let dueLabel: string | null = null
+                  let dueColor = "text-gray-500"
+                  if (due && !isNaN(due.getTime())) {
+                    due.setHours(0, 0, 0, 0)
+                    const diffDays = Math.round((due.getTime() - today.getTime()) / 86400000)
+                    if (diffDays < 0) {
+                      dueLabel = `逾期 ${Math.abs(diffDays)} 天`
+                      dueColor = "text-red-700 bg-red-100"
+                    } else if (diffDays === 0) {
+                      dueLabel = "今天到期"
+                      dueColor = "text-orange-700 bg-orange-100"
+                    } else if (diffDays <= 7) {
+                      dueLabel = `${diffDays} 天後到期`
+                      dueColor = "text-orange-700 bg-orange-100"
+                    } else if (diffDays <= 30) {
+                      dueLabel = `${diffDays} 天後到期`
+                      dueColor = "text-yellow-700 bg-yellow-100"
+                    } else {
+                      dueLabel = `${diffDays} 天後`
+                      dueColor = "text-gray-500 bg-gray-100"
+                    }
+                  }
                   return (
                     <button
                       key={item.id}
                       onClick={() => handleSelectItem(item)}
                       className="w-full text-left p-3 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-colors"
                     >
-                      <div className="flex justify-between items-start">
-                        <div className="min-w-0">
-                          <p className="font-medium text-gray-900 truncate">{item.itemName}</p>
+                      <div className="flex justify-between items-start gap-2">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <p className="font-medium text-gray-900 truncate">{item.itemName}</p>
+                            {dueLabel && (
+                              <span
+                                className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium whitespace-nowrap ${dueColor}`}
+                              >
+                                {dueLabel}
+                              </span>
+                            )}
+                          </div>
                           <p className="text-xs text-gray-500 mt-0.5">
                             {item.projectName || "無專案"}
                             {item.categoryName ? ` / ${item.categoryName}` : ""}
                           </p>
                         </div>
-                        <div className="text-right flex-shrink-0 ml-3">
-                          <p className="text-sm font-semibold text-red-600">
+                        <div className="text-right flex-shrink-0">
+                          <p className="text-sm font-semibold text-red-600 whitespace-nowrap">
                             ${formatCurrency(remaining)}
                           </p>
                           <p className="text-[10px] text-gray-400">待付</p>
@@ -254,7 +333,14 @@ export function QuickPaymentDialog({ open, onOpenChange }: QuickPaymentDialogPro
                 })
               ) : (
                 <div className="text-center py-8 text-gray-400">
-                  {searchQuery ? "找不到匹配的項目" : "目前沒有待付款項目"}
+                  {searchQuery ? (
+                    "找不到匹配的項目"
+                  ) : (
+                    <>
+                      <p>本月沒有逾期或即將到期項目</p>
+                      <p className="text-xs mt-2">要付未來月份？請輸入項目名稱搜尋</p>
+                    </>
+                  )}
                 </div>
               )}
             </div>
