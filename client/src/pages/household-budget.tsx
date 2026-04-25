@@ -290,7 +290,9 @@ export default function HouseholdBudget() {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="paymentMethod">付款方式</Label>
+                  <Label htmlFor="paymentMethod">
+                    付款方式 <span className="text-red-500">*</span>
+                  </Label>
                   <Select
                     onValueChange={(value: string) => quickAddForm.setValue("paymentMethod", value)}
                   >
@@ -306,7 +308,9 @@ export default function HouseholdBudget() {
                   </Select>
                 </div>
                 <div>
-                  <Label htmlFor="date">日期</Label>
+                  <Label htmlFor="date">
+                    日期 <span className="text-red-500">*</span>
+                  </Label>
                   <Input
                     id="date"
                     type="date"
@@ -346,12 +350,16 @@ export default function HouseholdBudget() {
               </DialogHeader>
               <form onSubmit={budgetForm.handleSubmit(onSetBudget)} className="space-y-4">
                 <div>
-                  <Label htmlFor="monthlyBudget">每月預算</Label>
+                  <Label htmlFor="monthlyBudget">
+                    每月預算 <span className="text-red-500">*</span>
+                  </Label>
                   <Input
                     id="monthlyBudget"
                     type="number"
                     step="0.01"
                     placeholder="輸入每月預算"
+                    onFocus={(e) => e.target.select()}
+                    autoFocus
                     {...budgetForm.register("monthlyBudget", { required: true })}
                   />
                 </div>
