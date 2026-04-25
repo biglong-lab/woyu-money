@@ -13,6 +13,7 @@ import {
   type InsertBudgetItem,
 } from "@shared/schema"
 import { eq, and, desc } from "drizzle-orm"
+import { localDateTPE } from "@shared/date-utils"
 
 // === 預算計劃篩選條件 ===
 interface BudgetPlanFilters {
@@ -23,9 +24,7 @@ interface BudgetPlanFilters {
 // === 預算計劃 CRUD ===
 
 /** 取得所有預算計劃（支援篩選） */
-export async function getBudgetPlans(
-  filters: BudgetPlanFilters = {}
-): Promise<BudgetPlan[]> {
+export async function getBudgetPlans(filters: BudgetPlanFilters = {}): Promise<BudgetPlan[]> {
   const conditions: ReturnType<typeof eq>[] = []
 
   if (filters.projectId) {
@@ -43,31 +42,18 @@ export async function getBudgetPlans(
       .orderBy(desc(budgetPlans.createdAt))
   }
 
-  return db
-    .select()
-    .from(budgetPlans)
-    .orderBy(desc(budgetPlans.createdAt))
+  return db.select().from(budgetPlans).orderBy(desc(budgetPlans.createdAt))
 }
 
 /** 取得單一預算計劃 */
-export async function getBudgetPlan(
-  id: number
-): Promise<BudgetPlan | undefined> {
-  const [plan] = await db
-    .select()
-    .from(budgetPlans)
-    .where(eq(budgetPlans.id, id))
+export async function getBudgetPlan(id: number): Promise<BudgetPlan | undefined> {
+  const [plan] = await db.select().from(budgetPlans).where(eq(budgetPlans.id, id))
   return plan
 }
 
 /** 新建預算計劃 */
-export async function createBudgetPlan(
-  data: InsertBudgetPlan
-): Promise<BudgetPlan> {
-  const [newPlan] = await db
-    .insert(budgetPlans)
-    .values(data)
-    .returning()
+export async function createBudgetPlan(data: InsertBudgetPlan): Promise<BudgetPlan> {
+  const [newPlan] = await db.insert(budgetPlans).values(data).returning()
   return newPlan
 }
 
@@ -114,9 +100,7 @@ interface BudgetItemFilters {
   convertedToPayment?: boolean
 }
 
-export async function getBudgetItems(
-  filters: BudgetItemFilters = {}
-): Promise<BudgetItem[]> {
+export async function getBudgetItems(filters: BudgetItemFilters = {}): Promise<BudgetItem[]> {
   const conditions: ReturnType<typeof eq>[] = [eq(budgetItems.isDeleted, false)]
 
   if (filters.budgetPlanId !== undefined) {
@@ -134,24 +118,14 @@ export async function getBudgetItems(
 }
 
 /** 取得單一預算項目 */
-export async function getBudgetItem(
-  id: number
-): Promise<BudgetItem | undefined> {
-  const [item] = await db
-    .select()
-    .from(budgetItems)
-    .where(eq(budgetItems.id, id))
+export async function getBudgetItem(id: number): Promise<BudgetItem | undefined> {
+  const [item] = await db.select().from(budgetItems).where(eq(budgetItems.id, id))
   return item
 }
 
 /** 新建預算項目 */
-export async function createBudgetItem(
-  data: InsertBudgetItem
-): Promise<BudgetItem> {
-  const [newItem] = await db
-    .insert(budgetItems)
-    .values(data)
-    .returning()
+export async function createBudgetItem(data: InsertBudgetItem): Promise<BudgetItem> {
+  const [newItem] = await db.insert(budgetItems).values(data).returning()
   return newItem
 }
 
@@ -169,9 +143,7 @@ export async function updateBudgetItem(
 }
 
 /** 軟刪除預算項目 */
-export async function softDeleteBudgetItem(
-  id: number
-): Promise<BudgetItem | undefined> {
+export async function softDeleteBudgetItem(id: number): Promise<BudgetItem | undefined> {
   const [item] = await db
     .update(budgetItems)
     .set({ isDeleted: true, updatedAt: new Date() })
@@ -183,20 +155,13 @@ export async function softDeleteBudgetItem(
 // === 預算計劃實際支出計算 ===
 
 /** 重新計算並更新預算計劃的實際支出金額 */
-export async function updateBudgetPlanActualSpent(
-  planId: number
-): Promise<void> {
+export async function updateBudgetPlanActualSpent(planId: number): Promise<void> {
   const items = await db
     .select()
     .from(budgetItems)
-    .where(
-      and(eq(budgetItems.budgetPlanId, planId), eq(budgetItems.isDeleted, false))
-    )
+    .where(and(eq(budgetItems.budgetPlanId, planId), eq(budgetItems.isDeleted, false)))
 
-  const totalActual = items.reduce(
-    (sum, item) => sum + parseFloat(item.actualAmount || "0"),
-    0
-  )
+  const totalActual = items.reduce((sum, item) => sum + parseFloat(item.actualAmount || "0"), 0)
 
   await db
     .update(budgetPlans)
@@ -237,23 +202,15 @@ export async function convertBudgetItemToPayment(
     fixedCategoryId: budgetItem.fixedCategoryId,
     totalAmount: budgetItem.plannedAmount,
     paidAmount: "0.00",
-    startDate:
-      budgetItem.startDate ||
-      budgetItem.endDate ||
-      new Date().toISOString().split("T")[0],
+    startDate: budgetItem.startDate || budgetItem.endDate || localDateTPE(),
     dueDate: budgetItem.endDate || budgetItem.startDate,
     status: "pending",
     priority: budgetItem.priority,
-    notes: budgetItem.notes
-      ? `[預算轉換] ${budgetItem.notes}`
-      : "[預算轉換項目]",
+    notes: budgetItem.notes ? `[預算轉換] ${budgetItem.notes}` : "[預算轉換項目]",
   }
 
   // 分期付款特殊處理
-  if (
-    budgetItem.paymentType === "installment" &&
-    budgetItem.installmentCount
-  ) {
+  if (budgetItem.paymentType === "installment" && budgetItem.installmentCount) {
     paymentItemData.paymentType = "installment"
     paymentItemData.installmentCount = budgetItem.installmentCount
     paymentItemData.installmentAmount = budgetItem.installmentAmount

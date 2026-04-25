@@ -11,6 +11,7 @@ import {
   type MonthlyHrCost,
 } from "@shared/schema"
 import { eq, and, asc } from "drizzle-orm"
+import { localDateTPE } from "@shared/date-utils"
 
 // === 員工 CRUD ===
 
@@ -20,12 +21,9 @@ interface EmployeeFilters {
 }
 
 /** 取得員工列表（支援篩選在職狀態） */
-export async function getEmployees(
-  filters: EmployeeFilters = {}
-): Promise<Employee[]> {
-  const conditions = filters.active !== undefined
-    ? eq(employees.isActive, filters.active)
-    : undefined
+export async function getEmployees(filters: EmployeeFilters = {}): Promise<Employee[]> {
+  const conditions =
+    filters.active !== undefined ? eq(employees.isActive, filters.active) : undefined
 
   return db.query.employees.findMany({
     where: conditions,
@@ -34,22 +32,15 @@ export async function getEmployees(
 }
 
 /** 取得單一員工 */
-export async function getEmployee(
-  id: number
-): Promise<Employee | undefined> {
+export async function getEmployee(id: number): Promise<Employee | undefined> {
   return db.query.employees.findFirst({
     where: eq(employees.id, id),
   })
 }
 
 /** 新增員工 */
-export async function createEmployee(
-  data: InsertEmployee
-): Promise<Employee> {
-  const [result] = await db
-    .insert(employees)
-    .values(data)
-    .returning()
+export async function createEmployee(data: InsertEmployee): Promise<Employee> {
+  const [result] = await db.insert(employees).values(data).returning()
   return result
 }
 
@@ -67,14 +58,12 @@ export async function updateEmployee(
 }
 
 /** 軟刪除員工（設為離職） */
-export async function softDeleteEmployee(
-  id: number
-): Promise<Employee | undefined> {
+export async function softDeleteEmployee(id: number): Promise<Employee | undefined> {
   const [result] = await db
     .update(employees)
     .set({
       isActive: false,
-      terminationDate: new Date().toISOString().split("T")[0],
+      terminationDate: localDateTPE(),
       updatedAt: new Date(),
     })
     .where(eq(employees.id, id))
@@ -95,10 +84,7 @@ export async function getMonthlyHrCosts(
   month: number
 ): Promise<MonthlyHrCostWithEmployee[]> {
   const result = await db.query.monthlyHrCosts.findMany({
-    where: and(
-      eq(monthlyHrCosts.year, year),
-      eq(monthlyHrCosts.month, month)
-    ),
+    where: and(eq(monthlyHrCosts.year, year), eq(monthlyHrCosts.month, month)),
     with: {
       employee: true,
     },
@@ -115,16 +101,10 @@ export async function createMonthlyHrCosts(
 }
 
 /** 刪除指定月份的所有人事費記錄 */
-export async function deleteMonthlyHrCosts(
-  year: number,
-  month: number
-): Promise<void> {
-  await db.delete(monthlyHrCosts).where(
-    and(
-      eq(monthlyHrCosts.year, year),
-      eq(monthlyHrCosts.month, month)
-    )
-  )
+export async function deleteMonthlyHrCosts(year: number, month: number): Promise<void> {
+  await db
+    .delete(monthlyHrCosts)
+    .where(and(eq(monthlyHrCosts.year, year), eq(monthlyHrCosts.month, month)))
 }
 
 /** 更新單筆月度人事費 */
@@ -144,9 +124,7 @@ export async function updateMonthlyHrCost(
 }
 
 /** 取得指定年度的所有月度人事費（含員工關聯） */
-export async function getHrCostsByYear(
-  year: number
-): Promise<MonthlyHrCostWithEmployee[]> {
+export async function getHrCostsByYear(year: number): Promise<MonthlyHrCostWithEmployee[]> {
   const result = await db.query.monthlyHrCosts.findMany({
     where: eq(monthlyHrCosts.year, year),
     with: {

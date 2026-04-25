@@ -1,6 +1,7 @@
 import { Router } from "express"
 import { storage } from "../storage"
 import { insertRentalContractSchema, insertRentalPriceTierSchema } from "@shared/schema"
+import { localDateTPE } from "@shared/date-utils"
 import { ZodError } from "zod"
 import * as XLSX from "xlsx"
 import { asyncHandler, AppError } from "../middleware/error-handler"
@@ -252,7 +253,7 @@ router.get(
       csvContent += "# ========================================\n"
       csvContent += "# 租金付款記錄匯出報表\n"
       csvContent += "# ========================================\n"
-      csvContent += `# 匯出日期: ${new Date().toISOString().split("T")[0]}\n`
+      csvContent += `# 匯出日期: ${localDateTPE()}\n`
       csvContent += `# 篩選年度: ${year || "全部"}\n`
       csvContent += `# 總筆數: ${filteredPayments.length}\n`
       csvContent += `# 已付款: ${paidCount} 筆 (NT$${paidAmount.toLocaleString()})\n`
@@ -288,7 +289,7 @@ router.get(
       XLSX.utils.book_append_sheet(wb, ws, "租金付款記錄")
 
       const summaryData = [
-        { 統計項目: "匯出日期", 數值: new Date().toISOString().split("T")[0], 備註: "" },
+        { 統計項目: "匯出日期", 數值: localDateTPE(), 備註: "" },
         { 統計項目: "篩選年度", 數值: year || "全部", 備註: "" },
         { 統計項目: "", 數值: "", 備註: "" },
         { 統計項目: "=== 付款統計 ===", 數值: "", 備註: "" },

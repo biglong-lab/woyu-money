@@ -5,16 +5,8 @@
 
 import { db } from "../db"
 import { paymentItems } from "@shared/schema"
-import {
-  and,
-  ne,
-  or,
-  sql,
-  lt,
-  isNull,
-  isNotNull,
-  eq,
-} from "drizzle-orm"
+import { localDateTPE } from "@shared/date-utils"
+import { and, ne, or, sql, lt, isNull, isNotNull, eq } from "drizzle-orm"
 
 /**
  * 查詢所有逾期付款項目
@@ -22,8 +14,10 @@ import {
  */
 export async function getOverduePaymentItems() {
   try {
-    const today = new Date().toISOString().split("T")[0]
-    const currentMonthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split("T")[0]
+    const today = localDateTPE()
+    const currentMonthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1)
+      .toISOString()
+      .split("T")[0]
 
     const result = await db
       .select({
@@ -95,10 +89,7 @@ export async function getOverduePaymentItems() {
           ),
           or(
             // 有明確結束日期且已逾期
-            and(
-              isNotNull(paymentItems.endDate),
-              lt(paymentItems.endDate, today)
-            ),
+            and(isNotNull(paymentItems.endDate), lt(paymentItems.endDate, today)),
             // 沒有結束日期但有開始日期且已逾期
             and(
               isNull(paymentItems.endDate),
@@ -107,10 +98,7 @@ export async function getOverduePaymentItems() {
             )
           ),
           // 確保未完全付款
-          or(
-            isNull(paymentItems.paidAmount),
-            lt(paymentItems.paidAmount, paymentItems.totalAmount)
-          )
+          or(isNull(paymentItems.paidAmount), lt(paymentItems.paidAmount, paymentItems.totalAmount))
         )
       )
       .orderBy(paymentItems.endDate)
