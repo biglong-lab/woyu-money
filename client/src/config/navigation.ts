@@ -77,6 +77,13 @@ export const decisionNavItems: NavItem[] = [
     description: "一鍵產生整月預估表（合約 + 過去 6 月平均）",
   },
   {
+    title: "館別損益報表",
+    href: "/property-pl",
+    icon: PieChart,
+    badge: "新",
+    description: "各館收入、開銷、共用攤提、淨利率一覽",
+  },
+  {
     title: "現金分配助理",
     href: "/cash-allocation",
     icon: Wallet,
@@ -401,6 +408,7 @@ export const breadcrumbConfig: Record<string, BreadcrumbItem[]> = {
 
   // 財務助理
   "/budget-estimates": [{ title: "首頁", href: "/" }, { title: "財務助理" }, { title: "月度預估" }],
+  "/property-pl": [{ title: "首頁", href: "/" }, { title: "財務助理" }, { title: "館別損益" }],
 
   // 系統管理
   "/property-groups": [
