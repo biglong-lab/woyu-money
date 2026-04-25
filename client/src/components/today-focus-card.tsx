@@ -36,7 +36,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { apiRequest, queryClient } from "@/lib/queryClient"
-import { localDateISO, formatNT } from "@/lib/utils"
+import { localDateISO, formatNT, friendlyApiError } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 import { useCopyAmount } from "@/hooks/use-copy-amount"
 
@@ -560,7 +560,7 @@ export function TodayFocusCard() {
     onError: (err) => {
       toast({
         title: "付款失敗",
-        description: err.message,
+        description: friendlyApiError(err),
         variant: "destructive",
       })
     },

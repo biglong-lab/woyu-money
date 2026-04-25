@@ -10,7 +10,7 @@ import { CheckCircle2, ArrowRight, Undo2, Copy } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { apiRequest, queryClient } from "@/lib/queryClient"
-import { formatNT } from "@/lib/utils"
+import { formatNT, friendlyApiError } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 import { useCopyAmount } from "@/hooks/use-copy-amount"
 
@@ -82,7 +82,7 @@ export function RecentPaymentsCard() {
     },
     onSettled: () => setUndoingId(null),
     onError: (err) =>
-      toast({ title: "撤銷失敗", description: err.message, variant: "destructive" }),
+      toast({ title: "撤銷失敗", description: friendlyApiError(err), variant: "destructive" }),
   })
 
   if (isLoading) {

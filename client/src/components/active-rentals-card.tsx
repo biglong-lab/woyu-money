@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { apiRequest, queryClient } from "@/lib/queryClient"
-import { formatNT } from "@/lib/utils"
+import { formatNT, friendlyApiError } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 import { useCopyAmount } from "@/hooks/use-copy-amount"
 
@@ -72,7 +72,7 @@ export function ActiveRentalsCard() {
     },
     onSettled: () => setPendingId(null),
     onError: (err) =>
-      toast({ title: "標記失敗", description: err.message, variant: "destructive" }),
+      toast({ title: "標記失敗", description: friendlyApiError(err), variant: "destructive" }),
   })
 
   // 一鍵批次：本月所有未付標記為已付
@@ -95,7 +95,7 @@ export function ActiveRentalsCard() {
       queryClient.invalidateQueries({ queryKey: ["/api/payment/priority-report?includeLow=true"] })
     },
     onError: (err) =>
-      toast({ title: "批次標記失敗", description: err.message, variant: "destructive" }),
+      toast({ title: "批次標記失敗", description: friendlyApiError(err), variant: "destructive" }),
   })
 
   const handleBatchMarkPaid = () => {
