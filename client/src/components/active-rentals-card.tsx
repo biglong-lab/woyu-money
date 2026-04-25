@@ -5,7 +5,7 @@
 
 import { useState } from "react"
 import { useQuery, useMutation } from "@tanstack/react-query"
-import { Building2, CheckCircle2 } from "lucide-react"
+import { Building2, CheckCircle2, Copy } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -128,6 +128,34 @@ export function ActiveRentalsCard() {
   // 慶祝條件：無未付/部分（未到期不算）
   const allPaid = pendingCount === 0 && total > 0 && paidCount > 0
 
+  // 複製本月待繳清單（給 LINE / 備忘錄）
+  const handleCopyPendingList = async () => {
+    const pending = items.filter(
+      ({ cell }) => cell.status === "unpaid" || cell.status === "partial"
+    )
+    if (pending.length === 0) return
+    const sumDue = pending.reduce(
+      (sum, { cell }) => sum + (cell.expectedAmount - cell.paidAmount),
+      0
+    )
+    const lines = pending
+      .map(({ cell, contract }, i) => {
+        if (!contract) return ""
+        const due = cell.expectedAmount - cell.paidAmount
+        const partial = cell.paidAmount > 0 ? `（已付 ${fmt(cell.paidAmount)}）` : ""
+        return `${i + 1}. ${contract.contractName} ${fmt(due)}${partial}`
+      })
+      .filter(Boolean)
+    const text =
+      `🏠 ${month} 月租金待繳（${pending.length} 件 / 共 ${fmt(sumDue)}）：\n\n` + lines.join("\n")
+    try {
+      await navigator.clipboard.writeText(text)
+      toast({ title: "已複製清單", description: "可貼到 LINE / 備忘錄" })
+    } catch {
+      toast({ title: "複製失敗", variant: "destructive" })
+    }
+  }
+
   return (
     <Card
       className={allPaid ? "bg-gradient-to-br from-green-50 to-emerald-50 border-green-300" : ""}
@@ -143,9 +171,25 @@ export function ActiveRentalsCard() {
               🎉 本月全部付清
             </span>
           ) : (
-            <span className="text-xs text-gray-500">
-              已付 {paidCount}/{total} · {fmt(monthPaid)} / {fmt(monthExpected)}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-500">
+                已付 {paidCount}/{total} · {fmt(monthPaid)} / {fmt(monthExpected)}
+              </span>
+              {pendingCount > 0 && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 px-2 text-xs"
+                  onClick={handleCopyPendingList}
+                  title="複製待繳清單"
+                  data-testid="copy-pending-rentals"
+                >
+                  <Copy className="h-3 w-3 mr-1" />
+                  清單
+                </Button>
+              )}
+            </div>
           )}
         </div>
         {/* 進度條 */}
