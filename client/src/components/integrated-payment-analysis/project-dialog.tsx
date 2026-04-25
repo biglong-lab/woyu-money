@@ -1,16 +1,32 @@
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui/button"
 import {
-  Dialog, DialogContent, DialogDescription, DialogFooter,
-  DialogHeader, DialogTitle, DialogTrigger,
-} from "@/components/ui/dialog";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
 import {
-  Form, FormControl, FormField, FormItem, FormLabel, FormMessage,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Building2 } from "lucide-react";
-import { UseFormReturn, FieldValues } from "react-hook-form";
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Building2 } from "lucide-react"
+import { UseFormReturn, FieldValues } from "react-hook-form"
 
 // ========================================
 // 新增專案對話框元件
@@ -18,15 +34,15 @@ import { UseFormReturn, FieldValues } from "react-hook-form";
 
 interface ProjectDialogProps {
   /** 對話框是否開啟 */
-  open: boolean;
+  open: boolean
   /** 開關狀態變更處理 */
-  onOpenChange: (open: boolean) => void;
+  onOpenChange: (open: boolean) => void
   /** 專案表單實例 */
-  form: UseFormReturn<FieldValues>;
+  form: UseFormReturn<FieldValues>
   /** 表單提交處理（建立專案） */
-  onSubmit: (data: FieldValues) => void;
+  onSubmit: (data: FieldValues) => void
   /** 是否正在建立中 */
-  isPending: boolean;
+  isPending: boolean
 }
 
 /** 新增專案對話框，包含名稱、類型、描述欄位 */
@@ -58,9 +74,11 @@ export function ProjectDialog({
               name="projectName"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>專案名稱 *</FormLabel>
+                  <FormLabel>
+                    專案名稱 <span className="text-red-500">*</span>
+                  </FormLabel>
                   <FormControl>
-                    <Input placeholder="輸入專案名稱" {...field} />
+                    <Input placeholder="輸入專案名稱" autoFocus {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -73,7 +91,9 @@ export function ProjectDialog({
               name="projectType"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>專案類型 *</FormLabel>
+                  <FormLabel>
+                    專案類型 <span className="text-red-500">*</span>
+                  </FormLabel>
                   <FormControl>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <SelectTrigger>
@@ -98,7 +118,9 @@ export function ProjectDialog({
               name="description"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>專案描述</FormLabel>
+                  <FormLabel>
+                    專案描述 <span className="text-xs text-gray-400 font-normal">（選填）</span>
+                  </FormLabel>
                   <FormControl>
                     <Textarea placeholder="專案描述（選填）" {...field} />
                   </FormControl>
@@ -116,5 +138,5 @@ export function ProjectDialog({
         </Form>
       </DialogContent>
     </Dialog>
-  );
+  )
 }
