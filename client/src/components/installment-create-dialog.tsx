@@ -1,24 +1,38 @@
 // 分期付款建立對話框元件
 
-import { UseFormReturn, Control, FieldValues } from "react-hook-form";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Plus } from "lucide-react";
-import CategorySelector from "@/components/category-selector";
-import type { PaymentCalculation } from "./installment-types";
+import { UseFormReturn, Control, FieldValues } from "react-hook-form"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form"
+import { Plus } from "lucide-react"
+import CategorySelector from "@/components/category-selector"
+import { formatNT } from "@/lib/utils"
+import type { PaymentCalculation } from "./installment-types"
 
 export interface InstallmentCreateDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  form: UseFormReturn<FieldValues>;
-  onSubmit: (data: FieldValues) => void;
-  isPending: boolean;
-  paymentCalculation: PaymentCalculation;
-  watchTotalAmount: string;
-  watchInstallments: number;
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  form: UseFormReturn<FieldValues>
+  onSubmit: (data: FieldValues) => void
+  isPending: boolean
+  paymentCalculation: PaymentCalculation
+  watchTotalAmount: string
+  watchInstallments: number
 }
 
 export default function InstallmentCreateDialog({
@@ -47,7 +61,13 @@ export default function InstallmentCreateDialog({
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             {/* 統一分類選擇組件 */}
             <CategorySelector
-              form={form as unknown as { control: Control<FieldValues>; watch: (name: string) => string; setValue: (name: string, value: string) => void; }}
+              form={
+                form as unknown as {
+                  control: Control<FieldValues>
+                  watch: (name: string) => string
+                  setValue: (name: string, value: string) => void
+                }
+              }
               onCategoryChange={() => {
                 // 分類變更回呼
               }}
@@ -119,7 +139,7 @@ export default function InstallmentCreateDialog({
                   <h4 className="font-medium text-blue-800 mb-2">分期付款計算結果</h4>
                   <div className="text-sm space-y-1">
                     <div className="font-medium">
-                      總金額: NT$ {parseFloat(watchTotalAmount).toLocaleString()}
+                      總金額: {formatNT(parseFloat(watchTotalAmount))}
                     </div>
                     <div className="font-medium">分期期數: {watchInstallments} 期</div>
                     <div className="mt-2">
@@ -131,9 +151,7 @@ export default function InstallmentCreateDialog({
                             className="text-xs bg-white p-2 rounded border flex justify-between"
                           >
                             <span>第 {calc.period} 期</span>
-                            <span className="font-medium">
-                              NT$ {calc.amount.toLocaleString()}
-                            </span>
+                            <span className="font-medium">NT$ {calc.amount.toLocaleString()}</span>
                             <span className="text-gray-500">({calc.type})</span>
                           </div>
                         ))}
@@ -169,5 +187,5 @@ export default function InstallmentCreateDialog({
         </Form>
       </DialogContent>
     </Dialog>
-  );
+  )
 }

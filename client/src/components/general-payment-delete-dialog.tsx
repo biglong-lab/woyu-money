@@ -1,15 +1,16 @@
 // 一般付款管理 - 刪除確認對話框元件
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Trash2 } from "lucide-react";
-import type { PaymentItem } from "./general-payment-types";
+import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Trash2 } from "lucide-react"
+import { formatNT } from "@/lib/utils"
+import type { PaymentItem } from "./general-payment-types"
 
 export interface GeneralPaymentDeleteDialogProps {
-  isOpen: boolean;
-  onOpenChange: (open: boolean) => void;
-  deleteItem: PaymentItem | null;
-  onConfirm: () => void;
-  isPending: boolean;
+  isOpen: boolean
+  onOpenChange: (open: boolean) => void
+  deleteItem: PaymentItem | null
+  onConfirm: () => void
+  isPending: boolean
 }
 
 export function GeneralPaymentDeleteDialog({
@@ -39,14 +40,11 @@ export function GeneralPaymentDeleteDialog({
             </p>
           </div>
           <div className="text-xs text-gray-500">
-            金額：NT$ {deleteItem ? parseFloat(deleteItem.totalAmount).toLocaleString() : 0}
+            金額：{deleteItem ? formatNT(parseFloat(deleteItem.totalAmount)) : formatNT(0)}
           </div>
         </div>
         <div className="flex justify-end gap-2">
-          <Button
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-          >
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
             取消
           </Button>
           <Button
@@ -60,5 +58,5 @@ export function GeneralPaymentDeleteDialog({
         </div>
       </DialogContent>
     </Dialog>
-  );
+  )
 }
