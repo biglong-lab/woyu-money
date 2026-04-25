@@ -18,6 +18,21 @@ export function formatCurrency(amount: string | number): string {
 }
 
 /**
+ * 台幣金額格式化：`NT$ 12,345`
+ *
+ * 與 formatCurrency（USD）區分：本專案多數場景應使用 NT$
+ * 整數化（網銀不接受小數點）、含千分位
+ *
+ * @param n 數字或可解析為數字的字串
+ * @returns 形如 "NT$ 12,345"，無效輸入回傳 "NT$ 0"
+ */
+export function formatNT(n: number | string | null | undefined): string {
+  const num = typeof n === "string" ? parseFloat(n) : Number(n)
+  if (!Number.isFinite(num)) return "NT$ 0"
+  return `NT$ ${Math.round(num).toLocaleString()}`
+}
+
+/**
  * 本地時區的 YYYY-MM-DD（避免 UTC 跨日 bug）
  *
  * 問題：`new Date().toISOString().slice(0, 10)` 回傳 UTC 日期。
