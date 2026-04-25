@@ -204,7 +204,19 @@ export function ActiveRentalsCard() {
           ) : (
             <div className="flex items-center gap-2">
               <span className="text-xs text-gray-500">
-                已付 {paidCount}/{total} · {formatNT(monthPaid)} / {formatNT(monthExpected)}
+                已付 {paidCount}/{total} · {formatNT(monthPaid)} /{" "}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    copyAmount(monthExpected, `${month} 月應付總額`)
+                  }}
+                  className="hover:text-blue-600 hover:underline cursor-pointer"
+                  title="點擊複製本月應付總額"
+                  data-testid="copy-month-expected"
+                >
+                  {formatNT(monthExpected)}
+                </button>
               </span>
               {pendingCount > 0 && (
                 <Button
