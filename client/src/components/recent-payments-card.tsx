@@ -68,7 +68,7 @@ export function RecentPaymentsCard() {
   const { toast } = useToast()
   const [undoingId, setUndoingId] = useState<number | null>(null)
 
-  const { data } = useQuery<PaymentRecordWithNames[]>({
+  const { data, isLoading } = useQuery<PaymentRecordWithNames[]>({
     queryKey: ["/api/payment/records?limit=5&page=1"],
   })
 
@@ -85,6 +85,21 @@ export function RecentPaymentsCard() {
     onError: (err) =>
       toast({ title: "撤銷失敗", description: err.message, variant: "destructive" }),
   })
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardHeader className="pb-2">
+          <div className="h-4 w-24 bg-gray-200 rounded animate-pulse" />
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-12 bg-gray-100 rounded animate-pulse" />
+          ))}
+        </CardContent>
+      </Card>
+    )
+  }
 
   if (!data || !Array.isArray(data) || data.length === 0) return null
 
