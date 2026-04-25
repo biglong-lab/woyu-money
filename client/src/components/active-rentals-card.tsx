@@ -235,12 +235,18 @@ export function ActiveRentalsCard() {
             </div>
           )}
         </div>
-        {/* 進度條 */}
-        <div className="mt-2 h-1.5 rounded-full bg-gray-100 overflow-hidden">
+        {/* 進度條 + 百分比 */}
+        <div className="mt-2 relative h-2 rounded-full bg-gray-100 overflow-hidden">
           <div
-            className={`h-full transition-all duration-300 ${allPaid ? "bg-emerald-500" : "bg-green-500"}`}
+            className={`absolute inset-y-0 left-0 transition-all duration-300 ${allPaid ? "bg-emerald-500" : "bg-green-500"}`}
             style={{ width: `${progressPct}%` }}
+            title={`${Math.round(progressPct)}% 已付（${formatNT(monthPaid)} / ${formatNT(monthExpected)}）`}
           />
+          {progressPct >= 30 && progressPct < 100 && !allPaid && (
+            <span className="absolute inset-0 flex items-center justify-center text-[9px] font-bold text-white pointer-events-none">
+              {Math.round(progressPct)}%
+            </span>
+          )}
         </div>
         {/* 一鍵批次：≥2 筆未付才顯示，避免單筆時誤觸 */}
         {pendingCount >= 2 && (
