@@ -9,7 +9,7 @@
  *
  * 呼叫 API：
  * - GET  /api/payment/priority-report?includeLow=true
- * - POST /api/payment/records        （標記已付）
+ * - POST /api/payment/items/:id/payments（標記已付，自動更新 paidAmount + status）
  */
 
 import { useState, useMemo } from "react"
@@ -566,9 +566,9 @@ export function TodayFocusCard() {
     { itemId: number; amountPaid: number; paymentDate: string }
   >({
     mutationFn: async (data) => {
-      return apiRequest("POST", "/api/payment/records", {
-        itemId: data.itemId,
-        amountPaid: data.amountPaid,
+      // 改用正確端點：自動更新 paidAmount + status + 建立 payment_record
+      return apiRequest("POST", `/api/payment/items/${data.itemId}/payments`, {
+        amount: data.amountPaid,
         paymentDate: data.paymentDate,
       })
     },
