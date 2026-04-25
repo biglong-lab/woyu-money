@@ -499,14 +499,18 @@ export default function CashAllocationPage() {
         <CardContent className="space-y-3">
           <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-3 sm:items-end">
             <div className="flex-1 space-y-1">
-              <Label htmlFor="budget">可動用金額（NT$）</Label>
+              <Label htmlFor="budget">
+                可動用金額（NT$） <span className="text-red-500">*</span>
+              </Label>
               <Input
                 id="budget"
                 inputMode="numeric"
                 placeholder="例如：300,000"
                 value={budgetInput}
                 onChange={(e) => handleBudgetChange(e.target.value)}
+                onFocus={(e) => e.target.select()}
                 disabled={mutation.isPending}
+                autoFocus
                 data-testid="input-budget"
               />
             </div>
