@@ -49,19 +49,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/objects", requireAuth, express.static(uploadDir))
 
   // 全域 API 認證保護（排除公開端點）
+  // 注意：middleware 掛在 "/api"，req.path 已不含 /api 前綴
+  // 例如請求 /api/line/callback，這裡的 req.path 是 /line/callback
   app.use("/api", (req, res, next) => {
-    // 公開端點白名單（不需要認證）
-    // 註：LINE OAuth 起點是 /api/auth/line（line-auth.ts），
-    // 回呼是 /api/line/callback（admin.ts）；舊有 "/api/line/login" 為 typo 從未存在過
-    const publicPaths = [
-      "/api/login",
-      "/api/register",
-      "/api/logout",
-      "/api/user",
-      "/api/auth/line",
-      "/api/line/callback",
-    ]
-    // Webhook 接收端點：以 /api/income/webhook/ 開頭的 POST 請求不需 session 認證
+    // 公開端點白名單（不需要認證）— 路徑不含 /api 前綴
+    // - /login /register /logout /user：setupAuth() 註冊，理論上在此 middleware 之前已處理，
+    //   保留為雙保險
+    // - /auth/line：LINE OAuth 起點（line-auth.ts），同樣早於此 middleware 註冊
+    // - /line/callback：LINE OAuth 回呼（admin.ts），晚於此 middleware 註冊，必須在白名單
+    const publicPaths = ["/login", "/register", "/logout", "/user", "/auth/line", "/line/callback"]
+    // Webhook 接收端點：以 /income/webhook/ 開頭的 POST 請求不需 session 認證
     // （改用 secret/token 驗證，在路由層處理）
     const isWebhookReceiver = req.method === "POST" && req.path.startsWith("/income/webhook/")
 
