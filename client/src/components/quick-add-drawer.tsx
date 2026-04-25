@@ -298,6 +298,12 @@ export function QuickAddDrawer({ open, onOpenChange }: QuickAddDrawerProps) {
                     className="pl-8 h-12 text-base"
                   />
                 </div>
+                {/* 即時格式預覽（千分位 + NT$）— 確認輸入正確 */}
+                {totalAmount && parseFloat(totalAmount) > 0 && (
+                  <div className="mt-1 text-xs text-blue-700 font-medium">
+                    = {formatNT(totalAmount)}
+                  </div>
+                )}
               </div>
 
               {/* 專案 + 到期日 — 同一行 */}
