@@ -422,10 +422,13 @@ export default function IncomeSourcesManagementPage() {
             {/* 基本資訊 */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label htmlFor="sourceName">顯示名稱 *</Label>
+                <Label htmlFor="sourceName">
+                  顯示名稱 <span className="text-red-500">*</span>
+                </Label>
                 <Input
                   id="sourceName"
                   placeholder="例：LINE Pay 收款"
+                  autoFocus
                   {...form.register("sourceName")}
                 />
                 {form.formState.errors.sourceName && (
@@ -435,7 +438,7 @@ export default function IncomeSourcesManagementPage() {
 
               <div className="space-y-1.5">
                 <Label htmlFor="sourceKey">
-                  來源識別碼 *
+                  來源識別碼 <span className="text-red-500">*</span>
                   <span className="text-xs text-muted-foreground ml-1">（URL 路徑用）</span>
                 </Label>
                 <Input
