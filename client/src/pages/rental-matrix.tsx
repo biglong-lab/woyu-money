@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dialog"
 import { apiRequest, queryClient } from "@/lib/queryClient"
 import { useToast } from "@/hooks/use-toast"
+import { useCopyAmount } from "@/hooks/use-copy-amount"
 
 type CellStatus = "paid" | "partial" | "unpaid" | "upcoming" | "out_of_contract"
 
@@ -152,6 +153,7 @@ export default function RentalMatrixPage() {
   const [cellTarget, setCellTarget] = useState<CellTarget | null>(null)
   const currentMonth = new Date().getMonth() + 1
   const { toast } = useToast()
+  const copyAmount = useCopyAmount()
   const years = [year - 1, year, year + 1].filter((y) => y >= 2020)
 
   const { data, isLoading } = useQuery<RentalMatrixData>({
@@ -438,11 +440,23 @@ export default function RentalMatrixPage() {
               </div>
               <div className="flex justify-between border-t pt-2">
                 <span className="text-gray-600">將要標記為已付</span>
-                <span className="font-bold text-green-700">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const due = Math.max(
+                      0,
+                      cellTarget.cell.expectedAmount - cellTarget.cell.paidAmount
+                    )
+                    copyAmount(due, cellTarget.contractName)
+                  }}
+                  className="font-bold text-green-700 hover:underline cursor-pointer"
+                  title="點擊複製金額（轉帳用）"
+                  data-testid="copy-cell-due-amount"
+                >
                   {formatCurrency(
                     Math.max(0, cellTarget.cell.expectedAmount - cellTarget.cell.paidAmount)
                   )}
-                </span>
+                </button>
               </div>
             </div>
           )}
