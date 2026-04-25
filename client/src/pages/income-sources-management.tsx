@@ -2,17 +2,12 @@
 import { useState } from "react"
 import { useQuery, useMutation } from "@tanstack/react-query"
 import { queryClient, apiRequest } from "@/lib/queryClient"
+import { useDocumentTitle } from "@/hooks/use-document-title"
 import { useToast } from "@/hooks/use-toast"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -44,11 +39,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import {
   Plus,
   Settings,
@@ -109,15 +100,13 @@ type FormValues = z.infer<typeof formSchema>
 
 // ─── 工具：產生 Webhook URL ─────────────────────────
 const getWebhookUrl = (sourceKey: string) => {
-  const base =
-    typeof window !== "undefined"
-      ? window.location.origin
-      : "https://your-domain.com"
+  const base = typeof window !== "undefined" ? window.location.origin : "https://your-domain.com"
   return `${base}/api/income/webhook/${sourceKey}`
 }
 
 // ─── 主頁面 ──────────────────────────────────────
 export default function IncomeSourcesManagementPage() {
+  useDocumentTitle("收入來源管理")
   const { toast } = useToast()
   const [showForm, setShowForm] = useState(false)
   const [editingSource, setEditingSource] = useState<IncomeSource | null>(null)
@@ -238,7 +227,11 @@ export default function IncomeSourcesManagementPage() {
   const toggleMapping = (id: number) => {
     setExpandedMappings((prev) => {
       const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
       return next
     })
   }
@@ -284,8 +277,9 @@ export default function IncomeSourcesManagementPage() {
             <div>
               <p className="font-medium">如何接入外部系統？</p>
               <p className="text-blue-700 mt-1">
-                1. 建立來源並設定驗證方式 &nbsp;→&nbsp; 2. 複製 Webhook URL 填入外部系統 &nbsp;→&nbsp;
-                3. 外部系統有收款時自動推送 &nbsp;→&nbsp; 4. 在「進帳收件箱」確認後自動歸帳
+                1. 建立來源並設定驗證方式 &nbsp;→&nbsp; 2. 複製 Webhook URL 填入外部系統
+                &nbsp;→&nbsp; 3. 外部系統有收款時自動推送 &nbsp;→&nbsp; 4.
+                在「進帳收件箱」確認後自動歸帳
               </p>
             </div>
           </div>
@@ -307,8 +301,7 @@ export default function IncomeSourcesManagementPage() {
       ) : (
         <div className="space-y-3">
           {sources.map((source) => {
-            const typeInfo =
-              SOURCE_TYPE_LABELS[source.sourceType] ?? SOURCE_TYPE_LABELS.custom_api
+            const typeInfo = SOURCE_TYPE_LABELS[source.sourceType] ?? SOURCE_TYPE_LABELS.custom_api
             const webhookUrl = getWebhookUrl(source.sourceKey)
             const mapping = (source.fieldMapping as Record<string, string>) ?? {}
             const hasMappings = Object.keys(mapping).length > 0
@@ -331,11 +324,7 @@ export default function IncomeSourcesManagementPage() {
                       )}
                     </div>
                     <div className="flex gap-1 flex-shrink-0">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => openEdit(source)}
-                      >
+                      <Button size="sm" variant="outline" onClick={() => openEdit(source)}>
                         <Settings className="h-3.5 w-3.5" />
                       </Button>
                       <Button
@@ -348,26 +337,18 @@ export default function IncomeSourcesManagementPage() {
                       </Button>
                     </div>
                   </div>
-                  {source.description && (
-                    <CardDescription>{source.description}</CardDescription>
-                  )}
+                  {source.description && <CardDescription>{source.description}</CardDescription>}
                 </CardHeader>
 
                 <CardContent className="space-y-3">
                   {/* Webhook URL */}
                   <div>
-                    <Label className="text-xs text-muted-foreground mb-1 block">
-                      Webhook URL
-                    </Label>
+                    <Label className="text-xs text-muted-foreground mb-1 block">Webhook URL</Label>
                     <div className="flex gap-2">
                       <code className="flex-1 text-xs bg-gray-100 rounded px-3 py-2 break-all">
                         {webhookUrl}
                       </code>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => copyUrl(webhookUrl)}
-                      >
+                      <Button size="sm" variant="outline" onClick={() => copyUrl(webhookUrl)}>
                         <Copy className="h-3.5 w-3.5" />
                       </Button>
                     </div>
@@ -392,8 +373,7 @@ export default function IncomeSourcesManagementPage() {
                     {source.defaultProjectId && projects.length > 0 && (
                       <span>
                         預設專案：
-                        {projects.find((p) => p.id === source.defaultProjectId)
-                          ?.projectName ?? "-"}
+                        {projects.find((p) => p.id === source.defaultProjectId)?.projectName ?? "-"}
                       </span>
                     )}
                   </div>
@@ -402,11 +382,7 @@ export default function IncomeSourcesManagementPage() {
                   {hasMappings && (
                     <Collapsible open={isExpanded} onOpenChange={() => toggleMapping(source.id)}>
                       <CollapsibleTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 text-xs gap-1 -ml-2"
-                        >
+                        <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 -ml-2">
                           {isExpanded ? (
                             <ChevronUp className="h-3.5 w-3.5" />
                           ) : (
@@ -438,18 +414,11 @@ export default function IncomeSourcesManagementPage() {
       <Dialog open={showForm} onOpenChange={setShowForm}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>
-              {editingSource ? "編輯進帳來源" : "新增進帳來源"}
-            </DialogTitle>
-            <DialogDescription>
-              設定外部系統的接入資訊與欄位對應規則
-            </DialogDescription>
+            <DialogTitle>{editingSource ? "編輯進帳來源" : "新增進帳來源"}</DialogTitle>
+            <DialogDescription>設定外部系統的接入資訊與欄位對應規則</DialogDescription>
           </DialogHeader>
 
-          <form
-            onSubmit={form.handleSubmit((v) => saveMutation.mutate(v))}
-            className="space-y-5"
-          >
+          <form onSubmit={form.handleSubmit((v) => saveMutation.mutate(v))} className="space-y-5">
             {/* 基本資訊 */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
@@ -460,9 +429,7 @@ export default function IncomeSourcesManagementPage() {
                   {...form.register("sourceName")}
                 />
                 {form.formState.errors.sourceName && (
-                  <p className="text-xs text-red-500">
-                    {form.formState.errors.sourceName.message}
-                  </p>
+                  <p className="text-xs text-red-500">{form.formState.errors.sourceName.message}</p>
                 )}
               </div>
 
@@ -478,9 +445,7 @@ export default function IncomeSourcesManagementPage() {
                   disabled={!!editingSource}
                 />
                 {form.formState.errors.sourceKey && (
-                  <p className="text-xs text-red-500">
-                    {form.formState.errors.sourceKey.message}
-                  </p>
+                  <p className="text-xs text-red-500">{form.formState.errors.sourceKey.message}</p>
                 )}
               </div>
             </div>
@@ -490,9 +455,7 @@ export default function IncomeSourcesManagementPage() {
                 <Label>來源類型</Label>
                 <Select
                   value={form.watch("sourceType")}
-                  onValueChange={(v) =>
-                    form.setValue("sourceType", v as FormValues["sourceType"])
-                  }
+                  onValueChange={(v) => form.setValue("sourceType", v as FormValues["sourceType"])}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -550,9 +513,7 @@ export default function IncomeSourcesManagementPage() {
                 <Label>驗證方式</Label>
                 <Select
                   value={form.watch("authType")}
-                  onValueChange={(v) =>
-                    form.setValue("authType", v as FormValues["authType"])
-                  }
+                  onValueChange={(v) => form.setValue("authType", v as FormValues["authType"])}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -565,15 +526,12 @@ export default function IncomeSourcesManagementPage() {
                 </Select>
               </div>
 
-              {(form.watch("authType") === "token" ||
-                form.watch("authType") === "both") && (
+              {(form.watch("authType") === "token" || form.watch("authType") === "both") && (
                 <div className="space-y-1.5">
                   <Label htmlFor="apiToken">
                     API Token
                     {editingSource && (
-                      <span className="text-xs text-muted-foreground ml-1">
-                        （留空表示不變更）
-                      </span>
+                      <span className="text-xs text-muted-foreground ml-1">（留空表示不變更）</span>
                     )}
                   </Label>
                   <Input
@@ -585,15 +543,12 @@ export default function IncomeSourcesManagementPage() {
                 </div>
               )}
 
-              {(form.watch("authType") === "hmac" ||
-                form.watch("authType") === "both") && (
+              {(form.watch("authType") === "hmac" || form.watch("authType") === "both") && (
                 <div className="space-y-1.5">
                   <Label htmlFor="webhookSecret">
                     Webhook Secret
                     {editingSource && (
-                      <span className="text-xs text-muted-foreground ml-1">
-                        （留空表示不變更）
-                      </span>
+                      <span className="text-xs text-muted-foreground ml-1">（留空表示不變更）</span>
                     )}
                   </Label>
                   <Input
@@ -617,7 +572,11 @@ export default function IncomeSourcesManagementPage() {
               <div className="grid grid-cols-2 gap-3">
                 {[
                   { field: "fieldAmount", label: "金額 *", placeholder: "$.amount" },
-                  { field: "fieldTransactionId", label: "交易 ID", placeholder: "$.transaction_id" },
+                  {
+                    field: "fieldTransactionId",
+                    label: "交易 ID",
+                    placeholder: "$.transaction_id",
+                  },
                   { field: "fieldPaidAt", label: "收款時間", placeholder: "$.paid_at" },
                   { field: "fieldDescription", label: "說明", placeholder: "$.description" },
                   { field: "fieldPayerName", label: "付款方名稱", placeholder: "$.payer.name" },
@@ -666,11 +625,7 @@ export default function IncomeSourcesManagementPage() {
             </div>
 
             <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setShowForm(false)}
-              >
+              <Button type="button" variant="outline" onClick={() => setShowForm(false)}>
                 取消
               </Button>
               <Button type="submit" disabled={saveMutation.isPending}>
