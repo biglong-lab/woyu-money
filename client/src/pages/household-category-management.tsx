@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/hooks/use-toast"
 import { apiRequest } from "@/lib/queryClient"
 import { localDateISO } from "@/lib/utils"
+import { useDocumentTitle } from "@/hooks/use-document-title"
 import type { DebtCategory } from "../../../shared/schema/category"
 import type { HouseholdBudget, HouseholdExpense } from "../../../shared/schema/household"
 
@@ -34,6 +35,7 @@ import {
 // ============================================================
 
 export default function HouseholdCategoryManagement() {
+  useDocumentTitle("家用分類管理")
   const { toast } = useToast()
   const queryClient = useQueryClient()
 

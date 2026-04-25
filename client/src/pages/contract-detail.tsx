@@ -1,6 +1,7 @@
 /** 合約詳情頁面 - 主入口元件 */
 
 import { useParams } from "wouter"
+import { useDocumentTitle } from "@/hooks/use-document-title"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -26,6 +27,7 @@ import {
 
 /** 合約詳情頁面主元件 */
 export default function ContractDetail() {
+  useDocumentTitle("合約詳情")
   const { id } = useParams()
 
   // 資料查詢
