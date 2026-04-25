@@ -14,6 +14,7 @@
 import { Router } from "express"
 import { z } from "zod"
 import { asyncHandler, errors } from "../middleware/error-handler"
+import { localDateTPE } from "@shared/date-utils"
 
 const router = Router()
 
@@ -148,7 +149,7 @@ router.post(
       throw errors.badRequest("請求格式錯誤（year/month/paymentDate）")
     }
     const { year, month } = parsed.data
-    const paymentDate = parsed.data.paymentDate ?? new Date().toISOString().slice(0, 10)
+    const paymentDate = parsed.data.paymentDate ?? localDateTPE()
 
     const { pool } = await import("../db")
     const client = await pool.connect()
@@ -237,7 +238,7 @@ router.post(
       throw errors.badRequest("請求格式錯誤（projectId/year/month）")
     }
     const { projectId, year, month } = parsed.data
-    const paymentDate = parsed.data.paymentDate ?? new Date().toISOString().slice(0, 10)
+    const paymentDate = parsed.data.paymentDate ?? localDateTPE()
 
     const { pool } = await import("../db")
     const client = await pool.connect()
