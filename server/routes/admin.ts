@@ -87,6 +87,46 @@ router.post(
   })
 )
 
+// 更新用戶基本資訊（username/email/fullName/role/isActive）
+// 用戶管理頁的「編輯」對話框使用此端點，避免分散呼叫多個子路徑
+router.put(
+  "/api/admin/users/:id",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const currentUser = req.user!
+    if (currentUser.role !== "admin") {
+      throw new AppError(403, "需要管理員權限")
+    }
+
+    const userId = parseInt(req.params.id)
+    const { username, email, fullName, role, isActive } = req.body
+
+    // 驗證 role（若有提供）
+    if (role !== undefined && !["admin", "user1", "user2"].includes(role)) {
+      throw new AppError(400, "無效的角色")
+    }
+
+    // 只更新有提供的欄位（避免將未填欄位覆寫為 null/undefined）
+    const updates: Record<string, unknown> = {}
+    if (username !== undefined) updates.username = username
+    if (email !== undefined) updates.email = email
+    if (fullName !== undefined) updates.fullName = fullName
+    if (role !== undefined) updates.role = role
+    if (isActive !== undefined) updates.isActive = isActive
+
+    const updatedUser = await storage.updateUser(userId, updates)
+
+    res.json({
+      id: updatedUser.id,
+      username: updatedUser.username,
+      email: updatedUser.email,
+      fullName: updatedUser.fullName,
+      role: updatedUser.role,
+      isActive: updatedUser.isActive,
+    })
+  })
+)
+
 // 更新用戶角色
 router.put(
   "/api/admin/users/:id/role",

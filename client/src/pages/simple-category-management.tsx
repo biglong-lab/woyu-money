@@ -1,225 +1,247 @@
-import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { useForm } from "react-hook-form";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Edit, Trash2, Settings, Building2, Zap, Archive } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { DebtCategory, PaymentProject, FixedCategory } from "@shared/schema";
+import { useState } from "react"
+import { useQuery, useMutation } from "@tanstack/react-query"
+import { useForm } from "react-hook-form"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form"
+import { Textarea } from "@/components/ui/textarea"
+import { Badge } from "@/components/ui/badge"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Plus, Edit, Trash2, Settings, Building2, Zap, Archive } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
+import { apiRequest, queryClient } from "@/lib/queryClient"
+import type { DebtCategory, PaymentProject, FixedCategory } from "@shared/schema"
 
 type Category = {
-  id: number;
-  categoryName: string;
-  categoryType: string;
-  description?: string;
-  accountInfo?: string;
-};
+  id: number
+  categoryName: string
+  categoryType: string
+  description?: string
+  accountInfo?: string
+}
 
 type FixedSubOption = {
-  id: number;
-  fixedCategoryId: number;
-  projectId: number;
-  optionName: string;
-  accountInfo?: string;
-  notes?: string;
-  projectName?: string;
-  fixedCategoryName?: string;
-};
+  id: number
+  fixedCategoryId: number
+  projectId: number
+  optionName: string
+  accountInfo?: string
+  notes?: string
+  projectName?: string
+  fixedCategoryName?: string
+}
 
 type CategoryFormData = {
-  categoryName: string;
-  description: string;
-  accountInfo: string;
-};
+  categoryName: string
+  description: string
+  accountInfo: string
+}
 
 type ProjectCategoryFormData = {
-  categoryName: string;
-  description: string;
-};
+  categoryName: string
+  description: string
+}
 
 type ErrorWithMessage = {
-  message: string;
-};
+  message: string
+}
 
 export default function SimpleCategoryManagement() {
-  const { toast } = useToast();
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [isCreateProjectCategoryOpen, setIsCreateProjectCategoryOpen] = useState(false);
-  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
-  const [selectedCategoryType, setSelectedCategoryType] = useState<string>("fixed");
+  const { toast } = useToast()
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [isCreateProjectCategoryOpen, setIsCreateProjectCategoryOpen] = useState(false)
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null)
+  const [selectedCategoryType, setSelectedCategoryType] = useState<string>("fixed")
 
   // Queries
   const { data: fixedCategories = [] } = useQuery<FixedCategory[]>({
     queryKey: ["/api/fixed-categories"],
-  });
+  })
 
   const { data: projectCategories = [] } = useQuery<DebtCategory[]>({
     queryKey: ["/api/categories/project"],
-  });
+  })
 
   const { data: projects = [] } = useQuery<PaymentProject[]>({
     queryKey: ["/api/payment/projects"],
-  });
+  })
 
   const { data: fixedSubOptions = [] } = useQuery<FixedSubOption[]>({
     queryKey: ["/api/fixed-category-sub-options"],
-  });
+  })
 
   // Forms
   const createForm = useForm<CategoryFormData>({
     defaultValues: {
       categoryName: "",
       description: "",
-      accountInfo: ""
-    }
-  });
+      accountInfo: "",
+    },
+  })
 
   const createProjectCategoryForm = useForm<ProjectCategoryFormData>({
     defaultValues: {
       categoryName: "",
-      description: ""
-    }
-  });
+      description: "",
+    },
+  })
 
   const editForm = useForm<CategoryFormData>({
     defaultValues: {
       categoryName: "",
       description: "",
-      accountInfo: ""
-    }
-  });
+      accountInfo: "",
+    },
+  })
 
   // Mutations
   const createFixedCategoryMutation = useMutation({
     mutationFn: async (data: CategoryFormData) => {
-      return await apiRequest("POST", "/api/fixed-categories", {
+      // 後端正確端點是 /api/categories/fixed（GET /api/fixed-categories 是相容別名僅供查詢）
+      return await apiRequest("POST", "/api/categories/fixed", {
         categoryName: data.categoryName,
         categoryType: "fixed",
         description: data.description,
-        accountInfo: data.accountInfo
-      });
+        accountInfo: data.accountInfo,
+      })
     },
     onSuccess: () => {
-      toast({ title: "固定分類建立成功" });
-      queryClient.invalidateQueries({ queryKey: ["/api/fixed-categories"] });
-      setIsCreateDialogOpen(false);
-      createForm.reset();
+      toast({ title: "固定分類建立成功" })
+      queryClient.invalidateQueries({ queryKey: ["/api/fixed-categories"] })
+      setIsCreateDialogOpen(false)
+      createForm.reset()
     },
     onError: (error: ErrorWithMessage) => {
       toast({
         title: "建立失敗",
         description: error.message,
         variant: "destructive",
-      });
+      })
     },
-  });
+  })
 
   const createProjectCategoryMutation = useMutation({
     mutationFn: async (data: ProjectCategoryFormData) => {
       return await apiRequest("POST", "/api/categories", {
         categoryName: data.categoryName,
         categoryType: "project",
-        description: data.description
-      });
+        description: data.description,
+      })
     },
     onSuccess: () => {
-      toast({ title: "專案分類建立成功" });
-      queryClient.invalidateQueries({ queryKey: ["/api/categories/project"] });
-      setIsCreateProjectCategoryOpen(false);
-      createProjectCategoryForm.reset();
+      toast({ title: "專案分類建立成功" })
+      queryClient.invalidateQueries({ queryKey: ["/api/categories/project"] })
+      setIsCreateProjectCategoryOpen(false)
+      createProjectCategoryForm.reset()
     },
     onError: (error: ErrorWithMessage) => {
       toast({
         title: "建立失敗",
         description: error.message,
         variant: "destructive",
-      });
+      })
     },
-  });
+  })
 
   const updateMutation = useMutation({
     mutationFn: async (data: CategoryFormData) => {
+      // 後端用 PUT 而非 PATCH；固定分類路徑為 /api/categories/fixed/:id
       if (editingCategory?.categoryType === "fixed") {
-        return await apiRequest("PATCH", `/api/fixed-categories/${editingCategory?.id}`, data);
+        return await apiRequest("PUT", `/api/categories/fixed/${editingCategory?.id}`, data)
       } else {
-        return await apiRequest("PATCH", `/api/categories/${editingCategory?.id}`, data);
+        return await apiRequest("PUT", `/api/categories/${editingCategory?.id}`, data)
       }
     },
     onSuccess: () => {
-      toast({ title: "分類更新成功" });
-      queryClient.invalidateQueries({ queryKey: ["/api/fixed-categories"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/categories/project"] });
-      setIsEditDialogOpen(false);
-      setEditingCategory(null);
-      editForm.reset();
+      toast({ title: "分類更新成功" })
+      queryClient.invalidateQueries({ queryKey: ["/api/fixed-categories"] })
+      queryClient.invalidateQueries({ queryKey: ["/api/categories/project"] })
+      setIsEditDialogOpen(false)
+      setEditingCategory(null)
+      editForm.reset()
     },
     onError: (error: ErrorWithMessage) => {
       toast({
         title: "更新失敗",
         description: error.message,
         variant: "destructive",
-      });
+      })
     },
-  });
+  })
 
   const deleteMutation = useMutation({
     mutationFn: async ({ id, type }: { id: number; type: string }) => {
+      // 固定分類正確路徑為 /api/categories/fixed/:id
       if (type === "fixed") {
-        return await apiRequest("DELETE", `/api/fixed-categories/${id}`);
+        return await apiRequest("DELETE", `/api/categories/fixed/${id}`)
       } else {
-        return await apiRequest("DELETE", `/api/categories/${id}`);
+        return await apiRequest("DELETE", `/api/categories/${id}`)
       }
     },
     onSuccess: () => {
-      toast({ title: "分類刪除成功" });
-      queryClient.invalidateQueries({ queryKey: ["/api/fixed-categories"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/categories/project"] });
+      toast({ title: "分類刪除成功" })
+      queryClient.invalidateQueries({ queryKey: ["/api/fixed-categories"] })
+      queryClient.invalidateQueries({ queryKey: ["/api/categories/project"] })
     },
     onError: (error: ErrorWithMessage) => {
       toast({
         title: "刪除失敗",
         description: error.message,
         variant: "destructive",
-      });
+      })
     },
-  });
+  })
 
   const handleCreateFixedCategory = (data: CategoryFormData) => {
-    createFixedCategoryMutation.mutate(data);
-  };
+    createFixedCategoryMutation.mutate(data)
+  }
 
   const handleCreateProjectCategory = (data: ProjectCategoryFormData) => {
-    createProjectCategoryMutation.mutate(data);
-  };
+    createProjectCategoryMutation.mutate(data)
+  }
 
   const handleEdit = (category: Category) => {
-    setEditingCategory(category);
+    setEditingCategory(category)
     editForm.reset({
       categoryName: category.categoryName,
       description: category.description || "",
-      accountInfo: category.accountInfo || ""
-    });
-    setIsEditDialogOpen(true);
-  };
+      accountInfo: category.accountInfo || "",
+    })
+    setIsEditDialogOpen(true)
+  }
 
   const handleUpdate = (data: CategoryFormData) => {
-    updateMutation.mutate(data);
-  };
+    updateMutation.mutate(data)
+  }
 
   const handleDelete = (category: Category) => {
     if (confirm(`確定要刪除分類「${category.categoryName}」嗎？`)) {
-      deleteMutation.mutate({ id: category.id, type: category.categoryType });
+      deleteMutation.mutate({ id: category.id, type: category.categoryType })
     }
-  };
+  }
 
   return (
     <div className="space-y-6">
@@ -265,7 +287,10 @@ export default function SimpleCategoryManagement() {
                   <DialogTitle>新增固定分類</DialogTitle>
                 </DialogHeader>
                 <Form {...createForm}>
-                  <form onSubmit={createForm.handleSubmit(handleCreateFixedCategory)} className="space-y-4">
+                  <form
+                    onSubmit={createForm.handleSubmit(handleCreateFixedCategory)}
+                    className="space-y-4"
+                  >
                     <FormField
                       control={createForm.control}
                       name="categoryName"
@@ -309,7 +334,11 @@ export default function SimpleCategoryManagement() {
                     />
 
                     <div className="flex justify-end gap-2">
-                      <Button type="button" variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setIsCreateDialogOpen(false)}
+                      >
                         取消
                       </Button>
                       <Button type="submit" disabled={createFixedCategoryMutation.isPending}>
@@ -329,7 +358,10 @@ export default function SimpleCategoryManagement() {
                   <p className="text-gray-500 text-center py-8">尚無固定分類</p>
                 ) : (
                   fixedCategories.map((category) => (
-                    <div key={category.id} className="flex items-center justify-between p-4 border rounded-lg">
+                    <div
+                      key={category.id}
+                      className="flex items-center justify-between p-4 border rounded-lg"
+                    >
                       <div>
                         <div className="font-medium text-lg">{category.categoryName}</div>
                         {category.description && (
@@ -337,22 +369,34 @@ export default function SimpleCategoryManagement() {
                         )}
                       </div>
                       <div className="flex gap-2">
-                        <Button variant="outline" size="sm" onClick={() => handleEdit({
-                          id: category.id,
-                          categoryName: category.categoryName,
-                          categoryType: category.categoryType,
-                          description: category.description || undefined,
-                          accountInfo: undefined
-                        })}>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            handleEdit({
+                              id: category.id,
+                              categoryName: category.categoryName,
+                              categoryType: category.categoryType,
+                              description: category.description || undefined,
+                              accountInfo: undefined,
+                            })
+                          }
+                        >
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => handleDelete({
-                          id: category.id,
-                          categoryName: category.categoryName,
-                          categoryType: category.categoryType,
-                          description: category.description || undefined,
-                          accountInfo: undefined
-                        })}>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            handleDelete({
+                              id: category.id,
+                              categoryName: category.categoryName,
+                              categoryType: category.categoryType,
+                              description: category.description || undefined,
+                              accountInfo: undefined,
+                            })
+                          }
+                        >
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
@@ -368,7 +412,9 @@ export default function SimpleCategoryManagement() {
         <TabsContent value="project-specific" className="space-y-4">
           <div className="mb-4">
             <h2 className="text-xl font-semibold">專案專屬項目</h2>
-            <p className="text-gray-600">固定分類 + 專案 = 專案專屬的具體項目（如：浯島文旅的電話費 088-219194）</p>
+            <p className="text-gray-600">
+              固定分類 + 專案 = 專案專屬的具體項目（如：浯島文旅的電話費 088-219194）
+            </p>
           </div>
 
           <Card>
@@ -378,13 +424,17 @@ export default function SimpleCategoryManagement() {
                   <div className="text-center py-8">
                     <p className="text-gray-500 mb-4">尚無專案專屬項目</p>
                     <p className="text-sm text-gray-400">
-                      專案專屬項目會在您建立付款項目時自動生成<br/>
+                      專案專屬項目會在您建立付款項目時自動生成
+                      <br />
                       例如：選擇「浯島文旅」專案 + 「電話費」分類時，輸入具體的電話號碼
                     </p>
                   </div>
                 ) : (
                   fixedSubOptions.map((option) => (
-                    <div key={option.id} className="flex items-center justify-between p-4 border rounded-lg">
+                    <div
+                      key={option.id}
+                      className="flex items-center justify-between p-4 border rounded-lg"
+                    >
                       <div className="flex-1">
                         <div className="flex items-center gap-3 mb-2">
                           <Badge variant="secondary">{option.fixedCategoryName}</Badge>
@@ -436,7 +486,10 @@ export default function SimpleCategoryManagement() {
                   <p className="text-gray-500 text-center py-8">尚無專案分類</p>
                 ) : (
                   projectCategories.map((category) => (
-                    <div key={category.id} className="flex items-center justify-between p-4 border rounded-lg">
+                    <div
+                      key={category.id}
+                      className="flex items-center justify-between p-4 border rounded-lg"
+                    >
                       <div>
                         <div className="font-medium text-lg">{category.categoryName}</div>
                         {category.description && (
@@ -444,22 +497,34 @@ export default function SimpleCategoryManagement() {
                         )}
                       </div>
                       <div className="flex gap-2">
-                        <Button variant="outline" size="sm" onClick={() => handleEdit({
-                          id: category.id,
-                          categoryName: category.categoryName,
-                          categoryType: category.categoryType,
-                          description: category.description || undefined,
-                          accountInfo: category.accountInfo || undefined
-                        })}>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            handleEdit({
+                              id: category.id,
+                              categoryName: category.categoryName,
+                              categoryType: category.categoryType,
+                              description: category.description || undefined,
+                              accountInfo: category.accountInfo || undefined,
+                            })
+                          }
+                        >
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => handleDelete({
-                          id: category.id,
-                          categoryName: category.categoryName,
-                          categoryType: category.categoryType,
-                          description: category.description || undefined,
-                          accountInfo: category.accountInfo || undefined
-                        })}>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            handleDelete({
+                              id: category.id,
+                              categoryName: category.categoryName,
+                              categoryType: category.categoryType,
+                              description: category.description || undefined,
+                              accountInfo: category.accountInfo || undefined,
+                            })
+                          }
+                        >
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
@@ -542,7 +607,12 @@ export default function SimpleCategoryManagement() {
             <DialogTitle>新增專案分類</DialogTitle>
           </DialogHeader>
           <Form {...createProjectCategoryForm}>
-            <form onSubmit={createProjectCategoryForm.handleSubmit((data) => createProjectCategoryMutation.mutate(data))} className="space-y-4">
+            <form
+              onSubmit={createProjectCategoryForm.handleSubmit((data) =>
+                createProjectCategoryMutation.mutate(data)
+              )}
+              className="space-y-4"
+            >
               <FormField
                 control={createProjectCategoryForm.control}
                 name="categoryName"
@@ -572,7 +642,11 @@ export default function SimpleCategoryManagement() {
               />
 
               <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={() => setIsCreateProjectCategoryOpen(false)}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsCreateProjectCategoryOpen(false)}
+                >
                   取消
                 </Button>
                 <Button type="submit" disabled={createProjectCategoryMutation.isPending}>
@@ -584,5 +658,5 @@ export default function SimpleCategoryManagement() {
         </DialogContent>
       </Dialog>
     </div>
-  );
+  )
 }
