@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { apiRequest, queryClient } from "@/lib/queryClient"
 import { useToast } from "@/hooks/use-toast"
+import { useCopyAmount } from "@/hooks/use-copy-amount"
 
 interface PaymentRecordWithNames {
   id: number
@@ -66,6 +67,7 @@ const GROUP_LABEL: Record<DateGroup, string> = {
 
 export function RecentPaymentsCard() {
   const { toast } = useToast()
+  const copyAmount = useCopyAmount()
   const [undoingId, setUndoingId] = useState<number | null>(null)
 
   const { data, isLoading } = useQuery<PaymentRecordWithNames[]>({
@@ -208,7 +210,15 @@ export function RecentPaymentsCard() {
         {records.length > 1 && (
           <div className="flex items-center justify-between pt-2 mt-1 border-t text-xs">
             <span className="text-gray-500">最近 {records.length} 筆合計</span>
-            <span className="font-semibold text-green-700">{fmt(visibleTotal)}</span>
+            <button
+              type="button"
+              onClick={() => copyAmount(visibleTotal, `最近 ${records.length} 筆合計`)}
+              className="font-semibold text-green-700 hover:underline cursor-pointer"
+              title="點擊複製總額"
+              data-testid="copy-recent-total"
+            >
+              {fmt(visibleTotal)}
+            </button>
           </div>
         )}
       </CardContent>
