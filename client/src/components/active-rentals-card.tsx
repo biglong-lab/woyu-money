@@ -50,7 +50,7 @@ export function ActiveRentalsCard() {
   const { toast } = useToast()
   const [pendingId, setPendingId] = useState<number | null>(null)
 
-  const { data } = useQuery<MatrixData>({
+  const { data, isLoading } = useQuery<MatrixData>({
     queryKey: [`/api/rental-matrix?year=${year}`],
   })
 
@@ -75,6 +75,21 @@ export function ActiveRentalsCard() {
     onError: (err) =>
       toast({ title: "標記失敗", description: err.message, variant: "destructive" }),
   })
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardHeader className="pb-2">
+          <div className="h-4 w-40 bg-gray-200 rounded animate-pulse" />
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-16 bg-gray-100 rounded animate-pulse" />
+          ))}
+        </CardContent>
+      </Card>
+    )
+  }
 
   if (!data || data.contracts.length === 0) return null
 
