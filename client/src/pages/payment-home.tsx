@@ -38,6 +38,7 @@ import { FinancialAssistantQuickCard } from "@/components/financial-assistant-qu
 import { FinancialHealthSummaryCard } from "@/components/financial-health-summary-card"
 import { ActiveRentalsCard } from "@/components/active-rentals-card"
 import { RecentPaymentsCard } from "@/components/recent-payments-card"
+import { NextMonthForecastCard } from "@/components/next-month-forecast-card"
 import { useDocumentTitle } from "@/hooks/use-document-title"
 
 /** API 回傳的付款項目（含關聯專案名） */
@@ -379,6 +380,9 @@ export default function PaymentHome() {
 
       {/* ===== 最近已付（成就回饋）===== */}
       <RecentPaymentsCard />
+
+      {/* ===== 下個月預估（提前規劃）===== */}
+      <NextMonthForecastCard />
 
       {/* ===== 待處理區（可直接操作）===== */}
       {(urgentItems.length > 0 || pendingDocs > 0) && (
