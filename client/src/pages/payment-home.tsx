@@ -38,6 +38,7 @@ import { FinancialAssistantQuickCard } from "@/components/financial-assistant-qu
 import { FinancialHealthSummaryCard } from "@/components/financial-health-summary-card"
 import { ActiveRentalsCard } from "@/components/active-rentals-card"
 import { RecentPaymentsCard } from "@/components/recent-payments-card"
+import { useDocumentTitle } from "@/hooks/use-document-title"
 
 /** API 回傳的付款項目（含關聯專案名） */
 interface PaymentItemWithProject extends PaymentItem {
@@ -94,6 +95,7 @@ interface InboxStats {
 }
 
 export default function PaymentHome() {
+  useDocumentTitle()
   const [searchQuery, setSearchQuery] = useState("")
   const [showQuickAdd, setShowQuickAdd] = useState(false)
   const [showQuickPay, setShowQuickPay] = useState(false)

@@ -36,6 +36,7 @@ import {
 } from "lucide-react"
 import { PaymentItemDetails } from "@/components/payment-item-details"
 import { useCopyAmount } from "@/hooks/use-copy-amount"
+import { useDocumentTitle } from "@/hooks/use-document-title"
 import type { PaymentItem } from "@shared/schema"
 
 // 專案篩選選項
@@ -96,6 +97,7 @@ const getPaymentMethodText = (method: string) => {
 }
 
 export default function PaymentRecords() {
+  useDocumentTitle("付款紀錄")
   const [location] = useLocation()
   const copyAmount = useCopyAmount()
   const [searchTerm, setSearchTerm] = useState("")
