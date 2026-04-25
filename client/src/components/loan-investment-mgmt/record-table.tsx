@@ -1,8 +1,16 @@
-import { Button } from "@/components/ui/button";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Edit2, Trash2, Receipt } from "lucide-react";
-import { getStatusBadge, getRiskBadge, getRecordTypeBadge } from "./badge-helpers";
-import type { LoanInvestmentRecord } from "./types";
+import { Button } from "@/components/ui/button"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import { Edit2, Trash2, Receipt } from "lucide-react"
+import { getStatusBadge, getRiskBadge, getRecordTypeBadge } from "./badge-helpers"
+import { formatNT } from "@/lib/utils"
+import type { LoanInvestmentRecord } from "./types"
 
 /**
  * 借貸投資管理 -- 桌面版記錄表格
@@ -11,16 +19,21 @@ import type { LoanInvestmentRecord } from "./types";
 
 interface RecordTableProps {
   /** 已篩選的記錄列表 */
-  records: LoanInvestmentRecord[];
+  records: LoanInvestmentRecord[]
   /** 編輯記錄回呼 */
-  onEdit: (record: LoanInvestmentRecord) => void;
+  onEdit: (record: LoanInvestmentRecord) => void
   /** 刪除記錄回呼 */
-  onDelete: (id: number) => void;
+  onDelete: (id: number) => void
   /** 檢視還款記錄回呼 */
-  onViewPayments: (record: LoanInvestmentRecord) => void;
+  onViewPayments: (record: LoanInvestmentRecord) => void
 }
 
-export default function RecordTable({ records, onEdit, onDelete, onViewPayments }: RecordTableProps) {
+export default function RecordTable({
+  records,
+  onEdit,
+  onDelete,
+  onViewPayments,
+}: RecordTableProps) {
   return (
     <div className="hidden md:block rounded-md border">
       <Table>
@@ -59,13 +72,11 @@ export default function RecordTable({ records, onEdit, onDelete, onViewPayments 
                     )}
                   </div>
                 </TableCell>
-                <TableCell>${parseFloat(record.principalAmount).toLocaleString()}</TableCell>
+                <TableCell>{formatNT(parseFloat(record.principalAmount))}</TableCell>
                 <TableCell>{record.annualInterestRate}%</TableCell>
                 <TableCell>{getStatusBadge(record.status)}</TableCell>
                 <TableCell>{getRiskBadge(record.riskLevel)}</TableCell>
-                <TableCell>
-                  {new Date(record.startDate).toLocaleDateString("zh-TW")}
-                </TableCell>
+                <TableCell>{new Date(record.startDate).toLocaleDateString("zh-TW")}</TableCell>
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-2">
                     <Button variant="outline" size="sm" onClick={() => onViewPayments(record)}>
@@ -85,5 +96,5 @@ export default function RecordTable({ records, onEdit, onDelete, onViewPayments 
         </TableBody>
       </Table>
     </div>
-  );
+  )
 }

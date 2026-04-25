@@ -1,8 +1,9 @@
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Edit2, Trash2, Receipt } from "lucide-react";
-import { getStatusBadge, getRiskBadge, getRecordTypeBadge } from "./badge-helpers";
-import type { LoanInvestmentRecord } from "./types";
+import { Card } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Edit2, Trash2, Receipt } from "lucide-react"
+import { getStatusBadge, getRiskBadge, getRecordTypeBadge } from "./badge-helpers"
+import { formatNT } from "@/lib/utils"
+import type { LoanInvestmentRecord } from "./types"
 
 /**
  * 借貸投資管理 -- 手機版記錄卡片列表
@@ -11,22 +12,23 @@ import type { LoanInvestmentRecord } from "./types";
 
 interface RecordCardListProps {
   /** 已篩選的記錄列表 */
-  records: LoanInvestmentRecord[];
+  records: LoanInvestmentRecord[]
   /** 編輯記錄回呼 */
-  onEdit: (record: LoanInvestmentRecord) => void;
+  onEdit: (record: LoanInvestmentRecord) => void
   /** 刪除記錄回呼 */
-  onDelete: (id: number) => void;
+  onDelete: (id: number) => void
   /** 檢視還款記錄回呼 */
-  onViewPayments: (record: LoanInvestmentRecord) => void;
+  onViewPayments: (record: LoanInvestmentRecord) => void
 }
 
-export default function RecordCardList({ records, onEdit, onDelete, onViewPayments }: RecordCardListProps) {
+export default function RecordCardList({
+  records,
+  onEdit,
+  onDelete,
+  onViewPayments,
+}: RecordCardListProps) {
   if (records.length === 0) {
-    return (
-      <div className="md:hidden text-center py-8 text-muted-foreground">
-        暫無記錄
-      </div>
-    );
+    return <div className="md:hidden text-center py-8 text-muted-foreground">暫無記錄</div>
   }
 
   return (
@@ -45,25 +47,13 @@ export default function RecordCardList({ records, onEdit, onDelete, onViewPaymen
                 </div>
               </div>
               <div className="flex gap-1">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => onViewPayments(record)}
-                >
+                <Button variant="outline" size="sm" onClick={() => onViewPayments(record)}>
                   <Receipt className="w-4 h-4" />
                 </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => onEdit(record)}
-                >
+                <Button variant="outline" size="sm" onClick={() => onEdit(record)}>
                   <Edit2 className="w-4 h-4" />
                 </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => onDelete(record.id)}
-                >
+                <Button variant="outline" size="sm" onClick={() => onDelete(record.id)}>
                   <Trash2 className="w-4 h-4" />
                 </Button>
               </div>
@@ -75,15 +65,13 @@ export default function RecordCardList({ records, onEdit, onDelete, onViewPaymen
                 <span className="text-muted-foreground">當事人：</span>
                 <div className="font-medium">{record.partyName}</div>
                 {record.partyRelationship && (
-                  <div className="text-xs text-muted-foreground">
-                    {record.partyRelationship}
-                  </div>
+                  <div className="text-xs text-muted-foreground">{record.partyRelationship}</div>
                 )}
               </div>
               <div>
                 <span className="text-muted-foreground">本金：</span>
                 <div className="font-medium text-lg">
-                  ${parseFloat(record.principalAmount).toLocaleString()}
+                  {formatNT(parseFloat(record.principalAmount))}
                 </div>
               </div>
               <div>
@@ -101,5 +89,5 @@ export default function RecordCardList({ records, onEdit, onDelete, onViewPaymen
         </Card>
       ))}
     </div>
-  );
+  )
 }
