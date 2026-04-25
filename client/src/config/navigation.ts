@@ -70,6 +70,13 @@ export const mainNavItems: NavItem[] = [
 // 財務助理分類（決策工具 — 解決記帳焦慮、拖延成本、現金缺口）
 export const decisionNavItems: NavItem[] = [
   {
+    title: "月度預估自動產生",
+    href: "/budget-estimates",
+    icon: Sparkles,
+    badge: "新",
+    description: "一鍵產生整月預估表（合約 + 過去 6 月平均）",
+  },
+  {
     title: "現金分配助理",
     href: "/cash-allocation",
     icon: Wallet,
@@ -391,6 +398,9 @@ export const breadcrumbConfig: Record<string, BreadcrumbItem[]> = {
     { title: "統一查看" },
     { title: "人事費報表" },
   ],
+
+  // 財務助理
+  "/budget-estimates": [{ title: "首頁", href: "/" }, { title: "財務助理" }, { title: "月度預估" }],
 
   // 系統管理
   "/property-groups": [
