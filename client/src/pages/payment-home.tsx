@@ -105,6 +105,7 @@ export default function PaymentHome() {
   const { openCamera, isUploading } = useQuickCameraUpload()
 
   // 鍵盤快捷鍵：/ 聚焦搜尋、N 開新增、P 開付款（不在 input 中時）
+  // CustomEvent 入口：讓其他元件也能觸發 dialog
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null
@@ -126,8 +127,17 @@ export default function PaymentHome() {
         setShowQuickPay(true)
       }
     }
+    const openQuickAdd = () => setShowQuickAdd(true)
+    const openQuickPay = () => setShowQuickPay(true)
+
     window.addEventListener("keydown", handler)
-    return () => window.removeEventListener("keydown", handler)
+    window.addEventListener("open-quick-add", openQuickAdd)
+    window.addEventListener("open-quick-payment", openQuickPay)
+    return () => {
+      window.removeEventListener("keydown", handler)
+      window.removeEventListener("open-quick-add", openQuickAdd)
+      window.removeEventListener("open-quick-payment", openQuickPay)
+    }
   }, [])
 
   // API 查詢
