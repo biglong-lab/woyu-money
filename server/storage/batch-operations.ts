@@ -5,7 +5,7 @@
 
 import { db } from "../db"
 import { paymentItems } from "@shared/schema"
-import { sql } from "drizzle-orm"
+import { inArray, sql } from "drizzle-orm"
 
 /**
  * 批量更新付款項目
@@ -31,6 +31,15 @@ export async function batchUpdatePaymentItems(
   userId: number
 ): Promise<BatchUpdateResult> {
   try {
+    // itemIds 必須是非空陣列
+    if (!Array.isArray(itemIds) || itemIds.length === 0) {
+      return { success: true, updatedCount: 0 }
+    }
+
+    // 用 drizzle 的 inArray() 自動序列化陣列為 PostgreSQL 陣列，
+    // 取代易壞的 sql`id = ANY(${itemIds})`（不會自動序列化 JS array）
+    const idsClause = inArray(paymentItems.id, itemIds)
+
     switch (action) {
       case "updateStatus":
         // 標記為已付清時，paidAmount 同步更新為 totalAmount，
@@ -43,34 +52,34 @@ export async function batchUpdatePaymentItems(
               paidAmount: sql`${paymentItems.totalAmount}`,
               updatedAt: new Date(),
             })
-            .where(sql`id = ANY(${itemIds})`)
+            .where(idsClause)
         } else {
           await db
             .update(paymentItems)
             .set({ status: data.status, updatedAt: new Date() })
-            .where(sql`id = ANY(${itemIds})`)
+            .where(idsClause)
         }
         break
       case "updatePriority":
         await db
           .update(paymentItems)
           .set({ priority: data.priority, updatedAt: new Date() })
-          .where(sql`id = ANY(${itemIds})`)
+          .where(idsClause)
         break
       case "updateCategory":
         await db
           .update(paymentItems)
           .set({ categoryId: data.categoryId, updatedAt: new Date() })
-          .where(sql`id = ANY(${itemIds})`)
+          .where(idsClause)
         break
       case "archive":
         await db
           .update(paymentItems)
           .set({ isDeleted: true, deletedAt: new Date() })
-          .where(sql`id = ANY(${itemIds})`)
+          .where(idsClause)
         break
       case "delete":
-        await db.delete(paymentItems).where(sql`id = ANY(${itemIds})`)
+        await db.delete(paymentItems).where(idsClause)
         break
     }
 
