@@ -36,9 +36,7 @@ interface MonthlyRow {
   paid: string | number
 }
 
-// 合約列：有租金項目的 active project，排除「雜項無分類」(id=1)
-// 重要：只看 item_name 是「租金/房租/租約/租賃」的項目，
-// 不能用 project_type='rental' 短路（會把該 project 所有雜費也當租金）
+// 只看 item_name 是「租金/房租/租約/租賃」的項目，避免把雜費（洗滌、水肥、暫繳款）誤算
 const RENT_ITEM_FILTER = `
   pi.item_name ILIKE '%租金%'
   OR pi.item_name ILIKE '%房租%'
@@ -46,25 +44,22 @@ const RENT_ITEM_FILTER = `
   OR pi.item_name ILIKE '%租賃%'
 `
 
+// 合約列：以 rental_contracts 為唯一真理源（與 /rental-management-enhanced 一致）
+// 透過 project_id 對應到 payment_items 取每月實際付款狀態
 const CONTRACTS_SQL = `
   SELECT
-    pp.id,
-    pp.project_name AS "projectName",
-    MIN(pi.start_date)::text AS "earliest",
-    MAX(pi.start_date)::text AS "latest",
-    AVG(pi.total_amount::numeric) AS "avgMonthly"
-  FROM payment_projects pp
-  JOIN payment_items pi ON pi.project_id = pp.id AND pi.is_deleted = false
-  WHERE pp.is_active = true
-    AND COALESCE(pp.is_deleted, false) = false
-    AND pp.id != 1
-    AND (${RENT_ITEM_FILTER})
-  GROUP BY pp.id, pp.project_name
-  ORDER BY pp.project_name
+    rc.project_id AS "id",
+    rc.contract_name AS "projectName",
+    rc.start_date::text AS "earliest",
+    rc.end_date::text AS "latest",
+    rc.base_amount AS "avgMonthly"
+  FROM rental_contracts rc
+  WHERE COALESCE(rc.is_active, true) = true
+  ORDER BY rc.contract_name
 `
 
 // 每月應付/已付（依 project_id + start_date 月份聚合）
-// 同樣只算租金項目，避免把雜費（如水肥、洗滌、暫繳款、保險）誤入計算
+// 只取對應 rental_contracts 的 project_id（與合約清單同步）+ 租金項目
 const MONTHLY_SQL = `
   SELECT
     pi.project_id AS "projectId",
@@ -72,9 +67,9 @@ const MONTHLY_SQL = `
     SUM(pi.total_amount::numeric) AS "expected",
     SUM(COALESCE(pi.paid_amount, 0)::numeric) AS "paid"
   FROM payment_items pi
-  JOIN payment_projects pp ON pp.id = pi.project_id
+  JOIN rental_contracts rc ON rc.project_id = pi.project_id
   WHERE pi.is_deleted = false
-    AND pp.id != 1
+    AND COALESCE(rc.is_active, true) = true
     AND EXTRACT(YEAR FROM pi.start_date) = $1
     AND (${RENT_ITEM_FILTER})
   GROUP BY pi.project_id, month
