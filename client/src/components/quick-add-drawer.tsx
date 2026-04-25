@@ -278,7 +278,7 @@ export function QuickAddDrawer({ open, onOpenChange }: QuickAddDrawerProps) {
                     {recentItems.map((item) => {
                       const tooltipParts: string[] = []
                       if (item.amount) {
-                        tooltipParts.push(`金額 NT$ ${parseFloat(item.amount).toLocaleString()}`)
+                        tooltipParts.push(`金額 ${formatNT(parseFloat(item.amount))}`)
                       }
                       if (item.endDate) tooltipParts.push(`截止 ${item.endDate}`)
                       if (item.projectId) {

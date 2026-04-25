@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
+import { formatNT } from "@/lib/utils"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import {
   Form,
@@ -93,17 +94,18 @@ export function GeneralPaymentPaymentDialog({
                 {paymentItem.itemName}
               </p>
               <p>
-                <strong>總金額：</strong>NT$ {parseFloat(paymentItem.totalAmount).toLocaleString()}
+                <strong>總金額：</strong>
+                {formatNT(parseFloat(paymentItem.totalAmount))}
               </p>
               <p>
-                <strong>已付金額：</strong>NT${" "}
-                {parseFloat(paymentItem.paidAmount || "0").toLocaleString()}
+                <strong>已付金額：</strong>
+                {formatNT(parseFloat(paymentItem.paidAmount || "0"))}
               </p>
               <p>
-                <strong>待付金額：</strong>NT${" "}
-                {(
+                <strong>待付金額：</strong>
+                {formatNT(
                   parseFloat(paymentItem.totalAmount) - parseFloat(paymentItem.paidAmount || "0")
-                ).toLocaleString()}
+                )}
               </p>
             </div>
           )}
