@@ -186,6 +186,14 @@ export function QuickAddDrawer({ open, onOpenChange }: QuickAddDrawerProps) {
     createMutation.mutate()
   }
 
+  // Enter 鍵直接提交（必填都填了才允許）
+  const handleEnterSubmit = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key !== "Enter") return
+    if (!itemName.trim() || !totalAmount || createMutation.isPending) return
+    e.preventDefault()
+    handleSubmit()
+  }
+
   const handleClose = () => {
     setItemName("")
     setTotalAmount("")
@@ -257,6 +265,7 @@ export function QuickAddDrawer({ open, onOpenChange }: QuickAddDrawerProps) {
                   placeholder="例：水電費、保險、貨款..."
                   value={itemName}
                   onChange={(e) => setItemName(e.target.value)}
+                  onKeyDown={handleEnterSubmit}
                   className="mt-1 h-12 text-base"
                   autoFocus
                 />
@@ -313,6 +322,7 @@ export function QuickAddDrawer({ open, onOpenChange }: QuickAddDrawerProps) {
                     value={totalAmount}
                     onChange={(e) => setTotalAmount(e.target.value)}
                     onFocus={(e) => e.target.select()}
+                    onKeyDown={handleEnterSubmit}
                     className="pl-8 h-12 text-base"
                   />
                 </div>
