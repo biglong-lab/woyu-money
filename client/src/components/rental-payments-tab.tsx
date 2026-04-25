@@ -1,38 +1,60 @@
-import { useState, useMemo } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useState, useMemo } from "react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Input } from "@/components/ui/input"
 import {
-  Calendar, Eye, TrendingUp, CheckCircle, Clock, Search, SortAsc, SortDesc, X
-} from "lucide-react";
-import { AnnualStatsReport } from "@/components/rental-annual-stats";
-import type { PaymentItem } from "@shared/schema";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import {
+  Calendar,
+  Eye,
+  TrendingUp,
+  CheckCircle,
+  Clock,
+  Search,
+  SortAsc,
+  SortDesc,
+  X,
+} from "lucide-react"
+import { AnnualStatsReport } from "@/components/rental-annual-stats"
+import { formatNT } from "@/lib/utils"
+import type { PaymentItem } from "@shared/schema"
 
 // 租金付款項目型別（對應 API 回傳的 RentalPaymentItem）
 interface RentalPaymentItem {
-  readonly id: number;
-  readonly itemName: string;
-  readonly totalAmount: string;
-  readonly paidAmount: string | null;
-  readonly status: string | null;
-  readonly startDate: string;
-  readonly endDate: string | null;
-  readonly notes: string | null;
-  readonly projectId: number | null;
-  readonly projectName: string | null;
-  readonly categoryName: string | null;
-  readonly createdAt: Date | null;
+  readonly id: number
+  readonly itemName: string
+  readonly totalAmount: string
+  readonly paidAmount: string | null
+  readonly status: string | null
+  readonly startDate: string
+  readonly endDate: string | null
+  readonly notes: string | null
+  readonly projectId: number | null
+  readonly projectName: string | null
+  readonly categoryName: string | null
+  readonly createdAt: Date | null
 }
 
 interface RentalPaymentsTabProps {
-  readonly rentalPayments: RentalPaymentItem[];
-  readonly monthlyPaymentYear: number;
-  readonly onMonthlyPaymentYearChange: (year: number) => void;
-  readonly onExportPayments: (format: 'excel' | 'csv') => void;
-  readonly onViewPaymentDetail: (payment: RentalPaymentItem) => void;
+  readonly rentalPayments: RentalPaymentItem[]
+  readonly monthlyPaymentYear: number
+  readonly onMonthlyPaymentYearChange: (year: number) => void
+  readonly onExportPayments: (format: "excel" | "csv") => void
+  readonly onViewPaymentDetail: (payment: RentalPaymentItem) => void
 }
 
 // 租金付款項目 Tab 元件
@@ -44,81 +66,92 @@ export function RentalPaymentsTab({
   onViewPaymentDetail,
 }: RentalPaymentsTabProps) {
   // 過濾和搜尋狀態
-  const [paymentSearchTerm, setPaymentSearchTerm] = useState("");
-  const [paymentStatusFilter, setPaymentStatusFilter] = useState<string>("all");
-  const [paymentProjectFilter, setPaymentProjectFilter] = useState<string>("all");
-  const [paymentSortBy, setPaymentSortBy] = useState<string>("date");
-  const [paymentSortOrder, setPaymentSortOrder] = useState<string>("desc");
+  const [paymentSearchTerm, setPaymentSearchTerm] = useState("")
+  const [paymentStatusFilter, setPaymentStatusFilter] = useState<string>("all")
+  const [paymentProjectFilter, setPaymentProjectFilter] = useState<string>("all")
+  const [paymentSortBy, setPaymentSortBy] = useState<string>("date")
+  const [paymentSortOrder, setPaymentSortOrder] = useState<string>("desc")
 
   // 分頁狀態
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage, setItemsPerPage] = useState(10)
 
   // 過濾和排序邏輯
   const filteredAndSortedPayments = useMemo(() => {
-    if (!rentalPayments || !Array.isArray(rentalPayments)) return [];
+    if (!rentalPayments || !Array.isArray(rentalPayments)) return []
 
     const filtered = rentalPayments.filter((payment: RentalPaymentItem) => {
-      const matchesSearch = !paymentSearchTerm ||
+      const matchesSearch =
+        !paymentSearchTerm ||
         payment.itemName?.toLowerCase().includes(paymentSearchTerm.toLowerCase()) ||
         payment.notes?.toLowerCase().includes(paymentSearchTerm.toLowerCase()) ||
-        payment.projectName?.toLowerCase().includes(paymentSearchTerm.toLowerCase());
+        payment.projectName?.toLowerCase().includes(paymentSearchTerm.toLowerCase())
 
-      const amount = payment.totalAmount ? parseFloat(payment.totalAmount) : 0;
-      const paidAmount = payment.paidAmount ? parseFloat(payment.paidAmount) : 0;
-      const isPaid = payment.status === 'paid' || paidAmount >= amount;
-      const matchesStatus = paymentStatusFilter === "all" ||
+      const amount = payment.totalAmount ? parseFloat(payment.totalAmount) : 0
+      const paidAmount = payment.paidAmount ? parseFloat(payment.paidAmount) : 0
+      const isPaid = payment.status === "paid" || paidAmount >= amount
+      const matchesStatus =
+        paymentStatusFilter === "all" ||
         (paymentStatusFilter === "paid" && isPaid) ||
-        (paymentStatusFilter === "pending" && !isPaid);
+        (paymentStatusFilter === "pending" && !isPaid)
 
-      const matchesProject = paymentProjectFilter === "all" ||
-        payment.projectName === paymentProjectFilter;
+      const matchesProject =
+        paymentProjectFilter === "all" || payment.projectName === paymentProjectFilter
 
-      return matchesSearch && matchesStatus && matchesProject;
-    });
+      return matchesSearch && matchesStatus && matchesProject
+    })
 
-    const sorted = [...filtered];
+    const sorted = [...filtered]
     sorted.sort((a: RentalPaymentItem, b: RentalPaymentItem) => {
-      let aValue: string | number | Date;
-      let bValue: string | number | Date;
+      let aValue: string | number | Date
+      let bValue: string | number | Date
 
       switch (paymentSortBy) {
         case "amount":
-          aValue = parseFloat(a.totalAmount || "0");
-          bValue = parseFloat(b.totalAmount || "0");
-          break;
+          aValue = parseFloat(a.totalAmount || "0")
+          bValue = parseFloat(b.totalAmount || "0")
+          break
         case "name":
-          aValue = a.itemName || "";
-          bValue = b.itemName || "";
-          break;
+          aValue = a.itemName || ""
+          bValue = b.itemName || ""
+          break
         case "project":
-          aValue = a.projectName || "";
-          bValue = b.projectName || "";
-          break;
+          aValue = a.projectName || ""
+          bValue = b.projectName || ""
+          break
         case "date":
         default:
-          aValue = new Date(a.startDate || a.createdAt || 0);
-          bValue = new Date(b.startDate || b.createdAt || 0);
-          break;
+          aValue = new Date(a.startDate || a.createdAt || 0)
+          bValue = new Date(b.startDate || b.createdAt || 0)
+          break
       }
 
       if (paymentSortOrder === "asc") {
-        return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
+        return aValue < bValue ? -1 : aValue > bValue ? 1 : 0
       }
-      return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
-    });
+      return aValue > bValue ? -1 : aValue < bValue ? 1 : 0
+    })
 
-    return sorted;
-  }, [rentalPayments, paymentSearchTerm, paymentStatusFilter, paymentProjectFilter, paymentSortBy, paymentSortOrder]);
+    return sorted
+  }, [
+    rentalPayments,
+    paymentSearchTerm,
+    paymentStatusFilter,
+    paymentProjectFilter,
+    paymentSortBy,
+    paymentSortOrder,
+  ])
 
   // 唯一專案列表
   const uniqueProjects = useMemo(() => {
-    if (!rentalPayments || !Array.isArray(rentalPayments)) return [];
+    if (!rentalPayments || !Array.isArray(rentalPayments)) return []
     const projectNames = rentalPayments
       .map((payment: RentalPaymentItem) => payment.projectName)
-      .filter((name): name is string => Boolean(name));
-    return projectNames.filter((name: string, index: number) => projectNames.indexOf(name) === index);
-  }, [rentalPayments]);
+      .filter((name): name is string => Boolean(name))
+    return projectNames.filter(
+      (name: string, index: number) => projectNames.indexOf(name) === index
+    )
+  }, [rentalPayments])
 
   return (
     <Card>
@@ -191,19 +224,25 @@ export function RentalPaymentsTab({
               onClick={() => setPaymentSortOrder(paymentSortOrder === "asc" ? "desc" : "asc")}
               className="px-3"
             >
-              {paymentSortOrder === "asc" ? <SortAsc className="w-4 h-4" /> : <SortDesc className="w-4 h-4" />}
+              {paymentSortOrder === "asc" ? (
+                <SortAsc className="w-4 h-4" />
+              ) : (
+                <SortDesc className="w-4 h-4" />
+              )}
             </Button>
 
-            {(paymentSearchTerm || paymentStatusFilter !== "all" || paymentProjectFilter !== "all") && (
+            {(paymentSearchTerm ||
+              paymentStatusFilter !== "all" ||
+              paymentProjectFilter !== "all") && (
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => {
-                  setPaymentSearchTerm("");
-                  setPaymentStatusFilter("all");
-                  setPaymentProjectFilter("all");
-                  setPaymentSortBy("date");
-                  setPaymentSortOrder("desc");
+                  setPaymentSearchTerm("")
+                  setPaymentStatusFilter("all")
+                  setPaymentProjectFilter("all")
+                  setPaymentSortBy("date")
+                  setPaymentSortOrder("desc")
                 }}
                 className="px-3"
               >
@@ -230,19 +269,19 @@ export function RentalPaymentsTab({
           {/* 分頁控制 - 頂部 */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 text-sm text-gray-600">
             <span>
-              顯示第 {((currentPage - 1) * itemsPerPage) + 1} - {Math.min(currentPage * itemsPerPage, filteredAndSortedPayments.length)} 筆，
-              共 {filteredAndSortedPayments.length} 筆結果
+              顯示第 {(currentPage - 1) * itemsPerPage + 1} -{" "}
+              {Math.min(currentPage * itemsPerPage, filteredAndSortedPayments.length)} 筆， 共{" "}
+              {filteredAndSortedPayments.length} 筆結果
               {rentalPayments.length !== filteredAndSortedPayments.length &&
-                ` (總計 ${rentalPayments.length} 筆)`
-              }
+                ` (總計 ${rentalPayments.length} 筆)`}
             </span>
             <div className="flex items-center gap-2">
               <span className="text-gray-500">每頁顯示：</span>
               <Select
                 value={itemsPerPage.toString()}
                 onValueChange={(value) => {
-                  setItemsPerPage(parseInt(value));
-                  setCurrentPage(1);
+                  setItemsPerPage(parseInt(value))
+                  setCurrentPage(1)
                 }}
               >
                 <SelectTrigger className="w-20 h-8">
@@ -286,25 +325,25 @@ export function RentalPaymentsTab({
         </div>
       </CardContent>
     </Card>
-  );
+  )
 }
 
 // ==========================================
 // 付款統計摘要卡片
 // ==========================================
 function PaymentSummaryCards({ payments }: { readonly payments: RentalPaymentItem[] }) {
-  const totalItems = payments.length;
+  const totalItems = payments.length
   const completedItems = payments.filter((p: RentalPaymentItem) => {
-    const total = p.totalAmount ? parseFloat(p.totalAmount) : 0;
-    const paid = p.paidAmount ? parseFloat(p.paidAmount) : 0;
-    return p.status === 'paid' || paid >= total;
-  }).length;
+    const total = p.totalAmount ? parseFloat(p.totalAmount) : 0
+    const paid = p.paidAmount ? parseFloat(p.paidAmount) : 0
+    return p.status === "paid" || paid >= total
+  }).length
   const partialItems = payments.filter((p: RentalPaymentItem) => {
-    const total = p.totalAmount ? parseFloat(p.totalAmount) : 0;
-    const paid = p.paidAmount ? parseFloat(p.paidAmount) : 0;
-    return paid > 0 && paid < total;
-  }).length;
-  const pendingItems = totalItems - completedItems - partialItems;
+    const total = p.totalAmount ? parseFloat(p.totalAmount) : 0
+    const paid = p.paidAmount ? parseFloat(p.paidAmount) : 0
+    return paid > 0 && paid < total
+  }).length
+  const pendingItems = totalItems - completedItems - partialItems
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4 mb-6">
@@ -345,7 +384,7 @@ function PaymentSummaryCards({ payments }: { readonly payments: RentalPaymentIte
         </div>
       </Card>
     </div>
-  );
+  )
 }
 
 // 付款表格
@@ -355,10 +394,10 @@ function PaymentTable({
   itemsPerPage,
   onViewDetail,
 }: {
-  readonly payments: RentalPaymentItem[];
-  readonly currentPage: number;
-  readonly itemsPerPage: number;
-  readonly onViewDetail: (payment: RentalPaymentItem) => void;
+  readonly payments: RentalPaymentItem[]
+  readonly currentPage: number
+  readonly itemsPerPage: number
+  readonly onViewDetail: (payment: RentalPaymentItem) => void
 }) {
   return (
     <Table>
@@ -377,81 +416,91 @@ function PaymentTable({
         {payments
           .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
           .map((payment: RentalPaymentItem) => {
-          const amount = payment.totalAmount ? parseFloat(payment.totalAmount) : 0;
-          const paidAmount = payment.paidAmount ? parseFloat(payment.paidAmount) : 0;
-          const isPaid = payment.status === 'paid' || paidAmount >= amount;
-          const isPartiallyPaid = paidAmount > 0 && paidAmount < amount;
-          const dueDate = payment.startDate || payment.createdAt;
-          const paymentProgress = amount > 0 ? (paidAmount / amount) * 100 : 0;
+            const amount = payment.totalAmount ? parseFloat(payment.totalAmount) : 0
+            const paidAmount = payment.paidAmount ? parseFloat(payment.paidAmount) : 0
+            const isPaid = payment.status === "paid" || paidAmount >= amount
+            const isPartiallyPaid = paidAmount > 0 && paidAmount < amount
+            const dueDate = payment.startDate || payment.createdAt
+            const paymentProgress = amount > 0 ? (paidAmount / amount) * 100 : 0
 
-          return (
-            <TableRow key={payment.id} className={isPaid ? "bg-green-50/50" : isPartiallyPaid ? "bg-blue-50/50" : ""}>
-              <TableCell className="font-medium">
-                <div className="flex items-center gap-2">
-                  <div className={`w-2 h-2 rounded-full ${isPaid ? 'bg-green-500' : isPartiallyPaid ? 'bg-blue-500' : 'bg-orange-400'}`} />
-                  {payment.itemName || '未命名租約'}
-                </div>
-              </TableCell>
-              <TableCell>{payment.notes || '租金付款'}</TableCell>
-              <TableCell className="font-medium">
-                <div className="space-y-1">
-                  <div>NT${amount.toLocaleString()}</div>
-                  {isPartiallyPaid && (
-                    <div className="w-full bg-gray-200 rounded-full h-1.5">
-                      <div
-                        className="bg-blue-500 h-1.5 rounded-full transition-all duration-300"
-                        style={{ width: `${paymentProgress}%` }}
-                      />
-                    </div>
+            return (
+              <TableRow
+                key={payment.id}
+                className={isPaid ? "bg-green-50/50" : isPartiallyPaid ? "bg-blue-50/50" : ""}
+              >
+                <TableCell className="font-medium">
+                  <div className="flex items-center gap-2">
+                    <div
+                      className={`w-2 h-2 rounded-full ${isPaid ? "bg-green-500" : isPartiallyPaid ? "bg-blue-500" : "bg-orange-400"}`}
+                    />
+                    {payment.itemName || "未命名租約"}
+                  </div>
+                </TableCell>
+                <TableCell>{payment.notes || "租金付款"}</TableCell>
+                <TableCell className="font-medium">
+                  <div className="space-y-1">
+                    <div>{formatNT(amount)}</div>
+                    {isPartiallyPaid && (
+                      <div className="w-full bg-gray-200 rounded-full h-1.5">
+                        <div
+                          className="bg-blue-500 h-1.5 rounded-full transition-all duration-300"
+                          style={{ width: `${paymentProgress}%` }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                </TableCell>
+                <TableCell className="text-green-600 font-medium">
+                  <div className="flex items-center gap-2">
+                    {formatNT(paidAmount)}
+                    {isPartiallyPaid && (
+                      <span className="text-xs text-gray-500">
+                        ({Math.round(paymentProgress)}%)
+                      </span>
+                    )}
+                  </div>
+                </TableCell>
+                <TableCell>
+                  {isPaid ? (
+                    <Badge
+                      variant="default"
+                      className="bg-green-100 text-green-800 border-green-200"
+                    >
+                      <CheckCircle className="w-3 h-3 mr-1" />
+                      已完成
+                    </Badge>
+                  ) : isPartiallyPaid ? (
+                    <Badge
+                      variant="secondary"
+                      className="bg-blue-100 text-blue-800 border-blue-200"
+                    >
+                      <TrendingUp className="w-3 h-3 mr-1" />
+                      部分付款
+                    </Badge>
+                  ) : (
+                    <Badge
+                      variant="secondary"
+                      className="bg-orange-100 text-orange-800 border-orange-200"
+                    >
+                      <Clock className="w-3 h-3 mr-1" />
+                      待付款
+                    </Badge>
                   )}
-                </div>
-              </TableCell>
-              <TableCell className="text-green-600 font-medium">
-                <div className="flex items-center gap-2">
-                  NT${paidAmount.toLocaleString()}
-                  {isPartiallyPaid && (
-                    <span className="text-xs text-gray-500">
-                      ({Math.round(paymentProgress)}%)
-                    </span>
-                  )}
-                </div>
-              </TableCell>
-              <TableCell>
-                {isPaid ? (
-                  <Badge variant="default" className="bg-green-100 text-green-800 border-green-200">
-                    <CheckCircle className="w-3 h-3 mr-1" />
-                    已完成
-                  </Badge>
-                ) : isPartiallyPaid ? (
-                  <Badge variant="secondary" className="bg-blue-100 text-blue-800 border-blue-200">
-                    <TrendingUp className="w-3 h-3 mr-1" />
-                    部分付款
-                  </Badge>
-                ) : (
-                  <Badge variant="secondary" className="bg-orange-100 text-orange-800 border-orange-200">
-                    <Clock className="w-3 h-3 mr-1" />
-                    待付款
-                  </Badge>
-                )}
-              </TableCell>
-              <TableCell>
-                {dueDate ? new Date(dueDate).toLocaleDateString('zh-TW') : '待確認'}
-              </TableCell>
-              <TableCell>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => onViewDetail(payment)}
-                >
-                  <Eye className="w-4 h-4" />
-                </Button>
-              </TableCell>
-            </TableRow>
-          );
-        })}
+                </TableCell>
+                <TableCell>
+                  {dueDate ? new Date(dueDate).toLocaleDateString("zh-TW") : "待確認"}
+                </TableCell>
+                <TableCell>
+                  <Button variant="outline" size="sm" onClick={() => onViewDetail(payment)}>
+                    <Eye className="w-4 h-4" />
+                  </Button>
+                </TableCell>
+              </TableRow>
+            )
+          })}
       </TableBody>
     </Table>
-  );
+  )
 }
 
 // 分頁控制
@@ -461,12 +510,12 @@ function PaginationControls({
   itemsPerPage,
   onPageChange,
 }: {
-  readonly currentPage: number;
-  readonly totalItems: number;
-  readonly itemsPerPage: number;
-  readonly onPageChange: (page: number) => void;
+  readonly currentPage: number
+  readonly totalItems: number
+  readonly itemsPerPage: number
+  readonly onPageChange: (page: number) => void
 }) {
-  const totalPages = Math.ceil(totalItems / itemsPerPage);
+  const totalPages = Math.ceil(totalItems / itemsPerPage)
 
   return (
     <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mt-4 pt-4 border-t">
@@ -493,12 +542,12 @@ function PaginationControls({
 
         <div className="flex items-center gap-1">
           {(() => {
-            const pages = [];
-            let startPage = Math.max(1, currentPage - 2);
-            const endPage = Math.min(totalPages, startPage + 4);
+            const pages = []
+            let startPage = Math.max(1, currentPage - 2)
+            const endPage = Math.min(totalPages, startPage + 4)
 
             if (endPage - startPage < 4) {
-              startPage = Math.max(1, endPage - 4);
+              startPage = Math.max(1, endPage - 4)
             }
 
             for (let i = startPage; i <= endPage; i++) {
@@ -512,9 +561,9 @@ function PaginationControls({
                 >
                   {i}
                 </Button>
-              );
+              )
             }
-            return pages;
+            return pages
           })()}
         </div>
 
@@ -536,5 +585,5 @@ function PaginationControls({
         </Button>
       </div>
     </div>
-  );
+  )
 }
