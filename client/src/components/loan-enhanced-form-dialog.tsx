@@ -1,11 +1,11 @@
-import { UseFormReturn } from "react-hook-form";
+import { UseFormReturn } from "react-hook-form"
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
+} from "@/components/ui/dialog"
 import {
   Form,
   FormControl,
@@ -13,36 +13,36 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "@/components/ui/form";
+} from "@/components/ui/form"
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useToast } from "@/hooks/use-toast";
-import type { LoanInvestmentFormData } from "./loan-enhanced-types";
+} from "@/components/ui/select"
+import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
+import { Textarea } from "@/components/ui/textarea"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { useToast } from "@/hooks/use-toast"
+import type { LoanInvestmentFormData } from "./loan-enhanced-types"
 import {
   SmartCalculatorWidget,
   LoanTermsSection,
   InvestmentTermsSection,
-} from "./loan-enhanced-form-sections";
+} from "./loan-enhanced-form-sections"
 
 // ==========================================
 // 借貸投資管理 - 新增 Dialog
 // ==========================================
 
 export interface LoanEnhancedAddDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  form: UseFormReturn<LoanInvestmentFormData>;
-  onSubmit: (data: LoanInvestmentFormData) => void;
-  isPending: boolean;
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  form: UseFormReturn<LoanInvestmentFormData>
+  onSubmit: (data: LoanInvestmentFormData) => void
+  isPending: boolean
 }
 
 export function LoanEnhancedAddDialog({
@@ -52,7 +52,7 @@ export function LoanEnhancedAddDialog({
   onSubmit,
   isPending,
 }: LoanEnhancedAddDialogProps) {
-  const { toast } = useToast();
+  const { toast } = useToast()
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -85,7 +85,9 @@ export function LoanEnhancedAddDialog({
                     name="itemName"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>項目名稱 *</FormLabel>
+                        <FormLabel>
+                          項目名稱 <span className="text-red-500">*</span>
+                        </FormLabel>
                         <FormControl>
                           <Input placeholder="例：房屋貸款、股票投資..." {...field} />
                         </FormControl>
@@ -99,7 +101,9 @@ export function LoanEnhancedAddDialog({
                     name="recordType"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>類型 *</FormLabel>
+                        <FormLabel>
+                          類型 <span className="text-red-500">*</span>
+                        </FormLabel>
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
                           <FormControl>
                             <SelectTrigger>
@@ -121,7 +125,9 @@ export function LoanEnhancedAddDialog({
                     name="principalAmount"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>本金金額 *</FormLabel>
+                        <FormLabel>
+                          本金金額 <span className="text-red-500">*</span>
+                        </FormLabel>
                         <FormControl>
                           <Input type="number" placeholder="0" {...field} />
                         </FormControl>
@@ -135,7 +141,9 @@ export function LoanEnhancedAddDialog({
                     name="annualInterestRate"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>年息 (%) *</FormLabel>
+                        <FormLabel>
+                          年息 (%) <span className="text-red-500">*</span>
+                        </FormLabel>
                         <FormControl>
                           <Input
                             type="number"
@@ -143,14 +151,14 @@ export function LoanEnhancedAddDialog({
                             placeholder="0.00"
                             {...field}
                             onChange={(e) => {
-                              field.onChange(e);
-                              const rate = parseFloat(e.target.value);
+                              field.onChange(e)
+                              const rate = parseFloat(e.target.value)
                               if (rate >= 15) {
                                 toast({
                                   title: "高風險提醒",
                                   description: "年息15%以上，建議優先處理",
                                   variant: "destructive",
-                                });
+                                })
                               }
                             }}
                           />
@@ -165,7 +173,9 @@ export function LoanEnhancedAddDialog({
                     name="startDate"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>開始日期 *</FormLabel>
+                        <FormLabel>
+                          開始日期 <span className="text-red-500">*</span>
+                        </FormLabel>
                         <FormControl>
                           <Input type="date" {...field} />
                         </FormControl>
@@ -201,7 +211,9 @@ export function LoanEnhancedAddDialog({
                     name="partyName"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>對方姓名 *</FormLabel>
+                        <FormLabel>
+                          對方姓名 <span className="text-red-500">*</span>
+                        </FormLabel>
                         <FormControl>
                           <Input placeholder="輸入姓名" {...field} />
                         </FormControl>
@@ -318,7 +330,7 @@ export function LoanEnhancedAddDialog({
         </Form>
       </DialogContent>
     </Dialog>
-  );
+  )
 }
 
 // ==========================================
@@ -326,11 +338,11 @@ export function LoanEnhancedAddDialog({
 // ==========================================
 
 export interface LoanEnhancedEditDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  form: UseFormReturn<LoanInvestmentFormData>;
-  onSubmit: (data: LoanInvestmentFormData) => void;
-  isPending: boolean;
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  form: UseFormReturn<LoanInvestmentFormData>
+  onSubmit: (data: LoanInvestmentFormData) => void
+  isPending: boolean
 }
 
 export function LoanEnhancedEditDialog({
@@ -362,7 +374,9 @@ export function LoanEnhancedEditDialog({
                   name="itemName"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>項目名稱 *</FormLabel>
+                      <FormLabel>
+                        項目名稱 <span className="text-red-500">*</span>
+                      </FormLabel>
                       <FormControl>
                         <Input placeholder="例：房屋貸款、股票投資..." {...field} />
                       </FormControl>
@@ -376,7 +390,9 @@ export function LoanEnhancedEditDialog({
                   name="recordType"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>紀錄類型 *</FormLabel>
+                      <FormLabel>
+                        紀錄類型 <span className="text-red-500">*</span>
+                      </FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger>
@@ -400,7 +416,9 @@ export function LoanEnhancedEditDialog({
                   name="principalAmount"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>本金 *</FormLabel>
+                      <FormLabel>
+                        本金 <span className="text-red-500">*</span>
+                      </FormLabel>
                       <FormControl>
                         <Input type="number" placeholder="0" {...field} />
                       </FormControl>
@@ -414,7 +432,9 @@ export function LoanEnhancedEditDialog({
                   name="annualInterestRate"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>年利率 (%) *</FormLabel>
+                      <FormLabel>
+                        年利率 (%) <span className="text-red-500">*</span>
+                      </FormLabel>
                       <FormControl>
                         <Input type="number" step="0.01" placeholder="0.00" {...field} />
                       </FormControl>
@@ -534,5 +554,5 @@ export function LoanEnhancedEditDialog({
         </Form>
       </DialogContent>
     </Dialog>
-  );
+  )
 }
