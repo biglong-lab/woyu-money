@@ -36,6 +36,7 @@ import {
 } from "lucide-react"
 import { apiRequest } from "@/lib/queryClient"
 import { PaymentItemDetails } from "@/components/payment-item-details"
+import { useCopyAmount } from "@/hooks/use-copy-amount"
 import type { PaymentItem } from "@shared/schema"
 
 // 專案篩選選項
@@ -97,6 +98,7 @@ const getPaymentMethodText = (method: string) => {
 
 export default function PaymentRecords() {
   const [location] = useLocation()
+  const copyAmount = useCopyAmount()
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedProject, setSelectedProject] = useState<string>("all")
   const [selectedCategory, setSelectedCategory] = useState<string>("all")
@@ -715,9 +717,18 @@ export default function PaymentRecords() {
 
                     {/* 金額和操作按鈕 */}
                     <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-start gap-2 sm:ml-4">
-                      <div className="text-xl sm:text-2xl font-bold text-green-600">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          copyAmount(parseFloat(record.amount), record.itemName)
+                        }}
+                        className="text-xl sm:text-2xl font-bold text-green-600 hover:underline cursor-pointer"
+                        title="點擊複製金額"
+                        data-testid={`copy-record-amount-${record.id}`}
+                      >
                         +${parseInt(record.amount).toLocaleString()}
-                      </div>
+                      </button>
                       <Button
                         variant="outline"
                         size="sm"
@@ -739,7 +750,7 @@ export default function PaymentRecords() {
 
       {/* 項目詳情對話框 */}
       <PaymentItemDetails
-        item={selectedItem as Parameters<typeof PaymentItemDetails>[0]['item']}
+        item={selectedItem as Parameters<typeof PaymentItemDetails>[0]["item"]}
         open={!!selectedItem}
         onOpenChange={(open) => !open && setSelectedItem(null)}
       />
