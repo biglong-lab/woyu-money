@@ -3,6 +3,7 @@ import { storage } from "../storage"
 import { requireAuth } from "../auth"
 import { insertPaymentItemSchema } from "@shared/schema"
 import { localDateTPE } from "@shared/date-utils"
+import { getAuditUserInfo } from "@shared/user-display"
 import { upload } from "./upload-config"
 import { asyncHandler, AppError } from "../middleware/error-handler"
 
@@ -235,7 +236,7 @@ router.delete(
   "/api/payment/items/:id",
   asyncHandler(async (req, res) => {
     const id = parseInt(req.params.id)
-    const userInfo = req.user?.username || "系統管理員"
+    const userInfo = getAuditUserInfo(req.user)
     const { reason } = req.body || {}
     await storage.deletePaymentItem(id, userInfo, reason || "刪除項目")
     res.status(204).send()
@@ -247,7 +248,7 @@ router.post(
   "/api/payment/items/:id/restore",
   asyncHandler(async (req, res) => {
     const id = parseInt(req.params.id)
-    const userInfo = req.user?.username || "系統管理員"
+    const userInfo = getAuditUserInfo(req.user)
     const { reason } = req.body || {}
     const item = await storage.restorePaymentItem(id, userInfo, reason || "恢復項目")
     res.json(item)
@@ -260,7 +261,7 @@ router.delete(
   requireAuth,
   asyncHandler(async (req, res) => {
     const id = parseInt(req.params.id)
-    const userInfo = req.user?.username || "系統管理員"
+    const userInfo = getAuditUserInfo(req.user)
     const { reason } = req.body || {}
     await storage.permanentlyDeletePaymentItem(id, userInfo, reason || "永久刪除項目")
     res.status(204).send()

@@ -321,7 +321,14 @@ export default function MonthlyPaymentManagement() {
 
   const batchDeleteMutation = useMutation({
     mutationFn: async (ids: number[]) => {
-      return Promise.all(ids.map((id) => apiRequest("DELETE", `/api/payment/items/${id}`)))
+      // 改用單一 batch 端點，避免 N 個並發 DELETE 觸發速率限制（429）
+      // 用 'archive' 而非 'delete'，因為原本單筆 DELETE 是軟刪除（移到回收站），
+      // batch 的 'delete' 是硬刪除（無法復原）。'archive' 設 isDeleted=true 才對。
+      return apiRequest("POST", "/api/batch/update", {
+        action: "archive",
+        itemIds: ids,
+        data: {},
+      })
     },
     onSuccess: (_, ids) => {
       queryClient.invalidateQueries({ queryKey: ["/api/payment/items"] })
@@ -341,16 +348,13 @@ export default function MonthlyPaymentManagement() {
 
   const batchMarkPaidMutation = useMutation({
     mutationFn: async (ids: number[]) => {
-      const today = localDateISO()
-      return Promise.all(
-        ids.map((id) =>
-          apiRequest("PUT", `/api/payment/items/${id}`, {
-            status: "paid",
-            endDate: today,
-            paidAmount: paymentItems.find((item) => item.id === id)?.totalAmount || "0",
-          })
-        )
-      )
+      // 改用單一 batch 端點，避免 N 個並發 PUT 觸發速率限制（429）
+      // batch 的 updateStatus + status='paid' 自動把 paidAmount = totalAmount
+      return apiRequest("POST", "/api/batch/update", {
+        action: "updateStatus",
+        itemIds: ids,
+        data: { status: "paid" },
+      })
     },
     onSuccess: (_, ids) => {
       queryClient.invalidateQueries({ queryKey: ["/api/payment/items"] })

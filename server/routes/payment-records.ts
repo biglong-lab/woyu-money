@@ -130,7 +130,10 @@ router.post(
       ...req.body,
       itemId,
       userId: user?.id || null,
-      userInfo: user ? user.fullName || user.username || `用戶ID: ${user.id}` : "匿名用戶",
+      // 優先 LINE 顯示名稱 → fullName → username（避免顯示 line_U123 長代號）
+      userInfo: user
+        ? user.lineDisplayName || user.fullName || user.username || `用戶ID: ${user.id}`
+        : "匿名用戶",
     }
 
     const result = insertPaymentItemNoteSchema.safeParse(noteData)
