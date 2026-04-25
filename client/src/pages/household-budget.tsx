@@ -239,17 +239,23 @@ export default function HouseholdBudget() {
               </DialogHeader>
               <form onSubmit={quickAddForm.handleSubmit(onQuickAdd)} className="space-y-4">
                 <div>
-                  <Label htmlFor="amount">金額</Label>
+                  <Label htmlFor="amount">
+                    金額 <span className="text-red-500">*</span>
+                  </Label>
                   <Input
                     id="amount"
                     type="number"
                     step="0.01"
                     placeholder="輸入金額"
+                    onFocus={(e) => e.target.select()}
+                    autoFocus
                     {...quickAddForm.register("amount", { required: true })}
                   />
                 </div>
                 <div>
-                  <Label htmlFor="categoryId">分類</Label>
+                  <Label htmlFor="categoryId">
+                    分類 <span className="text-red-500">*</span>
+                  </Label>
                   <Select
                     onValueChange={(value: string) => quickAddForm.setValue("categoryId", value)}
                   >
@@ -272,7 +278,9 @@ export default function HouseholdBudget() {
                   </Select>
                 </div>
                 <div>
-                  <Label htmlFor="description">備註（可選）</Label>
+                  <Label htmlFor="description">
+                    備註 <span className="text-xs text-gray-400 font-normal">（選填）</span>
+                  </Label>
                   <Textarea
                     id="description"
                     placeholder="簡單備註"
