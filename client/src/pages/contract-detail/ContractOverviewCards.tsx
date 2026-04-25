@@ -1,19 +1,17 @@
 /** 合約概覽統計卡片 */
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DollarSign, Calendar, Building2 } from "lucide-react";
-import type { ContractData, ContractStatistics } from "./types";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { DollarSign, Calendar, Building2 } from "lucide-react"
+import { formatNT } from "@/lib/utils"
+import type { ContractData, ContractStatistics } from "./types"
 
 interface ContractOverviewCardsProps {
-  contract: ContractData;
-  statistics: ContractStatistics;
+  contract: ContractData
+  statistics: ContractStatistics
 }
 
 /** 顯示合約的四張統計卡片 */
-export function ContractOverviewCards({
-  contract,
-  statistics,
-}: ContractOverviewCardsProps) {
+export function ContractOverviewCards({ contract, statistics }: ContractOverviewCardsProps) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
       <Card>
@@ -22,9 +20,7 @@ export function ContractOverviewCards({
           <DollarSign className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">
-            {parseInt(contract.baseAmount || "0").toLocaleString()}
-          </div>
+          <div className="text-2xl font-bold">{formatNT(parseInt(contract.baseAmount || "0"))}</div>
         </CardContent>
       </Card>
 
@@ -44,9 +40,7 @@ export function ContractOverviewCards({
           <Building2 className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">
-            {statistics.totalPaymentItems}
-          </div>
+          <div className="text-2xl font-bold">{statistics.totalPaymentItems}</div>
           <p className="text-xs text-muted-foreground">
             已付: {statistics.paidItems} | 待付: {statistics.pendingItems}
           </p>
@@ -59,14 +53,10 @@ export function ContractOverviewCards({
           <DollarSign className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">
-            {statistics.totalAmount.toLocaleString()}
-          </div>
-          <p className="text-xs text-muted-foreground">
-            已付: {statistics.paidAmount.toLocaleString()}
-          </p>
+          <div className="text-2xl font-bold">{formatNT(statistics.totalAmount)}</div>
+          <p className="text-xs text-muted-foreground">已付: {formatNT(statistics.paidAmount)}</p>
         </CardContent>
       </Card>
     </div>
-  );
+  )
 }
