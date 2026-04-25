@@ -182,11 +182,11 @@ export function ActiveRentalsCard() {
                   size="sm"
                   className="h-6 px-2 text-xs"
                   onClick={handleCopyPendingList}
-                  title="複製待繳清單"
+                  title={`複製待繳 ${pendingCount} 筆清單`}
                   data-testid="copy-pending-rentals"
                 >
                   <Copy className="h-3 w-3 mr-1" />
-                  清單
+                  清單 ({pendingCount})
                 </Button>
               )}
             </div>
