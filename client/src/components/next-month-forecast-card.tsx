@@ -12,6 +12,7 @@ import { TrendingUp, ArrowRight, AlertTriangle, Copy } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { formatNT } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
+import { useCopyAmount } from "@/hooks/use-copy-amount"
 
 interface ForecastMonth {
   year: number
@@ -38,6 +39,7 @@ interface ForecastData {
 
 export function NextMonthForecastCard() {
   const { toast } = useToast()
+  const copyAmount = useCopyAmount()
   const { data, isLoading } = useQuery<ForecastData>({
     queryKey: ["/api/cashflow/forecast?monthsAhead=1"],
   })
@@ -82,17 +84,45 @@ export function NextMonthForecastCard() {
           <div className="grid grid-cols-3 gap-2 text-xs">
             <div>
               <div className="text-gray-500">預估收入</div>
-              <div className="font-semibold text-green-700">{formatNT(gap.estimatedIncome)}</div>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault()
+                  copyAmount(gap.estimatedIncome, "下月預估收入")
+                }}
+                className="font-semibold text-green-700 hover:underline cursor-pointer"
+                title="點擊複製金額"
+              >
+                {formatNT(gap.estimatedIncome)}
+              </button>
             </div>
             <div>
               <div className="text-gray-500">預估支出</div>
-              <div className="font-semibold text-red-700">{formatNT(gap.estimatedExpense)}</div>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault()
+                  copyAmount(gap.estimatedExpense, "下月預估支出")
+                }}
+                className="font-semibold text-red-700 hover:underline cursor-pointer"
+                title="點擊複製金額"
+              >
+                {formatNT(gap.estimatedExpense)}
+              </button>
             </div>
             <div>
               <div className="text-gray-500">淨額</div>
-              <div className={`font-bold ${isNegative ? "text-red-700" : "text-gray-900"}`}>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault()
+                  copyAmount(gap.net, "下月淨額")
+                }}
+                className={`font-bold hover:underline cursor-pointer ${isNegative ? "text-red-700" : "text-gray-900"}`}
+                title="點擊複製金額"
+              >
                 {formatNT(gap.net)}
-              </div>
+              </button>
             </div>
           </div>
           {hasGap && (
