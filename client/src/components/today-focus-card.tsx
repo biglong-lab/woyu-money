@@ -314,6 +314,27 @@ function PaidDialog({ item, open, onOpenChange, onConfirm, isPending }: PaidDial
             {!isInvalid && parsedAmount > 0 && (
               <div className="text-xs text-blue-700 font-medium">= {formatNT(parsedAmount)}</div>
             )}
+            {/* 快速金額按鈕 */}
+            {item.unpaidAmount > 0 && (
+              <div className="flex gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setAmountInput(String(Math.round(item.unpaidAmount)))}
+                  className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-700 hover:bg-green-200 active:scale-95 transition-all"
+                  title="輸入應付全額"
+                >
+                  付清 {formatNT(item.unpaidAmount)}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAmountInput(String(Math.round(item.unpaidAmount / 2)))}
+                  className="text-xs px-2 py-1 rounded-full bg-yellow-100 text-yellow-800 hover:bg-yellow-200 active:scale-95 transition-all"
+                  title="輸入應付一半"
+                >
+                  半額 {formatNT(Math.round(item.unpaidAmount / 2))}
+                </button>
+              </div>
+            )}
             {isPartial && (
               <div className="text-xs text-yellow-700 bg-yellow-50 rounded px-2 py-1">
                 ⚠️ 此為部分付款，剩餘 {formatNT(item.unpaidAmount - parsedAmount)} 仍會列為待付
