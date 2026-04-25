@@ -181,39 +181,42 @@ export default function DueDateDashboard({
         onClick={() => onItemClick?.(item)}
         data-testid={`due-item-${item.id}`}
       >
-        <div className="flex justify-between items-start mb-2">
-          <div className="flex-1 min-w-0">
-            <h4 className="font-medium text-sm sm:text-base truncate">{item.itemName}</h4>
-            {item.projectName && (
-              <p className="text-xs text-gray-500 truncate">{item.projectName}</p>
-            )}
-          </div>
+        {/* 第一列：項目名稱 + 緊急度 Badge */}
+        <div className="flex justify-between items-start gap-2 mb-1">
+          <h4 className="font-medium text-sm sm:text-base truncate flex-1 min-w-0">
+            {item.itemName}
+          </h4>
           <Badge
             variant={
               urgency === "overdue" ? "destructive" : urgency === "urgent" ? "default" : "secondary"
             }
-            className="ml-2 text-[10px] sm:text-xs flex-shrink-0"
+            className="text-[10px] sm:text-xs flex-shrink-0 whitespace-nowrap"
           >
             {daysText}
           </Badge>
         </div>
-        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
-          <span className="text-base sm:text-lg font-bold text-gray-900">
+        {/* 第二列：專案名稱（小字） */}
+        {item.projectName && (
+          <p className="text-xs text-gray-500 truncate mb-2">{item.projectName}</p>
+        )}
+        {/* 第三列：金額 + 快速付款按鈕（金額永不換行截斷） */}
+        <div className="flex justify-between items-center gap-2">
+          <span className="text-base sm:text-lg font-bold text-gray-900 whitespace-nowrap">
             {formatNT(pendingAmount)}
           </span>
           {onQuickPay && (
             <Button
               size="sm"
               variant="outline"
-              className="w-full sm:w-auto min-h-[36px]"
+              className="h-8 px-2 sm:px-3 flex-shrink-0"
               onClick={(e) => {
                 e.stopPropagation()
                 onQuickPay(item)
               }}
               data-testid={`btn-quick-pay-${item.id}`}
             >
-              <CreditCard className="h-3 w-3 mr-1" />
-              快速付款
+              <CreditCard className="h-3 w-3 sm:mr-1" />
+              <span className="hidden sm:inline">付款</span>
             </Button>
           )}
         </div>
@@ -294,8 +297,8 @@ export default function DueDateDashboard({
         </Card>
       </div>
 
-      {/* 響應式分類清單：手機單欄，桌面三欄 */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">
+      {/* 響應式分類清單：手機單欄，平板雙欄，桌面三欄 */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
         {categorizedItems.overdue.length > 0 && (
           <Card className="border-red-200" data-testid="card-overdue-list">
             <CardHeader className="pb-2 bg-red-50 px-3 sm:px-6">
