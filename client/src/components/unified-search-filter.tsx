@@ -141,25 +141,9 @@ export default function UnifiedSearchFilter({
     return () => clearTimeout(handler)
   }, [activeFilters, onFilterChange])
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === "k") {
-        e.preventDefault()
-        const searchInput = document.querySelector(
-          '[data-testid="unified-search-input"]'
-        ) as HTMLInputElement
-        if (searchInput) {
-          searchInput.focus()
-        }
-      }
-      if (e.key === "Escape") {
-        setSearch("")
-        clearAllFilters()
-      }
-    }
-    window.addEventListener("keydown", handleKeyDown)
-    return () => window.removeEventListener("keydown", handleKeyDown)
-  }, [])
+  // 注意：Cmd+K 聚焦由上方第一個 useEffect 處理（用 ref 更穩定）
+  // 全域 Esc 清除所有 filters 已移除：Esc 應只關閉 dialog，不應誤觸發清除
+  // 在 search input 內按 Esc 仍會清除搜尋（onKeyDown 處理）
 
   const clearAllFilters = useCallback(() => {
     setSearch("")
