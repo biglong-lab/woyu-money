@@ -269,6 +269,17 @@ export function QuickPaymentDialog({ open, onOpenChange }: QuickPaymentDialogPro
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
                     onFocus={(e) => e.target.select()}
+                    onKeyDown={(e) => {
+                      if (
+                        e.key === "Enter" &&
+                        amount &&
+                        !paymentMutation.isPending &&
+                        selectedItem
+                      ) {
+                        e.preventDefault()
+                        handleConfirmPayment()
+                      }
+                    }}
                     className="pl-8"
                     autoFocus
                   />
