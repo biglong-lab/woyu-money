@@ -26,6 +26,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { apiRequest, queryClient } from "@/lib/queryClient"
+import { localDateISO } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 
 const BUDGET_PRESETS = [50000, 100000, 200000, 300000, 500000, 1000000]
@@ -426,7 +427,7 @@ export default function CashAllocationPage() {
       apiRequest("POST", "/api/payment/records", {
         itemId: item.id,
         amountPaid: item.unpaidAmount,
-        paymentDate: new Date().toISOString().slice(0, 10),
+        paymentDate: localDateISO(),
       }),
     onMutate: (item) => setPendingId(item.id),
     onSuccess: (_data, item) => {

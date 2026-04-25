@@ -17,6 +17,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { apiRequest, queryClient } from "@/lib/queryClient"
+import { localDateISO } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 import { useCopyAmount } from "@/hooks/use-copy-amount"
 
@@ -99,7 +100,7 @@ function MonthDetail({ year, month }: { year: number; month: number }) {
       apiRequest("POST", "/api/payment/records", {
         itemId: item.id,
         amountPaid: item.unpaidAmount,
-        paymentDate: new Date().toISOString().slice(0, 10),
+        paymentDate: localDateISO(),
       }),
     onMutate: (item) => setPendingId(item.id),
     onSuccess: (_data, item) => {

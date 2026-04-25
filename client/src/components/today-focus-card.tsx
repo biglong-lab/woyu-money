@@ -36,6 +36,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { apiRequest, queryClient } from "@/lib/queryClient"
+import { localDateISO } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 import { useCopyAmount } from "@/hooks/use-copy-amount"
 
@@ -80,16 +81,7 @@ function formatCurrency(n: number): string {
 }
 
 function todayISODate(): string {
-  return localDate(0)
-}
-
-/** 本地日期 YYYY-MM-DD（避免 UTC 跨日 bug：TPE 00:00-08:00 等同 UTC 前一天） */
-function localDate(offsetDays = 0): string {
-  const d = new Date(Date.now() + offsetDays * 86_400_000)
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, "0")
-  const day = String(d.getDate()).padStart(2, "0")
-  return `${y}-${m}-${day}`
+  return localDateISO(0)
 }
 
 const SCOPE_FILTERS: Record<ViewScope, UrgencyLevel[]> = {
@@ -349,13 +341,13 @@ function loadCompleted(): { date: string; count: number; amount: number } {
     const raw = localStorage.getItem(COMPLETED_KEY)
     if (raw) {
       const parsed = JSON.parse(raw) as { date: string; count: number; amount: number }
-      const today = localDate(0)
+      const today = localDateISO(0)
       if (parsed.date === today) return parsed
     }
   } catch {
     // ignore
   }
-  return { date: localDate(0), count: 0, amount: 0 }
+  return { date: localDateISO(0), count: 0, amount: 0 }
 }
 function saveCompleted(state: { date: string; count: number; amount: number }) {
   try {
@@ -376,8 +368,8 @@ function loadStreak(): StreakState {
     const raw = localStorage.getItem(STREAK_KEY)
     if (raw) {
       const parsed = JSON.parse(raw) as StreakState
-      const today = localDate(0)
-      const yesterday = localDate(-1)
+      const today = localDateISO(0)
+      const yesterday = localDateISO(-1)
       // 最後付款日是昨天或今天 → 維持；否則歸零（中斷）
       if (parsed.lastDate === today || parsed.lastDate === yesterday) {
         return parsed
@@ -396,8 +388,8 @@ function saveStreak(state: StreakState) {
   }
 }
 function bumpStreak(prev: StreakState): StreakState {
-  const today = localDate(0)
-  const yesterday = localDate(-1)
+  const today = localDateISO(0)
+  const yesterday = localDateISO(-1)
   if (prev.lastDate === today) return prev // 今天已計
   if (prev.lastDate === yesterday) return { lastDate: today, days: prev.days + 1 }
   return { lastDate: today, days: 1 } // 中斷後重啟
@@ -460,7 +452,7 @@ export function TodayFocusCard() {
       queryClient.invalidateQueries({ queryKey: ["/api/payment/items"] })
       queryClient.invalidateQueries({ queryKey: ["/api/payment/records"] })
       // 累計今日已完成
-      const today = localDate(0)
+      const today = localDateISO(0)
       const next =
         completed.date === today
           ? {
