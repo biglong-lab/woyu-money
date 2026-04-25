@@ -1,5 +1,5 @@
-import { UseFormReturn } from "react-hook-form";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { UseFormReturn } from "react-hook-form"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Dialog,
   DialogContent,
@@ -7,7 +7,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog";
+} from "@/components/ui/dialog"
 import {
   Form,
   FormControl,
@@ -15,14 +15,14 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "@/components/ui/form";
+} from "@/components/ui/form"
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "@/components/ui/select"
 import {
   Table,
   TableBody,
@@ -30,18 +30,14 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
-import { Plus, Edit, Trash2, Receipt, Search } from "lucide-react";
-import {
-  formatCurrency,
-  type ExpenseFormData,
-  type ExpenseFilter,
-} from "./types";
-import type { HouseholdExpense, DebtCategory } from "@shared/schema";
+} from "@/components/ui/table"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import { Badge } from "@/components/ui/badge"
+import { Plus, Edit, Trash2, Receipt, Search } from "lucide-react"
+import { formatCurrency, type ExpenseFormData, type ExpenseFilter } from "./types"
+import type { HouseholdExpense, DebtCategory } from "@shared/schema"
 
 // ============================================================
 // 支出記錄分頁 - 新增支出對話框 + 篩選器 + 支出表格
@@ -55,29 +51,29 @@ const PAYMENT_METHOD_OPTIONS = [
   { value: "transfer", label: "轉帳" },
   { value: "mobile_payment", label: "行動支付" },
   { value: "other", label: "其他" },
-] as const;
+] as const
 
 interface ExpenseTabProps {
   /** 目前選取的分類 */
-  selectedCategory: DebtCategory;
+  selectedCategory: DebtCategory
   /** 已篩選的支出資料 */
-  filteredExpenses: HouseholdExpense[];
+  filteredExpenses: HouseholdExpense[]
   /** 是否載入中 */
-  isLoadingExpenses: boolean;
+  isLoadingExpenses: boolean
   /** 支出對話框是否開啟 */
-  showExpenseDialog: boolean;
+  showExpenseDialog: boolean
   /** 支出對話框開關回呼 */
-  onShowExpenseDialogChange: (open: boolean) => void;
+  onShowExpenseDialogChange: (open: boolean) => void
   /** react-hook-form 表單實例 */
-  expenseForm: UseFormReturn<ExpenseFormData>;
+  expenseForm: UseFormReturn<ExpenseFormData>
   /** 表單送出回呼 */
-  onExpenseSubmit: (data: ExpenseFormData) => void;
+  onExpenseSubmit: (data: ExpenseFormData) => void
   /** mutation 是否進行中 */
-  isExpensePending: boolean;
+  isExpensePending: boolean
   /** 篩選條件 */
-  expenseFilter: ExpenseFilter;
+  expenseFilter: ExpenseFilter
   /** 篩選條件變更回呼 */
-  onFilterChange: (filter: ExpenseFilter) => void;
+  onFilterChange: (filter: ExpenseFilter) => void
 }
 
 export function ExpenseTab({
@@ -102,10 +98,7 @@ export function ExpenseTab({
           </span>
 
           {/* 新增支出對話框 */}
-          <Dialog
-            open={showExpenseDialog}
-            onOpenChange={onShowExpenseDialogChange}
-          >
+          <Dialog open={showExpenseDialog} onOpenChange={onShowExpenseDialogChange}>
             <DialogTrigger asChild>
               <Button size="sm">
                 <Plus className="h-4 w-4 mr-2" />
@@ -120,10 +113,7 @@ export function ExpenseTab({
                 </DialogDescription>
               </DialogHeader>
               <Form {...expenseForm}>
-                <form
-                  onSubmit={expenseForm.handleSubmit(onExpenseSubmit)}
-                  className="space-y-4"
-                >
+                <form onSubmit={expenseForm.handleSubmit(onExpenseSubmit)} className="space-y-4">
                   {/* 金額 */}
                   <FormField
                     control={expenseForm.control}
@@ -132,12 +122,7 @@ export function ExpenseTab({
                       <FormItem>
                         <FormLabel>金額</FormLabel>
                         <FormControl>
-                          <Input
-                            type="number"
-                            placeholder="0"
-                            step="0.01"
-                            {...field}
-                          />
+                          <Input type="number" placeholder="0" step="0.01" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -166,10 +151,7 @@ export function ExpenseTab({
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>付款方式</FormLabel>
-                        <Select
-                          onValueChange={field.onChange}
-                          defaultValue={field.value}
-                        >
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue />
@@ -244,14 +226,18 @@ export function ExpenseTab({
                       search: e.target.value,
                     })
                   }
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape" && expenseFilter.search) {
+                      e.preventDefault()
+                      onFilterChange({ ...expenseFilter, search: "" })
+                    }
+                  }}
                 />
               </div>
             </div>
             <Select
               value={expenseFilter.paymentMethod}
-              onValueChange={(value) =>
-                onFilterChange({ ...expenseFilter, paymentMethod: value })
-              }
+              onValueChange={(value) => onFilterChange({ ...expenseFilter, paymentMethod: value })}
             >
               <SelectTrigger className="w-40">
                 <SelectValue />
@@ -272,9 +258,7 @@ export function ExpenseTab({
             {isLoadingExpenses ? (
               <div className="text-center py-4">載入中...</div>
             ) : filteredExpenses.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
-                暫無支出記錄
-              </div>
+              <div className="text-center py-8 text-gray-500">暫無支出記錄</div>
             ) : (
               <Table>
                 <TableHeader>
@@ -289,16 +273,10 @@ export function ExpenseTab({
                 <TableBody>
                   {filteredExpenses.map((expense) => (
                     <TableRow key={expense.id}>
+                      <TableCell>{new Date(expense.date).toLocaleDateString()}</TableCell>
+                      <TableCell>NT$ {formatCurrency(expense.amount)}</TableCell>
                       <TableCell>
-                        {new Date(expense.date).toLocaleDateString()}
-                      </TableCell>
-                      <TableCell>
-                        NT$ {formatCurrency(expense.amount)}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline">
-                          {expense.paymentMethod}
-                        </Badge>
+                        <Badge variant="outline">{expense.paymentMethod}</Badge>
                       </TableCell>
                       <TableCell>{expense.description || "-"}</TableCell>
                       <TableCell>
@@ -320,5 +298,5 @@ export function ExpenseTab({
         </div>
       </CardContent>
     </Card>
-  );
+  )
 }

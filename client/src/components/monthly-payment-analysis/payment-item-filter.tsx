@@ -1,31 +1,31 @@
-import { Input } from "@/components/ui/input";
+import { Input } from "@/components/ui/input"
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { Search, Filter, SortAsc, SortDesc } from "lucide-react";
-import type { SortOrder } from "./types";
+} from "@/components/ui/select"
+import { Search, Filter, SortAsc, SortDesc } from "lucide-react"
+import type { SortOrder } from "./types"
 
 interface PaymentItemFilterProps {
   // 搜尋
-  readonly searchKeyword: string;
-  readonly onSearchChange: (value: string) => void;
-  readonly searchPlaceholder?: string;
+  readonly searchKeyword: string
+  readonly onSearchChange: (value: string) => void
+  readonly searchPlaceholder?: string
   // 分類篩選
-  readonly selectedCategory: string;
-  readonly onCategoryChange: (value: string) => void;
-  readonly categories: Array<{ id: number; categoryName: string }>;
+  readonly selectedCategory: string
+  readonly onCategoryChange: (value: string) => void
+  readonly categories: Array<{ id: number; categoryName: string }>
   // 專案篩選
-  readonly selectedProject: string;
-  readonly onProjectChange: (value: string) => void;
-  readonly projects: Array<{ id: number; projectName: string }>;
+  readonly selectedProject: string
+  readonly onProjectChange: (value: string) => void
+  readonly projects: Array<{ id: number; projectName: string }>
   // 排序
-  readonly sortBy: string;
-  readonly sortOrder: SortOrder;
-  readonly onSortChange: (sortBy: string, sortOrder: SortOrder) => void;
+  readonly sortBy: string
+  readonly sortOrder: SortOrder
+  readonly onSortChange: (sortBy: string, sortOrder: SortOrder) => void
 }
 
 // 付款項目搜尋與篩選控制列
@@ -52,6 +52,12 @@ export function PaymentItemFilter({
           placeholder={searchPlaceholder}
           value={searchKeyword}
           onChange={(e) => onSearchChange(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Escape" && searchKeyword) {
+              e.preventDefault()
+              onSearchChange("")
+            }
+          }}
           className="pl-10"
         />
       </div>
@@ -92,8 +98,8 @@ export function PaymentItemFilter({
       <Select
         value={`${sortBy}-${sortOrder}`}
         onValueChange={(value) => {
-          const [field, order] = value.split("-");
-          onSortChange(field, order as SortOrder);
+          const [field, order] = value.split("-")
+          onSortChange(field, order as SortOrder)
         }}
       >
         <SelectTrigger>
@@ -107,16 +113,12 @@ export function PaymentItemFilter({
         <SelectContent>
           <SelectItem value="startDate-desc">到期日 (最新)</SelectItem>
           <SelectItem value="startDate-asc">到期日 (最舊)</SelectItem>
-          <SelectItem value="remainingAmount-desc">
-            剩餘金額 (高到低)
-          </SelectItem>
-          <SelectItem value="remainingAmount-asc">
-            剩餘金額 (低到高)
-          </SelectItem>
+          <SelectItem value="remainingAmount-desc">剩餘金額 (高到低)</SelectItem>
+          <SelectItem value="remainingAmount-asc">剩餘金額 (低到高)</SelectItem>
           <SelectItem value="itemName-asc">項目名稱 (A-Z)</SelectItem>
           <SelectItem value="itemName-desc">項目名稱 (Z-A)</SelectItem>
         </SelectContent>
       </Select>
     </div>
-  );
+  )
 }
