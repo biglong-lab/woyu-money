@@ -33,10 +33,23 @@ export async function batchUpdatePaymentItems(
   try {
     switch (action) {
       case "updateStatus":
-        await db
-          .update(paymentItems)
-          .set({ status: data.status, updatedAt: new Date() })
-          .where(sql`id = ANY(${itemIds})`)
+        // 標記為已付清時，paidAmount 同步更新為 totalAmount，
+        // 確保「待付總額」儀表板立即反映此次批量結算
+        if (data.status === "paid") {
+          await db
+            .update(paymentItems)
+            .set({
+              status: "paid",
+              paidAmount: sql`${paymentItems.totalAmount}`,
+              updatedAt: new Date(),
+            })
+            .where(sql`id = ANY(${itemIds})`)
+        } else {
+          await db
+            .update(paymentItems)
+            .set({ status: data.status, updatedAt: new Date() })
+            .where(sql`id = ANY(${itemIds})`)
+        }
         break
       case "updatePriority":
         await db
