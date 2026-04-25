@@ -122,6 +122,9 @@ export function RecentPaymentsCard() {
     0
   )
 
+  // 最近 5 筆合計（footer 顯示用）
+  const visibleTotal = records.reduce((s, rec) => s + Number(rec.amountPaid ?? rec.amount ?? 0), 0)
+
   const handleUndo = (rec: PaymentRecordWithNames) => {
     if (
       !window.confirm(
@@ -202,6 +205,12 @@ export function RecentPaymentsCard() {
             </div>
           )
         })}
+        {records.length > 1 && (
+          <div className="flex items-center justify-between pt-2 mt-1 border-t text-xs">
+            <span className="text-gray-500">最近 {records.length} 筆合計</span>
+            <span className="font-semibold text-green-700">{fmt(visibleTotal)}</span>
+          </div>
+        )}
       </CardContent>
     </Card>
   )
