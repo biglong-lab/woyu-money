@@ -297,6 +297,9 @@ function PaidDialog({ item, open, onOpenChange, onConfirm, isPending }: PaidDial
                 data-testid="input-paid-amount"
               />
             </div>
+            {!isInvalid && parsedAmount > 0 && (
+              <div className="text-xs text-blue-700 font-medium">= {formatNT(parsedAmount)}</div>
+            )}
             {isPartial && (
               <div className="text-xs text-yellow-700 bg-yellow-50 rounded px-2 py-1">
                 ⚠️ 此為部分付款，剩餘 {formatNT(item.unpaidAmount - parsedAmount)} 仍會列為待付
