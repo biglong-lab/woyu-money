@@ -11,7 +11,15 @@
 
 import { useState, useEffect } from "react"
 import { useMutation } from "@tanstack/react-query"
-import { AlertCircle, CheckCircle2, TrendingDown, Wallet, Clock, AlertTriangle } from "lucide-react"
+import {
+  AlertCircle,
+  CheckCircle2,
+  TrendingDown,
+  Wallet,
+  Clock,
+  AlertTriangle,
+  Copy,
+} from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -536,6 +544,29 @@ export default function CashAllocationPage() {
 
       {result && (result.suggested.length > 0 || result.deferred.length > 0) && (
         <div className="space-y-4 sm:space-y-6" data-testid="allocation-result">
+          <div className="flex justify-end">
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-xs"
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(result.markdown)
+                  toast({ title: "已複製建議清單", description: "可貼到 LINE / 備忘錄" })
+                } catch {
+                  toast({
+                    title: "複製失敗",
+                    description: "瀏覽器不支援",
+                    variant: "destructive",
+                  })
+                }
+              }}
+              data-testid="copy-allocation-md"
+            >
+              <Copy className="h-3 w-3 mr-1" />
+              複製建議清單
+            </Button>
+          </div>
           <SummaryCard result={result} />
 
           <UrgencyGroup
