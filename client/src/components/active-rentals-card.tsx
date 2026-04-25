@@ -266,18 +266,37 @@ export function ActiveRentalsCard() {
                   </Badge>
                 </div>
                 <div className="text-xs text-gray-600 mt-0.5">
-                  應付{" "}
-                  <button
-                    type="button"
-                    onClick={() => copyAmount(cell.expectedAmount, contract.contractName)}
-                    className="font-medium hover:text-blue-600 hover:underline cursor-pointer"
-                    title="點擊複製數字（轉帳用）"
-                    data-testid={`copy-amount-${cell.contractId}`}
-                  >
-                    {formatNT(cell.expectedAmount)}
-                  </button>
-                  {cell.paidAmount > 0 && cell.status !== "paid" && (
-                    <span className="ml-1">/ 已付 {formatNT(cell.paidAmount)}</span>
+                  {cell.paidAmount > 0 && cell.status !== "paid" ? (
+                    <>
+                      待付{" "}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          copyAmount(cell.expectedAmount - cell.paidAmount, contract.contractName)
+                        }
+                        className="font-medium hover:text-blue-600 hover:underline cursor-pointer"
+                        title="點擊複製剩餘待付金額（轉帳用）"
+                        data-testid={`copy-amount-${cell.contractId}`}
+                      >
+                        {formatNT(cell.expectedAmount - cell.paidAmount)}
+                      </button>
+                      <span className="ml-1 text-gray-400">
+                        （應付 {formatNT(cell.expectedAmount)}，已付 {formatNT(cell.paidAmount)}）
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      應付{" "}
+                      <button
+                        type="button"
+                        onClick={() => copyAmount(cell.expectedAmount, contract.contractName)}
+                        className="font-medium hover:text-blue-600 hover:underline cursor-pointer"
+                        title="點擊複製數字（轉帳用）"
+                        data-testid={`copy-amount-${cell.contractId}`}
+                      >
+                        {formatNT(cell.expectedAmount)}
+                      </button>
+                    </>
                   )}
                 </div>
               </div>
