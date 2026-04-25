@@ -98,9 +98,10 @@ export function QuickPaymentDialog({ open, onOpenChange }: QuickPaymentDialogPro
   // 建立付款記錄
   const paymentMutation = useMutation<unknown, Error, PaymentFormData>({
     mutationFn: async (data: PaymentFormData) => {
-      return apiRequest("POST", "/api/payment/records", {
-        itemId: data.itemId,
-        amountPaid: data.amountPaid,
+      // 改用正確端點：POST /api/payment/items/:id/payments
+      // 此端點會自動更新 paidAmount + status + 建立 payment_record（單一交易）
+      return apiRequest("POST", `/api/payment/items/${data.itemId}/payments`, {
+        amount: data.amountPaid,
         paymentDate: data.paymentDate,
         paymentMethod: data.paymentMethod,
       })

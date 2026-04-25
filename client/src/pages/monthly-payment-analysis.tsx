@@ -145,14 +145,16 @@ export default function MonthlyPaymentAnalysis() {
   const createPaymentMutation = useMutation({
     mutationFn: async (data: PaymentRecordInput & { itemId: number }) => {
       const formData = new FormData()
-      formData.append("itemId", data.itemId.toString())
+      // 改用正確端點：/api/payment/items/:id/payments（自動更新 paidAmount + status）
+      // itemId 改放 URL，body 移除 itemId；保留其他欄位
       formData.append("amount", data.amount)
       formData.append("paymentDate", data.paymentDate)
       formData.append("paymentMethod", data.paymentMethod)
       if (data.notes) formData.append("notes", data.notes)
-      if (selectedImage) formData.append("receiptImage", selectedImage)
+      // 注意：server 端 multer 用 receiptFile 欄位名（不是 receiptImage）
+      if (selectedImage) formData.append("receiptFile", selectedImage)
 
-      const res = await fetch("/api/payment/records", {
+      const res = await fetch(`/api/payment/items/${data.itemId}/payments`, {
         method: "POST",
         body: formData,
       })

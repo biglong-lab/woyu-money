@@ -124,9 +124,8 @@ export default function ReceiptMatchHelperPage() {
 
   const markPaidMutation = useMutation<unknown, Error, { itemId: number; amountPaid: number }>({
     mutationFn: (data) =>
-      apiRequest("POST", "/api/payment/records", {
-        itemId: data.itemId,
-        amountPaid: data.amountPaid,
+      apiRequest("POST", `/api/payment/items/${data.itemId}/payments`, {
+        amount: data.amountPaid,
         paymentDate: receiptDate || localDateISO(),
       }),
     onSuccess: () => {

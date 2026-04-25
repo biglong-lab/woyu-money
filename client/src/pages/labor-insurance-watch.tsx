@@ -106,9 +106,8 @@ function ReminderCard() {
     { id: number; itemName: string; unpaidAmount: number }
   >({
     mutationFn: (input) =>
-      apiRequest("POST", "/api/payment/records", {
-        itemId: input.id,
-        amountPaid: input.unpaidAmount,
+      apiRequest("POST", `/api/payment/items/${input.id}/payments`, {
+        amount: input.unpaidAmount,
         paymentDate: localDateISO(),
       }),
     onMutate: (input) => setPendingId(input.id),

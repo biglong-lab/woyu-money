@@ -94,9 +94,8 @@ function MonthDetail({ year, month }: { year: number; month: number }) {
 
   const markPaidMutation = useMutation<unknown, Error, MonthDetailItem>({
     mutationFn: (item) =>
-      apiRequest("POST", "/api/payment/records", {
-        itemId: item.id,
-        amountPaid: item.unpaidAmount,
+      apiRequest("POST", `/api/payment/items/${item.id}/payments`, {
+        amount: item.unpaidAmount,
         paymentDate: localDateISO(),
       }),
     onMutate: (item) => setPendingId(item.id),
