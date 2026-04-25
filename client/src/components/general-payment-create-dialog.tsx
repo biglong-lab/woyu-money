@@ -1,20 +1,33 @@
 // 一般付款管理 - 新增對話框元件
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Plus, FileSpreadsheet } from "lucide-react";
-import { UseFormReturn, Control, FieldValues } from "react-hook-form";
-import CategorySelector from "@/components/category-selector";
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form"
+import { Plus, FileSpreadsheet } from "lucide-react"
+import { UseFormReturn, Control, FieldValues } from "react-hook-form"
+import CategorySelector from "@/components/category-selector"
 
 export interface GeneralPaymentCreateDialogProps {
-  isOpen: boolean;
-  onOpenChange: (open: boolean) => void;
-  createForm: UseFormReturn<FieldValues>;
-  onSubmit: (data: FieldValues) => void;
-  isPending: boolean;
-  onBatchImportOpen: () => void;
+  isOpen: boolean
+  onOpenChange: (open: boolean) => void
+  createForm: UseFormReturn<FieldValues>
+  onSubmit: (data: FieldValues) => void
+  isPending: boolean
+  onBatchImportOpen: () => void
 }
 
 export function GeneralPaymentCreateDialog({
@@ -34,7 +47,10 @@ export function GeneralPaymentCreateDialog({
             <span className="text-sm sm:text-base">新增付款項目</span>
           </Button>
         </DialogTrigger>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" aria-describedby="create-payment-description">
+        <DialogContent
+          className="max-w-2xl max-h-[90vh] overflow-y-auto"
+          aria-describedby="create-payment-description"
+        >
           <DialogHeader>
             <DialogTitle>新增一般付款項目</DialogTitle>
           </DialogHeader>
@@ -46,15 +62,20 @@ export function GeneralPaymentCreateDialog({
               {/* 使用 CategorySelector 組件 */}
               /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
               <CategorySelector
-                form={createForm as unknown as { control: Control<FieldValues>; watch: (name: string) => string; setValue: (name: string, value: string) => void; }}
+                form={
+                  createForm as unknown as {
+                    control: Control<FieldValues>
+                    watch: (name: string) => string
+                    setValue: (name: string, value: string) => void
+                  }
+                }
                 onCategoryChange={(categoryData) => {
                   // 處理分類變更
                   if (categoryData.itemName) {
-                    createForm.setValue("itemName", categoryData.itemName);
+                    createForm.setValue("itemName", categoryData.itemName)
                   }
                 }}
               />
-
               {/* 第三行：項目名稱和付款金額 */}
               <div className="grid grid-cols-2 gap-4">
                 <FormField
@@ -62,11 +83,14 @@ export function GeneralPaymentCreateDialog({
                   name="itemName"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>項目名稱</FormLabel>
+                      <FormLabel>
+                        項目名稱 <span className="text-red-500">*</span>
+                      </FormLabel>
                       <FormControl>
                         <Input
                           {...field}
                           placeholder="輸入付款項目名稱（可自定義專案專屬項目）"
+                          autoFocus
                         />
                       </FormControl>
                       <FormMessage />
@@ -78,16 +102,23 @@ export function GeneralPaymentCreateDialog({
                   name="amount"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>金額</FormLabel>
+                      <FormLabel>
+                        金額 <span className="text-red-500">*</span>
+                      </FormLabel>
                       <FormControl>
-                        <Input {...field} type="number" step="0.01" placeholder="輸入金額" />
+                        <Input
+                          {...field}
+                          type="number"
+                          step="0.01"
+                          placeholder="輸入金額"
+                          onFocus={(e) => e.target.select()}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
               </div>
-
               {/* 第四行：日期欄位 */}
               <div className="grid grid-cols-2 gap-4">
                 <FormField
@@ -95,7 +126,9 @@ export function GeneralPaymentCreateDialog({
                   name="dueDate"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>預計付款日期</FormLabel>
+                      <FormLabel>
+                        預計付款日期 <span className="text-red-500">*</span>
+                      </FormLabel>
                       <FormControl>
                         <Input {...field} type="date" />
                       </FormControl>
@@ -117,7 +150,6 @@ export function GeneralPaymentCreateDialog({
                   )}
                 />
               </div>
-
               {/* 第五行：備註 */}
               <FormField
                 control={createForm.control}
@@ -132,13 +164,8 @@ export function GeneralPaymentCreateDialog({
                   </FormItem>
                 )}
               />
-
               <div className="flex justify-end gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => onOpenChange(false)}
-                >
+                <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                   取消
                 </Button>
                 <Button type="submit" disabled={isPending}>
@@ -150,14 +177,10 @@ export function GeneralPaymentCreateDialog({
         </DialogContent>
       </Dialog>
 
-      <Button
-        onClick={onBatchImportOpen}
-        variant="outline"
-        className="flex items-center gap-2"
-      >
+      <Button onClick={onBatchImportOpen} variant="outline" className="flex items-center gap-2">
         <FileSpreadsheet className="w-4 h-4" />
         <span className="text-sm sm:text-base">批量導入</span>
       </Button>
     </div>
-  );
+  )
 }
