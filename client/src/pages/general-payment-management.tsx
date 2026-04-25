@@ -1,6 +1,7 @@
 // 一般付款管理 - 主頁面（重構後）
 import { useState, useMemo, useEffect } from "react"
 import { localDateISO } from "@/lib/utils"
+import { useDocumentTitle } from "@/hooks/use-document-title"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { useForm, type UseFormReturn, type FieldValues } from "react-hook-form"
 import { Button } from "@/components/ui/button"
@@ -66,6 +67,7 @@ interface ApiError {
 }
 
 export default function GeneralPaymentManagement() {
+  useDocumentTitle("一般付款管理")
   const { toast } = useToast()
   const queryClient = useQueryClient()
 

@@ -2,6 +2,7 @@ import { useState, useCallback, useMemo } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { useLocation } from "wouter"
 import { localDateISO } from "@/lib/utils"
+import { useDocumentTitle } from "@/hooks/use-document-title"
 import {
   LayoutDashboard,
   FileText,
@@ -98,6 +99,7 @@ interface CashflowPaymentRecord {
 }
 
 export default function FinancialOverview() {
+  useDocumentTitle("財務總覽")
   const [, setLocation] = useLocation()
   const { toast } = useToast()
   const [activeFilters, setActiveFilters] = useState<ActiveFilters>({

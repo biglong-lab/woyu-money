@@ -26,6 +26,7 @@ import { Plus, Camera, Wallet, TrendingDown, TrendingUp, Calendar } from "lucide
 import { useToast } from "@/hooks/use-toast"
 import { apiRequest } from "@/lib/queryClient"
 import { localDateISO } from "@/lib/utils"
+import { useDocumentTitle } from "@/hooks/use-document-title"
 import type { HouseholdExpense } from "@shared/schema/household"
 import type { DebtCategory } from "@shared/schema/category"
 
@@ -77,6 +78,7 @@ interface SetBudgetPayload {
 }
 
 export default function HouseholdBudget() {
+  useDocumentTitle("家用預算")
   const { data: monthlyBudget, isLoading: isLoadingBudget } = useQuery<MonthlyBudgetResponse>({
     queryKey: ["/api/household/budget"],
   })

@@ -1,31 +1,35 @@
 // 專案付款管理 - 主頁面（協調器）
 // 負責：組合 hooks 與子元件，渲染頁面佈局
-import { useState } from "react";
-import PaymentItemDetails from "@/components/payment-item-details";
-import ProjectCategoryDialog from "@/components/project-category-dialog";
+import { useState } from "react"
+import { useDocumentTitle } from "@/hooks/use-document-title"
+import PaymentItemDetails from "@/components/payment-item-details"
+import ProjectCategoryDialog from "@/components/project-category-dialog"
 
 // 子元件
-import PaymentProjectStats from "@/components/payment-project-stats";
-import PaymentProjectFilters from "@/components/payment-project-filters";
-import PaymentProjectItemList from "@/components/payment-project-item-list";
-import PaymentProjectPaymentDialog from "@/components/payment-project-payment-dialog";
-import { PaymentProjectEditDialog, PaymentProjectDeleteDialog } from "@/components/payment-project-edit-dialog";
+import PaymentProjectStats from "@/components/payment-project-stats"
+import PaymentProjectFilters from "@/components/payment-project-filters"
+import PaymentProjectItemList from "@/components/payment-project-item-list"
+import PaymentProjectPaymentDialog from "@/components/payment-project-payment-dialog"
+import {
+  PaymentProjectEditDialog,
+  PaymentProjectDeleteDialog,
+} from "@/components/payment-project-edit-dialog"
 
 // 共用型別
-import { type PaymentProject as PaymentProjectType } from "@/components/payment-project-types";
+import { type PaymentProject as PaymentProjectType } from "@/components/payment-project-types"
 
 // 自訂 Hooks
-import { usePaymentProjectFilters } from "@/hooks/use-payment-project-filters";
-import { usePaymentProjectQueries } from "@/hooks/use-payment-project-queries";
-import { useFilteredPaymentItems } from "@/hooks/use-filtered-payment-items";
-import { usePaymentProjectMutations } from "@/hooks/use-payment-project-mutations";
-import { useVirtualScroll } from "@/hooks/use-virtual-scroll";
+import { usePaymentProjectFilters } from "@/hooks/use-payment-project-filters"
+import { usePaymentProjectQueries } from "@/hooks/use-payment-project-queries"
+import { useFilteredPaymentItems } from "@/hooks/use-filtered-payment-items"
+import { usePaymentProjectMutations } from "@/hooks/use-payment-project-mutations"
+import { useVirtualScroll } from "@/hooks/use-virtual-scroll"
 
 function PaymentProjectContent() {
-  const [activeTab, setActiveTab] = useState("items");
+  const [activeTab, setActiveTab] = useState("items")
 
   // 篩選狀態管理
-  const filters = usePaymentProjectFilters();
+  const filters = usePaymentProjectFilters()
 
   // 資料查詢
   const queries = usePaymentProjectQueries({
@@ -33,7 +37,7 @@ function PaymentProjectContent() {
     selectedYear: filters.selectedYear,
     selectedMonth: filters.selectedMonth,
     selectedProject: filters.selectedProject,
-  });
+  })
 
   // 篩選排序與統計
   const { filteredAndSortedItems, stats } = useFilteredPaymentItems({
@@ -55,17 +59,17 @@ function PaymentProjectContent() {
     selectedMonth: filters.selectedMonth,
     selectedYear: filters.selectedYear,
     showDeleted: filters.showDeleted,
-  });
+  })
 
   // Mutations 與事件處理
   const mutations = usePaymentProjectMutations({
     paymentItems: queries.paymentItems,
-  });
+  })
 
   // 虛擬滾動
   const virtualScroll = useVirtualScroll({
     totalItems: filteredAndSortedItems.length,
-  });
+  })
 
   return (
     <div className="space-y-4 px-2 sm:px-0">
@@ -125,8 +129,16 @@ function PaymentProjectContent() {
         resetFilters={filters.resetFilters}
         applySmartFilter={filters.applySmartFilter}
         projects={queries.projects as PaymentProjectType[] | undefined}
-        fixedCategoriesData={queries.fixedCategoriesData as unknown as Parameters<typeof PaymentProjectFilters>[0]['fixedCategoriesData']}
-        projectCategoriesData={queries.projectCategoriesData as unknown as Parameters<typeof PaymentProjectFilters>[0]['projectCategoriesData']}
+        fixedCategoriesData={
+          queries.fixedCategoriesData as unknown as Parameters<
+            typeof PaymentProjectFilters
+          >[0]["fixedCategoriesData"]
+        }
+        projectCategoriesData={
+          queries.projectCategoriesData as unknown as Parameters<
+            typeof PaymentProjectFilters
+          >[0]["projectCategoriesData"]
+        }
       />
 
       {/* 項目列表 */}
@@ -160,7 +172,7 @@ function PaymentProjectContent() {
 
       {/* 項目詳情對話框 */}
       <PaymentItemDetails
-        item={mutations.selectedItem as Parameters<typeof PaymentItemDetails>[0]['item']}
+        item={mutations.selectedItem as Parameters<typeof PaymentItemDetails>[0]["item"]}
         open={!!mutations.selectedItem}
         onOpenChange={(open) => !open && mutations.setSelectedItem(null)}
       />
@@ -170,9 +182,9 @@ function PaymentProjectContent() {
         isOpen={mutations.isPaymentDialogOpen}
         onOpenChange={(open) => {
           if (!open) {
-            mutations.setPaymentItem(null);
+            mutations.setPaymentItem(null)
           }
-          mutations.setIsPaymentDialogOpen(open);
+          mutations.setIsPaymentDialogOpen(open)
         }}
         paymentItem={mutations.paymentItem}
         paymentForm={mutations.paymentForm}
@@ -208,9 +220,10 @@ function PaymentProjectContent() {
         isPending={mutations.deleteMutation.isPending}
       />
     </div>
-  );
+  )
 }
 
 export default function PaymentProject() {
-  return <PaymentProjectContent />;
+  useDocumentTitle("專案付款管理")
+  return <PaymentProjectContent />
 }
