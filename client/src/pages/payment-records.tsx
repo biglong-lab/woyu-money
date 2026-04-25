@@ -33,6 +33,7 @@ import {
   FileText,
   Download,
   Image,
+  X,
 } from "lucide-react"
 import { PaymentItemDetails } from "@/components/payment-item-details"
 import { useCopyAmount } from "@/hooks/use-copy-amount"
@@ -449,8 +450,21 @@ export default function PaymentRecords() {
                   placeholder="搜尋項目名稱或備註..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape") setSearchTerm("")
+                  }}
+                  className="pl-10 pr-9"
                 />
+                {searchTerm && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchTerm("")}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded"
+                    title="清除搜尋（Esc）"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
               </div>
 
               <Select value={selectedProject} onValueChange={setSelectedProject}>
