@@ -49,3 +49,20 @@ export function localDateISO(offsetDays = 0): string {
   const day = String(d.getDate()).padStart(2, "0")
   return `${y}-${m}-${day}`
 }
+
+/**
+ * API 錯誤訊息友善化
+ *
+ * 避免暴露技術錯誤給使用者：
+ * - 離線時直接告訴使用者離線
+ * - 空訊息給通用 fallback
+ *
+ * @param error API 拋出的 Error 物件
+ * @returns 適合直接顯示在 toast description 的中文訊息
+ */
+export function friendlyApiError(error: Error | null | undefined): string {
+  if (!navigator.onLine) {
+    return "目前離線中，請等網路恢復後重試"
+  }
+  return error?.message?.trim() || "請稍後再試"
+}

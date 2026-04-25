@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
 import { apiRequest, queryClient } from "@/lib/queryClient"
-import { localDateISO, formatNT } from "@/lib/utils"
+import { localDateISO, formatNT, friendlyApiError } from "@/lib/utils"
 import { Camera, CheckCircle2, Loader2, ImagePlus, X } from "lucide-react"
 
 interface QuickAddDrawerProps {
@@ -159,13 +159,9 @@ export function QuickAddDrawer({ open, onOpenChange }: QuickAddDrawerProps) {
       setIsDone(true)
     },
     onError: (error: Error) => {
-      // 離線時給友善提示，避免使用者看到技術錯誤
-      const friendly = !navigator.onLine
-        ? "目前離線中，請等網路恢復後重試"
-        : error.message || "請稍後再試"
       toast({
         title: "記帳失敗",
-        description: friendly,
+        description: friendlyApiError(error),
         variant: "destructive",
       })
     },
