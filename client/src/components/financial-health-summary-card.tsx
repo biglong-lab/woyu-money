@@ -7,6 +7,7 @@ import { useQuery } from "@tanstack/react-query"
 import { Link } from "wouter"
 import { AlertTriangle, CheckCircle2, TrendingDown, ArrowRight, Clock, Copy } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
+import { formatNT } from "@/lib/utils"
 import { useCopyAmount } from "@/hooks/use-copy-amount"
 
 type UrgencyLevel = "critical" | "high" | "medium" | "low"
@@ -31,10 +32,6 @@ interface AnnualLossReport {
   totalLateFee: number
   totalPrincipal: number
   lossPercentage: number
-}
-
-function fmt(n: number): string {
-  return `NT$ ${Math.round(n).toLocaleString()}`
 }
 
 export function FinancialHealthSummaryCard() {
@@ -94,7 +91,7 @@ export function FinancialHealthSummaryCard() {
             <div className="bg-white/70 rounded p-2.5 cursor-pointer hover:bg-white transition-colors active:scale-95">
               <div className="text-xs text-gray-500">未付總額</div>
               <div className="text-base sm:text-lg font-bold text-gray-900">
-                {fmt(priority.totalUnpaid)}
+                {formatNT(priority.totalUnpaid)}
               </div>
             </div>
           </Link>
@@ -129,7 +126,7 @@ export function FinancialHealthSummaryCard() {
                   accumulatedLateFee > 0 ? "text-amber-700" : "text-gray-900"
                 }`}
               >
-                {fmt(accumulatedLateFee)}
+                {formatNT(accumulatedLateFee)}
               </div>
             </div>
           </Link>
@@ -152,7 +149,7 @@ export function FinancialHealthSummaryCard() {
                   yearLateFee > 0 ? "text-red-700" : "text-green-700"
                 }`}
               >
-                {yearLateFee > 0 ? fmt(yearLateFee) : "0"}
+                {yearLateFee > 0 ? formatNT(yearLateFee) : "0"}
               </div>
             </div>
           </Link>
@@ -195,7 +192,7 @@ export function FinancialHealthSummaryCard() {
                 title="點擊複製金額（轉帳用）"
                 data-testid="copy-next-item-amount"
               >
-                {fmt(nextItem.unpaidAmount)}
+                {formatNT(nextItem.unpaidAmount)}
                 <Copy className="h-3 w-3 opacity-50" />
               </button>
             </div>

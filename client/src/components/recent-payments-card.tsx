@@ -10,6 +10,7 @@ import { CheckCircle2, ArrowRight, Undo2 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { apiRequest, queryClient } from "@/lib/queryClient"
+import { formatNT } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 import { useCopyAmount } from "@/hooks/use-copy-amount"
 
@@ -22,10 +23,6 @@ interface PaymentRecordWithNames {
   itemName?: string
   projectName?: string
   notes?: string
-}
-
-function fmt(n: number): string {
-  return `NT$ ${Math.round(n).toLocaleString()}`
 }
 
 function formatRelativeDate(dateStr: string): string {
@@ -153,7 +150,7 @@ export function RecentPaymentsCard() {
         </div>
         {todayCount > 0 && (
           <div className="mt-1.5 text-xs font-medium text-green-700 bg-green-50 rounded px-2 py-1 border border-green-200">
-            🎉 今天已完成 {todayCount} 件付款 · 共 {fmt(todayTotal)}
+            🎉 今天已完成 {todayCount} 件付款 · 共 {formatNT(todayTotal)}
           </div>
         )}
       </CardHeader>
@@ -171,7 +168,7 @@ export function RecentPaymentsCard() {
                 <span className="font-medium">
                   {GROUP_LABEL[group]} · {items.length} 件
                 </span>
-                <span className="text-green-700">{fmt(groupTotal)}</span>
+                <span className="text-green-700">{formatNT(groupTotal)}</span>
               </div>
               {items.map((rec) => {
                 const amount = Number(rec.amountPaid ?? rec.amount ?? 0)
@@ -188,7 +185,7 @@ export function RecentPaymentsCard() {
                       </div>
                     </div>
                     <div className="text-sm font-semibold text-green-700 shrink-0">
-                      {fmt(amount)}
+                      {formatNT(amount)}
                     </div>
                     <Button
                       size="sm"
@@ -217,7 +214,7 @@ export function RecentPaymentsCard() {
               title="點擊複製總額"
               data-testid="copy-recent-total"
             >
-              {fmt(visibleTotal)}
+              {formatNT(visibleTotal)}
             </button>
           </div>
         )}

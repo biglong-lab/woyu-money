@@ -17,7 +17,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { apiRequest, queryClient } from "@/lib/queryClient"
-import { localDateISO } from "@/lib/utils"
+import { localDateISO, formatNT } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 import { useCopyAmount } from "@/hooks/use-copy-amount"
 
@@ -51,10 +51,6 @@ interface ForecastResponse {
   }
   gapAnalysis: GapItem[]
   hasShortage: boolean
-}
-
-function fmt(n: number): string {
-  return `NT$ ${Math.round(n).toLocaleString()}`
 }
 
 const CONFIDENCE_META: Record<Confidence, { label: string; color: string }> = {
@@ -120,7 +116,7 @@ function MonthDetail({ year, month }: { year: number; month: number }) {
   return (
     <div className="mt-2 pt-2 border-t border-gray-200 space-y-1">
       <div className="text-xs text-gray-600">
-        共 {data.count} 筆未付，{fmt(data.totalUnpaid)}
+        共 {data.count} 筆未付，{formatNT(data.totalUnpaid)}
       </div>
       <ul className="text-xs space-y-1 max-h-64 overflow-y-auto">
         {data.items.slice(0, 20).map((item) => (
@@ -143,7 +139,7 @@ function MonthDetail({ year, month }: { year: number; month: number }) {
               title="點擊複製金額"
               data-testid={`copy-cashflow-amount-${item.id}`}
             >
-              {fmt(item.unpaidAmount)}
+              {formatNT(item.unpaidAmount)}
             </button>
             <Button
               size="sm"
@@ -181,16 +177,16 @@ function MonthCard({ forecast, gap }: { forecast: ForecastMonth; gap: GapItem })
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
         <div>
           <div className="text-gray-500">預估收入</div>
-          <div className="font-semibold text-green-700">{fmt(gap.estimatedIncome)}</div>
+          <div className="font-semibold text-green-700">{formatNT(gap.estimatedIncome)}</div>
         </div>
         <div>
           <div className="text-gray-500">預估支出</div>
-          <div className="font-semibold text-red-700">{fmt(gap.estimatedExpense)}</div>
+          <div className="font-semibold text-red-700">{formatNT(gap.estimatedExpense)}</div>
         </div>
         <div>
           <div className="text-gray-500">淨額</div>
           <div className={`font-bold ${gap.net >= 0 ? "text-gray-900" : "text-red-700"}`}>
-            {fmt(gap.net)}
+            {formatNT(gap.net)}
           </div>
         </div>
       </div>
@@ -199,7 +195,7 @@ function MonthCard({ forecast, gap }: { forecast: ForecastMonth; gap: GapItem })
         <div className="mt-2 flex items-start gap-2 text-xs text-red-800 bg-red-100 rounded p-2">
           <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
           <div>
-            <div className="font-semibold">缺口 {fmt(gap.gap ?? 0)}</div>
+            <div className="font-semibold">缺口 {formatNT(gap.gap ?? 0)}</div>
             <div>{gap.recommendation}</div>
           </div>
         </div>
@@ -257,7 +253,7 @@ export default function CashflowDecisionCenterPage() {
                   成長趨勢：
                   {data.forecast.trend.growthRate >= 0 ? "+" : ""}
                   {(data.forecast.trend.growthRate * 100).toFixed(1)}% / 近期月均{" "}
-                  {fmt(data.forecast.trend.recentAvg)}
+                  {formatNT(data.forecast.trend.recentAvg)}
                 </CardDescription>
               )}
             </div>
