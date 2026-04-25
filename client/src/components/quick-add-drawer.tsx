@@ -312,6 +312,7 @@ export function QuickAddDrawer({ open, onOpenChange }: QuickAddDrawerProps) {
                     placeholder="0"
                     value={totalAmount}
                     onChange={(e) => setTotalAmount(e.target.value)}
+                    onFocus={(e) => e.target.select()}
                     className="pl-8 h-12 text-base"
                   />
                 </div>

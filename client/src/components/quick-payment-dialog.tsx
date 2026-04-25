@@ -268,6 +268,7 @@ export function QuickPaymentDialog({ open, onOpenChange }: QuickPaymentDialogPro
                     type="number"
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
+                    onFocus={(e) => e.target.select()}
                     className="pl-8"
                     autoFocus
                   />
