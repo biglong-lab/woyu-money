@@ -1,30 +1,34 @@
-import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { useState } from "react"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { useToast } from "@/hooks/use-toast"
+import { apiRequest } from "@/lib/queryClient"
+import { localDateISO } from "@/lib/utils"
 
 // 共用型別與工具函式
 import {
   loanInvestmentSchema,
   isHighRisk,
   calculateMonthlyInterest,
-} from "@/components/loan-enhanced-types";
+} from "@/components/loan-enhanced-types"
 import type {
   LoanInvestmentFormData,
   LoanInvestmentRecord,
   LoanStats,
   QuickPaymentFormData,
-} from "@/components/loan-enhanced-types";
+} from "@/components/loan-enhanced-types"
 
 // 子元件
-import { LoanEnhancedStatsPanel } from "@/components/loan-enhanced-stats-panel";
-import { LoanEnhancedRecordTable } from "@/components/loan-enhanced-record-table";
-import { LoanEnhancedAddDialog, LoanEnhancedEditDialog } from "@/components/loan-enhanced-form-dialog";
-import { LoanEnhancedDetailDialog } from "@/components/loan-enhanced-detail-dialog";
-import { LoanEnhancedDeleteDialog } from "@/components/loan-enhanced-delete-dialog";
-import { LoanEnhancedQuickPaymentDialog } from "@/components/loan-enhanced-quick-payment-dialog";
+import { LoanEnhancedStatsPanel } from "@/components/loan-enhanced-stats-panel"
+import { LoanEnhancedRecordTable } from "@/components/loan-enhanced-record-table"
+import {
+  LoanEnhancedAddDialog,
+  LoanEnhancedEditDialog,
+} from "@/components/loan-enhanced-form-dialog"
+import { LoanEnhancedDetailDialog } from "@/components/loan-enhanced-detail-dialog"
+import { LoanEnhancedDeleteDialog } from "@/components/loan-enhanced-delete-dialog"
+import { LoanEnhancedQuickPaymentDialog } from "@/components/loan-enhanced-quick-payment-dialog"
 
 // ==========================================
 // 借貸投資管理 - 主頁面
@@ -35,24 +39,25 @@ const INITIAL_QUICK_PAYMENT: QuickPaymentFormData = {
   paymentType: "interest",
   paymentMethod: "cash",
   notes: "",
-  paymentDate: new Date().toISOString().split("T")[0],
-};
+  paymentDate: localDateISO(),
+}
 
 export default function LoanInvestmentEnhanced() {
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
+  const { toast } = useToast()
+  const queryClient = useQueryClient()
 
   // ==========================================
   // Dialog 狀態
   // ==========================================
-  const [addDialogOpen, setAddDialogOpen] = useState(false);
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
-  const [quickPaymentDialogOpen, setQuickPaymentDialogOpen] = useState(false);
-  const [selectedRecord, setSelectedRecord] = useState<LoanInvestmentRecord | null>(null);
-  const [quickPaymentForm, setQuickPaymentForm] = useState<QuickPaymentFormData>(INITIAL_QUICK_PAYMENT);
+  const [addDialogOpen, setAddDialogOpen] = useState(false)
+  const [editDialogOpen, setEditDialogOpen] = useState(false)
+  const [detailDialogOpen, setDetailDialogOpen] = useState(false)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false)
+  const [quickPaymentDialogOpen, setQuickPaymentDialogOpen] = useState(false)
+  const [selectedRecord, setSelectedRecord] = useState<LoanInvestmentRecord | null>(null)
+  const [quickPaymentForm, setQuickPaymentForm] =
+    useState<QuickPaymentFormData>(INITIAL_QUICK_PAYMENT)
 
   // ==========================================
   // 表單設定
@@ -63,21 +68,21 @@ export default function LoanInvestmentEnhanced() {
       recordType: "loan",
       hasAgreedReturn: false,
     },
-  });
+  })
 
   // ==========================================
   // 資料查詢
   // ==========================================
   const { data: records = [], isLoading: recordsLoading } = useQuery({
     queryKey: ["/api/loan-investment/records"],
-  });
+  })
 
   const { data: stats = {} as LoanStats, isLoading: statsLoading } = useQuery({
     queryKey: ["/api/loan-investment/stats"],
-  });
+  })
 
-  const safeStats = stats as LoanStats;
-  const safeRecords = records as LoanInvestmentRecord[];
+  const safeStats = stats as LoanStats
+  const safeRecords = records as LoanInvestmentRecord[]
 
   // ==========================================
   // Mutations
@@ -85,76 +90,76 @@ export default function LoanInvestmentEnhanced() {
   const addRecordMutation = useMutation({
     mutationFn: (data: unknown) => apiRequest("POST", "/api/loan-investment/records", data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/loan-investment/records"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/loan-investment/stats"] });
-      setAddDialogOpen(false);
-      form.reset();
-      toast({ title: "成功", description: "借貸投資紀錄已新增" });
+      queryClient.invalidateQueries({ queryKey: ["/api/loan-investment/records"] })
+      queryClient.invalidateQueries({ queryKey: ["/api/loan-investment/stats"] })
+      setAddDialogOpen(false)
+      form.reset()
+      toast({ title: "成功", description: "借貸投資紀錄已新增" })
     },
     onError: (error: Error) => {
       toast({
         title: "錯誤",
         description: error.message || "新增失敗",
         variant: "destructive",
-      });
+      })
     },
-  });
+  })
 
   const updateRecordMutation = useMutation({
     mutationFn: ({ id, data }: { id: number; data: unknown }) =>
       apiRequest("PUT", `/api/loan-investment/records/${id}`, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/loan-investment/records"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/loan-investment/stats"] });
-      setEditDialogOpen(false);
-      toast({ title: "成功", description: "借貸投資紀錄已更新" });
+      queryClient.invalidateQueries({ queryKey: ["/api/loan-investment/records"] })
+      queryClient.invalidateQueries({ queryKey: ["/api/loan-investment/stats"] })
+      setEditDialogOpen(false)
+      toast({ title: "成功", description: "借貸投資紀錄已更新" })
     },
     onError: (error: Error) => {
       toast({
         title: "錯誤",
         description: error.message || "更新失敗",
         variant: "destructive",
-      });
+      })
     },
-  });
+  })
 
   const deleteRecordMutation = useMutation({
     mutationFn: (id: number) => apiRequest("DELETE", `/api/loan-investment/records/${id}`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/loan-investment/records"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/loan-investment/stats"] });
-      setDeleteDialogOpen(false);
-      setSelectedRecord(null);
-      toast({ title: "成功", description: "借貸投資紀錄已刪除" });
+      queryClient.invalidateQueries({ queryKey: ["/api/loan-investment/records"] })
+      queryClient.invalidateQueries({ queryKey: ["/api/loan-investment/stats"] })
+      setDeleteDialogOpen(false)
+      setSelectedRecord(null)
+      toast({ title: "成功", description: "借貸投資紀錄已刪除" })
     },
     onError: (error: Error) => {
       toast({
         title: "錯誤",
         description: error.message || "刪除失敗",
         variant: "destructive",
-      });
+      })
     },
-  });
+  })
 
   const quickPaymentMutation = useMutation({
     mutationFn: ({ recordId, paymentData }: { recordId: number; paymentData: unknown }) =>
       apiRequest("POST", `/api/loan-investment/records/${recordId}/payments`, paymentData),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/loan-investment/records"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/loan-investment/stats"] });
-      setQuickPaymentDialogOpen(false);
-      setSelectedRecord(null);
-      setQuickPaymentForm(INITIAL_QUICK_PAYMENT);
-      toast({ title: "還款記錄新增成功", description: "還款已成功記錄" });
+      queryClient.invalidateQueries({ queryKey: ["/api/loan-investment/records"] })
+      queryClient.invalidateQueries({ queryKey: ["/api/loan-investment/stats"] })
+      setQuickPaymentDialogOpen(false)
+      setSelectedRecord(null)
+      setQuickPaymentForm(INITIAL_QUICK_PAYMENT)
+      toast({ title: "還款記錄新增成功", description: "還款已成功記錄" })
     },
     onError: (error: Error) => {
       toast({
         title: "新增還款記錄失敗",
         description: error.message || "新增失敗",
         variant: "destructive",
-      });
+      })
     },
-  });
+  })
 
   // ==========================================
   // 事件處理
@@ -163,12 +168,12 @@ export default function LoanInvestmentEnhanced() {
     const enhancedData = {
       ...data,
       isHighRisk: isHighRisk(data.annualInterestRate),
-    };
-    addRecordMutation.mutate(enhancedData);
-  };
+    }
+    addRecordMutation.mutate(enhancedData)
+  }
 
   const handleEditSubmit = (data: LoanInvestmentFormData) => {
-    if (!selectedRecord) return;
+    if (!selectedRecord) return
 
     const enhancedData = {
       ...data,
@@ -179,13 +184,13 @@ export default function LoanInvestmentEnhanced() {
       partyPhone: data.partyPhone || null,
       partyRelationship: data.partyRelationship || null,
       partyNotes: data.partyNotes || null,
-    };
+    }
 
-    updateRecordMutation.mutate({ id: selectedRecord.id, data: enhancedData });
-  };
+    updateRecordMutation.mutate({ id: selectedRecord.id, data: enhancedData })
+  }
 
   const openEditDialog = (record: LoanInvestmentRecord) => {
-    setSelectedRecord(record);
+    setSelectedRecord(record)
 
     const formData = {
       itemName: record.itemName || "",
@@ -210,38 +215,38 @@ export default function LoanInvestmentEnhanced() {
       installmentCount: record.installmentCount?.toString() || "",
       installmentAmount: record.installmentAmount || "",
       annualPaymentDate: record.annualPaymentDate || "",
-    };
+    }
 
-    form.reset(formData as unknown as LoanInvestmentFormData);
-    setEditDialogOpen(true);
-  };
+    form.reset(formData as unknown as LoanInvestmentFormData)
+    setEditDialogOpen(true)
+  }
 
   const openDetailDialog = (record: LoanInvestmentRecord) => {
-    setSelectedRecord(record);
-    setDetailDialogOpen(true);
-  };
+    setSelectedRecord(record)
+    setDetailDialogOpen(true)
+  }
 
   const openDeleteDialog = (record: LoanInvestmentRecord) => {
-    setSelectedRecord(record);
-    setDeleteDialogOpen(true);
-  };
+    setSelectedRecord(record)
+    setDeleteDialogOpen(true)
+  }
 
   const openQuickPaymentDialog = (record: LoanInvestmentRecord) => {
-    setSelectedRecord(record);
+    setSelectedRecord(record)
     const monthlyInterest = calculateMonthlyInterest(
       record.principalAmount,
       record.annualInterestRate
-    );
+    )
     setQuickPaymentForm({
       ...INITIAL_QUICK_PAYMENT,
       amount: monthlyInterest.toString(),
-      paymentDate: new Date().toISOString().split("T")[0],
-    });
-    setQuickPaymentDialogOpen(true);
-  };
+      paymentDate: localDateISO(),
+    })
+    setQuickPaymentDialogOpen(true)
+  }
 
   const handleQuickPayment = () => {
-    if (!selectedRecord || !quickPaymentForm.amount) return;
+    if (!selectedRecord || !quickPaymentForm.amount) return
 
     const paymentData = {
       amount: quickPaymentForm.amount,
@@ -252,18 +257,18 @@ export default function LoanInvestmentEnhanced() {
       paymentStatus: "completed",
       isVerified: true,
       recordedBy: "系統用戶",
-    };
+    }
 
     quickPaymentMutation.mutate({
       recordId: selectedRecord.id,
       paymentData,
-    });
-  };
+    })
+  }
 
   const handleDetailRecordPayment = () => {
-    setDetailDialogOpen(false);
-    setPaymentDialogOpen(true);
-  };
+    setDetailDialogOpen(false)
+    setPaymentDialogOpen(true)
+  }
 
   // ==========================================
   // 渲染
@@ -336,5 +341,5 @@ export default function LoanInvestmentEnhanced() {
         isPending={quickPaymentMutation.isPending}
       />
     </div>
-  );
+  )
 }

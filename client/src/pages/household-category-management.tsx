@@ -1,17 +1,13 @@
-import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
-import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
-import type { DebtCategory } from "../../../shared/schema/category";
-import type { HouseholdBudget, HouseholdExpense } from "../../../shared/schema/household";
+import { useState } from "react"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { useToast } from "@/hooks/use-toast"
+import { apiRequest } from "@/lib/queryClient"
+import { localDateISO } from "@/lib/utils"
+import type { DebtCategory } from "../../../shared/schema/category"
+import type { HouseholdBudget, HouseholdExpense } from "../../../shared/schema/household"
 
 // 子元件與型別
 import {
@@ -30,7 +26,7 @@ import {
   type ExpenseFormData,
   type ExpenseFilter,
   type CategoryStats,
-} from "@/components/household-category";
+} from "@/components/household-category"
 
 // ============================================================
 // 家用分類管理主頁面
@@ -38,57 +34,49 @@ import {
 // ============================================================
 
 export default function HouseholdCategoryManagement() {
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
+  const { toast } = useToast()
+  const queryClient = useQueryClient()
 
   // ---- 狀態 ----
-  const [selectedCategory, setSelectedCategory] = useState<DebtCategory | null>(null);
-  const [editingCategory, setEditingCategory] = useState<DebtCategory | null>(null);
-  const [showCategoryDialog, setShowCategoryDialog] = useState(false);
-  const [showBudgetDialog, setShowBudgetDialog] = useState(false);
-  const [showExpenseDialog, setShowExpenseDialog] = useState(false);
-  const [selectedYear, setSelectedYear] = useState(
-    new Date().getFullYear().toString()
-  );
+  const [selectedCategory, setSelectedCategory] = useState<DebtCategory | null>(null)
+  const [editingCategory, setEditingCategory] = useState<DebtCategory | null>(null)
+  const [showCategoryDialog, setShowCategoryDialog] = useState(false)
+  const [showBudgetDialog, setShowBudgetDialog] = useState(false)
+  const [showExpenseDialog, setShowExpenseDialog] = useState(false)
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString())
   const [selectedMonth, setSelectedMonth] = useState(
     (new Date().getMonth() + 1).toString().padStart(2, "0")
-  );
+  )
   const [expenseFilter, setExpenseFilter] = useState<ExpenseFilter>({
     dateRange: "current_month",
     paymentMethod: "all",
     search: "",
-  });
+  })
 
   // ---- 資料查詢 ----
-  const { data: categories = [], isLoading: isLoadingCategories } = useQuery<
-    DebtCategory[]
-  >({
+  const { data: categories = [], isLoading: isLoadingCategories } = useQuery<DebtCategory[]>({
     queryKey: ["/api/categories/household"],
     staleTime: 5 * 60 * 1000,
-  });
+  })
 
   const { data: budgets = [], isLoading: isLoadingBudgets } = useQuery<HouseholdBudget[]>({
-    queryKey: [
-      `/api/household/budgets?year=${selectedYear}&month=${selectedMonth}`,
-    ],
+    queryKey: [`/api/household/budgets?year=${selectedYear}&month=${selectedMonth}`],
     enabled: !!selectedCategory,
-  });
+  })
 
-  const { data: expenses = [], isLoading: isLoadingExpenses } = useQuery<
-    HouseholdExpense[]
-  >({
+  const { data: expenses = [], isLoading: isLoadingExpenses } = useQuery<HouseholdExpense[]>({
     queryKey: [
       `/api/household/expenses?categoryId=${selectedCategory?.id}&year=${selectedYear}&month=${selectedMonth}`,
     ],
     enabled: !!selectedCategory,
-  });
+  })
 
   const { data: categoryStats } = useQuery<CategoryStats>({
     queryKey: [
       `/api/household/category-stats/${selectedCategory?.id}?year=${selectedYear}&month=${selectedMonth}`,
     ],
     enabled: !!selectedCategory,
-  });
+  })
 
   // ---- 表單 ----
   const categoryForm = useForm<CategoryFormData>({
@@ -98,7 +86,7 @@ export default function HouseholdCategoryManagement() {
       categoryType: "household",
       description: "",
     },
-  });
+  })
 
   const budgetForm = useForm<BudgetFormData>({
     resolver: zodResolver(budgetSchema),
@@ -107,161 +95,156 @@ export default function HouseholdCategoryManagement() {
       budgetAmount: "",
       notes: "",
     },
-  });
+  })
 
   const expenseForm = useForm<ExpenseFormData>({
     resolver: zodResolver(expenseSchema),
     defaultValues: {
       amount: "",
-      date: new Date().toISOString().split("T")[0],
+      date: localDateISO(),
       description: "",
       paymentMethod: "cash",
       tags: [],
     },
-  });
+  })
 
   // ---- Mutations ----
   const createCategoryMutation = useMutation({
-    mutationFn: (data: CategoryFormData) =>
-      apiRequest("/api/categories/household", "POST", data),
+    mutationFn: (data: CategoryFormData) => apiRequest("/api/categories/household", "POST", data),
     onSuccess: () => {
-      toast({ title: "成功", description: "分類已新增" });
+      toast({ title: "成功", description: "分類已新增" })
       queryClient.invalidateQueries({
         queryKey: ["/api/categories/household"],
-      });
-      setShowCategoryDialog(false);
-      categoryForm.reset();
+      })
+      setShowCategoryDialog(false)
+      categoryForm.reset()
     },
     onError: (error: Error) => {
       toast({
         title: "錯誤",
         description: error.message,
         variant: "destructive",
-      });
+      })
     },
-  });
+  })
 
   const updateCategoryMutation = useMutation({
     mutationFn: ({ id, data }: { id: number; data: CategoryFormData }) =>
       apiRequest(`/api/categories/household/${id}`, "PUT", data),
     onSuccess: () => {
-      toast({ title: "成功", description: "分類已更新" });
+      toast({ title: "成功", description: "分類已更新" })
       queryClient.invalidateQueries({
         queryKey: ["/api/categories/household"],
-      });
-      setEditingCategory(null);
-      setShowCategoryDialog(false);
-      categoryForm.reset();
+      })
+      setEditingCategory(null)
+      setShowCategoryDialog(false)
+      categoryForm.reset()
     },
     onError: (error: Error) => {
       toast({
         title: "錯誤",
         description: error.message,
         variant: "destructive",
-      });
+      })
     },
-  });
+  })
 
   const deleteCategoryMutation = useMutation({
-    mutationFn: (id: number) =>
-      apiRequest(`/api/categories/household/${id}`, "DELETE"),
+    mutationFn: (id: number) => apiRequest(`/api/categories/household/${id}`, "DELETE"),
     onSuccess: () => {
-      toast({ title: "成功", description: "分類已刪除" });
+      toast({ title: "成功", description: "分類已刪除" })
       queryClient.invalidateQueries({
         queryKey: ["/api/categories/household"],
-      });
-      setSelectedCategory(null);
+      })
+      setSelectedCategory(null)
     },
     onError: (error: Error) => {
       toast({
         title: "錯誤",
         description: error.message,
         variant: "destructive",
-      });
+      })
     },
-  });
+  })
 
   const createBudgetMutation = useMutation({
     mutationFn: (data: BudgetFormData & { categoryId: number }) =>
       apiRequest("/api/household/budgets", "POST", data),
     onSuccess: () => {
-      toast({ title: "成功", description: "預算已設定" });
+      toast({ title: "成功", description: "預算已設定" })
       queryClient.invalidateQueries({
         queryKey: [`/api/household/budgets`],
-      });
-      setShowBudgetDialog(false);
-      budgetForm.reset();
+      })
+      setShowBudgetDialog(false)
+      budgetForm.reset()
     },
     onError: (error: Error) => {
       toast({
         title: "錯誤",
         description: error.message,
         variant: "destructive",
-      });
+      })
     },
-  });
+  })
 
   const createExpenseMutation = useMutation({
     mutationFn: (data: ExpenseFormData & { categoryId: number }) =>
       apiRequest("/api/household/expenses", "POST", data),
     onSuccess: () => {
-      toast({ title: "成功", description: "支出已新增" });
+      toast({ title: "成功", description: "支出已新增" })
       queryClient.invalidateQueries({
         queryKey: [`/api/household/expenses`],
-      });
-      setShowExpenseDialog(false);
-      expenseForm.reset();
+      })
+      setShowExpenseDialog(false)
+      expenseForm.reset()
     },
     onError: (error: Error) => {
       toast({
         title: "錯誤",
         description: error.message,
         variant: "destructive",
-      });
+      })
     },
-  });
+  })
 
   // ---- 事件處理 ----
   const handleCategorySubmit = (data: CategoryFormData) => {
     if (editingCategory) {
-      updateCategoryMutation.mutate({ id: editingCategory.id, data });
+      updateCategoryMutation.mutate({ id: editingCategory.id, data })
     } else {
-      createCategoryMutation.mutate(data);
+      createCategoryMutation.mutate(data)
     }
-  };
+  }
 
   const handleBudgetSubmit = (data: BudgetFormData) => {
-    if (!selectedCategory) return;
-    createBudgetMutation.mutate({ ...data, categoryId: selectedCategory.id });
-  };
+    if (!selectedCategory) return
+    createBudgetMutation.mutate({ ...data, categoryId: selectedCategory.id })
+  }
 
   const handleExpenseSubmit = (data: ExpenseFormData) => {
-    if (!selectedCategory) return;
-    createExpenseMutation.mutate({ ...data, categoryId: selectedCategory.id });
-  };
+    if (!selectedCategory) return
+    createExpenseMutation.mutate({ ...data, categoryId: selectedCategory.id })
+  }
 
   const handleEditCategory = (category: DebtCategory) => {
-    setEditingCategory(category);
+    setEditingCategory(category)
     categoryForm.reset({
       categoryName: category.categoryName,
       categoryType: category.categoryType,
       description: category.description || "",
-    });
-    setShowCategoryDialog(true);
-  };
+    })
+    setShowCategoryDialog(true)
+  }
 
   /** 篩選支出記錄 */
   const filteredExpenses = expenses.filter((expense: HouseholdExpense) => {
     const searchMatch =
       !expenseFilter.search ||
-      expense.description
-        ?.toLowerCase()
-        .includes(expenseFilter.search.toLowerCase());
+      expense.description?.toLowerCase().includes(expenseFilter.search.toLowerCase())
     const methodMatch =
-      expenseFilter.paymentMethod === "all" ||
-      expense.paymentMethod === expenseFilter.paymentMethod;
-    return searchMatch && methodMatch;
-  });
+      expenseFilter.paymentMethod === "all" || expense.paymentMethod === expenseFilter.paymentMethod
+    return searchMatch && methodMatch
+  })
 
   // ---- 渲染 ----
   return (
@@ -270,9 +253,7 @@ export default function HouseholdCategoryManagement() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">家用分類管理</h1>
-          <p className="text-gray-600 mt-2">
-            管理家用記帳分類、預算設定和支出記錄
-          </p>
+          <p className="text-gray-600 mt-2">管理家用記帳分類、預算設定和支出記錄</p>
         </div>
         <CategoryFormDialog
           open={showCategoryDialog}
@@ -280,10 +261,7 @@ export default function HouseholdCategoryManagement() {
           form={categoryForm}
           editingCategory={editingCategory}
           onSubmit={handleCategorySubmit}
-          isPending={
-            createCategoryMutation.isPending ||
-            updateCategoryMutation.isPending
-          }
+          isPending={createCategoryMutation.isPending || updateCategoryMutation.isPending}
           onResetEditing={() => setEditingCategory(null)}
         />
       </div>
@@ -359,5 +337,5 @@ export default function HouseholdCategoryManagement() {
         </div>
       </div>
     </div>
-  );
+  )
 }

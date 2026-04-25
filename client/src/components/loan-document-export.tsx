@@ -1,53 +1,64 @@
-import React, { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { useQuery } from "@tanstack/react-query";
-import { Download, FileText, BarChart3, Calendar, DollarSign } from "lucide-react";
-import { format } from "date-fns";
-import type { LoanInvestmentRecord, LoanPaymentHistory } from "@shared/schema";
+import React, { useState } from "react"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Progress } from "@/components/ui/progress"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import { useQuery } from "@tanstack/react-query"
+import { Download, FileText, BarChart3, Calendar, DollarSign } from "lucide-react"
+import { format } from "date-fns"
+import { localDateISO } from "@/lib/utils"
+import type { LoanInvestmentRecord, LoanPaymentHistory } from "@shared/schema"
 
 interface PaymentStats {
-  totalPayments: string;
-  paymentCount: number;
+  totalPayments: string
+  paymentCount: number
 }
 
 interface LoanDocumentExportProps {
-  recordId: number;
-  recordTitle: string;
-  recordData: LoanInvestmentRecord;
+  recordId: number
+  recordTitle: string
+  recordData: LoanInvestmentRecord
 }
 
 export function LoanDocumentExport({ recordId, recordTitle, recordData }: LoanDocumentExportProps) {
-  const [isExporting, setIsExporting] = useState(false);
-  const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [isExporting, setIsExporting] = useState(false)
+  const [exportDialogOpen, setExportDialogOpen] = useState(false)
 
   // Fetch payment history for the record
   const { data: payments = [] } = useQuery<LoanPaymentHistory[]>({
     queryKey: [`/api/loan-investment/records/${recordId}/payments`],
-  });
+  })
 
   // Fetch payment statistics
   const { data: paymentStats = { totalPayments: "0", paymentCount: 0 } } = useQuery<PaymentStats>({
     queryKey: [`/api/loan-investment/records/${recordId}/payment-stats`],
-  });
+  })
 
   const formatCurrency = (amount: string | number) => {
-    const num = typeof amount === "string" ? parseFloat(amount) : amount;
+    const num = typeof amount === "string" ? parseFloat(amount) : amount
     return new Intl.NumberFormat("zh-TW", {
       style: "currency",
       currency: "TWD",
       minimumFractionDigits: 0,
-    }).format(num);
-  };
+    }).format(num)
+  }
 
   const generateDocumentHTML = () => {
-    const currentDate = new Date().toLocaleDateString('zh-TW');
-    const progressPercentage = paymentStats.totalPayments && recordData.principalAmount 
-      ? ((parseFloat(paymentStats.totalPayments) / parseFloat(recordData.principalAmount)) * 100).toFixed(1)
-      : "0";
+    const currentDate = new Date().toLocaleDateString("zh-TW")
+    const progressPercentage =
+      paymentStats.totalPayments && recordData.principalAmount
+        ? (
+            (parseFloat(paymentStats.totalPayments) / parseFloat(recordData.principalAmount)) *
+            100
+          ).toFixed(1)
+        : "0"
 
     return `
 <!DOCTYPE html>
@@ -182,19 +193,19 @@ export function LoanDocumentExport({ recordId, recordTitle, recordData }: LoanDo
         <div class="info-grid">
             <div class="info-item">
                 <div class="info-label">記錄類型</div>
-                <div class="info-value">${recordData.recordType === 'loan' ? '借貸 (我方借入)' : '投資 (我方投出)'}</div>
+                <div class="info-value">${recordData.recordType === "loan" ? "借貸 (我方借入)" : "投資 (我方投出)"}</div>
             </div>
             <div class="info-item">
                 <div class="info-label">對方姓名</div>
-                <div class="info-value">${recordData.partyName || '未設定'}</div>
+                <div class="info-value">${recordData.partyName || "未設定"}</div>
             </div>
             <div class="info-item">
                 <div class="info-label">關係</div>
-                <div class="info-value">${recordData.partyRelationship || '未設定'}</div>
+                <div class="info-value">${recordData.partyRelationship || "未設定"}</div>
             </div>
             <div class="info-item">
                 <div class="info-label">聯絡電話</div>
-                <div class="info-value">${recordData.partyPhone || '未提供'}</div>
+                <div class="info-value">${recordData.partyPhone || "未提供"}</div>
             </div>
         </div>
     </div>
@@ -208,25 +219,25 @@ export function LoanDocumentExport({ recordId, recordTitle, recordData }: LoanDo
             </div>
             <div class="info-item">
                 <div class="info-label">年利率</div>
-                <div class="info-value ${parseFloat(recordData.annualInterestRate) > 10 ? 'risk-high' : parseFloat(recordData.annualInterestRate) > 5 ? 'risk-medium' : 'risk-low'}">${recordData.annualInterestRate}%</div>
+                <div class="info-value ${parseFloat(recordData.annualInterestRate) > 10 ? "risk-high" : parseFloat(recordData.annualInterestRate) > 5 ? "risk-medium" : "risk-low"}">${recordData.annualInterestRate}%</div>
             </div>
             <div class="info-item">
                 <div class="info-label">開始日期</div>
-                <div class="info-value">${recordData.startDate ? format(new Date(recordData.startDate), 'yyyy/MM/dd') : '未設定'}</div>
+                <div class="info-value">${recordData.startDate ? format(new Date(recordData.startDate), "yyyy/MM/dd") : "未設定"}</div>
             </div>
             <div class="info-item">
                 <div class="info-label">預計結束日期</div>
-                <div class="info-value">${recordData.endDate ? format(new Date(recordData.endDate), 'yyyy/MM/dd') : '未設定'}</div>
+                <div class="info-value">${recordData.endDate ? format(new Date(recordData.endDate), "yyyy/MM/dd") : "未設定"}</div>
             </div>
             <div class="info-item">
                 <div class="info-label">每月付款金額</div>
-                <div class="info-value">${recordData.monthlyPaymentAmount ? formatCurrency(recordData.monthlyPaymentAmount) : '未設定'}</div>
+                <div class="info-value">${recordData.monthlyPaymentAmount ? formatCurrency(recordData.monthlyPaymentAmount) : "未設定"}</div>
             </div>
             <div class="info-item">
                 <div class="info-label">目前狀態</div>
                 <div class="info-value">
-                    <span class="status-badge ${recordData.status === 'active' ? 'status-pending' : 'status-completed'}">
-                        ${recordData.status === 'active' ? '進行中' : '已完成'}
+                    <span class="status-badge ${recordData.status === "active" ? "status-pending" : "status-completed"}">
+                        ${recordData.status === "active" ? "進行中" : "已完成"}
                     </span>
                 </div>
             </div>
@@ -250,7 +261,9 @@ export function LoanDocumentExport({ recordId, recordTitle, recordData }: LoanDo
         </div>
     </div>
 
-    ${payments.length > 0 ? `
+    ${
+      payments.length > 0
+        ? `
     <div class="section">
         <div class="section-title">還款記錄明細</div>
         <table class="payment-table">
@@ -265,78 +278,96 @@ export function LoanDocumentExport({ recordId, recordTitle, recordData }: LoanDo
                 </tr>
             </thead>
             <tbody>
-                ${payments.map((payment: LoanPaymentHistory) => `
+                ${payments
+                  .map(
+                    (payment: LoanPaymentHistory) => `
                     <tr>
-                        <td>${format(new Date(payment.paymentDate), 'yyyy/MM/dd')}</td>
+                        <td>${format(new Date(payment.paymentDate), "yyyy/MM/dd")}</td>
                         <td>${formatCurrency(payment.amount)}</td>
-                        <td>${payment.paymentType === 'interest' ? '利息' : payment.paymentType === 'principal' ? '本金' : '本金+利息'}</td>
-                        <td>${payment.paymentMethod === 'cash' ? '現金' : payment.paymentMethod === 'bank_transfer' ? '銀行轉帳' : payment.paymentMethod === 'check' ? '支票' : '其他'}</td>
+                        <td>${payment.paymentType === "interest" ? "利息" : payment.paymentType === "principal" ? "本金" : "本金+利息"}</td>
+                        <td>${payment.paymentMethod === "cash" ? "現金" : payment.paymentMethod === "bank_transfer" ? "銀行轉帳" : payment.paymentMethod === "check" ? "支票" : "其他"}</td>
                         <td>
-                            <span class="status-badge ${payment.paymentStatus === 'completed' ? 'status-completed' : 'status-pending'}">
-                                ${payment.paymentStatus === 'completed' ? '已完成' : '待處理'}
+                            <span class="status-badge ${payment.paymentStatus === "completed" ? "status-completed" : "status-pending"}">
+                                ${payment.paymentStatus === "completed" ? "已完成" : "待處理"}
                             </span>
                         </td>
-                        <td>${payment.notes || '-'}</td>
+                        <td>${payment.notes || "-"}</td>
                     </tr>
-                `).join('')}
+                `
+                  )
+                  .join("")}
             </tbody>
         </table>
     </div>
-    ` : ''}
+    `
+        : ""
+    }
 
-    ${recordData.notes || recordData.documentNotes ? `
+    ${
+      recordData.notes || recordData.documentNotes
+        ? `
     <div class="section">
         <div class="section-title">備註資訊</div>
-        ${recordData.notes ? `
+        ${
+          recordData.notes
+            ? `
             <div class="info-item">
                 <div class="info-label">資金狀況備註</div>
                 <div class="info-value">${recordData.notes}</div>
             </div>
-        ` : ''}
-        ${recordData.documentNotes ? `
+        `
+            : ""
+        }
+        ${
+          recordData.documentNotes
+            ? `
             <div class="info-item">
                 <div class="info-label">文件相關備註</div>
                 <div class="info-value">${recordData.documentNotes}</div>
             </div>
-        ` : ''}
+        `
+            : ""
+        }
     </div>
-    ` : ''}
+    `
+        : ""
+    }
 
     <div class="footer">
-        <p>此報告由借貸投資管理系統自動生成 | 生成時間：${new Date().toLocaleString('zh-TW')}</p>
+        <p>此報告由借貸投資管理系統自動生成 | 生成時間：${new Date().toLocaleString("zh-TW")}</p>
         <p>※ 本報告僅供參考，實際交易請以正式合約文件為準</p>
     </div>
 </body>
 </html>
-    `;
-  };
+    `
+  }
 
   const handleExportHTML = () => {
-    setIsExporting(true);
+    setIsExporting(true)
     try {
-      const htmlContent = generateDocumentHTML();
-      const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.download = `${recordTitle}_借貸投資報告_${new Date().toISOString().split('T')[0]}.html`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(link.href);
+      const htmlContent = generateDocumentHTML()
+      const blob = new Blob([htmlContent], { type: "text/html;charset=utf-8" })
+      const link = document.createElement("a")
+      link.href = URL.createObjectURL(blob)
+      link.download = `${recordTitle}_借貸投資報告_${localDateISO()}.html`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(link.href)
     } finally {
-      setIsExporting(false);
-      setExportDialogOpen(false);
+      setIsExporting(false)
+      setExportDialogOpen(false)
     }
-  };
+  }
 
   const handlePrintPreview = () => {
-    const htmlContent = generateDocumentHTML();
-    const printWindow = window.open('', '_blank');
+    const htmlContent = generateDocumentHTML()
+    const printWindow = window.open("", "_blank")
     if (printWindow) {
-      printWindow.document.write(htmlContent);
-      printWindow.document.close();
+      printWindow.document.write(htmlContent)
+      printWindow.document.close()
     }
-  };
+  }
 
   return (
     <Dialog open={exportDialogOpen} onOpenChange={setExportDialogOpen}>
@@ -350,7 +381,7 @@ export function LoanDocumentExport({ recordId, recordTitle, recordData }: LoanDo
         <DialogHeader>
           <DialogTitle>文件輸出選項</DialogTitle>
         </DialogHeader>
-        
+
         <div className="space-y-4">
           <Card>
             <CardHeader>
@@ -380,31 +411,22 @@ export function LoanDocumentExport({ recordId, recordTitle, recordData }: LoanDo
           </Card>
 
           <div className="space-y-3">
-            <Button 
-              onClick={handlePrintPreview} 
-              className="w-full"
-              variant="outline"
-            >
+            <Button onClick={handlePrintPreview} className="w-full" variant="outline">
               <BarChart3 className="h-4 w-4 mr-2" />
               預覽報告
             </Button>
-            
-            <Button 
-              onClick={handleExportHTML} 
-              disabled={isExporting}
-              className="w-full"
-            >
+
+            <Button onClick={handleExportHTML} disabled={isExporting} className="w-full">
               <Download className="h-4 w-4 mr-2" />
               {isExporting ? "導出中..." : "下載 HTML 報告"}
             </Button>
           </div>
 
           <div className="text-xs text-muted-foreground text-center">
-            報告包含所有款項記錄、還款資訊和進度圖表，
-            適合列印或數位保存使用
+            報告包含所有款項記錄、還款資訊和進度圖表， 適合列印或數位保存使用
           </div>
         </div>
       </DialogContent>
     </Dialog>
-  );
+  )
 }

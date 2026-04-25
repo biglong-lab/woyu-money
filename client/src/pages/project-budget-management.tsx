@@ -1,67 +1,74 @@
 // 專案預算管理主頁面
 
-import { useState, useMemo } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useForm, type UseFormReturn, type FieldValues } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { Plus, Search, ClipboardList, FileText, PieChart } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { useState, useMemo } from "react"
+import { localDateISO } from "@/lib/utils"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { useForm, type UseFormReturn, type FieldValues } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { z } from "zod"
+import { Plus, Search, ClipboardList, FileText, PieChart } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { useToast } from "@/hooks/use-toast"
+import { apiRequest } from "@/lib/queryClient"
 
 // 子元件
-import ProjectBudgetPlanList from "@/components/project-budget-plan-list";
-import ProjectBudgetPlanDetail from "@/components/project-budget-plan-detail";
-import ProjectBudgetDashboard from "@/components/project-budget-dashboard";
-import ProjectBudgetPlanDialog from "@/components/project-budget-plan-dialog";
-import ProjectBudgetItemDialog from "@/components/project-budget-item-dialog";
+import ProjectBudgetPlanList from "@/components/project-budget-plan-list"
+import ProjectBudgetPlanDetail from "@/components/project-budget-plan-detail"
+import ProjectBudgetDashboard from "@/components/project-budget-dashboard"
+import ProjectBudgetPlanDialog from "@/components/project-budget-plan-dialog"
+import ProjectBudgetItemDialog from "@/components/project-budget-item-dialog"
 import {
   DeletePlanDialog,
   DeleteItemDialog,
   ConvertItemDialog,
-} from "@/components/project-budget-confirm-dialogs";
+} from "@/components/project-budget-confirm-dialogs"
 
 // 型別
-import type { BudgetPlan, BudgetItem, Project, Category } from "@/components/project-budget-types";
+import type { BudgetPlan, BudgetItem, Project, Category } from "@/components/project-budget-types"
 
 // 預算計劃摘要 API 回傳型別
 interface PaymentTypeStat {
-  count: number;
-  total: number;
+  count: number
+  total: number
 }
 
 interface BudgetSummary {
-  totalBudget: number;
-  calculatedTotal: number;
-  totalPlanned?: number;
-  totalActual: number;
-  variance: number;
-  utilizationRate: string | number;
-  conversionRate: string | number;
-  itemCount: number;
-  convertedCount: number;
-  pendingCount: number;
+  totalBudget: number
+  calculatedTotal: number
+  totalPlanned?: number
+  totalActual: number
+  variance: number
+  utilizationRate: string | number
+  conversionRate: string | number
+  itemCount: number
+  convertedCount: number
+  pendingCount: number
   byPaymentType: {
-    single: PaymentTypeStat;
-    installment: PaymentTypeStat;
-    monthly: PaymentTypeStat;
-  };
+    single: PaymentTypeStat
+    installment: PaymentTypeStat
+    monthly: PaymentTypeStat
+  }
 }
 
 interface BudgetPlanSummaryResponse {
-  plan: BudgetPlan;
-  summary: BudgetSummary;
+  plan: BudgetPlan
+  summary: BudgetSummary
 }
 
 // 轉換預算項目為付款項目的 API 回傳型別
 interface ConvertItemResponse {
-  message: string;
-  paymentItem: { id: number };
-  budgetItemId: number;
+  message: string
+  paymentItem: { id: number }
+  budgetItemId: number
 }
 
 // Zod 驗證 Schema
@@ -73,7 +80,7 @@ const budgetPlanSchema = z.object({
   startDate: z.string().min(1, "請選擇開始日期"),
   endDate: z.string().min(1, "請選擇結束日期"),
   totalBudget: z.string().min(1, "請輸入預算總額"),
-});
+})
 
 const budgetItemSchema = z.object({
   itemName: z.string().min(1, "請輸入項目名稱"),
@@ -90,80 +97,80 @@ const budgetItemSchema = z.object({
   priority: z.string().min(1, "請選擇優先級"),
   categoryId: z.string().optional(),
   notes: z.string().optional(),
-});
+})
 
 // 表單資料型別（由 Zod schema 推導）
-type BudgetPlanFormData = z.infer<typeof budgetPlanSchema>;
-type BudgetItemFormData = z.infer<typeof budgetItemSchema>;
+type BudgetPlanFormData = z.infer<typeof budgetPlanSchema>
+type BudgetItemFormData = z.infer<typeof budgetItemSchema>
 
 export default function ProjectBudgetManagement() {
   // 頁面狀態
-  const [activeTab, setActiveTab] = useState("plans");
-  const [selectedPlanId, setSelectedPlanId] = useState<number | null>(null);
-  const [selectedProject, setSelectedProject] = useState<string>("all");
-  const [searchTerm, setSearchTerm] = useState("");
+  const [activeTab, setActiveTab] = useState("plans")
+  const [selectedPlanId, setSelectedPlanId] = useState<number | null>(null)
+  const [selectedProject, setSelectedProject] = useState<string>("all")
+  const [searchTerm, setSearchTerm] = useState("")
 
   // Dialog 狀態
-  const [isPlanDialogOpen, setIsPlanDialogOpen] = useState(false);
-  const [isItemDialogOpen, setIsItemDialogOpen] = useState(false);
-  const [editingPlan, setEditingPlan] = useState<BudgetPlan | null>(null);
-  const [editingItem, setEditingItem] = useState<BudgetItem | null>(null);
-  const [deletePlan, setDeletePlan] = useState<BudgetPlan | null>(null);
-  const [deleteItem, setDeleteItem] = useState<BudgetItem | null>(null);
-  const [convertItem, setConvertItem] = useState<BudgetItem | null>(null);
+  const [isPlanDialogOpen, setIsPlanDialogOpen] = useState(false)
+  const [isItemDialogOpen, setIsItemDialogOpen] = useState(false)
+  const [editingPlan, setEditingPlan] = useState<BudgetPlan | null>(null)
+  const [editingItem, setEditingItem] = useState<BudgetItem | null>(null)
+  const [deletePlan, setDeletePlan] = useState<BudgetPlan | null>(null)
+  const [deleteItem, setDeleteItem] = useState<BudgetItem | null>(null)
+  const [convertItem, setConvertItem] = useState<BudgetItem | null>(null)
 
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
+  const { toast } = useToast()
+  const queryClient = useQueryClient()
 
   // 查詢資料
   const { data: projects = [] } = useQuery<Project[]>({
     queryKey: ["/api/payment/projects"],
-  });
+  })
 
   const { data: categories = [] } = useQuery<Category[]>({
     queryKey: ["/api/debt-categories"],
-  });
+  })
 
   const { data: budgetPlans = [], isLoading: isLoadingPlans } = useQuery<BudgetPlan[]>({
     queryKey: ["/api/budget/plans", selectedProject],
     queryFn: async () => {
-      const params = new URLSearchParams();
+      const params = new URLSearchParams()
       if (selectedProject !== "all") {
-        params.append("projectId", selectedProject);
+        params.append("projectId", selectedProject)
       }
-      const res = await fetch(`/api/budget/plans?${params.toString()}`);
-      if (!res.ok) throw new Error("Failed to fetch budget plans");
-      return res.json();
+      const res = await fetch(`/api/budget/plans?${params.toString()}`)
+      if (!res.ok) throw new Error("Failed to fetch budget plans")
+      return res.json()
     },
-  });
+  })
 
   const { data: selectedPlanDetail, isLoading: isLoadingPlanDetail } = useQuery<BudgetPlan>({
     queryKey: ["/api/budget/plans", selectedPlanId],
     queryFn: async () => {
-      const res = await fetch(`/api/budget/plans/${selectedPlanId}`);
-      if (!res.ok) throw new Error("Failed to fetch budget plan detail");
-      return res.json();
+      const res = await fetch(`/api/budget/plans/${selectedPlanId}`)
+      if (!res.ok) throw new Error("Failed to fetch budget plan detail")
+      return res.json()
     },
     enabled: !!selectedPlanId,
-  });
+  })
 
   const { data: planSummary } = useQuery<BudgetPlanSummaryResponse>({
     queryKey: ["/api/budget/plans", selectedPlanId, "summary"],
     queryFn: async () => {
-      const res = await fetch(`/api/budget/plans/${selectedPlanId}/summary`);
-      if (!res.ok) throw new Error("Failed to fetch budget summary");
-      return res.json();
+      const res = await fetch(`/api/budget/plans/${selectedPlanId}/summary`)
+      if (!res.ok) throw new Error("Failed to fetch budget summary")
+      return res.json()
     },
     enabled: !!selectedPlanId,
-  });
+  })
 
   // 篩選
   const filteredPlans = useMemo(() => {
-    if (!searchTerm) return budgetPlans;
+    if (!searchTerm) return budgetPlans
     return budgetPlans.filter((plan) =>
       plan.planName.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  }, [budgetPlans, searchTerm]);
+    )
+  }, [budgetPlans, searchTerm])
 
   // 表單
   const planForm = useForm({
@@ -177,7 +184,7 @@ export default function ProjectBudgetManagement() {
       endDate: "",
       totalBudget: "",
     },
-  });
+  })
 
   const itemForm = useForm({
     resolver: zodResolver(budgetItemSchema),
@@ -197,9 +204,9 @@ export default function ProjectBudgetManagement() {
       categoryId: "",
       notes: "",
     },
-  });
+  })
 
-  const paymentType = itemForm.watch("paymentType");
+  const paymentType = itemForm.watch("paymentType")
 
   // Mutations
   const createPlanMutation = useMutation({
@@ -207,56 +214,56 @@ export default function ProjectBudgetManagement() {
       const payload = {
         ...data,
         projectId: data.projectId && data.projectId !== "none" ? parseInt(data.projectId) : null,
-      };
-      return apiRequest("POST", "/api/budget/plans", payload);
+      }
+      return apiRequest("POST", "/api/budget/plans", payload)
     },
     onSuccess: () => {
-      toast({ title: "成功", description: "預算計劃已建立" });
-      queryClient.invalidateQueries({ queryKey: ["/api/budget/plans"] });
-      setIsPlanDialogOpen(false);
-      planForm.reset();
+      toast({ title: "成功", description: "預算計劃已建立" })
+      queryClient.invalidateQueries({ queryKey: ["/api/budget/plans"] })
+      setIsPlanDialogOpen(false)
+      planForm.reset()
     },
     onError: (error: Error) => {
-      toast({ title: "錯誤", description: error.message || "建立失敗", variant: "destructive" });
+      toast({ title: "錯誤", description: error.message || "建立失敗", variant: "destructive" })
     },
-  });
+  })
 
   const updatePlanMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: BudgetPlanFormData }) => {
       const payload = {
         ...data,
         projectId: data.projectId && data.projectId !== "none" ? parseInt(data.projectId) : null,
-      };
-      return apiRequest("PATCH", `/api/budget/plans/${id}`, payload);
+      }
+      return apiRequest("PATCH", `/api/budget/plans/${id}`, payload)
     },
     onSuccess: () => {
-      toast({ title: "成功", description: "預算計劃已更新" });
-      queryClient.invalidateQueries({ queryKey: ["/api/budget/plans"] });
-      setIsPlanDialogOpen(false);
-      setEditingPlan(null);
-      planForm.reset();
+      toast({ title: "成功", description: "預算計劃已更新" })
+      queryClient.invalidateQueries({ queryKey: ["/api/budget/plans"] })
+      setIsPlanDialogOpen(false)
+      setEditingPlan(null)
+      planForm.reset()
     },
     onError: (error: Error) => {
-      toast({ title: "錯誤", description: error.message || "更新失敗", variant: "destructive" });
+      toast({ title: "錯誤", description: error.message || "更新失敗", variant: "destructive" })
     },
-  });
+  })
 
   const deletePlanMutation = useMutation({
     mutationFn: async (id: number) => {
-      return apiRequest("DELETE", `/api/budget/plans/${id}`);
+      return apiRequest("DELETE", `/api/budget/plans/${id}`)
     },
     onSuccess: () => {
-      toast({ title: "成功", description: "預算計劃已刪除" });
-      queryClient.invalidateQueries({ queryKey: ["/api/budget/plans"] });
-      setDeletePlan(null);
+      toast({ title: "成功", description: "預算計劃已刪除" })
+      queryClient.invalidateQueries({ queryKey: ["/api/budget/plans"] })
+      setDeletePlan(null)
       if (selectedPlanId === deletePlan?.id) {
-        setSelectedPlanId(null);
+        setSelectedPlanId(null)
       }
     },
     onError: (error: Error) => {
-      toast({ title: "錯誤", description: error.message || "刪除失敗", variant: "destructive" });
+      toast({ title: "錯誤", description: error.message || "刪除失敗", variant: "destructive" })
     },
-  });
+  })
 
   const createItemMutation = useMutation({
     mutationFn: async (data: BudgetItemFormData) => {
@@ -265,31 +272,41 @@ export default function ProjectBudgetManagement() {
         description: data.description || null,
         paymentType: data.paymentType,
         plannedAmount: data.plannedAmount,
-        actualAmount: data.actualAmount && data.actualAmount.trim() !== "" ? data.actualAmount : null,
+        actualAmount:
+          data.actualAmount && data.actualAmount.trim() !== "" ? data.actualAmount : null,
         budgetPlanId: selectedPlanId,
-        categoryId: data.categoryId && data.categoryId !== "none" ? parseInt(data.categoryId) : null,
+        categoryId:
+          data.categoryId && data.categoryId !== "none" ? parseInt(data.categoryId) : null,
         priority: parseInt(data.priority),
-        installmentCount: data.installmentCount && data.installmentCount.trim() !== "" ? parseInt(data.installmentCount) : null,
-        installmentAmount: data.installmentAmount && data.installmentAmount.trim() !== "" ? data.installmentAmount : null,
-        monthlyAmount: data.monthlyAmount && data.monthlyAmount.trim() !== "" ? data.monthlyAmount : null,
-        monthCount: data.monthCount && data.monthCount.trim() !== "" ? parseInt(data.monthCount) : null,
+        installmentCount:
+          data.installmentCount && data.installmentCount.trim() !== ""
+            ? parseInt(data.installmentCount)
+            : null,
+        installmentAmount:
+          data.installmentAmount && data.installmentAmount.trim() !== ""
+            ? data.installmentAmount
+            : null,
+        monthlyAmount:
+          data.monthlyAmount && data.monthlyAmount.trim() !== "" ? data.monthlyAmount : null,
+        monthCount:
+          data.monthCount && data.monthCount.trim() !== "" ? parseInt(data.monthCount) : null,
         startDate: data.startDate || null,
         endDate: data.endDate || null,
         notes: data.notes || null,
-      };
-      return apiRequest("POST", "/api/budget/items", payload);
+      }
+      return apiRequest("POST", "/api/budget/items", payload)
     },
     onSuccess: () => {
-      toast({ title: "成功", description: "預算項目已建立" });
-      queryClient.invalidateQueries({ queryKey: ["/api/budget/plans", selectedPlanId] });
-      queryClient.invalidateQueries({ queryKey: ["/api/budget/plans", selectedPlanId, "summary"] });
-      setIsItemDialogOpen(false);
-      itemForm.reset();
+      toast({ title: "成功", description: "預算項目已建立" })
+      queryClient.invalidateQueries({ queryKey: ["/api/budget/plans", selectedPlanId] })
+      queryClient.invalidateQueries({ queryKey: ["/api/budget/plans", selectedPlanId, "summary"] })
+      setIsItemDialogOpen(false)
+      itemForm.reset()
     },
     onError: (error: Error) => {
-      toast({ title: "錯誤", description: error.message || "建立失敗", variant: "destructive" });
+      toast({ title: "錯誤", description: error.message || "建立失敗", variant: "destructive" })
     },
-  });
+  })
 
   const updateItemMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: BudgetItemFormData }) => {
@@ -298,68 +315,78 @@ export default function ProjectBudgetManagement() {
         description: data.description || null,
         paymentType: data.paymentType,
         plannedAmount: data.plannedAmount,
-        actualAmount: data.actualAmount && data.actualAmount.trim() !== "" ? data.actualAmount : null,
-        categoryId: data.categoryId && data.categoryId !== "none" ? parseInt(data.categoryId) : null,
+        actualAmount:
+          data.actualAmount && data.actualAmount.trim() !== "" ? data.actualAmount : null,
+        categoryId:
+          data.categoryId && data.categoryId !== "none" ? parseInt(data.categoryId) : null,
         priority: parseInt(data.priority),
-        installmentCount: data.installmentCount && data.installmentCount.trim() !== "" ? parseInt(data.installmentCount) : null,
-        installmentAmount: data.installmentAmount && data.installmentAmount.trim() !== "" ? data.installmentAmount : null,
-        monthlyAmount: data.monthlyAmount && data.monthlyAmount.trim() !== "" ? data.monthlyAmount : null,
-        monthCount: data.monthCount && data.monthCount.trim() !== "" ? parseInt(data.monthCount) : null,
+        installmentCount:
+          data.installmentCount && data.installmentCount.trim() !== ""
+            ? parseInt(data.installmentCount)
+            : null,
+        installmentAmount:
+          data.installmentAmount && data.installmentAmount.trim() !== ""
+            ? data.installmentAmount
+            : null,
+        monthlyAmount:
+          data.monthlyAmount && data.monthlyAmount.trim() !== "" ? data.monthlyAmount : null,
+        monthCount:
+          data.monthCount && data.monthCount.trim() !== "" ? parseInt(data.monthCount) : null,
         startDate: data.startDate || null,
         endDate: data.endDate || null,
         notes: data.notes || null,
-      };
-      return apiRequest("PATCH", `/api/budget/items/${id}`, payload);
+      }
+      return apiRequest("PATCH", `/api/budget/items/${id}`, payload)
     },
     onSuccess: () => {
-      toast({ title: "成功", description: "預算項目已更新" });
-      queryClient.invalidateQueries({ queryKey: ["/api/budget/plans", selectedPlanId] });
-      queryClient.invalidateQueries({ queryKey: ["/api/budget/plans", selectedPlanId, "summary"] });
-      setIsItemDialogOpen(false);
-      setEditingItem(null);
-      itemForm.reset();
+      toast({ title: "成功", description: "預算項目已更新" })
+      queryClient.invalidateQueries({ queryKey: ["/api/budget/plans", selectedPlanId] })
+      queryClient.invalidateQueries({ queryKey: ["/api/budget/plans", selectedPlanId, "summary"] })
+      setIsItemDialogOpen(false)
+      setEditingItem(null)
+      itemForm.reset()
     },
     onError: (error: Error) => {
-      toast({ title: "錯誤", description: error.message || "更新失敗", variant: "destructive" });
+      toast({ title: "錯誤", description: error.message || "更新失敗", variant: "destructive" })
     },
-  });
+  })
 
   const deleteItemMutation = useMutation({
     mutationFn: async (id: number) => {
-      return apiRequest("DELETE", `/api/budget/items/${id}`);
+      return apiRequest("DELETE", `/api/budget/items/${id}`)
     },
     onSuccess: () => {
-      toast({ title: "成功", description: "預算項目已刪除" });
-      queryClient.invalidateQueries({ queryKey: ["/api/budget/plans", selectedPlanId] });
-      queryClient.invalidateQueries({ queryKey: ["/api/budget/plans", selectedPlanId, "summary"] });
-      setDeleteItem(null);
+      toast({ title: "成功", description: "預算項目已刪除" })
+      queryClient.invalidateQueries({ queryKey: ["/api/budget/plans", selectedPlanId] })
+      queryClient.invalidateQueries({ queryKey: ["/api/budget/plans", selectedPlanId, "summary"] })
+      setDeleteItem(null)
     },
     onError: (error: Error) => {
-      toast({ title: "錯誤", description: error.message || "刪除失敗", variant: "destructive" });
+      toast({ title: "錯誤", description: error.message || "刪除失敗", variant: "destructive" })
     },
-  });
+  })
 
   const convertItemMutation = useMutation({
     mutationFn: async (id: number) => {
-      return apiRequest<ConvertItemResponse>("POST", `/api/budget/items/${id}/convert`);
+      return apiRequest<ConvertItemResponse>("POST", `/api/budget/items/${id}/convert`)
     },
     onSuccess: (data: ConvertItemResponse) => {
       toast({
         title: "成功",
         description: `預算項目已轉換為付款項目 (ID: ${data.paymentItem.id})`,
-      });
-      queryClient.invalidateQueries({ queryKey: ["/api/budget/plans", selectedPlanId] });
-      queryClient.invalidateQueries({ queryKey: ["/api/budget/plans", selectedPlanId, "summary"] });
-      setConvertItem(null);
+      })
+      queryClient.invalidateQueries({ queryKey: ["/api/budget/plans", selectedPlanId] })
+      queryClient.invalidateQueries({ queryKey: ["/api/budget/plans", selectedPlanId, "summary"] })
+      setConvertItem(null)
     },
     onError: (error: Error) => {
-      toast({ title: "錯誤", description: error.message || "轉換失敗", variant: "destructive" });
+      toast({ title: "錯誤", description: error.message || "轉換失敗", variant: "destructive" })
     },
-  });
+  })
 
   // 事件處理
   const openEditPlan = (plan: BudgetPlan) => {
-    setEditingPlan(plan);
+    setEditingPlan(plan)
     planForm.reset({
       planName: plan.planName,
       planType: plan.planType,
@@ -368,12 +395,12 @@ export default function ProjectBudgetManagement() {
       startDate: plan.startDate,
       endDate: plan.endDate,
       totalBudget: plan.totalBudget,
-    });
-    setIsPlanDialogOpen(true);
-  };
+    })
+    setIsPlanDialogOpen(true)
+  }
 
   const openEditItem = (item: BudgetItem) => {
-    setEditingItem(item);
+    setEditingItem(item)
     itemForm.reset({
       itemName: item.itemName,
       description: item.description || "",
@@ -389,47 +416,47 @@ export default function ProjectBudgetManagement() {
       priority: item.priority.toString(),
       categoryId: item.categoryId?.toString() || "",
       notes: item.notes || "",
-    });
-    setIsItemDialogOpen(true);
-  };
+    })
+    setIsItemDialogOpen(true)
+  }
 
   const onPlanSubmit = (data: BudgetPlanFormData) => {
     if (editingPlan) {
-      updatePlanMutation.mutate({ id: editingPlan.id, data });
+      updatePlanMutation.mutate({ id: editingPlan.id, data })
     } else {
-      createPlanMutation.mutate(data);
+      createPlanMutation.mutate(data)
     }
-  };
+  }
 
   const onItemSubmit = (data: BudgetItemFormData) => {
     if (editingItem) {
-      updateItemMutation.mutate({ id: editingItem.id, data });
+      updateItemMutation.mutate({ id: editingItem.id, data })
     } else {
-      createItemMutation.mutate(data);
+      createItemMutation.mutate(data)
     }
-  };
+  }
 
   const handleSelectPlan = (planId: number) => {
-    setSelectedPlanId(planId);
-    setActiveTab("detail");
-  };
+    setSelectedPlanId(planId)
+    setActiveTab("detail")
+  }
 
   const handleOpenCreatePlan = () => {
-    setEditingPlan(null);
+    setEditingPlan(null)
     planForm.reset({
       planName: "",
       planType: "project",
       projectId: "",
       budgetPeriod: "monthly",
-      startDate: new Date().toISOString().split("T")[0],
+      startDate: localDateISO(),
       endDate: "",
       totalBudget: "",
-    });
-    setIsPlanDialogOpen(true);
-  };
+    })
+    setIsPlanDialogOpen(true)
+  }
 
   const handleOpenCreateItem = () => {
-    setEditingItem(null);
+    setEditingItem(null)
     itemForm.reset({
       itemName: "",
       description: "",
@@ -445,9 +472,9 @@ export default function ProjectBudgetManagement() {
       priority: "2",
       categoryId: "",
       notes: "",
-    });
-    setIsItemDialogOpen(true);
-  };
+    })
+    setIsItemDialogOpen(true)
+  }
 
   return (
     <div className="space-y-6">
@@ -538,7 +565,13 @@ export default function ProjectBudgetManagement() {
         </TabsContent>
 
         <TabsContent value="dashboard" className="space-y-4">
-          <ProjectBudgetDashboard planSummary={planSummary as unknown as import("@/components/project-budget-dashboard").PlanSummary | null} />
+          <ProjectBudgetDashboard
+            planSummary={
+              planSummary as unknown as
+                | import("@/components/project-budget-dashboard").PlanSummary
+                | null
+            }
+          />
         </TabsContent>
       </Tabs>
 
@@ -582,5 +615,5 @@ export default function ProjectBudgetManagement() {
         onConfirm={(id) => convertItemMutation.mutate(id)}
       />
     </div>
-  );
+  )
 }
