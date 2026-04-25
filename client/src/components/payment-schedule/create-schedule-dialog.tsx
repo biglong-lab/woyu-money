@@ -3,29 +3,42 @@
  * 供使用者為指定項目建立付款計劃
  */
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Button } from '@/components/ui/button';
-import { UseFormReturn } from 'react-hook-form';
-import type { IntegratedPaymentItem, ScheduleFormData } from './types';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog"
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import { Button } from "@/components/ui/button"
+import { UseFormReturn } from "react-hook-form"
+import type { IntegratedPaymentItem, ScheduleFormData } from "./types"
 
 interface CreateScheduleDialogProps {
   /** 是否開啟對話框 */
-  open: boolean;
+  open: boolean
   /** 控制對話框開關 */
-  onOpenChange: (open: boolean) => void;
+  onOpenChange: (open: boolean) => void
   /** 選中的付款項目 */
-  selectedItem: IntegratedPaymentItem | null;
+  selectedItem: IntegratedPaymentItem | null
   /** 選擇的排程日期 */
-  selectedDate: string;
+  selectedDate: string
   /** react-hook-form 的 form 實例 */
-  form: UseFormReturn<ScheduleFormData>;
+  form: UseFormReturn<ScheduleFormData>
   /** 提交表單的回呼 */
-  onSubmit: (data: ScheduleFormData) => void;
+  onSubmit: (data: ScheduleFormData) => void
   /** 是否正在建立中 */
-  isPending: boolean;
+  isPending: boolean
 }
 
 export function CreateScheduleDialog({
@@ -52,20 +65,24 @@ export function CreateScheduleDialog({
               <div className="grid grid-cols-3 gap-2 text-sm">
                 <div>
                   <div className="text-gray-500">應付總額</div>
-                  <div className="font-medium">${parseFloat(selectedItem.totalAmount).toLocaleString()}</div>
+                  <div className="font-medium">
+                    ${parseFloat(selectedItem.totalAmount).toLocaleString()}
+                  </div>
                 </div>
                 <div>
                   <div className="text-gray-500">實際已付</div>
-                  <div className="font-medium text-green-600">${parseFloat(selectedItem.actualPaid).toLocaleString()}</div>
+                  <div className="font-medium text-green-600">
+                    ${parseFloat(selectedItem.actualPaid).toLocaleString()}
+                  </div>
                 </div>
                 <div>
                   <div className="text-gray-500">待付金額</div>
-                  <div className="font-medium text-orange-600">${parseFloat(selectedItem.pendingAmount).toLocaleString()}</div>
+                  <div className="font-medium text-orange-600">
+                    ${parseFloat(selectedItem.pendingAmount).toLocaleString()}
+                  </div>
                 </div>
               </div>
-              <div className="text-sm text-gray-500">
-                計劃日期：{selectedDate}
-              </div>
+              <div className="text-sm text-gray-500">計劃日期：{selectedDate}</div>
             </div>
 
             {/* 排程表單 */}
@@ -76,9 +93,18 @@ export function CreateScheduleDialog({
                   name="scheduledAmount"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>計劃金額</FormLabel>
+                      <FormLabel>
+                        計劃金額 <span className="text-red-500">*</span>
+                      </FormLabel>
                       <FormControl>
-                        <Input {...field} type="number" placeholder="請輸入計劃金額" data-testid="input-scheduled-amount" />
+                        <Input
+                          {...field}
+                          type="number"
+                          placeholder="請輸入計劃金額"
+                          onFocus={(e) => e.target.select()}
+                          autoFocus
+                          data-testid="input-scheduled-amount"
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -90,9 +116,16 @@ export function CreateScheduleDialog({
                   name="notes"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>備註</FormLabel>
+                      <FormLabel>
+                        備註 <span className="text-xs text-gray-400 font-normal">（選填）</span>
+                      </FormLabel>
                       <FormControl>
-                        <Textarea {...field} placeholder="選填" rows={3} data-testid="textarea-notes" />
+                        <Textarea
+                          {...field}
+                          placeholder="選填"
+                          rows={3}
+                          data-testid="textarea-notes"
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -104,7 +137,7 @@ export function CreateScheduleDialog({
                     取消
                   </Button>
                   <Button type="submit" disabled={isPending} data-testid="btn-submit-schedule">
-                    {isPending ? '建立中...' : '建立計劃'}
+                    {isPending ? "建立中..." : "建立計劃"}
                   </Button>
                 </DialogFooter>
               </form>
@@ -113,5 +146,5 @@ export function CreateScheduleDialog({
         )}
       </DialogContent>
     </Dialog>
-  );
+  )
 }
