@@ -183,7 +183,9 @@ export default function ReceiptMatchHelperPage() {
         <CardContent>
           <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1">
-              <Label htmlFor="amount">金額</Label>
+              <Label htmlFor="amount">
+                金額 <span className="text-xs text-gray-400 font-normal">（任一即可）</span>
+              </Label>
               <Input
                 id="amount"
                 inputMode="numeric"
@@ -199,7 +201,9 @@ export default function ReceiptMatchHelperPage() {
               )}
             </div>
             <div className="space-y-1">
-              <Label htmlFor="date">日期</Label>
+              <Label htmlFor="date">
+                日期 <span className="text-xs text-gray-400 font-normal">（選填）</span>
+              </Label>
               <Input
                 id="date"
                 type="date"
@@ -208,7 +212,9 @@ export default function ReceiptMatchHelperPage() {
               />
             </div>
             <div className="space-y-1 sm:col-span-2">
-              <Label htmlFor="vendor">廠商</Label>
+              <Label htmlFor="vendor">
+                廠商 <span className="text-xs text-gray-400 font-normal">（任一即可）</span>
+              </Label>
               <Input
                 id="vendor"
                 placeholder="例如：台電、中華電信"
