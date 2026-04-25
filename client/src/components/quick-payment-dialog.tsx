@@ -18,7 +18,7 @@ import {
 import { useToast } from "@/hooks/use-toast"
 import { useOnlineStatus } from "@/hooks/use-online-status"
 import { apiRequest, queryClient } from "@/lib/queryClient"
-import { localDateISO, friendlyApiError } from "@/lib/utils"
+import { localDateISO, friendlyApiError, formatNT } from "@/lib/utils"
 import { Search, DollarSign, CheckCircle2, ArrowRight, Loader2 } from "lucide-react"
 
 interface QuickPaymentDialogProps {
@@ -294,7 +294,7 @@ export function QuickPaymentDialog({ open, onOpenChange }: QuickPaymentDialogPro
                 </div>
                 {amount && parseFloat(amount) > 0 && (
                   <div className="mt-1 text-xs text-blue-700 font-medium">
-                    = NT$ {Math.round(parseFloat(amount)).toLocaleString()}
+                    = {formatNT(parseFloat(amount))}
                   </div>
                 )}
                 {/* 快速金額按鈕（付清 / 半額） */}
