@@ -253,6 +253,7 @@ function PaidDialog({ item, open, onOpenChange, onConfirm, isPending }: PaidDial
 
   const parsedAmount = parseFloat(amountInput.replace(/[,\s]/g, ""))
   const isPartial = Number.isFinite(parsedAmount) && parsedAmount < item.unpaidAmount
+  const isOverpaid = Number.isFinite(parsedAmount) && parsedAmount > item.unpaidAmount
   const isInvalid = !Number.isFinite(parsedAmount) || parsedAmount <= 0
 
   return (
@@ -283,7 +284,7 @@ function PaidDialog({ item, open, onOpenChange, onConfirm, isPending }: PaidDial
           </div>
           <div className="space-y-1">
             <label htmlFor="paid-amount" className="text-sm text-gray-600">
-              實際付款金額
+              實際付款金額 <span className="text-red-500">*</span>
             </label>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">NT$</span>
@@ -293,6 +294,7 @@ function PaidDialog({ item, open, onOpenChange, onConfirm, isPending }: PaidDial
                 inputMode="decimal"
                 value={amountInput}
                 onChange={(e) => setAmountInput(e.target.value)}
+                onFocus={(e) => e.target.select()}
                 className="border rounded pl-12 pr-2 py-2 text-base font-bold w-full"
                 data-testid="input-paid-amount"
               />
@@ -303,6 +305,11 @@ function PaidDialog({ item, open, onOpenChange, onConfirm, isPending }: PaidDial
             {isPartial && (
               <div className="text-xs text-yellow-700 bg-yellow-50 rounded px-2 py-1">
                 ⚠️ 此為部分付款，剩餘 {formatNT(item.unpaidAmount - parsedAmount)} 仍會列為待付
+              </div>
+            )}
+            {isOverpaid && (
+              <div className="text-xs text-orange-700 bg-orange-50 rounded px-2 py-1">
+                ⚠️ 超付 {formatNT(parsedAmount - item.unpaidAmount)}，請確認金額正確
               </div>
             )}
           </div>
