@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { apiRequest, queryClient } from "@/lib/queryClient"
-import { localDateISO, formatNT } from "@/lib/utils"
+import { localDateISO, formatNT, friendlyApiError } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 import { useCopyAmount } from "@/hooks/use-copy-amount"
 import { useDocumentTitle } from "@/hooks/use-document-title"
@@ -123,7 +123,7 @@ function ReminderCard() {
     },
     onSettled: () => setPendingId(null),
     onError: (err) =>
-      toast({ title: "標記失敗", description: err.message, variant: "destructive" }),
+      toast({ title: "標記失敗", description: friendlyApiError(err), variant: "destructive" }),
   })
 
   if (isLoading) {

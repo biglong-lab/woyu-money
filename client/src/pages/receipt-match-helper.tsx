@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { apiRequest, queryClient } from "@/lib/queryClient"
-import { localDateISO, formatNT } from "@/lib/utils"
+import { localDateISO, formatNT, friendlyApiError } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 import { useDocumentTitle } from "@/hooks/use-document-title"
 
@@ -118,7 +118,7 @@ export default function ReceiptMatchHelperPage() {
     mutationFn: (payload) => apiRequest("POST", "/api/receipt-match/suggest", payload),
     onSuccess: (data) => setResult(data),
     onError: (err) =>
-      toast({ title: "查詢失敗", description: err.message, variant: "destructive" }),
+      toast({ title: "查詢失敗", description: friendlyApiError(err), variant: "destructive" }),
   })
 
   const markPaidMutation = useMutation<unknown, Error, { itemId: number; amountPaid: number }>({
@@ -139,7 +139,7 @@ export default function ReceiptMatchHelperPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/payment/items"] })
     },
     onError: (err) =>
-      toast({ title: "標記失敗", description: err.message, variant: "destructive" }),
+      toast({ title: "標記失敗", description: friendlyApiError(err), variant: "destructive" }),
   })
 
   const handleSubmit = (e: React.FormEvent) => {

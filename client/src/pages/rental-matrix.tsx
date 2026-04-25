@@ -17,7 +17,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { apiRequest, queryClient } from "@/lib/queryClient"
-import { formatNT } from "@/lib/utils"
+import { formatNT, friendlyApiError } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 import { useCopyAmount } from "@/hooks/use-copy-amount"
 import { useDocumentTitle } from "@/hooks/use-document-title"
@@ -186,7 +186,7 @@ export default function RentalMatrixPage() {
       queryClient.invalidateQueries({ queryKey: [`/api/rental-matrix?year=${year}`] })
     },
     onError: (err) =>
-      toast({ title: "建立失敗", description: err.message, variant: "destructive" }),
+      toast({ title: "建立失敗", description: friendlyApiError(err), variant: "destructive" }),
   })
 
   const handleCreateYear = (projectId: number, monthlyAmount: number, contractName: string) => {
@@ -223,7 +223,7 @@ export default function RentalMatrixPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/payment/priority-report?includeLow=true"] })
     },
     onError: (err) =>
-      toast({ title: "標記失敗", description: err.message, variant: "destructive" }),
+      toast({ title: "標記失敗", description: friendlyApiError(err), variant: "destructive" }),
   })
 
   const markPaidMutation = useMutation<{ processedCount: number; totalPaid: number }, Error, void>({
@@ -246,7 +246,7 @@ export default function RentalMatrixPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/payment/priority-report?includeLow=true"] })
     },
     onError: (err) => {
-      toast({ title: "批次標記失敗", description: err.message, variant: "destructive" })
+      toast({ title: "批次標記失敗", description: friendlyApiError(err), variant: "destructive" })
     },
   })
 

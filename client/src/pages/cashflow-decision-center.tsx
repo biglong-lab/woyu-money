@@ -17,7 +17,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { apiRequest, queryClient } from "@/lib/queryClient"
-import { localDateISO, formatNT } from "@/lib/utils"
+import { localDateISO, formatNT, friendlyApiError } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 import { useCopyAmount } from "@/hooks/use-copy-amount"
 import { useDocumentTitle } from "@/hooks/use-document-title"
@@ -108,7 +108,7 @@ function MonthDetail({ year, month }: { year: number; month: number }) {
     },
     onSettled: () => setPendingId(null),
     onError: (err) =>
-      toast({ title: "標記失敗", description: err.message, variant: "destructive" }),
+      toast({ title: "標記失敗", description: friendlyApiError(err), variant: "destructive" }),
   })
 
   if (isLoading) return <div className="text-xs text-gray-500 p-2">載入中...</div>

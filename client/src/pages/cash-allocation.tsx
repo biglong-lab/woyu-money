@@ -26,7 +26,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { apiRequest, queryClient } from "@/lib/queryClient"
-import { localDateISO, formatNT } from "@/lib/utils"
+import { localDateISO, formatNT, friendlyApiError } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 import { useDocumentTitle } from "@/hooks/use-document-title"
 
@@ -411,7 +411,7 @@ export default function CashAllocationPage() {
     onError: (err) => {
       toast({
         title: "無法取得分配建議",
-        description: err.message,
+        description: friendlyApiError(err),
         variant: "destructive",
       })
     },
@@ -438,7 +438,7 @@ export default function CashAllocationPage() {
     },
     onSettled: () => setPendingId(null),
     onError: (err) =>
-      toast({ title: "標記失敗", description: err.message, variant: "destructive" }),
+      toast({ title: "標記失敗", description: friendlyApiError(err), variant: "destructive" }),
   })
 
   const handleMarkPaid = (item: PriorityResult) => {
