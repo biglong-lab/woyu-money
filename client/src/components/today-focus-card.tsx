@@ -154,9 +154,10 @@ interface FocusCardProps {
   total: number
   onMarkPaid: () => void
   onDefer: () => void
+  onCopyAmount: (amount: number, label?: string) => void
 }
 
-function FocusCard({ item, position, total, onMarkPaid, onDefer }: FocusCardProps) {
+function FocusCard({ item, position, total, onMarkPaid, onDefer, onCopyAmount }: FocusCardProps) {
   const isOverdue = item.daysOverdue > 0
   return (
     <div className="rounded-lg border-2 border-amber-200 bg-gradient-to-br from-amber-50 to-white p-4 sm:p-5">
@@ -171,7 +172,16 @@ function FocusCard({ item, position, total, onMarkPaid, onDefer }: FocusCardProp
 
       <h3 className="text-lg sm:text-xl font-bold text-gray-900">{item.itemName}</h3>
       <div className="mt-1 text-2xl sm:text-3xl font-bold text-gray-900">
-        {formatCurrency(item.unpaidAmount)}
+        <button
+          type="button"
+          onClick={() => onCopyAmount(item.unpaidAmount, item.itemName)}
+          className="hover:text-blue-600 hover:underline cursor-pointer text-left inline-flex items-center gap-1.5"
+          title="點擊複製數字（轉帳貼網銀用）"
+          data-testid="focus-amount-copy"
+        >
+          {formatCurrency(item.unpaidAmount)}
+          <Copy className="h-4 w-4 opacity-40" />
+        </button>
       </div>
 
       <div className="mt-3 space-y-1.5 text-sm">
@@ -428,6 +438,20 @@ export function TodayFocusCard() {
 
   const handleResetSkipped = () => setSkippedIds(new Set())
 
+  // 一鍵複製金額（給轉帳貼到網銀用）
+  const handleCopyAmount = async (amount: number, label?: string) => {
+    try {
+      await navigator.clipboard.writeText(String(Math.round(amount)))
+      toast({
+        title: "已複製金額",
+        description: label ? `${label}: ${formatCurrency(amount)}` : formatCurrency(amount),
+        duration: 1500,
+      })
+    } catch {
+      toast({ title: "複製失敗", variant: "destructive" })
+    }
+  }
+
   // 複製今日清單為 LINE 風格訊息
   const handleCopyDigest = async () => {
     const items = visibleItems.slice(0, 10)
@@ -508,6 +532,7 @@ export function TodayFocusCard() {
             total={visibleItems.length}
             onMarkPaid={handleMarkPaidClick}
             onDefer={handleDefer}
+            onCopyAmount={handleCopyAmount}
           />
         ) : (
           <EmptyState scope={scope} />
