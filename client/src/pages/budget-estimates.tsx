@@ -39,8 +39,25 @@ import {
   Lock,
   ChevronDown,
   ChevronUp,
+  Plus,
+  Users,
 } from "lucide-react"
 import { formatNT, friendlyApiError } from "@/lib/utils"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {
+  allocateCost,
+  type AllocationRule,
+  type PropertyGroupMemberInput,
+} from "@shared/cost-allocation"
 
 interface PreviewItem {
   fixedCategoryId: number | null
@@ -51,6 +68,28 @@ interface PreviewItem {
   targetProjectName: string | null
   plannedAmount: number
   basis: string
+}
+
+interface PropertyGroupMember {
+  id: number
+  groupId: number
+  projectId: number
+  projectName: string | null
+  weight: string
+}
+
+interface PropertyGroup {
+  id: number
+  name: string
+  description: string | null
+  isActive: boolean
+  members: PropertyGroupMember[]
+}
+
+interface FixedCategory {
+  id: number
+  categoryName: string
+  isActive: boolean | null
 }
 
 interface PreviewResponse {
@@ -79,6 +118,7 @@ export default function BudgetEstimates() {
   const [year, setYear] = useState(now.getFullYear())
   const [month, setMonth] = useState(now.getMonth() + 1)
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+  const [sharedDialogOpen, setSharedDialogOpen] = useState(false)
 
   // ── Preview query ──────────────────────────────
   const {
@@ -179,18 +219,32 @@ export default function BudgetEstimates() {
                 </Select>
               </div>
             </div>
-            <Button
-              variant="outline"
-              size="default"
-              onClick={() => refetch()}
-              disabled={isFetching}
-            >
-              <RefreshCw className={`h-4 w-4 mr-1 ${isFetching ? "animate-spin" : ""}`} />
-              重新預覽
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="default"
+                onClick={() => refetch()}
+                disabled={isFetching}
+              >
+                <RefreshCw className={`h-4 w-4 mr-1 ${isFetching ? "animate-spin" : ""}`} />
+                重新預覽
+              </Button>
+              <Button variant="outline" size="default" onClick={() => setSharedDialogOpen(true)}>
+                <Plus className="h-4 w-4 mr-1" />
+                新增共用費用
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
+
+      {/* 共用費用對話框 */}
+      <SharedExpenseDialog
+        open={sharedDialogOpen}
+        onOpenChange={setSharedDialogOpen}
+        year={year}
+        month={month}
+      />
 
       {/* 預覽結果 */}
       {isLoading ? (
@@ -365,6 +419,245 @@ function groupByProject(items: PreviewItem[]): ItemGroup[] {
     g.subtotal += item.plannedAmount
   }
   return Array.from(map.values())
+}
+
+// ─────────────────────────────────────────────
+// SharedExpenseDialog — 新增共用費用
+// ─────────────────────────────────────────────
+
+interface SharedExpenseDialogProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  year: number
+  month: number
+}
+
+function SharedExpenseDialog({ open, onOpenChange, year, month }: SharedExpenseDialogProps) {
+  const { toast } = useToast()
+  const queryClient = useQueryClient()
+
+  const [groupId, setGroupId] = useState<string>("")
+  const [categoryId, setCategoryId] = useState<string>("")
+  const [itemName, setItemName] = useState("")
+  const [totalAmount, setTotalAmount] = useState("")
+  const [rule, setRule] = useState<AllocationRule>("equal")
+
+  // 取共用組
+  const { data: groups = [] } = useQuery<PropertyGroup[]>({
+    queryKey: ["/api/property-groups"],
+    enabled: open,
+  })
+
+  // 取分類
+  const { data: categories = [] } = useQuery<FixedCategory[]>({
+    queryKey: ["/api/fixed-categories"],
+    enabled: open,
+  })
+
+  const selectedGroup = groups.find((g) => String(g.id) === groupId)
+
+  // 即時預覽分攤（client side 用純函式）
+  const allocPreview = (() => {
+    if (!selectedGroup || selectedGroup.members.length === 0) return null
+    const amount = parseFloat(totalAmount)
+    if (!Number.isFinite(amount) || amount < 0) return null
+    try {
+      const memberInputs: PropertyGroupMemberInput[] = selectedGroup.members.map((m) => ({
+        projectId: m.projectId,
+        weight: parseFloat(m.weight) || 1,
+        // by_revenue 暫時不支援前端輸入，先給 0（會在 server 端拒絕）
+        revenue: rule === "by_revenue" ? 0 : undefined,
+      }))
+      if (rule === "by_revenue") {
+        // 提示：本對話框暫不支援 by_revenue（需要當月營收資料）
+        return null
+      }
+      return allocateCost(amount, memberInputs, rule)
+    } catch {
+      return null
+    }
+  })()
+
+  // 自動帶入分類名稱
+  const handleCategoryChange = (v: string) => {
+    setCategoryId(v)
+    if (!itemName) {
+      const cat = categories.find((c) => String(c.id) === v)
+      if (cat) setItemName(`${year}/${month} ${cat.categoryName}（共用）`)
+    }
+  }
+
+  const submit = useMutation({
+    mutationFn: async () => {
+      return apiRequest("POST", "/api/budget/estimates/shared-item", {
+        year,
+        month,
+        sharedGroupId: parseInt(groupId),
+        fixedCategoryId: categoryId ? parseInt(categoryId) : undefined,
+        itemName: itemName.trim(),
+        totalAmount: parseFloat(totalAmount),
+        allocationRule: rule,
+      })
+    },
+    onSuccess: () => {
+      toast({ title: "共用費用已建立並分攤" })
+      onOpenChange(false)
+      // 清空
+      setGroupId("")
+      setCategoryId("")
+      setItemName("")
+      setTotalAmount("")
+      setRule("equal")
+      queryClient.invalidateQueries({ queryKey: ["/api/budget/plans"] })
+    },
+    onError: (e: Error) =>
+      toast({
+        title: "建立失敗",
+        description: friendlyApiError(e),
+        variant: "destructive",
+      }),
+  })
+
+  const canSubmit =
+    groupId && itemName.trim().length > 0 && parseFloat(totalAmount) > 0 && rule !== "by_revenue" // by_revenue 暫不支援
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Users className="h-5 w-5 text-purple-600" />
+            新增共用費用 ({year}/{month})
+          </DialogTitle>
+          <DialogDescription>輸入共用費用總額後，系統會依規則分攤到各館</DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-3">
+          <div>
+            <Label>共用組 *</Label>
+            <Select value={groupId} onValueChange={setGroupId}>
+              <SelectTrigger>
+                <SelectValue placeholder="選擇共用組" />
+              </SelectTrigger>
+              <SelectContent>
+                {groups
+                  .filter((g) => g.isActive && g.members.length > 0)
+                  .map((g) => (
+                    <SelectItem key={g.id} value={String(g.id)}>
+                      {g.name}（{g.members.length} 個成員）
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+            {groups.length === 0 && (
+              <p className="text-xs text-muted-foreground mt-1">
+                尚無共用組。請先到「系統管理 → 館別共用組」建立
+              </p>
+            )}
+          </div>
+
+          <div>
+            <Label>費用分類（選填）</Label>
+            <Select value={categoryId} onValueChange={handleCategoryChange}>
+              <SelectTrigger>
+                <SelectValue placeholder="選擇分類（如：人事費、洗滌費）" />
+              </SelectTrigger>
+              <SelectContent>
+                {categories
+                  .filter((c) => c.isActive !== false)
+                  .map((c) => (
+                    <SelectItem key={c.id} value={String(c.id)}>
+                      {c.categoryName}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <Label>項目名稱 *</Label>
+            <Input
+              value={itemName}
+              onChange={(e) => setItemName(e.target.value)}
+              placeholder={`例：${year}/${month} 人事費（共用）`}
+            />
+          </div>
+
+          <div>
+            <Label>總金額 *</Label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                NT$
+              </span>
+              <Input
+                type="number"
+                value={totalAmount}
+                onChange={(e) => setTotalAmount(e.target.value)}
+                placeholder="0"
+                className="pl-12"
+              />
+            </div>
+            {parseFloat(totalAmount) > 0 && (
+              <p className="text-xs text-purple-700 mt-1 font-medium">
+                = {formatNT(parseFloat(totalAmount))}
+              </p>
+            )}
+          </div>
+
+          <div>
+            <Label>分攤規則 *</Label>
+            <Select value={rule} onValueChange={(v) => setRule(v as AllocationRule)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="equal">平均分攤（每館相同）</SelectItem>
+                <SelectItem value="by_rooms">依房數比例（用權重）</SelectItem>
+                <SelectItem value="manual">手動權重（用各成員 weight）</SelectItem>
+                <SelectItem value="by_revenue" disabled>
+                  依營收比例（暫不支援）
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* 即時分攤預覽 */}
+          {allocPreview && allocPreview.length > 0 && (
+            <Card className="bg-purple-50/50 border-purple-200">
+              <CardContent className="pt-4">
+                <p className="text-xs font-medium text-purple-800 mb-2">分攤預覽：</p>
+                <div className="space-y-1.5">
+                  {allocPreview.map((a) => {
+                    const member = selectedGroup?.members.find((m) => m.projectId === a.projectId)
+                    return (
+                      <div key={a.projectId} className="flex justify-between text-sm">
+                        <span>{member?.projectName ?? `Project ${a.projectId}`}</span>
+                        <span className="font-medium">{formatNT(a.amount)}</span>
+                      </div>
+                    )
+                  })}
+                  <div className="pt-1.5 border-t border-purple-200 flex justify-between text-sm font-semibold">
+                    <span>合計</span>
+                    <span>{formatNT(allocPreview.reduce((s, a) => s + a.amount, 0))}</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            取消
+          </Button>
+          <Button onClick={() => submit.mutate()} disabled={!canSubmit || submit.isPending}>
+            <CheckCircle2 className="h-4 w-4 mr-1" />
+            {submit.isPending ? "建立中..." : "確認建立"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
 }
 
 function PreviewItemRow({ item }: { item: PreviewItem }) {

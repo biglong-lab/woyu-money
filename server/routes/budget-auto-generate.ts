@@ -29,7 +29,9 @@ import { fixedCategories, fixedCategorySubOptions } from "@shared/schema"
 import { budgetPlans, budgetItems } from "@shared/schema"
 import { asyncHandler, AppError } from "../middleware/error-handler"
 import { requireAuth } from "../auth"
-import { estimateFromHistory } from "@shared/cost-allocation"
+import { estimateFromHistory, allocateCost, type AllocationRule } from "@shared/cost-allocation"
+import { propertyGroups, propertyGroupMembers, budgetItemAllocations } from "@shared/schema"
+import { eq } from "drizzle-orm"
 
 const router = Router()
 
@@ -309,6 +311,170 @@ router.get(
       itemCount: preview.length,
       totalBudget: preview.reduce((s, g) => s + g.plannedAmount, 0),
       items: preview,
+    })
+  })
+)
+
+// ─────────────────────────────────────────────
+// POST /api/budget/estimates/shared-item
+// 新增共用費用到指定月份預估表（自動建立 plan 若不存在）
+// ─────────────────────────────────────────────
+
+const sharedItemBodySchema = z.object({
+  year: z.number().int().min(2000).max(2100),
+  month: z.number().int().min(1).max(12),
+  sharedGroupId: z.number().int().positive(),
+  fixedCategoryId: z.number().int().positive().optional(),
+  itemName: z.string().min(1).max(255),
+  totalAmount: z.number().nonnegative(),
+  allocationRule: z.enum(["equal", "by_rooms", "by_revenue", "manual"]),
+  // by_revenue 時需提供各館營收
+  memberRevenues: z
+    .array(
+      z.object({
+        projectId: z.number(),
+        revenue: z.number(),
+      })
+    )
+    .optional(),
+})
+
+router.post(
+  "/api/budget/estimates/shared-item",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const parsed = sharedItemBodySchema.safeParse(req.body)
+    if (!parsed.success) {
+      throw new AppError(400, "輸入格式錯誤：請檢查必填欄位")
+    }
+    const {
+      year,
+      month,
+      sharedGroupId,
+      fixedCategoryId,
+      itemName,
+      totalAmount,
+      allocationRule,
+      memberRevenues,
+    } = parsed.data
+
+    // ── 1. 取得共用組成員 ───────────────────────────
+    const group = await db
+      .select()
+      .from(propertyGroups)
+      .where(eq(propertyGroups.id, sharedGroupId))
+      .limit(1)
+    if (group.length === 0) throw new AppError(404, "共用組不存在")
+
+    const members = await db
+      .select()
+      .from(propertyGroupMembers)
+      .where(eq(propertyGroupMembers.groupId, sharedGroupId))
+    if (members.length === 0) {
+      throw new AppError(400, "此共用組沒有成員，無法分攤")
+    }
+
+    // ── 2. 計算分攤（用共用純函式）──────────────────
+    const memberInputs = members.map((m) => ({
+      projectId: m.projectId,
+      weight: parseFloat(m.weight ?? "1"),
+      revenue: memberRevenues?.find((mr) => mr.projectId === m.projectId)?.revenue,
+    }))
+
+    let allocations
+    try {
+      allocations = allocateCost(totalAmount, memberInputs, allocationRule as AllocationRule)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "分攤計算失敗"
+      throw new AppError(400, msg)
+    }
+
+    // ── 3. 取或建立當月 plan ────────────────────────
+    const planName = `${year}-${String(month).padStart(2, "0")} 月度預估`
+    let plan = (
+      await db
+        .select()
+        .from(budgetPlans)
+        .where(sql`plan_name = ${planName} AND COALESCE(status, 'active') = 'active'`)
+        .limit(1)
+    )[0]
+
+    if (!plan) {
+      const startDate = new Date(year, month - 1, 1).toISOString().slice(0, 10)
+      const endDate = new Date(year, month, 0).toISOString().slice(0, 10)
+      const [created] = await db
+        .insert(budgetPlans)
+        .values({
+          planName,
+          planType: "monthly_auto",
+          budgetPeriod: "monthly",
+          startDate,
+          endDate,
+          totalBudget: "0",
+          status: "active",
+        })
+        .returning()
+      plan = created
+    }
+
+    // ── 4. 建立 budget_item（attribution=shared）─────
+    const startDate = new Date(year, month - 1, 1).toISOString().slice(0, 10)
+    const endDate = new Date(year, month, 0).toISOString().slice(0, 10)
+
+    const [budgetItem] = await db
+      .insert(budgetItems)
+      .values({
+        budgetPlanId: plan.id,
+        itemName,
+        paymentType: "single",
+        plannedAmount: totalAmount.toString(),
+        attribution: "shared",
+        sharedGroupId,
+        allocationRule,
+        fixedCategoryId: fixedCategoryId ?? null,
+        startDate,
+        endDate,
+        notes: `共用費用：${group[0].name} (${allocationRule})`,
+      })
+      .returning()
+
+    // ── 5. 寫入 N 筆 allocations ────────────────────
+    if (allocations.length > 0) {
+      await db.insert(budgetItemAllocations).values(
+        allocations.map((a) => ({
+          budgetItemId: budgetItem.id,
+          projectId: a.projectId,
+          allocatedAmount: a.amount.toString(),
+          allocationBasis: a.basis,
+        }))
+      )
+    }
+
+    // ── 6. 更新 plan total ──────────────────────────
+    const allItems = await db
+      .select({ planned: budgetItems.plannedAmount })
+      .from(budgetItems)
+      .where(sql`budget_plan_id = ${plan.id} AND COALESCE(is_deleted, false) = false`)
+    const newTotal = allItems.reduce((s, r) => s + parseFloat(r.planned ?? "0"), 0)
+    await db
+      .update(budgetPlans)
+      .set({ totalBudget: newTotal.toString(), updatedAt: new Date() })
+      .where(eq(budgetPlans.id, plan.id))
+
+    res.json({
+      planId: plan.id,
+      budgetItemId: budgetItem.id,
+      itemName,
+      totalAmount,
+      allocations: allocations.map((a) => {
+        const member = members.find((m) => m.projectId === a.projectId)
+        return {
+          projectId: a.projectId,
+          amount: a.amount,
+          basis: a.basis,
+          memberId: member?.id,
+        }
+      }),
     })
   })
 )
