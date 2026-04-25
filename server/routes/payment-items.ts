@@ -2,6 +2,7 @@ import { Router } from "express"
 import { storage } from "../storage"
 import { requireAuth } from "../auth"
 import { insertPaymentItemSchema } from "@shared/schema"
+import { localDateTPE } from "@shared/date-utils"
 import { upload } from "./upload-config"
 import { asyncHandler, AppError } from "../middleware/error-handler"
 
@@ -85,7 +86,7 @@ router.post(
   asyncHandler(async (req, res) => {
     // Clean empty date strings and provide defaults
     const cleanData = { ...req.body }
-    const today = new Date().toISOString().split("T")[0] // YYYY-MM-DD format
+    const today = localDateTPE() // YYYY-MM-DD format
 
     if (cleanData.startDate === "" || !cleanData.startDate) {
       cleanData.startDate = today
@@ -115,7 +116,7 @@ router.put(
 
     // Clean empty date strings and provide defaults
     const cleanData = { ...req.body }
-    const today = new Date().toISOString().split("T")[0] // YYYY-MM-DD format
+    const today = localDateTPE() // YYYY-MM-DD format
 
     if (cleanData.startDate === "" || !cleanData.startDate) {
       cleanData.startDate = today
@@ -325,7 +326,7 @@ router.post(
     await storage.createPaymentRecord({
       itemId: itemId,
       amountPaid: paymentAmountFloat.toString(),
-      paymentDate: paymentDate || new Date().toISOString().split("T")[0],
+      paymentDate: paymentDate || localDateTPE(),
       paymentMethod: paymentMethod || "bank_transfer",
       notes: notes || null,
       receiptImageUrl:
