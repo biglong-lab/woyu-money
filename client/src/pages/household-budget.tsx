@@ -25,8 +25,9 @@ import { Badge } from "@/components/ui/badge"
 import { Plus, Camera, Wallet, TrendingDown, TrendingUp, Calendar } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { apiRequest } from "@/lib/queryClient"
-import { localDateISO } from "@/lib/utils"
+import { localDateISO, formatNT } from "@/lib/utils"
 import { useDocumentTitle } from "@/hooks/use-document-title"
+import { useCopyAmount } from "@/hooks/use-copy-amount"
 import type { HouseholdExpense } from "@shared/schema/household"
 import type { DebtCategory } from "@shared/schema/category"
 
@@ -100,6 +101,7 @@ export default function HouseholdBudget() {
   })
 
   const { toast } = useToast()
+  const copyAmount = useCopyAmount()
   const [showQuickAdd, setShowQuickAdd] = useState(false)
   const [showBudgetSetup, setShowBudgetSetup] = useState(false)
   const queryClient = useQueryClient()
@@ -375,7 +377,14 @@ export default function HouseholdBudget() {
             <Wallet className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">NT$ {budgetAmount.toLocaleString()}</div>
+            <button
+              type="button"
+              onClick={() => copyAmount(budgetAmount, "本月預算")}
+              className="text-2xl font-bold hover:text-blue-600 hover:underline cursor-pointer"
+              title="點擊複製金額"
+            >
+              {formatNT(budgetAmount)}
+            </button>
           </CardContent>
         </Card>
 
@@ -385,7 +394,14 @@ export default function HouseholdBudget() {
             <TrendingDown className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-600">NT$ {totalSpent.toLocaleString()}</div>
+            <button
+              type="button"
+              onClick={() => copyAmount(totalSpent, "本月已花費")}
+              className="text-2xl font-bold text-red-600 hover:underline cursor-pointer"
+              title="點擊複製金額"
+            >
+              {formatNT(totalSpent)}
+            </button>
             <p className="text-xs text-muted-foreground">{spentPercentage.toFixed(1)}% 的預算</p>
           </CardContent>
         </Card>
@@ -396,11 +412,16 @@ export default function HouseholdBudget() {
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div
-              className={`text-2xl font-bold ${remaining >= 0 ? "text-green-600" : "text-red-600"}`}
+            <button
+              type="button"
+              onClick={() => copyAmount(remaining, "本月剩餘預算")}
+              className={`text-2xl font-bold hover:underline cursor-pointer ${
+                remaining >= 0 ? "text-green-600" : "text-red-600"
+              }`}
+              title="點擊複製金額"
             >
-              NT$ {remaining.toLocaleString()}
-            </div>
+              {formatNT(remaining)}
+            </button>
             <p className="text-xs text-muted-foreground">
               {remaining >= 0 ? "還可以花" : "已超支"}
             </p>
