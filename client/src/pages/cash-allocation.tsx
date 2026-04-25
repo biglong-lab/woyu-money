@@ -28,6 +28,7 @@ import { Badge } from "@/components/ui/badge"
 import { apiRequest, queryClient } from "@/lib/queryClient"
 import { localDateISO, formatNT } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
+import { useDocumentTitle } from "@/hooks/use-document-title"
 
 const BUDGET_PRESETS = [50000, 100000, 200000, 300000, 500000, 1000000]
 const BUDGET_KEY = "cash-allocation:lastBudget"
@@ -344,6 +345,7 @@ function SummaryCard({ result }: { result: AllocationResult }) {
 // ─────────────────────────────────────────────
 
 export default function CashAllocationPage() {
+  useDocumentTitle("現金分配")
   const [budgetInput, setBudgetInput] = useState("")
   const [result, setResult] = useState<AllocationResult | null>(null)
   const [pendingId, setPendingId] = useState<number | null>(null)

@@ -20,6 +20,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient"
 import { formatNT } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 import { useCopyAmount } from "@/hooks/use-copy-amount"
+import { useDocumentTitle } from "@/hooks/use-document-title"
 
 type CellStatus = "paid" | "partial" | "unpaid" | "upcoming" | "out_of_contract"
 
@@ -145,6 +146,7 @@ interface CellTarget {
 }
 
 export default function RentalMatrixPage() {
+  useDocumentTitle("租金矩陣")
   const [year, setYear] = useState(new Date().getFullYear())
   const [batchOpen, setBatchOpen] = useState(false)
   const [cellTarget, setCellTarget] = useState<CellTarget | null>(null)

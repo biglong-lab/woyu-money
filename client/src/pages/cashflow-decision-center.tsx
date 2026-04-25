@@ -20,6 +20,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient"
 import { localDateISO, formatNT } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 import { useCopyAmount } from "@/hooks/use-copy-amount"
+import { useDocumentTitle } from "@/hooks/use-document-title"
 
 type Basis = "last_year_same_month" | "recent_average" | "overall_average" | "no_data"
 type Confidence = "high" | "medium" | "low"
@@ -226,6 +227,7 @@ function MonthCard({ forecast, gap }: { forecast: ForecastMonth; gap: GapItem })
 }
 
 export default function CashflowDecisionCenterPage() {
+  useDocumentTitle("現金流預估")
   const [monthsAhead, setMonthsAhead] = useState(6)
   const { data, isLoading } = useQuery<ForecastResponse>({
     queryKey: [`/api/cashflow/forecast?monthsAhead=${monthsAhead}`],

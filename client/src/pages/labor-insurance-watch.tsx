@@ -13,6 +13,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient"
 import { localDateISO, formatNT } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 import { useCopyAmount } from "@/hooks/use-copy-amount"
+import { useDocumentTitle } from "@/hooks/use-document-title"
 
 type ReminderLevel = "none" | "early" | "warning" | "final"
 type LateFeeStatus = "unpaid" | "paid_late" | "paid_on_time"
@@ -377,6 +378,7 @@ function AnnualLossCard({
 }
 
 export default function LaborInsuranceWatchPage() {
+  useDocumentTitle("勞健保監控")
   const [year, setYear] = useState(new Date().getFullYear())
 
   return (
