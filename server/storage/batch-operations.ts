@@ -5,7 +5,7 @@
 
 import { db } from "../db"
 import { paymentItems } from "@shared/schema"
-import { inArray, sql } from "drizzle-orm"
+import { eq, inArray } from "drizzle-orm"
 
 /**
  * 批量更新付款項目
@@ -44,15 +44,24 @@ export async function batchUpdatePaymentItems(
       case "updateStatus":
         // 標記為已付清時，paidAmount 同步更新為 totalAmount，
         // 確保「待付總額」儀表板立即反映此次批量結算
+        // 採兩步驟：先 fetch 得到每筆 totalAmount，再對每筆獨立 update
+        // （避免 sql 模板字串在 esbuild 後與 drizzle 對 SET 子句的型別推論衝突）
         if (data.status === "paid") {
-          await db
-            .update(paymentItems)
-            .set({
-              status: "paid",
-              paidAmount: sql`${paymentItems.totalAmount}`,
-              updatedAt: new Date(),
-            })
+          const items = await db
+            .select({ id: paymentItems.id, totalAmount: paymentItems.totalAmount })
+            .from(paymentItems)
             .where(idsClause)
+
+          for (const item of items) {
+            await db
+              .update(paymentItems)
+              .set({
+                status: "paid",
+                paidAmount: item.totalAmount,
+                updatedAt: new Date(),
+              })
+              .where(eq(paymentItems.id, item.id))
+          }
         } else {
           await db
             .update(paymentItems)
