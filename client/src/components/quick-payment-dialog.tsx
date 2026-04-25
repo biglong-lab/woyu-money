@@ -261,6 +261,11 @@ export function QuickPaymentDialog({ open, onOpenChange }: QuickPaymentDialogPro
                     autoFocus
                   />
                 </div>
+                {amount && parseFloat(amount) > 0 && (
+                  <div className="mt-1 text-xs text-blue-700 font-medium">
+                    = NT$ {Math.round(parseFloat(amount)).toLocaleString()}
+                  </div>
+                )}
               </div>
 
               <div>
