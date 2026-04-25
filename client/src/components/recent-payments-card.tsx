@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { apiRequest, queryClient } from "@/lib/queryClient"
 import { formatNT, friendlyApiError } from "@/lib/utils"
+import { shareOrCopy } from "@/lib/share-or-copy"
 import { useToast } from "@/hooks/use-toast"
 import { useCopyAmount } from "@/hooks/use-copy-amount"
 
@@ -147,10 +148,10 @@ export function RecentPaymentsCard() {
       `✅ ${dateStr} 已付清單（${todayCount} 件）：\n\n` +
       lines.join("\n") +
       `\n\n💰 合計：${formatNT(todayTotal)}`
-    try {
-      await navigator.clipboard.writeText(text)
+    const result = await shareOrCopy({ title: `${dateStr} 已付清單`, text })
+    if (result === "copied") {
       toast({ title: "已複製今日已付清單", description: "可貼到 LINE / 備忘錄" })
-    } catch {
+    } else if (result === "failed") {
       toast({
         title: "複製失敗",
         description: "瀏覽器不支援",
