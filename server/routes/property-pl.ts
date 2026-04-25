@@ -82,15 +82,16 @@ router.get(
       .where(sql`COALESCE(is_active, true) = true AND COALESCE(is_deleted, false) = false`)
 
     // ── 2. 收入：daily_revenues 月加總（依 project_id）
+    // 注意：daily_revenues 欄位名是 date（不是 revenue_date），且無 is_deleted
     const revenueRows = await db.execute<{
       project_id: number
       total: string
     }>(sql`
       SELECT project_id, SUM(amount::numeric)::text AS total
       FROM daily_revenues
-      WHERE EXTRACT(YEAR FROM revenue_date)::int = ${year}
-        AND EXTRACT(MONTH FROM revenue_date)::int = ${month}
-        AND COALESCE(is_deleted, false) = false
+      WHERE EXTRACT(YEAR FROM date)::int = ${year}
+        AND EXTRACT(MONTH FROM date)::int = ${month}
+        AND project_id IS NOT NULL
       GROUP BY project_id
     `)
 
