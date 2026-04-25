@@ -49,6 +49,7 @@ interface RecentItem {
   name: string
   amount: string
   endDate?: string // 截止日（選填）— 月固定項目可記住
+  projectId?: string // 專案 ID（選填）— 重複記同一筆專案項目時免重選
 }
 
 function loadRecentItems(): RecentItem[] {
@@ -72,13 +73,19 @@ function loadRecentItems(): RecentItem[] {
   return []
 }
 
-function saveRecentItem(name: string, amount: string, endDate?: string): RecentItem[] {
+function saveRecentItem(
+  name: string,
+  amount: string,
+  endDate?: string,
+  projectId?: string
+): RecentItem[] {
   if (!name.trim()) return loadRecentItems()
   try {
     const current = loadRecentItems()
     const filtered = current.filter((item) => item.name !== name)
     const newItem: RecentItem = { name, amount }
     if (endDate) newItem.endDate = endDate
+    if (projectId) newItem.projectId = projectId
     const updated = [newItem, ...filtered].slice(0, MAX_RECENT_ITEMS)
     localStorage.setItem(RECENT_ITEMS_KEY, JSON.stringify(updated))
     return updated
@@ -141,8 +148,13 @@ export function QuickAddDrawer({ open, onOpenChange }: QuickAddDrawerProps) {
       if (attachedFile) {
         queryClient.invalidateQueries({ queryKey: ["/api/document-inbox"] })
       }
-      // 儲存到最近使用清單（含金額 + 截止日，如果有提供）
-      const updated = saveRecentItem(itemName.trim(), totalAmount, endDate || undefined)
+      // 儲存到最近使用清單（含金額 + 截止日 + 專案，如果有提供）
+      const updated = saveRecentItem(
+        itemName.trim(),
+        totalAmount,
+        endDate || undefined,
+        projectId || undefined
+      )
       setRecentItems(updated)
       setIsDone(true)
     },
@@ -248,7 +260,7 @@ export function QuickAddDrawer({ open, onOpenChange }: QuickAddDrawerProps) {
                   className="mt-1 h-12 text-base"
                   autoFocus
                 />
-                {/* 最近使用 chips（點擊同時填入名稱、金額、截止日） */}
+                {/* 最近使用 chips（點擊同時填入名稱、金額、截止日、專案） */}
                 {recentItems.length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     <span className="text-xs text-gray-500 self-center">最近：</span>
@@ -258,6 +270,10 @@ export function QuickAddDrawer({ open, onOpenChange }: QuickAddDrawerProps) {
                         tooltipParts.push(`金額 NT$ ${parseFloat(item.amount).toLocaleString()}`)
                       }
                       if (item.endDate) tooltipParts.push(`截止 ${item.endDate}`)
+                      if (item.projectId) {
+                        const proj = projects.find((p) => p.id === parseInt(item.projectId!))
+                        if (proj) tooltipParts.push(`專案 ${proj.projectName}`)
+                      }
                       return (
                         <button
                           key={item.name}
@@ -266,6 +282,7 @@ export function QuickAddDrawer({ open, onOpenChange }: QuickAddDrawerProps) {
                             setItemName(item.name)
                             if (item.amount) setTotalAmount(item.amount)
                             if (item.endDate) setEndDate(item.endDate)
+                            if (item.projectId) setProjectId(item.projectId)
                           }}
                           className="text-xs px-2 py-1 rounded-full bg-gray-100 hover:bg-blue-100 hover:text-blue-700 transition-colors active:scale-95"
                           title={tooltipParts.join(" · ") || "點擊套用"}
