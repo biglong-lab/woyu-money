@@ -36,6 +36,7 @@ import IntegratedPaymentAnalysisOptimized from "@/pages/integrated-payment-analy
 import PaymentProjectStatsOptimized from "@/pages/payment-project-stats-optimized"
 import PaymentReports from "@/pages/payment-reports"
 import SimpleCategoryManagement from "@/pages/simple-category-management"
+import PropertyGroupsManagement from "@/pages/property-groups-management"
 import ProjectSpecificItemsManagement from "@/pages/project-specific-items-management"
 import UnifiedProjectTemplateManagement from "@/pages/unified-project-template-management"
 import ProjectTemplateManagement from "@/pages/project-template-management"
@@ -137,6 +138,7 @@ function Router() {
                 {/* Category Management */}
                 <ProtectedRoute path="/categories" component={SimpleCategoryManagement} />
                 <ProtectedRoute path="/category-management" component={CategoryManagement} />
+                <ProtectedRoute path="/property-groups" component={PropertyGroupsManagement} />
 
                 {/* Template Management */}
                 <ProtectedRoute
