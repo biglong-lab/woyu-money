@@ -117,26 +117,39 @@ export function ActiveRentalsCard() {
   // 統計進度
   const total = thisMonth.length
   const paidCount = thisMonth.filter((c) => c.status === "paid").length
+  const pendingCount = thisMonth.filter(
+    (c) => c.status === "unpaid" || c.status === "partial"
+  ).length
   const monthExpected = thisMonth.reduce((sum, c) => sum + c.expectedAmount, 0)
   const monthPaid = thisMonth.reduce((sum, c) => sum + c.paidAmount, 0)
   const progressPct = monthExpected > 0 ? (monthPaid / monthExpected) * 100 : 0
+  // 慶祝條件：無未付/部分（未到期不算）
+  const allPaid = pendingCount === 0 && total > 0 && paidCount > 0
 
   return (
-    <Card>
+    <Card
+      className={allPaid ? "bg-gradient-to-br from-green-50 to-emerald-50 border-green-300" : ""}
+    >
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between gap-2">
           <CardTitle className="text-sm sm:text-base flex items-center gap-1.5">
             <Building2 className="h-4 w-4" />
             {month} 月租金狀態
           </CardTitle>
-          <span className="text-xs text-gray-500">
-            已付 {paidCount}/{total} · {fmt(monthPaid)} / {fmt(monthExpected)}
-          </span>
+          {allPaid ? (
+            <span className="inline-flex items-center gap-1 text-xs font-semibold text-green-700 bg-green-100 px-2 py-0.5 rounded-full">
+              🎉 本月全部付清
+            </span>
+          ) : (
+            <span className="text-xs text-gray-500">
+              已付 {paidCount}/{total} · {fmt(monthPaid)} / {fmt(monthExpected)}
+            </span>
+          )}
         </div>
         {/* 進度條 */}
         <div className="mt-2 h-1.5 rounded-full bg-gray-100 overflow-hidden">
           <div
-            className="h-full bg-green-500 transition-all duration-300"
+            className={`h-full transition-all duration-300 ${allPaid ? "bg-emerald-500" : "bg-green-500"}`}
             style={{ width: `${progressPct}%` }}
           />
         </div>
