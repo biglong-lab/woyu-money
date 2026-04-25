@@ -236,7 +236,7 @@ export function setupAuth(app: Express) {
 }
 
 // Middleware to check if user is authenticated
-export function requireAuth(
+export async function requireAuth(
   req: import("express").Request,
   res: import("express").Response,
   next: import("express").NextFunction
@@ -251,8 +251,27 @@ export function requireAuth(
   }
 
   // Check session-based authentication (for LINE login)
+  // 重要：必須把 user 物件從 DB 補到 req.user，
+  // 否則所有讀 req.user.id 的端點對 LINE 登入用戶都會 crash
   if (req.session.userId && req.session.isAuthenticated) {
-    return next()
+    try {
+      const user = await storage.getUserById(req.session.userId)
+      if (!user) {
+        // session 過期或用戶已被刪除
+        req.session.userId = undefined
+        req.session.isAuthenticated = false
+        return res.status(401).json({ message: "登入狀態已失效，請重新登入" })
+      }
+      if (!user.isActive) {
+        return res.status(403).json({ message: "帳號已被停用" })
+      }
+      // 補上 req.user，讓後續 handler 一致使用 req.user.id
+      req.user = user
+      return next()
+    } catch (err) {
+      console.error("requireAuth: 從 session 載入 user 失敗", err)
+      return res.status(500).json({ message: "驗證失敗" })
+    }
   }
 
   return res.status(401).json({ message: "需要登入才能訪問此資源" })
