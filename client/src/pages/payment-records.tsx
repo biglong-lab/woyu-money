@@ -37,6 +37,7 @@ import {
 } from "lucide-react"
 import { PaymentItemDetails } from "@/components/payment-item-details"
 import { useCopyAmount } from "@/hooks/use-copy-amount"
+import { formatNT } from "@/lib/utils"
 import { useDocumentTitle } from "@/hooks/use-document-title"
 import type { PaymentItem } from "@shared/schema"
 
@@ -373,7 +374,7 @@ export default function PaymentRecords() {
           </CardHeader>
           <CardContent className="pt-0">
             <div className="text-lg sm:text-2xl font-bold text-green-600">
-              ${totalAmount.toLocaleString()}
+              {formatNT(totalAmount)}
             </div>
           </CardContent>
         </Card>
@@ -415,7 +416,7 @@ export default function PaymentRecords() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              ${totalRecords > 0 ? Math.round(totalAmount / totalRecords).toLocaleString() : 0}
+              {totalRecords > 0 ? formatNT(totalAmount / totalRecords) : formatNT(0)}
             </div>
           </CardContent>
         </Card>
@@ -636,7 +637,7 @@ export default function PaymentRecords() {
         <CardHeader>
           <CardTitle>付款記錄列表</CardTitle>
           <CardDescription>
-            顯示 {filteredRecords.length} 筆付款記錄，總金額 ${totalAmount.toLocaleString()}
+            顯示 {filteredRecords.length} 筆付款記錄，總金額 {formatNT(totalAmount)}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -741,7 +742,7 @@ export default function PaymentRecords() {
                         title="點擊複製金額"
                         data-testid={`copy-record-amount-${record.id}`}
                       >
-                        +${parseInt(record.amount).toLocaleString()}
+                        +{formatNT(parseInt(record.amount))}
                       </button>
                       <Button
                         variant="outline"
