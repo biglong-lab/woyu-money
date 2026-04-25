@@ -165,13 +165,27 @@ function ReminderCard() {
               </div>
               <div>
                 <div className="text-gray-500">未付金額</div>
-                <div className="font-bold text-lg">{formatNT(data.pendingTotalAmount)}</div>
+                <button
+                  type="button"
+                  onClick={() => copyAmount(data.pendingTotalAmount, "勞健保未付總額")}
+                  className="font-bold text-lg hover:text-blue-600 hover:underline cursor-pointer"
+                  title="點擊複製總額"
+                  data-testid="copy-labor-pending-total"
+                >
+                  {formatNT(data.pendingTotalAmount)}
+                </button>
               </div>
               <div>
                 <div className="text-gray-500">已產生滯納金</div>
-                <div className="font-bold text-lg text-red-700">
+                <button
+                  type="button"
+                  onClick={() => copyAmount(data.pendingTotalLateFee, "勞健保滯納金總額")}
+                  className="font-bold text-lg text-red-700 hover:text-blue-600 hover:underline cursor-pointer"
+                  title="點擊複製總額"
+                  data-testid="copy-labor-late-fee-total"
+                >
                   {formatNT(data.pendingTotalLateFee)}
-                </div>
+                </button>
               </div>
             </div>
             <div className="space-y-3 pt-2 border-t">
