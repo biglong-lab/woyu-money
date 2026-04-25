@@ -8,7 +8,21 @@ import {
   type PaymentItem,
   type InsertPaymentItem,
 } from "@shared/schema"
-import { eq, and, sql, desc, gte, lte, lt, count, ne, or, isNull, isNotNull } from "drizzle-orm"
+import {
+  eq,
+  and,
+  sql,
+  desc,
+  gte,
+  lte,
+  lt,
+  count,
+  ne,
+  or,
+  isNull,
+  isNotNull,
+  inArray,
+} from "drizzle-orm"
 import { localDateTPE } from "@shared/date-utils"
 
 // === 付款統計型別 ===
@@ -250,16 +264,18 @@ export async function bulkUpdatePaymentItems(
   updates: Partial<InsertPaymentItem>,
   userInfo = "系統管理員"
 ): Promise<void> {
+  if (!Array.isArray(itemIds) || itemIds.length === 0) return
+
   await db.transaction(async (tx) => {
-    const oldItems = await tx
-      .select()
-      .from(paymentItems)
-      .where(sql`id = ANY(${itemIds})`)
+    // 用 inArray() 自動序列化陣列為 PostgreSQL 陣列
+    const idsClause = inArray(paymentItems.id, itemIds)
+
+    const oldItems = await tx.select().from(paymentItems).where(idsClause)
 
     await tx
       .update(paymentItems)
       .set({ ...updates, updatedAt: new Date() } as Partial<typeof paymentItems.$inferInsert>)
-      .where(sql`id = ANY(${itemIds})`)
+      .where(idsClause)
 
     for (const oldItem of oldItems) {
       await tx.insert(auditLogs).values({
