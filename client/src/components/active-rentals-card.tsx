@@ -92,7 +92,7 @@ export function ActiveRentalsCard() {
     onSuccess: (result) => {
       toast({
         title: `已標記 ${result.processedCount} 筆租金為已付`,
-        description: `合計 NT$ ${Math.round(result.totalPaid).toLocaleString()}`,
+        description: `合計 ${formatNT(result.totalPaid)}`,
       })
       queryClient.invalidateQueries({ queryKey: [`/api/rental-matrix?year=${year}`] })
       queryClient.invalidateQueries({ queryKey: ["/api/payment/priority-report?includeLow=true"] })
