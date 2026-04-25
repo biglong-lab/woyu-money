@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { apiRequest, queryClient } from "@/lib/queryClient"
-import { localDateISO } from "@/lib/utils"
+import { localDateISO, formatNT } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 import { useCopyAmount } from "@/hooks/use-copy-amount"
 
@@ -53,10 +53,6 @@ interface ReminderStatus {
     unpaidAmount: number
     lateFee: number
   }>
-}
-
-function formatCurrency(n: number): string {
-  return `NT$ ${Math.round(n).toLocaleString()}`
 }
 
 const LEVEL_META: Record<
@@ -118,7 +114,7 @@ function ReminderCard() {
     onSuccess: (_data, input) => {
       toast({
         title: "已標記為已付",
-        description: `${input.itemName}（${formatCurrency(input.unpaidAmount)}）`,
+        description: `${input.itemName}（${formatNT(input.unpaidAmount)}）`,
       })
       queryClient.invalidateQueries({ queryKey: ["/api/late-fee/reminder-status"] })
       queryClient.invalidateQueries({ queryKey: ["/api/late-fee/annual-loss"] })
@@ -168,12 +164,12 @@ function ReminderCard() {
               </div>
               <div>
                 <div className="text-gray-500">未付金額</div>
-                <div className="font-bold text-lg">{formatCurrency(data.pendingTotalAmount)}</div>
+                <div className="font-bold text-lg">{formatNT(data.pendingTotalAmount)}</div>
               </div>
               <div>
                 <div className="text-gray-500">已產生滯納金</div>
                 <div className="font-bold text-lg text-red-700">
-                  {formatCurrency(data.pendingTotalLateFee)}
+                  {formatNT(data.pendingTotalLateFee)}
                 </div>
               </div>
             </div>
@@ -203,12 +199,10 @@ function ReminderCard() {
                       title="點擊複製金額（轉帳用）"
                       data-testid={`copy-labor-amount-${item.id}`}
                     >
-                      {formatCurrency(item.unpaidAmount)}
+                      {formatNT(item.unpaidAmount)}
                     </button>
                     {item.lateFee > 0 && (
-                      <div className="text-xs text-red-700">
-                        +{formatCurrency(item.lateFee)} 滯納金
-                      </div>
+                      <div className="text-xs text-red-700">+{formatNT(item.lateFee)} 滯納金</div>
                     )}
                   </div>
                   <Button
@@ -302,7 +296,7 @@ function AnnualLossCard({
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <div className="text-xs text-gray-600">本金</div>
-                  <div className="text-xl font-bold">{formatCurrency(data.totalPrincipal)}</div>
+                  <div className="text-xl font-bold">{formatNT(data.totalPrincipal)}</div>
                   <div className="text-xs text-gray-500">{data.itemCount} 筆</div>
                 </div>
                 <div>
@@ -310,7 +304,7 @@ function AnnualLossCard({
                   <div
                     className={`text-xl font-bold ${hasLoss ? "text-red-700" : "text-green-700"}`}
                   >
-                    {formatCurrency(data.totalLateFee)}
+                    {formatNT(data.totalLateFee)}
                   </div>
                 </div>
                 <div>
@@ -326,7 +320,7 @@ function AnnualLossCard({
                 <div className="mt-3 pt-3 border-t border-red-200 text-sm text-red-800 flex items-start gap-2">
                   <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
                   <div>
-                    今年因延遲付款已損失 <strong>{formatCurrency(data.totalLateFee)}</strong>
+                    今年因延遲付款已損失 <strong>{formatNT(data.totalLateFee)}</strong>
                     。每筆按時付款可避免此損失。
                   </div>
                 </div>
@@ -366,9 +360,9 @@ function AnnualLossCard({
                       </div>
                     </div>
                     <div className="text-right shrink-0">
-                      <div className="text-sm font-semibold">{formatCurrency(item.amount)}</div>
+                      <div className="text-sm font-semibold">{formatNT(item.amount)}</div>
                       {item.lateFee > 0 && (
-                        <div className="text-xs text-red-700">+{formatCurrency(item.lateFee)}</div>
+                        <div className="text-xs text-red-700">+{formatNT(item.lateFee)}</div>
                       )}
                     </div>
                   </div>

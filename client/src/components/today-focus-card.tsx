@@ -36,7 +36,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { apiRequest, queryClient } from "@/lib/queryClient"
-import { localDateISO } from "@/lib/utils"
+import { localDateISO, formatNT } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 import { useCopyAmount } from "@/hooks/use-copy-amount"
 
@@ -75,10 +75,6 @@ interface PriorityReport {
 // ─────────────────────────────────────────────
 // 輔助函式
 // ─────────────────────────────────────────────
-
-function formatCurrency(n: number): string {
-  return `NT$ ${Math.round(n).toLocaleString()}`
-}
 
 function todayISODate(): string {
   return localDateISO(0)
@@ -177,7 +173,7 @@ function FocusCard({ item, position, total, onMarkPaid, onDefer, onCopyAmount }:
           title="點擊複製數字（轉帳貼網銀用）"
           data-testid="focus-amount-copy"
         >
-          {formatCurrency(item.unpaidAmount)}
+          {formatNT(item.unpaidAmount)}
           <Copy className="h-4 w-4 opacity-40" />
         </button>
       </div>
@@ -200,9 +196,9 @@ function FocusCard({ item, position, total, onMarkPaid, onDefer, onCopyAmount }:
           <div className="flex items-start gap-2 text-red-700 bg-red-50 rounded p-2">
             <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
             <div className="text-xs">
-              已產生滯納金 <strong>{formatCurrency(item.lateFeeEstimate)}</strong>
+              已產生滯納金 <strong>{formatNT(item.lateFeeEstimate)}</strong>
               <br />
-              每拖 1 天再多 <strong>{formatCurrency(item.dailyLateFee)}</strong>
+              每拖 1 天再多 <strong>{formatNT(item.dailyLateFee)}</strong>
             </div>
           </div>
         )}
@@ -262,7 +258,7 @@ function PaidDialog({ item, open, onOpenChange, onConfirm, isPending }: PaidDial
           </div>
           <div className="flex justify-between text-sm">
             <span className="text-gray-600">應付金額</span>
-            <span className="font-bold text-lg">{formatCurrency(item.unpaidAmount)}</span>
+            <span className="font-bold text-lg">{formatNT(item.unpaidAmount)}</span>
           </div>
           <div className="flex justify-between items-center text-sm">
             <label htmlFor="payment-date" className="text-gray-600">
@@ -320,7 +316,7 @@ function EmptyState({
         <div className="mt-4 pt-3 border-t border-green-200 text-xs">
           <div className="text-gray-500 mb-1">下一個截止</div>
           <div className="font-semibold text-gray-900">{nextUpcoming.itemName}</div>
-          <div className="text-gray-700 mt-0.5">{formatCurrency(nextUpcoming.unpaidAmount)}</div>
+          <div className="text-gray-700 mt-0.5">{formatNT(nextUpcoming.unpaidAmount)}</div>
           <div className="text-gray-500 mt-0.5">
             {nextUpcoming.dueDate}（{nextUpcoming.daysUntilDue} 天後）
           </div>
@@ -517,12 +513,12 @@ export function TodayFocusCard() {
     const lines = items.map((item, i) => {
       const icon = { critical: "🔴", high: "🟠", medium: "🟡", low: "🟢" }[item.urgency]
       const suffix = item.daysOverdue > 0 ? `（逾期 ${item.daysOverdue} 天）` : ""
-      return `${i + 1}. ${icon} ${item.itemName}\n   ${formatCurrency(item.unpaidAmount)}${suffix}`
+      return `${i + 1}. ${icon} ${item.itemName}\n   ${formatNT(item.unpaidAmount)}${suffix}`
     })
     const text =
       `📅 ${dateStr} 待付款清單（${items.length} 件）：\n\n` +
       lines.join("\n\n") +
-      `\n\n💰 合計：${formatCurrency(total)}`
+      `\n\n💰 合計：${formatNT(total)}`
     try {
       await navigator.clipboard.writeText(text)
       toast({ title: "已複製到剪貼簿", description: "可貼到 LINE / 備忘錄" })
@@ -594,16 +590,14 @@ export function TodayFocusCard() {
             {completed.count > 0 ? (
               <>
                 <div className="text-green-600 font-medium">今天 ✨ {completed.count} 件</div>
-                <div className="text-gray-500">{formatCurrency(completed.amount)}</div>
+                <div className="text-gray-500">{formatNT(completed.amount)}</div>
               </>
             ) : (
               report &&
               report.totalUnpaid > 0 && (
                 <>
                   <div className="text-gray-500">總未付</div>
-                  <div className="font-bold text-gray-900">
-                    {formatCurrency(report.totalUnpaid)}
-                  </div>
+                  <div className="font-bold text-gray-900">{formatNT(report.totalUnpaid)}</div>
                 </>
               )
             )}

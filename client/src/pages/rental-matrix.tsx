@@ -17,6 +17,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { apiRequest, queryClient } from "@/lib/queryClient"
+import { formatNT } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 import { useCopyAmount } from "@/hooks/use-copy-amount"
 
@@ -53,10 +54,6 @@ interface RentalMatrixData {
   }
 }
 
-function formatCurrency(n: number): string {
-  return `NT$ ${Math.round(n).toLocaleString()}`
-}
-
 const STATUS_META: Record<CellStatus, { label: string; bg: string; icon: string }> = {
   paid: { label: "已付", bg: "bg-green-100 text-green-800 border-green-200", icon: "✅" },
   partial: { label: "部分", bg: "bg-yellow-100 text-yellow-800 border-yellow-200", icon: "🟡" },
@@ -81,13 +78,13 @@ function MatrixCell({
   const meta = STATUS_META[cell.status]
   const clickable = cell.status === "unpaid" || cell.status === "partial"
   const tooltip = clickable
-    ? `${meta.label}\n應付 ${formatCurrency(cell.expectedAmount)}${
-        cell.paidAmount > 0 ? `\n已付 ${formatCurrency(cell.paidAmount)}` : ""
+    ? `${meta.label}\n應付 ${formatNT(cell.expectedAmount)}${
+        cell.paidAmount > 0 ? `\n已付 ${formatNT(cell.paidAmount)}` : ""
       }\n👆 點此標記已付`
     : cell.status === "out_of_contract"
       ? "合約未涵蓋此月份"
-      : `${meta.label}\n應付 ${formatCurrency(cell.expectedAmount)}${
-          cell.paidAmount > 0 ? `\n已付 ${formatCurrency(cell.paidAmount)}` : ""
+      : `${meta.label}\n應付 ${formatNT(cell.expectedAmount)}${
+          cell.paidAmount > 0 ? `\n已付 ${formatNT(cell.paidAmount)}` : ""
         }`
   return (
     <td className="p-1 text-center">
@@ -358,7 +355,7 @@ export default function RentalMatrixPage() {
                           />
                         ))}
                         <td className="p-2 text-right text-xs text-gray-700">
-                          {formatCurrency(expected)}
+                          {formatNT(expected)}
                         </td>
                       </tr>
                     )
@@ -383,9 +380,7 @@ export default function RentalMatrixPage() {
                         </td>
                       )
                     })}
-                    <td className="p-2 text-right text-sm">
-                      {formatCurrency(data.totals.expected)}
-                    </td>
+                    <td className="p-2 text-right text-sm">{formatNT(data.totals.expected)}</td>
                   </tr>
                   {/* 每月已付小計 */}
                   <tr className="font-semibold bg-green-50">
@@ -401,7 +396,7 @@ export default function RentalMatrixPage() {
                       )
                     })}
                     <td className="p-2 text-right text-sm text-green-700">
-                      {formatCurrency(data.totals.paid)}
+                      {formatNT(data.totals.paid)}
                     </td>
                   </tr>
                 </tfoot>
@@ -432,11 +427,11 @@ export default function RentalMatrixPage() {
             <div className="py-2 space-y-2 text-sm">
               <div className="flex justify-between">
                 <span className="text-gray-600">應付金額</span>
-                <span className="font-bold">{formatCurrency(cellTarget.cell.expectedAmount)}</span>
+                <span className="font-bold">{formatNT(cellTarget.cell.expectedAmount)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">已付金額</span>
-                <span>{formatCurrency(cellTarget.cell.paidAmount)}</span>
+                <span>{formatNT(cellTarget.cell.paidAmount)}</span>
               </div>
               <div className="flex justify-between border-t pt-2">
                 <span className="text-gray-600">將要標記為已付</span>
@@ -453,7 +448,7 @@ export default function RentalMatrixPage() {
                   title="點擊複製金額（轉帳用）"
                   data-testid="copy-cell-due-amount"
                 >
-                  {formatCurrency(
+                  {formatNT(
                     Math.max(0, cellTarget.cell.expectedAmount - cellTarget.cell.paidAmount)
                   )}
                 </button>

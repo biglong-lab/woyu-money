@@ -26,7 +26,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { apiRequest, queryClient } from "@/lib/queryClient"
-import { localDateISO } from "@/lib/utils"
+import { localDateISO, formatNT } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 
 const BUDGET_PRESETS = [50000, 100000, 200000, 300000, 500000, 1000000]
@@ -77,10 +77,6 @@ interface PriorityReport {
 // ─────────────────────────────────────────────
 // 格式化輔助
 // ─────────────────────────────────────────────
-
-function formatCurrency(n: number): string {
-  return `NT$ ${Math.round(n).toLocaleString()}`
-}
 
 function parseBudgetInput(raw: string): number | null {
   const cleaned = raw.replace(/[,\s]/g, "")
@@ -176,8 +172,8 @@ function ItemCard({
           {item.lateFeeEstimate > 0 && (
             <div className="mt-2 flex items-center gap-1 text-xs text-red-700 font-medium">
               <AlertTriangle className="h-3.5 w-3.5" />
-              已產生滯納金 {formatCurrency(item.lateFeeEstimate)}（每拖一天 +
-              {formatCurrency(item.dailyLateFee)}）
+              已產生滯納金 {formatNT(item.lateFeeEstimate)}（每拖一天 +{formatNT(item.dailyLateFee)}
+              ）
             </div>
           )}
           {onMarkPaid && (
@@ -197,7 +193,7 @@ function ItemCard({
         </div>
         <div className="text-right shrink-0">
           <div className="text-lg sm:text-xl font-bold text-gray-900">
-            {formatCurrency(item.unpaidAmount)}
+            {formatNT(item.unpaidAmount)}
           </div>
         </div>
       </div>
@@ -267,7 +263,7 @@ function SummaryCard({ result }: { result: AllocationResult }) {
           <div className="flex items-center justify-between text-xs">
             <span className="text-gray-700">必須支付</span>
             <span className={`font-semibold ${hasShortage ? "text-red-700" : "text-gray-900"}`}>
-              {formatCurrency(result.suggestedTotal)}
+              {formatNT(result.suggestedTotal)}
             </span>
           </div>
           <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
@@ -278,9 +274,7 @@ function SummaryCard({ result }: { result: AllocationResult }) {
           </div>
           <div className="flex items-center justify-between text-xs">
             <span className="text-gray-700">可動用金額</span>
-            <span className="font-semibold text-blue-700">
-              {formatCurrency(result.availableBudget)}
-            </span>
+            <span className="font-semibold text-blue-700">{formatNT(result.availableBudget)}</span>
           </div>
           <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
             <div className="h-full bg-blue-400" style={{ width: `${budgetPct}%` }} />
@@ -293,9 +287,7 @@ function SummaryCard({ result }: { result: AllocationResult }) {
               <Wallet className="h-4 w-4" />
               可動用金額
             </div>
-            <div className="text-xl sm:text-2xl font-bold">
-              {formatCurrency(result.availableBudget)}
-            </div>
+            <div className="text-xl sm:text-2xl font-bold">{formatNT(result.availableBudget)}</div>
           </div>
           <div>
             <div className="text-sm text-gray-600 flex items-center gap-1">
@@ -303,7 +295,7 @@ function SummaryCard({ result }: { result: AllocationResult }) {
               必須支付
             </div>
             <div className="text-xl sm:text-2xl font-bold text-red-700">
-              {formatCurrency(result.suggestedTotal)}
+              {formatNT(result.suggestedTotal)}
             </div>
             <div className="text-xs text-gray-500">{result.suggested.length} 筆</div>
           </div>
@@ -313,7 +305,7 @@ function SummaryCard({ result }: { result: AllocationResult }) {
               可延後
             </div>
             <div className="text-xl sm:text-2xl font-bold text-gray-700">
-              {formatCurrency(result.deferredTotal)}
+              {formatNT(result.deferredTotal)}
             </div>
             <div className="text-xs text-gray-500">{result.deferred.length} 筆</div>
           </div>
@@ -324,10 +316,10 @@ function SummaryCard({ result }: { result: AllocationResult }) {
             <div className="flex items-start gap-2 text-red-800">
               <AlertCircle className="h-5 w-5 shrink-0 mt-0.5" />
               <div>
-                <div className="font-semibold">缺口 {formatCurrency(result.shortage)}</div>
+                <div className="font-semibold">缺口 {formatNT(result.shortage)}</div>
                 <div className="text-sm">
-                  Critical/High 項目已強制列入必須支付。你需要額外籌措{" "}
-                  {formatCurrency(result.shortage)} 才能完成。
+                  Critical/High 項目已強制列入必須支付。你需要額外籌措 {formatNT(result.shortage)}{" "}
+                  才能完成。
                 </div>
               </div>
             </div>
@@ -336,7 +328,7 @@ function SummaryCard({ result }: { result: AllocationResult }) {
             <div className="flex items-start gap-2 text-green-800">
               <CheckCircle2 className="h-5 w-5 shrink-0 mt-0.5" />
               <div>
-                <div className="font-semibold">餘額 {formatCurrency(result.surplus)}</div>
+                <div className="font-semibold">餘額 {formatNT(result.surplus)}</div>
                 <div className="text-sm">付完建議清單後仍有餘裕，可視情況處理延後項目。</div>
               </div>
             </div>
@@ -433,7 +425,7 @@ export default function CashAllocationPage() {
     onSuccess: (_data, item) => {
       toast({
         title: "已標記為已付款",
-        description: `${item.itemName}（${formatCurrency(item.unpaidAmount)}）`,
+        description: `${item.itemName}（${formatNT(item.unpaidAmount)}）`,
       })
       // 重新計算分配
       const budget = parseBudgetInput(budgetInput)
@@ -533,9 +525,9 @@ export default function CashAllocationPage() {
                   disabled={mutation.isPending}
                   className="text-xs h-7 border-red-300 text-red-700 hover:bg-red-50"
                   data-testid="smart-preset-critical"
-                  title={`正好付清所有緊急項目（${formatCurrency(smartPresets.critical)}）`}
+                  title={`正好付清所有緊急項目（${formatNT(smartPresets.critical)}）`}
                 >
-                  🔴 付清緊急 {formatCurrency(smartPresets.critical)}
+                  🔴 付清緊急 {formatNT(smartPresets.critical)}
                 </Button>
               )}
               {smartPresets.thisWeek > smartPresets.critical && (
@@ -547,9 +539,9 @@ export default function CashAllocationPage() {
                   disabled={mutation.isPending}
                   className="text-xs h-7 border-orange-300 text-orange-700 hover:bg-orange-50"
                   data-testid="smart-preset-week"
-                  title={`付清本週到期（${formatCurrency(smartPresets.thisWeek)}）`}
+                  title={`付清本週到期（${formatNT(smartPresets.thisWeek)}）`}
                 >
-                  🟠 付清本週 {formatCurrency(smartPresets.thisWeek)}
+                  🟠 付清本週 {formatNT(smartPresets.thisWeek)}
                 </Button>
               )}
               {smartPresets.thisMonth > smartPresets.thisWeek && (
@@ -561,9 +553,9 @@ export default function CashAllocationPage() {
                   disabled={mutation.isPending}
                   className="text-xs h-7 border-yellow-300 text-yellow-800 hover:bg-yellow-50"
                   data-testid="smart-preset-month"
-                  title={`付清本月應付（${formatCurrency(smartPresets.thisMonth)}）`}
+                  title={`付清本月應付（${formatNT(smartPresets.thisMonth)}）`}
                 >
-                  🟡 付清本月 {formatCurrency(smartPresets.thisMonth)}
+                  🟡 付清本月 {formatNT(smartPresets.thisMonth)}
                 </Button>
               )}
             </div>
@@ -679,8 +671,7 @@ export default function CashAllocationPage() {
             <Card>
               <CardHeader>
                 <CardTitle className="text-base sm:text-lg">
-                  ⏸️ 建議延後（{result.deferred.length} 筆，共{" "}
-                  {formatCurrency(result.deferredTotal)}）
+                  ⏸️ 建議延後（{result.deferred.length} 筆，共 {formatNT(result.deferredTotal)}）
                 </CardTitle>
                 <CardDescription>預算不足或無罰金，可延到下期處理</CardDescription>
               </CardHeader>
