@@ -10,7 +10,7 @@
  */
 
 import { useState, useEffect } from "react"
-import { useMutation } from "@tanstack/react-query"
+import { useMutation, useQuery } from "@tanstack/react-query"
 import {
   AlertCircle,
   CheckCircle2,
@@ -65,6 +65,12 @@ interface AllocationResult {
   shortage: number
   surplus: number
   markdown: string
+}
+
+interface PriorityReport {
+  totalUnpaid: number
+  counts: Record<UrgencyLevel, number>
+  all: PriorityResult[]
 }
 
 // ─────────────────────────────────────────────
@@ -350,6 +356,30 @@ export default function CashAllocationPage() {
   const [pendingId, setPendingId] = useState<number | null>(null)
   const { toast } = useToast()
 
+  // 取優先級報表，用來計算智能預設金額
+  const { data: priority } = useQuery<PriorityReport>({
+    queryKey: ["/api/payment/priority-report?includeLow=true"],
+  })
+
+  // 智能預設金額（依目前未付狀況動態算）
+  const smartPresets = (() => {
+    if (!priority) return null
+    const criticalSum = priority.all
+      .filter((r) => r.urgency === "critical")
+      .reduce((s, r) => s + r.unpaidAmount, 0)
+    const highSum = priority.all
+      .filter((r) => r.urgency === "high")
+      .reduce((s, r) => s + r.unpaidAmount, 0)
+    const mediumSum = priority.all
+      .filter((r) => r.urgency === "medium")
+      .reduce((s, r) => s + r.unpaidAmount, 0)
+    return {
+      critical: Math.ceil(criticalSum),
+      thisWeek: Math.ceil(criticalSum + highSum),
+      thisMonth: Math.ceil(criticalSum + highSum + mediumSum),
+    }
+  })()
+
   // 載入上次輸入金額並自動計算（不用使用者再點按鈕）
   useEffect(() => {
     try {
@@ -488,6 +518,55 @@ export default function CashAllocationPage() {
               {mutation.isPending ? "計算中..." : "計算分配建議"}
             </Button>
           </form>
+
+          {/* 智能預設按鈕（依目前未付狀況計算） */}
+          {smartPresets && (smartPresets.critical > 0 || smartPresets.thisWeek > 0) && (
+            <div className="flex flex-wrap gap-1.5 pt-1">
+              <span className="text-xs text-gray-500 self-center mr-1">💡 智能：</span>
+              {smartPresets.critical > 0 && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handlePresetClick(smartPresets.critical)}
+                  disabled={mutation.isPending}
+                  className="text-xs h-7 border-red-300 text-red-700 hover:bg-red-50"
+                  data-testid="smart-preset-critical"
+                  title={`正好付清所有緊急項目（${formatCurrency(smartPresets.critical)}）`}
+                >
+                  🔴 付清緊急 {formatCurrency(smartPresets.critical)}
+                </Button>
+              )}
+              {smartPresets.thisWeek > smartPresets.critical && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handlePresetClick(smartPresets.thisWeek)}
+                  disabled={mutation.isPending}
+                  className="text-xs h-7 border-orange-300 text-orange-700 hover:bg-orange-50"
+                  data-testid="smart-preset-week"
+                  title={`付清本週到期（${formatCurrency(smartPresets.thisWeek)}）`}
+                >
+                  🟠 付清本週 {formatCurrency(smartPresets.thisWeek)}
+                </Button>
+              )}
+              {smartPresets.thisMonth > smartPresets.thisWeek && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handlePresetClick(smartPresets.thisMonth)}
+                  disabled={mutation.isPending}
+                  className="text-xs h-7 border-yellow-300 text-yellow-800 hover:bg-yellow-50"
+                  data-testid="smart-preset-month"
+                  title={`付清本月應付（${formatCurrency(smartPresets.thisMonth)}）`}
+                >
+                  🟡 付清本月 {formatCurrency(smartPresets.thisMonth)}
+                </Button>
+              )}
+            </div>
+          )}
 
           {/* 快捷金額按鈕 */}
           <div className="flex flex-wrap gap-1.5 pt-1">
