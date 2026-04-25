@@ -117,14 +117,23 @@ router.get(
     for (const r of monthlyRes.rows) {
       expectedMap.set(`${r.projectId}-${r.month}`, Number(r.expected))
     }
+    // 覆寫每格金額狀態。注意：
+    // - buildRentalMatrix 已根據 contract.startDate/endDate 判斷該月是否在合約內，
+    //   合約期外會回傳 status='out_of_contract'，此處需「尊重該判斷」不覆蓋。
+    // - 合約期內但無 payment_item → 用 contract.monthlyAmount (avgMonthly) 為應付額，
+    //   paid=0，狀態保留 buildCell 原本的 unpaid/upcoming 判斷（已含日期）。
     matrix.cells = matrix.cells.map((c) => {
-      const key = `${c.contractId}-${c.month}`
-      const expected = expectedMap.get(key)
-      if (expected === undefined) {
-        // 該月無租金項目 → out_of_contract
-        return { ...c, status: "out_of_contract", expectedAmount: 0, paidAmount: 0 }
+      // 合約期外直接保留（不要覆寫成有金額）
+      if (c.status === "out_of_contract") {
+        return { ...c, expectedAmount: 0, paidAmount: 0 }
       }
+
+      const key = `${c.contractId}-${c.month}`
+      const expectedFromDb = expectedMap.get(key)
+      const expected = expectedFromDb ?? c.expectedAmount // fallback 用合約 base_amount
       const paid = c.paidAmount
+
+      // 重新計算 status（保留 upcoming 判斷給未來月份）
       let status: typeof c.status
       if (paid >= expected && expected > 0) status = "paid"
       else if (paid > 0) status = "partial"
