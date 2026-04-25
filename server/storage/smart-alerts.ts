@@ -6,6 +6,7 @@
 import { db } from "../db"
 import { loanInvestmentRecords } from "@shared/schema"
 import { eq, and, sql } from "drizzle-orm"
+import { localDateTPE } from "@shared/date-utils"
 
 // 嚴重程度排序對照表
 const severityOrder: Record<string, number> = {
@@ -41,6 +42,9 @@ export async function getSmartAlerts(): Promise<SmartAlertItem[]> {
     const currentDate = new Date()
     const thirtyDaysFromNow = new Date()
     thirtyDaysFromNow.setDate(currentDate.getDate() + 30)
+    // TPE 時區的日期字串（用於 SQL 比對）
+    const todayTPE = localDateTPE(0)
+    const future30TPE = localDateTPE(30)
 
     // 1. 高風險借貸提醒（年利率 >= 15%）
     const highRiskLoans = await db
@@ -75,8 +79,8 @@ export async function getSmartAlerts(): Promise<SmartAlertItem[]> {
       .from(loanInvestmentRecords)
       .where(
         and(
-          sql`${loanInvestmentRecords.endDate} <= ${thirtyDaysFromNow.toISOString().split("T")[0]}`,
-          sql`${loanInvestmentRecords.endDate} >= ${currentDate.toISOString().split("T")[0]}`,
+          sql`${loanInvestmentRecords.endDate} <= ${future30TPE}`,
+          sql`${loanInvestmentRecords.endDate} >= ${todayTPE}`,
           eq(loanInvestmentRecords.status, "active")
         )
       )
@@ -106,7 +110,7 @@ export async function getSmartAlerts(): Promise<SmartAlertItem[]> {
       .from(loanInvestmentRecords)
       .where(
         and(
-          sql`${loanInvestmentRecords.endDate} < ${currentDate.toISOString().split("T")[0]}`,
+          sql`${loanInvestmentRecords.endDate} < ${todayTPE}`,
           eq(loanInvestmentRecords.status, "active")
         )
       )
@@ -157,9 +161,8 @@ interface SmartAlertStatsResult {
 
 export async function getSmartAlertStats(): Promise<SmartAlertStatsResult> {
   try {
-    const currentDate = new Date()
-    const thirtyDaysFromNow = new Date()
-    thirtyDaysFromNow.setDate(currentDate.getDate() + 30)
+    const todayTPE = localDateTPE(0)
+    const future30TPE = localDateTPE(30)
 
     // 高風險借貸數量
     const highRiskCount = await db
@@ -178,8 +181,8 @@ export async function getSmartAlertStats(): Promise<SmartAlertStatsResult> {
       .from(loanInvestmentRecords)
       .where(
         and(
-          sql`${loanInvestmentRecords.endDate} <= ${thirtyDaysFromNow.toISOString().split("T")[0]}`,
-          sql`${loanInvestmentRecords.endDate} >= ${currentDate.toISOString().split("T")[0]}`,
+          sql`${loanInvestmentRecords.endDate} <= ${future30TPE}`,
+          sql`${loanInvestmentRecords.endDate} >= ${todayTPE}`,
           eq(loanInvestmentRecords.status, "active")
         )
       )
@@ -190,7 +193,7 @@ export async function getSmartAlertStats(): Promise<SmartAlertStatsResult> {
       .from(loanInvestmentRecords)
       .where(
         and(
-          sql`${loanInvestmentRecords.endDate} < ${currentDate.toISOString().split("T")[0]}`,
+          sql`${loanInvestmentRecords.endDate} < ${todayTPE}`,
           eq(loanInvestmentRecords.status, "active")
         )
       )
@@ -203,8 +206,8 @@ export async function getSmartAlertStats(): Promise<SmartAlertStatsResult> {
       .from(loanInvestmentRecords)
       .where(
         and(
-          sql`${loanInvestmentRecords.endDate} <= ${thirtyDaysFromNow.toISOString().split("T")[0]}`,
-          sql`${loanInvestmentRecords.endDate} >= ${currentDate.toISOString().split("T")[0]}`,
+          sql`${loanInvestmentRecords.endDate} <= ${future30TPE}`,
+          sql`${loanInvestmentRecords.endDate} >= ${todayTPE}`,
           eq(loanInvestmentRecords.status, "active")
         )
       )
@@ -217,7 +220,7 @@ export async function getSmartAlertStats(): Promise<SmartAlertStatsResult> {
       .from(loanInvestmentRecords)
       .where(
         and(
-          sql`${loanInvestmentRecords.endDate} < ${currentDate.toISOString().split("T")[0]}`,
+          sql`${loanInvestmentRecords.endDate} < ${todayTPE}`,
           eq(loanInvestmentRecords.status, "active")
         )
       )
