@@ -6,7 +6,7 @@
 import { useState } from "react"
 import { useQuery, useMutation } from "@tanstack/react-query"
 import { Link } from "wouter"
-import { CheckCircle2, ArrowRight, Undo2 } from "lucide-react"
+import { CheckCircle2, ArrowRight, Undo2, Copy } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { apiRequest, queryClient } from "@/lib/queryClient"
@@ -134,6 +134,31 @@ export function RecentPaymentsCard() {
     undoMutation.mutate({ id: rec.id, itemName: rec.itemName ?? "未命名項目" })
   }
 
+  // 複製今日已付清單（給 LINE 通知合夥人/家人）
+  const handleCopyTodayList = async () => {
+    if (todayCount === 0) return
+    const today = new Date()
+    const dateStr = `${today.getMonth() + 1}/${today.getDate()}`
+    const lines = grouped.today.map((rec, i) => {
+      const amount = Number(rec.amountPaid ?? rec.amount ?? 0)
+      return `${i + 1}. ${rec.itemName ?? "未命名項目"} ${formatNT(amount)}`
+    })
+    const text =
+      `✅ ${dateStr} 已付清單（${todayCount} 件）：\n\n` +
+      lines.join("\n") +
+      `\n\n💰 合計：${formatNT(todayTotal)}`
+    try {
+      await navigator.clipboard.writeText(text)
+      toast({ title: "已複製今日已付清單", description: "可貼到 LINE / 備忘錄" })
+    } catch {
+      toast({
+        title: "複製失敗",
+        description: "瀏覽器不支援",
+        variant: "destructive",
+      })
+    }
+  }
+
   return (
     <Card>
       <CardHeader className="pb-2">
@@ -149,8 +174,20 @@ export function RecentPaymentsCard() {
           </Link>
         </div>
         {todayCount > 0 && (
-          <div className="mt-1.5 text-xs font-medium text-green-700 bg-green-50 rounded px-2 py-1 border border-green-200">
-            🎉 今天已完成 {todayCount} 件付款 · 共 {formatNT(todayTotal)}
+          <div className="mt-1.5 flex items-center gap-2 text-xs font-medium text-green-700 bg-green-50 rounded px-2 py-1 border border-green-200">
+            <span className="flex-1">
+              🎉 今天已完成 {todayCount} 件付款 · 共 {formatNT(todayTotal)}
+            </span>
+            <button
+              type="button"
+              onClick={handleCopyTodayList}
+              className="text-blue-600 hover:underline flex items-center gap-1 shrink-0"
+              title="複製今日已付清單"
+              data-testid="copy-today-list"
+            >
+              <Copy className="h-3 w-3" />
+              <span className="hidden sm:inline">複製</span>
+            </button>
           </div>
         )}
       </CardHeader>
