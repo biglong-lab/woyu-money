@@ -132,23 +132,6 @@ export default function PaymentRecords() {
     }
   }, [location])
 
-  // 從財務總覽帶入 itemId → 找到該項目並用其名稱作為搜尋字串（顯示該項目的付款歷史）
-  const { data: paymentItemsForLink = [] } = useQuery<{ id: number; itemName: string }[]>({
-    queryKey: ["/api/payment/items"],
-    refetchOnWindowFocus: false,
-  })
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search)
-    const itemIdParam = urlParams.get("itemId")
-    if (itemIdParam && paymentItemsForLink.length > 0) {
-      const found = paymentItemsForLink.find((p) => String(p.id) === itemIdParam)
-      if (found) {
-        setSearchTerm(found.itemName)
-        setDateRange("all")
-      }
-    }
-  }, [location, paymentItemsForLink])
-
   // 查詢付款記錄
   const {
     data: paymentRecords = [],

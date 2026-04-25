@@ -352,7 +352,7 @@ export function usePaymentProjectMutations(params: UsePaymentProjectMutationsPar
     })
   }
 
-  // 處理從財務總覽頁面的快速付款跳轉
+  // 處理從財務總覽頁面的快速付款跳轉（?pay=ID&amount=N → 直接開付款 dialog）
   useEffect(() => {
     if (!searchString || !paymentItems || paymentItems.length === 0) return
 
@@ -378,6 +378,23 @@ export function usePaymentProjectMutations(params: UsePaymentProjectMutationsPar
       }
     }
   }, [searchString, paymentItems, paymentForm, setLocation])
+
+  // 處理從財務總覽頁面的「檢視項目詳情」跳轉（?viewItem=ID → 開項目詳情 dialog）
+  useEffect(() => {
+    if (!searchString || !paymentItems || paymentItems.length === 0) return
+
+    const urlParams = new URLSearchParams(searchString)
+    const viewItemId = urlParams.get("viewItem")
+
+    if (viewItemId) {
+      const targetItem = paymentItems.find((item: PaymentItem) => item.id === parseInt(viewItemId))
+
+      if (targetItem) {
+        setSelectedItem(targetItem)
+        setLocation("/payment-project", { replace: true })
+      }
+    }
+  }, [searchString, paymentItems, setLocation])
 
   return {
     // 對話框狀態
