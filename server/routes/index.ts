@@ -36,6 +36,7 @@ import cashflowForecastRoutes from "./cashflow-forecast"
 import receiptMatchRoutes from "./receipt-match"
 import propertyGroupRoutes from "./property-groups"
 import budgetAutoGenerateRoutes from "./budget-auto-generate"
+import propertyPlRoutes from "./property-pl"
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // 設定認證系統
@@ -99,6 +100,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use(receiptMatchRoutes)
   app.use(propertyGroupRoutes)
   app.use(budgetAutoGenerateRoutes)
+  app.use(propertyPlRoutes)
 
   const httpServer = createServer(app)
   return httpServer
