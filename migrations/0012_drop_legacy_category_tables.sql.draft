@@ -1,0 +1,176 @@
+-- ============================================================
+-- 0012 (DRAFT): DROP 舊分類系統 — 等 30 天觀察期過後啟用
+--
+-- 預計執行日期：2026-06 (PR-1 完成 30 天後)
+--
+-- 啟用方式：
+--   1. 確認下方所有檢查項通過
+--   2. 把檔名 .draft 拿掉變成正式 migration
+--   3. 執行 psql -f migrations/0012_...sql
+--
+-- 影響：
+--   - DROP TABLE fixed_categories
+--   - DROP TABLE fixed_category_sub_options
+--   - DROP TABLE project_category_templates
+--   - ALTER payment_items DROP COLUMN fixed_category_id
+--   - ALTER budget_items DROP COLUMN fixed_category_id
+--
+-- ⚠️ 不可逆操作 — 執行前必做完整 pg_dump 備份
+-- ============================================================
+
+-- ─────────────────────────────────────────────
+-- 啟用前檢查清單（人工跑這段先驗證）
+-- ─────────────────────────────────────────────
+--
+-- ✅ 1. payment_items.fixed_category_id 全為 NULL（軟刪除除外）
+-- SELECT COUNT(*) FROM payment_items
+-- WHERE fixed_category_id IS NOT NULL
+--   AND COALESCE(is_deleted, false) = false;
+-- 預期：0
+--
+-- ✅ 2. budget_items.fixed_category_id 全為 NULL
+-- SELECT COUNT(*) FROM budget_items
+-- WHERE fixed_category_id IS NOT NULL;
+-- 預期：0
+--
+-- ✅ 3. fixed_category_sub_options 為空表
+-- SELECT COUNT(*) FROM fixed_category_sub_options
+-- WHERE COALESCE(is_active, true) = true;
+-- 預期：0
+--
+-- ✅ 4. project_category_templates 為空表
+-- SELECT COUNT(*) FROM project_category_templates
+-- WHERE COALESCE(is_active, true) = true;
+-- 預期：0
+--
+-- ✅ 5. fixed_categories 全部已軟刪/未使用（用 fixed_category_id 反查）
+-- SELECT fc.id, fc.category_name, COUNT(pi.id) AS used
+-- FROM fixed_categories fc
+-- LEFT JOIN payment_items pi ON pi.fixed_category_id = fc.id
+-- GROUP BY fc.id, fc.category_name
+-- HAVING COUNT(pi.id) > 0;
+-- 預期：0 列
+--
+-- ✅ 6. 程式碼搜尋無 fixedCategoryId / fixed_category_id 引用
+-- $ grep -rn "fixedCategoryId\|fixed_category_id" --include="*.ts" --include="*.tsx" \
+--     server/ client/ shared/ \
+--     | grep -v "shared/schema\|deprecated\|/categories-legacy\|migrations/00[0-9]*\.sql"
+-- 預期：無結果
+--
+-- ✅ 7. pg_dump 備份完成且驗證可還原
+--
+-- ============================================================
+
+BEGIN;
+
+-- ─────────────────────────────────────────────
+-- 步驟 1：移除 payment_items.fixed_category_id 的 FK + 欄位
+-- ─────────────────────────────────────────────
+
+DO $$
+DECLARE
+  fk_name TEXT;
+BEGIN
+  SELECT conname INTO fk_name
+  FROM pg_constraint
+  WHERE conrelid = 'payment_items'::regclass
+    AND confrelid = 'fixed_categories'::regclass
+    AND contype = 'f';
+
+  IF fk_name IS NOT NULL THEN
+    EXECUTE format('ALTER TABLE payment_items DROP CONSTRAINT %I', fk_name);
+    RAISE NOTICE '已移除 payment_items FK: %', fk_name;
+  END IF;
+END $$;
+
+ALTER TABLE payment_items DROP COLUMN IF EXISTS fixed_category_id;
+
+-- ─────────────────────────────────────────────
+-- 步驟 2：移除 budget_items.fixed_category_id 的 FK + 欄位
+-- ─────────────────────────────────────────────
+
+DO $$
+DECLARE
+  fk_name TEXT;
+BEGIN
+  SELECT conname INTO fk_name
+  FROM pg_constraint
+  WHERE conrelid = 'budget_items'::regclass
+    AND confrelid = 'fixed_categories'::regclass
+    AND contype = 'f';
+
+  IF fk_name IS NOT NULL THEN
+    EXECUTE format('ALTER TABLE budget_items DROP CONSTRAINT %I', fk_name);
+    RAISE NOTICE '已移除 budget_items FK: %', fk_name;
+  END IF;
+END $$;
+
+ALTER TABLE budget_items DROP COLUMN IF EXISTS fixed_category_id;
+
+-- ─────────────────────────────────────────────
+-- 步驟 3：DROP 廢表（先處理 FK 依賴順序）
+-- ─────────────────────────────────────────────
+
+-- fixed_category_sub_options 引用 fixed_categories — 先 DROP 子表
+DROP TABLE IF EXISTS fixed_category_sub_options CASCADE;
+
+-- project_category_templates 引用 debt_categories（保留）— 直接 DROP
+DROP TABLE IF EXISTS project_category_templates CASCADE;
+
+-- 最後 DROP fixed_categories
+DROP TABLE IF EXISTS fixed_categories CASCADE;
+
+-- ─────────────────────────────────────────────
+-- 步驟 4：統計報告
+-- ─────────────────────────────────────────────
+
+DO $$
+DECLARE
+  v_pi_remaining INT;
+  v_bi_remaining INT;
+  v_table_count INT;
+BEGIN
+  -- 確認欄位已移除
+  SELECT COUNT(*) INTO v_pi_remaining
+  FROM information_schema.columns
+  WHERE table_name = 'payment_items' AND column_name = 'fixed_category_id';
+
+  SELECT COUNT(*) INTO v_bi_remaining
+  FROM information_schema.columns
+  WHERE table_name = 'budget_items' AND column_name = 'fixed_category_id';
+
+  -- 確認表已移除
+  SELECT COUNT(*) INTO v_table_count
+  FROM information_schema.tables
+  WHERE table_name IN (
+    'fixed_categories',
+    'fixed_category_sub_options',
+    'project_category_templates'
+  );
+
+  RAISE NOTICE '════════════════════════════';
+  RAISE NOTICE 'Migration 0012 完成統計：';
+  RAISE NOTICE '  payment_items.fixed_category_id 殘留：% (應為 0)', v_pi_remaining;
+  RAISE NOTICE '  budget_items.fixed_category_id 殘留：% (應為 0)', v_bi_remaining;
+  RAISE NOTICE '  廢表殘留：% (應為 0)', v_table_count;
+  RAISE NOTICE '════════════════════════════';
+
+  IF v_pi_remaining > 0 OR v_bi_remaining > 0 OR v_table_count > 0 THEN
+    RAISE EXCEPTION '清理失敗，自動 ROLLBACK';
+  END IF;
+END $$;
+
+COMMIT;
+
+-- ============================================================
+-- 程式碼後續清理（migration 之後做）：
+--   - shared/schema/payment.ts: 移除 fixedCategoryId 欄位定義
+--   - shared/schema/category.ts: 移除 fixedCategories / fixedCategorySubOptions / projectCategoryTemplates 表定義
+--   - server/storage/categories.ts: 移除 getFixedCategories / createFixedCategory 等函式
+--   - server/routes/categories.ts: 移除 /api/categories/fixed*、/api/fixed-category-sub-options、
+--     /api/project-category-templates 等舊 endpoint
+--   - client/src/pages/category-management.tsx, simple-category-management.tsx, ...：刪除舊頁
+--   - client/src/App.tsx: 移除舊頁 import 與 route
+--
+-- 預估清理約 600 行程式碼
+-- ============================================================
