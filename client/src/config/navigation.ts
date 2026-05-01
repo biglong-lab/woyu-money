@@ -34,6 +34,7 @@ import {
   Banknote,
   AlertTriangle,
   Sparkles,
+  Scale,
   type LucideIcon,
 } from "lucide-react"
 
@@ -82,6 +83,13 @@ export const decisionNavItems: NavItem[] = [
     icon: PieChart,
     badge: "新",
     description: "各館收入、開銷、共用攤提、淨利率一覽",
+  },
+  {
+    title: "月度差異對賬",
+    href: "/variance-report",
+    icon: Scale,
+    badge: "新",
+    description: "預估 vs 實際差異 + 漏記提醒 + 系統洞察",
   },
   {
     title: "現金分配助理",
@@ -409,6 +417,7 @@ export const breadcrumbConfig: Record<string, BreadcrumbItem[]> = {
   // 財務助理
   "/budget-estimates": [{ title: "首頁", href: "/" }, { title: "財務助理" }, { title: "月度預估" }],
   "/property-pl": [{ title: "首頁", href: "/" }, { title: "財務助理" }, { title: "館別損益" }],
+  "/variance-report": [{ title: "首頁", href: "/" }, { title: "財務助理" }, { title: "差異對賬" }],
 
   // 系統管理
   "/property-groups": [
