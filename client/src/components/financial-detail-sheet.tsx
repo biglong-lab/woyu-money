@@ -70,20 +70,6 @@ interface Props {
   annual: AnnualLossReport | undefined
 }
 
-const URGENCY_BADGE: Record<UrgencyLevel, string> = {
-  critical: "bg-red-100 text-red-800 border-red-200",
-  high: "bg-orange-100 text-orange-800 border-orange-200",
-  medium: "bg-yellow-100 text-yellow-800 border-yellow-200",
-  low: "bg-gray-100 text-gray-700 border-gray-200",
-}
-
-const URGENCY_LABEL: Record<UrgencyLevel, string> = {
-  critical: "緊急",
-  high: "本週",
-  medium: "本月",
-  low: "可緩",
-}
-
 const TITLES: Record<DetailMode, { title: string; desc: string }> = {
   unpaid: {
     title: "應付總額明細",
@@ -167,21 +153,39 @@ function UnpaidView({ priority }: { priority: PriorityReport | undefined }) {
         </div>
       </div>
 
-      {/* 按緊急度分 */}
-      <Section title="按緊急度">
-        <div className="grid grid-cols-2 gap-2">
-          {(["critical", "high", "medium", "low"] as UrgencyLevel[]).map((level) => {
-            const items = priority.all.filter((r) => r.urgency === level)
-            const sum = items.reduce((s, r) => s + r.unpaidAmount, 0)
-            if (items.length === 0) return null
-            return (
-              <div key={level} className={`rounded border p-2 text-sm ${URGENCY_BADGE[level]}`}>
-                <div className="text-xs">{URGENCY_LABEL[level]}</div>
-                <div className="font-semibold">{formatNT(sum)}</div>
-                <div className="text-xs opacity-80">{items.length} 筆</div>
-              </div>
+      {/* 按到期狀態分（更直觀，避免 priority 引擎的 critical/high 混淆） */}
+      <Section title="按到期狀態">
+        <div className="grid grid-cols-3 gap-2">
+          {(() => {
+            const overdue = priority.all.filter((r) => r.daysOverdue > 0)
+            const thisWeek = priority.all.filter((r) => r.daysOverdue === 0 && r.daysUntilDue <= 7)
+            const within2w = priority.all.filter(
+              (r) => r.daysOverdue === 0 && r.daysUntilDue > 7 && r.daysUntilDue <= 14
             )
-          })}
+            const groups = [
+              { items: overdue, label: "已逾期", cls: "bg-red-50 border-red-200 text-red-800" },
+              {
+                items: thisWeek,
+                label: "7 天內到期",
+                cls: "bg-orange-50 border-orange-200 text-orange-800",
+              },
+              {
+                items: within2w,
+                label: "8–14 天到期",
+                cls: "bg-yellow-50 border-yellow-200 text-yellow-800",
+              },
+            ]
+            return groups.map((g) => {
+              const sum = g.items.reduce((s, r) => s + r.unpaidAmount, 0)
+              return (
+                <div key={g.label} className={`rounded border p-2 text-sm ${g.cls}`}>
+                  <div className="text-xs">{g.label}</div>
+                  <div className="font-semibold">{formatNT(sum)}</div>
+                  <div className="text-xs opacity-80">{g.items.length} 筆</div>
+                </div>
+              )
+            })
+          })()}
         </div>
       </Section>
 
@@ -219,8 +223,9 @@ function UnpaidView({ priority }: { priority: PriorityReport | undefined }) {
       {/* Top 10 大筆 */}
       <Section title="最大筆 Top 10">
         <div className="space-y-1.5">
+          {/* 顯示逾期天數讓使用者一眼看出「這筆是 N 天前的舊帳」 */}
           {top10.map((r) => (
-            <ItemRow key={r.id} item={r} showOverdue={false} />
+            <ItemRow key={r.id} item={r} showOverdue={true} />
           ))}
         </div>
       </Section>
@@ -452,10 +457,24 @@ function ItemRow({ item, showOverdue }: { item: PriorityResult; showOverdue: boo
             <span className="whitespace-nowrap">{item.dueDate}</span>
             {showOverdue && item.daysOverdue > 0 && (
               <Badge
-                className={`ml-auto text-[10px] py-0 h-4 ${URGENCY_BADGE[item.urgency]}`}
+                className="ml-auto text-[10px] py-0 h-4 bg-red-100 text-red-800 border-red-200"
                 variant="outline"
               >
                 逾期 {item.daysOverdue} 天
+              </Badge>
+            )}
+            {showOverdue && item.daysOverdue === 0 && item.daysUntilDue >= 0 && (
+              <Badge
+                className={`ml-auto text-[10px] py-0 h-4 ${
+                  item.daysUntilDue <= 3
+                    ? "bg-orange-100 text-orange-800 border-orange-200"
+                    : item.daysUntilDue <= 7
+                      ? "bg-yellow-100 text-yellow-800 border-yellow-200"
+                      : "bg-blue-100 text-blue-800 border-blue-200"
+                }`}
+                variant="outline"
+              >
+                {item.daysUntilDue === 0 ? "今天到期" : `剩 ${item.daysUntilDue} 天`}
               </Badge>
             )}
           </div>
