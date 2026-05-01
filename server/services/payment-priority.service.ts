@@ -228,9 +228,14 @@ export async function fetchUnpaidRowsFromDb(): Promise<RawUnpaidRow[]> {
 
 function filterLowUrgency(report: PriorityReport, includeLow: boolean | undefined): PriorityReport {
   if (includeLow) return report
+  // 修正：排除 low 時必須同步重算 totalUnpaid，否則金額會包含「未來 14+ 天才到期」
+  // 造成首頁「未付總額」看起來虛高
+  const filteredAll = report.all.filter((r) => r.urgency !== "low")
+  const recomputedTotal = filteredAll.reduce((sum, r) => sum + r.unpaidAmount, 0)
   return {
     ...report,
-    all: report.all.filter((r) => r.urgency !== "low"),
+    totalUnpaid: recomputedTotal,
+    all: filteredAll,
     byUrgency: { ...report.byUrgency, low: [] },
     counts: { ...report.counts, low: 0 },
   }

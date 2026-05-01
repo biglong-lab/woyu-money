@@ -85,7 +85,10 @@ const URGENCY_LABEL: Record<UrgencyLevel, string> = {
 }
 
 const TITLES: Record<DetailMode, { title: string; desc: string }> = {
-  unpaid: { title: "未付總額明細", desc: "依專案、緊急度與項目分解" },
+  unpaid: {
+    title: "應付總額明細",
+    desc: "已逾期 + 14 天內到期（不含未來未發生）",
+  },
   overdue: { title: "逾期項目清單", desc: "已過期未付款，請優先處理" },
   lateFee: { title: "已產生滯納金", desc: "目前累計的滯納金損失（每日增加）" },
   annual: { title: "年度損失分析", desc: "今年因延遲付款累計的滯納金" },
@@ -149,17 +152,19 @@ function UnpaidView({ priority }: { priority: PriorityReport | undefined }) {
     <div className="space-y-5">
       {/* 總額大數字 */}
       <div className="rounded-lg bg-gradient-to-br from-blue-50 to-indigo-50 p-3 border">
-        <div className="text-xs text-gray-600">未付總額</div>
+        <div className="text-xs text-gray-600">應付總額（14 天內到期 + 已逾期）</div>
         <button
           type="button"
-          onClick={() => copyAmount(priority.totalUnpaid, "未付總額")}
+          onClick={() => copyAmount(priority.totalUnpaid, "應付總額")}
           className="mt-1 inline-flex items-center gap-1 text-2xl font-bold text-gray-900 hover:underline"
           title="點擊複製金額"
         >
           {formatNT(priority.totalUnpaid)}
           <Copy className="h-4 w-4 opacity-50" />
         </button>
-        <div className="text-xs text-gray-500 mt-1">共 {priority.all.length} 筆未付款項目</div>
+        <div className="text-xs text-gray-500 mt-1">
+          共 {priority.all.length} 筆 · 不含 14 天以上未到期項目
+        </div>
       </div>
 
       {/* 按緊急度分 */}
