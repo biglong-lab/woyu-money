@@ -316,6 +316,213 @@ router.get(
 )
 
 // ─────────────────────────────────────────────
+// POST /api/admin/batch-generate-estimates
+// 一次補建多個月份的預估表（給歷史資料補建用）
+// body: { fromYear, fromMonth, toYear, toMonth, force? }
+// ─────────────────────────────────────────────
+
+const batchBodySchema = z.object({
+  fromYear: z.number().int().min(2000).max(2100),
+  fromMonth: z.number().int().min(1).max(12),
+  toYear: z.number().int().min(2000).max(2100),
+  toMonth: z.number().int().min(1).max(12),
+  force: z.boolean().optional().default(false),
+})
+
+router.post(
+  "/api/admin/batch-generate-estimates",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const parsed = batchBodySchema.safeParse(req.body)
+    if (!parsed.success) {
+      throw new AppError(400, "請提供 fromYear/fromMonth/toYear/toMonth")
+    }
+    const { fromYear, fromMonth, toYear, toMonth, force } = parsed.data
+
+    // 列出所有要建立的月份
+    const months: { year: number; month: number }[] = []
+    let cy = fromYear
+    let cm = fromMonth
+    while (cy < toYear || (cy === toYear && cm <= toMonth)) {
+      months.push({ year: cy, month: cm })
+      cm++
+      if (cm > 12) {
+        cm = 1
+        cy++
+      }
+      if (months.length > 60) break // 安全限制：60 個月
+    }
+
+    const results: Array<{
+      year: number
+      month: number
+      status: "created" | "skipped" | "rebuilt" | "error"
+      itemCount?: number
+      totalBudget?: number
+      message?: string
+    }> = []
+
+    for (const { year, month } of months) {
+      try {
+        // 直接複製 auto-generate 邏輯（避免重複呼叫 router）
+        const planName = `${year}-${String(month).padStart(2, "0")} 月度預估`
+        const existing = await db
+          .select()
+          .from(budgetPlans)
+          .where(sql`plan_name = ${planName} AND COALESCE(status, 'active') = 'active'`)
+          .limit(1)
+
+        if (existing.length > 0 && !force) {
+          results.push({ year, month, status: "skipped", message: "已存在" })
+          continue
+        }
+
+        const startDate = new Date(year, month - 1, 1).toISOString().slice(0, 10)
+        const endDate = new Date(year, month, 0).toISOString().slice(0, 10)
+
+        let plan
+        if (existing.length > 0 && force) {
+          await db.delete(budgetItems).where(sql`budget_plan_id = ${existing[0].id}`)
+          plan = existing[0]
+        } else {
+          const [created] = await db
+            .insert(budgetPlans)
+            .values({
+              planName,
+              planType: "monthly_auto",
+              budgetPeriod: "monthly",
+              startDate,
+              endDate,
+              totalBudget: "0",
+              status: "active",
+            })
+            .returning()
+          plan = created
+        }
+
+        // 取 active project + 合約 + 分類
+        const projects = await db
+          .select()
+          .from(paymentProjects)
+          .where(sql`COALESCE(is_active, true) = true AND COALESCE(is_deleted, false) = false`)
+
+        const contracts = await db
+          .select()
+          .from(rentalContracts)
+          .where(
+            sql`COALESCE(is_active, true) = true
+              AND start_date <= make_date(${year}, ${month}, 28)
+              AND end_date >= make_date(${year}, ${month}, 1)`
+          )
+
+        const categories = await db
+          .select()
+          .from(fixedCategories)
+          .where(sql`COALESCE(is_active, true) = true`)
+          .orderBy(fixedCategories.sortOrder)
+
+        const generated: Array<{
+          fixedCategoryId: number | null
+          itemName: string
+          targetProjectId: number | null
+          plannedAmount: number
+          basis: string
+        }> = []
+
+        // 租金
+        for (const c of contracts) {
+          generated.push({
+            fixedCategoryId: null,
+            itemName: `${year}/${month} ${c.contractName} 租金`,
+            targetProjectId: c.projectId,
+            plannedAmount: Math.round(Number(c.baseAmount)),
+            basis: "依合約 base_amount（固定）",
+          })
+        }
+
+        // 預估型（過去 6 月平均）
+        const sixMonthsAgo = monthsBefore(year, month, 6)
+        for (const project of projects) {
+          for (const cat of categories) {
+            if (cat.categoryName.includes("租")) continue
+            const history = await getHistoricalMonthlyTotals(
+              project.id,
+              cat.id,
+              sixMonthsAgo.year,
+              sixMonthsAgo.month,
+              year,
+              month - 1
+            )
+            if (history.length === 0) continue
+            const avgAmount = estimateFromHistory(history.map((h) => h.total))
+            if (avgAmount <= 0) continue
+
+            generated.push({
+              fixedCategoryId: cat.id,
+              itemName: `${year}/${month} ${project.projectName} ${cat.categoryName}`,
+              targetProjectId: project.id,
+              plannedAmount: avgAmount,
+              basis: `過去 ${history.length} 個月平均（去極值）`,
+            })
+          }
+        }
+
+        // 寫入
+        if (generated.length > 0) {
+          await db.insert(budgetItems).values(
+            generated.map((g) => ({
+              budgetPlanId: plan.id,
+              itemName: g.itemName,
+              paymentType: "single" as const,
+              plannedAmount: g.plannedAmount.toString(),
+              attribution: "single",
+              targetProjectId: g.targetProjectId,
+              fixedCategoryId: g.fixedCategoryId,
+              startDate,
+              endDate,
+              notes: g.basis,
+            }))
+          )
+        }
+
+        const totalBudget = generated.reduce((s, g) => s + g.plannedAmount, 0)
+        await db
+          .update(budgetPlans)
+          .set({ totalBudget: totalBudget.toString(), updatedAt: new Date() })
+          .where(sql`id = ${plan.id}`)
+
+        results.push({
+          year,
+          month,
+          status: existing.length > 0 ? "rebuilt" : "created",
+          itemCount: generated.length,
+          totalBudget,
+        })
+      } catch (err) {
+        results.push({
+          year,
+          month,
+          status: "error",
+          message: err instanceof Error ? err.message : String(err),
+        })
+      }
+    }
+
+    res.json({
+      monthsRequested: months.length,
+      results,
+      summary: {
+        created: results.filter((r) => r.status === "created").length,
+        rebuilt: results.filter((r) => r.status === "rebuilt").length,
+        skipped: results.filter((r) => r.status === "skipped").length,
+        errors: results.filter((r) => r.status === "error").length,
+        totalItems: results.reduce((s, r) => s + (r.itemCount ?? 0), 0),
+      },
+    })
+  })
+)
+
+// ─────────────────────────────────────────────
 // GET /api/budget/plans/by-month?year=YYYY&month=MM
 // 取該月已建立的 plan + 所有 items（含 actualAmount/variance）
 // 用於 /budget-estimates 頁切換「檢視模式」
