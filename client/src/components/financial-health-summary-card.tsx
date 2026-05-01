@@ -26,8 +26,9 @@ export function FinancialHealthSummaryCard() {
   const copyAmount = useCopyAmount()
   const [sheetMode, setSheetMode] = useState<DetailMode | null>(null)
 
+  // 排除「可緩」(>14 天才到期) 項目，避免 totalUnpaid 被未來未發生項目灌水
   const { data: priority } = useQuery<PriorityReport>({
-    queryKey: ["/api/payment/priority-report?includeLow=true"],
+    queryKey: ["/api/payment/priority-report?includeLow=false"],
   })
   const year = new Date().getFullYear()
   const { data: annual } = useQuery<AnnualLossReport>({
@@ -96,9 +97,9 @@ export function FinancialHealthSummaryCard() {
           {/* 4 張卡：點擊展開明細 Sheet（不再跳轉） */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
             <KpiCard
-              label="未付總額"
+              label="應付總額"
               value={formatNT(priority.totalUnpaid)}
-              hint={`${priority.all.length} 筆 · 點看明細`}
+              hint={`${priority.all.length} 筆 · 14 天內到期`}
               variant="default"
               onClick={() => setSheetMode("unpaid")}
               testId="kpi-unpaid"
@@ -144,11 +145,11 @@ export function FinancialHealthSummaryCard() {
           <div className="mt-3">
             <UrgencyProgressBar counts={priority.counts} />
           </div>
+          {/* 緊急度分布 — 已排除「可緩」(>14 天)，避免顯示干擾 */}
           <div className="mt-2 flex flex-wrap gap-2 text-xs">
             <BadgeChip level="critical" count={priority.counts.critical} label="緊急" />
             <BadgeChip level="high" count={priority.counts.high} label="本週" />
-            <BadgeChip level="medium" count={priority.counts.medium} label="本月" />
-            <BadgeChip level="low" count={priority.counts.low} label="可緩" />
+            <BadgeChip level="medium" count={priority.counts.medium} label="14 天內" />
           </div>
 
           {nextItem && (
