@@ -34,10 +34,11 @@ interface ToolCallItem {
 // ─────────────────────────────────────────────
 // OpenRouter 可用模型清單
 // 已抽到獨立檔案 ai-assistant-models.ts（避免測試 import 連動到 db.ts）
-// 此 re-export 保持向後相容
+// 此 re-export 保持向後相容；本檔內部使用直接 import
 // ─────────────────────────────────────────────
 
-export { AVAILABLE_MODELS } from "./ai-assistant-models"
+import { AVAILABLE_MODELS } from "./ai-assistant-models"
+export { AVAILABLE_MODELS }
 export type { AvailableModel } from "./ai-assistant-models"
 
 // ─────────────────────────────────────────────

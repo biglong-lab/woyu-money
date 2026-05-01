@@ -12,6 +12,7 @@
  */
 
 import { useState } from "react"
+import { useSearch } from "wouter"
 import { useQuery } from "@tanstack/react-query"
 import { useDocumentTitle } from "@/hooks/use-document-title"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
@@ -76,12 +77,21 @@ const MONTHS = Array.from({ length: 12 }, (_, i) => i + 1)
 
 export default function VarianceReport() {
   useDocumentTitle("月度差異對賬")
+  const search = useSearch()
 
   const now = new Date()
   // 預設上月（差異報表通常看上月，因為當月還沒結束）
   const defaultMonth = now.getMonth() // 0-indexed → 上月
-  const [year, setYear] = useState(defaultMonth === 0 ? now.getFullYear() - 1 : now.getFullYear())
-  const [month, setMonth] = useState(defaultMonth === 0 ? 12 : defaultMonth)
+  const fallbackYear = defaultMonth === 0 ? now.getFullYear() - 1 : now.getFullYear()
+  const fallbackMonth = defaultMonth === 0 ? 12 : defaultMonth
+
+  // URL query 優先（讓書籤/分享可重現）
+  const params = new URLSearchParams(search)
+  const initialYear = parseInt(params.get("year") ?? "") || fallbackYear
+  const initialMonth = parseInt(params.get("month") ?? "") || fallbackMonth
+
+  const [year, setYear] = useState(initialYear)
+  const [month, setMonth] = useState(initialMonth)
   const [showNormal, setShowNormal] = useState(false)
 
   const { data, isLoading, error } = useQuery<VarianceResponse>({

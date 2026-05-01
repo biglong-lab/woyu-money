@@ -58,8 +58,10 @@ router.get(
 )
 
 // 取得單一預算計劃詳情
+// 注意：:id(\\d+) regex 限制只能是純數字，避免吃掉
+// /api/budget/plans/by-month 等其他路由（route 順序問題的雙保險）
 router.get(
-  "/api/budget/plans/:id",
+  "/api/budget/plans/:id(\\d+)",
   asyncHandler(async (req, res) => {
     const id = parseInt(req.params.id)
     if (isNaN(id)) throw new AppError(400, "無效的預算計劃 ID")
