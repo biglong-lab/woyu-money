@@ -70,6 +70,38 @@ interface PreviewItem {
   basis: string
 }
 
+// 已建立 plan 的檢視模式項目
+interface PlanItemView {
+  id: number
+  itemName: string
+  attribution: string
+  targetProjectId: number | null
+  projectName: string | null
+  categoryName: string | null
+  plannedAmount: number
+  actualAmount: number
+  variance: number
+  variancePercentage: number
+  completionPercentage: number
+  notes: string | null
+}
+
+interface PlanByMonthResponse {
+  exists: boolean
+  planId?: number
+  year: number
+  month: number
+  planName?: string
+  status?: string
+  totals?: {
+    planned: number
+    actual: number
+    variance: number
+    completionPercent: number
+  }
+  items?: PlanItemView[]
+}
+
 interface PropertyGroupMember {
   id: number
   groupId: number
@@ -120,16 +152,26 @@ export default function BudgetEstimates() {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const [sharedDialogOpen, setSharedDialogOpen] = useState(false)
 
-  // ── Preview query ──────────────────────────────
+  // ── 1. 先檢查該月是否已有 plan ────────────────────
+  const { data: planData, isLoading: planLoading } = useQuery<PlanByMonthResponse>({
+    queryKey: [`/api/budget/plans/by-month?year=${year}&month=${month}`],
+  })
+
+  const planExists = planData?.exists === true
+
+  // ── 2. 沒 plan 才跑 preview ────────────────────
   const {
     data: preview,
-    isLoading,
+    isLoading: previewLoading,
     isFetching,
     error,
     refetch,
   } = useQuery<PreviewResponse>({
     queryKey: [`/api/budget/estimates/preview?year=${year}&month=${month}`],
+    enabled: planData !== undefined && !planExists,
   })
+
+  const isLoading = planLoading || (planExists === false && previewLoading)
 
   // ── Generate mutation ─────────────────────────
   const generateMutation = useMutation<GenerateResponse, Error, { force: boolean }>({
@@ -146,6 +188,10 @@ export default function BudgetEstimates() {
         description: `${data.itemCount} 筆項目，總額 ${formatNT(data.totalBudget)}`,
       })
       queryClient.invalidateQueries({ queryKey: ["/api/budget/plans"] })
+      // 重要：重新查 plan 狀態，自動切換到「檢視模式」
+      queryClient.invalidateQueries({
+        queryKey: [`/api/budget/plans/by-month?year=${year}&month=${month}`],
+      })
     },
     onError: (e: Error) => {
       const msg = friendlyApiError(e)
@@ -158,8 +204,16 @@ export default function BudgetEstimates() {
     },
   })
 
+  // ── 重新整理 plan 資料（提供給 invalidate）────
+  const refreshPlan = () => {
+    queryClient.invalidateQueries({
+      queryKey: [`/api/budget/plans/by-month?year=${year}&month=${month}`],
+    })
+  }
+
   // ── 分組顯示 ─────────────────────────────────────
   const grouped = groupByProject(preview?.items ?? [])
+  const planGrouped = groupPlanByProject(planData?.items ?? [])
 
   const toggleCollapsed = (key: string) => {
     setCollapsed((prev) => {
@@ -251,7 +305,7 @@ export default function BudgetEstimates() {
         <Card>
           <CardContent className="py-12 text-center text-muted-foreground">
             <RefreshCw className="h-8 w-8 mx-auto mb-2 animate-spin opacity-50" />
-            產生預覽中...
+            載入中...
           </CardContent>
         </Card>
       ) : error ? (
@@ -261,6 +315,26 @@ export default function BudgetEstimates() {
             載入失敗：{friendlyApiError(error as Error)}
           </CardContent>
         </Card>
+      ) : planExists && planData?.totals && planData.items ? (
+        // ─── 檢視模式（已建立）────────────────
+        <PlanViewMode
+          year={year}
+          month={month}
+          totals={planData.totals}
+          grouped={planGrouped}
+          collapsed={collapsed}
+          toggleCollapsed={toggleCollapsed}
+          onRebuild={() => {
+            if (
+              confirm(
+                `確定要強制重建 ${year}/${month} 預估表？\n（會刪除舊預估的所有項目，包含已實際發生的記錄連結）`
+              )
+            )
+              generateMutation.mutate({ force: true })
+          }}
+          onAddSharedExpense={() => setSharedDialogOpen(true)}
+          isPending={generateMutation.isPending}
+        />
       ) : (
         preview && (
           <>
@@ -419,6 +493,43 @@ function groupByProject(items: PreviewItem[]): ItemGroup[] {
     g.subtotal += item.plannedAmount
   }
   return Array.from(map.values())
+}
+
+interface PlanItemGroup {
+  key: string
+  title: string
+  items: PlanItemView[]
+  plannedSubtotal: number
+  actualSubtotal: number
+  completionPercent: number
+}
+
+function groupPlanByProject(items: PlanItemView[]): PlanItemGroup[] {
+  const map = new Map<string, PlanItemGroup>()
+  for (const item of items) {
+    const key = item.projectName ?? "（公司級 / 未歸屬）"
+    if (!map.has(key)) {
+      map.set(key, {
+        key,
+        title: key,
+        items: [],
+        plannedSubtotal: 0,
+        actualSubtotal: 0,
+        completionPercent: 0,
+      })
+    }
+    const g = map.get(key)!
+    g.items.push(item)
+    g.plannedSubtotal += item.plannedAmount
+    g.actualSubtotal += item.actualAmount
+  }
+  // 計算每組的完成度
+  const result = Array.from(map.values())
+  for (const g of result) {
+    g.completionPercent =
+      g.plannedSubtotal > 0 ? Math.round((g.actualSubtotal / g.plannedSubtotal) * 1000) / 10 : 0
+  }
+  return result
 }
 
 // ─────────────────────────────────────────────
@@ -673,6 +784,233 @@ function PreviewItemRow({ item }: { item: PreviewItem }) {
         <div className="text-xs text-muted-foreground mt-0.5">{item.basis}</div>
       </div>
       <div className="font-semibold whitespace-nowrap">{formatNT(item.plannedAmount)}</div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────
+// PlanViewMode — 已建立 plan 時的檢視模式
+// ─────────────────────────────────────────────
+
+interface PlanViewModeProps {
+  year: number
+  month: number
+  totals: {
+    planned: number
+    actual: number
+    variance: number
+    completionPercent: number
+  }
+  grouped: PlanItemGroup[]
+  collapsed: Set<string>
+  toggleCollapsed: (key: string) => void
+  onRebuild: () => void
+  onAddSharedExpense: () => void
+  isPending: boolean
+}
+
+function PlanViewMode({
+  year,
+  month,
+  totals,
+  grouped,
+  collapsed,
+  toggleCollapsed,
+  onRebuild,
+  isPending,
+}: PlanViewModeProps) {
+  return (
+    <>
+      {/* 摘要卡 */}
+      <Card className="mb-4 border-emerald-200 bg-gradient-to-br from-emerald-50 to-white">
+        <CardContent className="pt-6">
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div className="flex-1 min-w-0">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Calendar className="h-5 w-5 text-emerald-700" />
+                {year} 年 {month} 月預估表（已建立）
+              </CardTitle>
+              <CardDescription className="mt-2">
+                <div className="space-y-1">
+                  <div className="flex justify-between text-sm">
+                    <span>整體完成度：</span>
+                    <span className="font-medium">
+                      {formatNT(totals.actual)} / {formatNT(totals.planned)}
+                    </span>
+                  </div>
+                  <div className="w-full h-3 bg-gray-200 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full transition-all ${
+                        totals.completionPercent >= 100
+                          ? "bg-red-500"
+                          : totals.completionPercent >= 70
+                            ? "bg-emerald-500"
+                            : totals.completionPercent >= 30
+                              ? "bg-yellow-400"
+                              : "bg-blue-400"
+                      }`}
+                      style={{ width: `${Math.min(100, totals.completionPercent)}%` }}
+                    />
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span>完成 {totals.completionPercent}%</span>
+                    <span
+                      className={
+                        totals.variance > 0
+                          ? "text-red-700 font-semibold"
+                          : totals.variance < 0
+                            ? "text-emerald-700"
+                            : ""
+                      }
+                    >
+                      {totals.variance > 0 ? "超支 " : totals.variance < 0 ? "節省 " : ""}
+                      {formatNT(Math.abs(totals.variance))}
+                    </span>
+                  </div>
+                </div>
+              </CardDescription>
+            </div>
+            <div className="flex gap-2 flex-wrap">
+              <Button variant="outline" size="sm" onClick={onRebuild} disabled={isPending}>
+                <RefreshCw className="h-4 w-4 mr-1" />
+                強制重建
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* 各館分組 */}
+      <div className="space-y-3">
+        {grouped.map((group) => {
+          const isCollapsed = collapsed.has(group.key)
+          return (
+            <Card key={group.key}>
+              <CardHeader
+                className="pb-3 cursor-pointer hover:bg-muted/30"
+                onClick={() => toggleCollapsed(group.key)}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <Building2 className="h-5 w-5 text-blue-600" />
+                    {group.title}
+                    <Badge variant="outline">{group.items.length}</Badge>
+                    <Badge
+                      variant="outline"
+                      className={
+                        group.completionPercent >= 100
+                          ? "border-red-300 text-red-700"
+                          : group.completionPercent >= 70
+                            ? "border-emerald-300 text-emerald-700"
+                            : "border-yellow-300 text-yellow-700"
+                      }
+                    >
+                      {group.completionPercent}%
+                    </Badge>
+                  </CardTitle>
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className="text-muted-foreground">
+                      {formatNT(group.actualSubtotal)} / {formatNT(group.plannedSubtotal)}
+                    </span>
+                    {isCollapsed ? (
+                      <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                    ) : (
+                      <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                    )}
+                  </div>
+                </div>
+              </CardHeader>
+              {!isCollapsed && (
+                <CardContent className="pt-0">
+                  <div className="space-y-2">
+                    {group.items.map((item) => (
+                      <PlanItemRow key={item.id} item={item} />
+                    ))}
+                  </div>
+                </CardContent>
+              )}
+            </Card>
+          )
+        })}
+      </div>
+
+      {/* 提示 */}
+      <Card className="mt-4 border-blue-200 bg-blue-50/30">
+        <CardContent className="pt-4 pb-4 text-sm text-blue-900 space-y-1">
+          <div className="font-medium flex items-center gap-1">
+            <TrendingUp className="h-4 w-4" />
+            檢視模式說明
+          </div>
+          <ul className="list-disc list-inside space-y-0.5 text-xs ml-1">
+            <li>進度條顏色：藍 = 0-30%、黃 = 30-70%、綠 = 70-100%、紅 = 超支</li>
+            <li>付款後系統會自動更新「實際金額」</li>
+            <li>「強制重建」會刪除既有預估項目並重新自動產生（不影響 payment_records）</li>
+            <li>看月底差異 → 「💡 財務助理 → 月度差異對賬」</li>
+          </ul>
+        </CardContent>
+      </Card>
+    </>
+  )
+}
+
+// ─────────────────────────────────────────────
+// PlanItemRow — 含進度條的 item 列
+// ─────────────────────────────────────────────
+
+function PlanItemRow({ item }: { item: PlanItemView }) {
+  const isOverspent = item.completionPercentage > 100
+  const isComplete = item.completionPercentage >= 100 && !isOverspent
+  const isPartial = item.completionPercentage > 0 && item.completionPercentage < 100
+  const isMissing = item.actualAmount === 0 && item.plannedAmount > 0
+
+  return (
+    <div className="p-2.5 rounded hover:bg-muted/40">
+      <div className="flex items-center gap-2 flex-wrap mb-1">
+        <Badge variant="secondary" className="text-xs">
+          {item.categoryName ?? "未分類"}
+        </Badge>
+        <span className="text-sm font-medium truncate flex-1">{item.itemName}</span>
+        {item.attribution === "shared" && (
+          <Badge variant="outline" className="text-[10px]">
+            共用
+          </Badge>
+        )}
+        {isOverspent && (
+          <Badge variant="destructive" className="text-[10px]">
+            超支 +{item.variancePercentage}%
+          </Badge>
+        )}
+        {isComplete && (
+          <Badge variant="outline" className="text-[10px] border-emerald-300 text-emerald-700">
+            ✅ 已完成
+          </Badge>
+        )}
+        {isMissing && (
+          <Badge variant="outline" className="text-[10px] border-orange-400 text-orange-700">
+            尚未發生
+          </Badge>
+        )}
+      </div>
+      <div className="flex items-center gap-2 text-xs">
+        <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+          <div
+            className={`h-full transition-all ${
+              isOverspent
+                ? "bg-red-500"
+                : isComplete
+                  ? "bg-emerald-500"
+                  : isPartial
+                    ? "bg-yellow-400"
+                    : "bg-gray-300"
+            }`}
+            style={{ width: `${Math.min(100, item.completionPercentage)}%` }}
+          />
+        </div>
+        <span className="text-muted-foreground whitespace-nowrap">
+          {formatNT(item.actualAmount)} / {formatNT(item.plannedAmount)}
+        </span>
+      </div>
+      {item.notes && <div className="text-xs text-muted-foreground mt-1">{item.notes}</div>}
     </div>
   )
 }

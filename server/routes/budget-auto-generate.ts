@@ -316,6 +316,133 @@ router.get(
 )
 
 // ─────────────────────────────────────────────
+// GET /api/budget/plans/by-month?year=YYYY&month=MM
+// 取該月已建立的 plan + 所有 items（含 actualAmount/variance）
+// 用於 /budget-estimates 頁切換「檢視模式」
+// ─────────────────────────────────────────────
+
+interface PlanItemRow extends Record<string, unknown> {
+  id: number
+  item_name: string
+  attribution: string | null
+  target_project_id: number | null
+  project_name: string | null
+  category_name: string | null
+  fixed_category_id: number | null
+  planned_amount: string | null
+  actual_amount: string | null
+  variance: string | null
+  variance_percentage: string | null
+  notes: string | null
+}
+
+router.get(
+  "/api/budget/plans/by-month",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const year = parseInt(req.query.year as string)
+    const month = parseInt(req.query.month as string)
+    if (!year || !month || month < 1 || month > 12) {
+      throw new AppError(400, "請提供有效的 year 與 month")
+    }
+
+    // 找該月 active plan
+    const planRows = await db
+      .select()
+      .from(budgetPlans)
+      .where(
+        sql`COALESCE(status, 'active') = 'active'
+          AND EXTRACT(YEAR FROM start_date)::int = ${year}
+          AND EXTRACT(MONTH FROM start_date)::int = ${month}`
+      )
+      .limit(1)
+
+    if (planRows.length === 0) {
+      res.json({ exists: false, year, month })
+      return
+    }
+
+    const plan = planRows[0]
+
+    // 取所有 items（含 actualAmount + variance）
+    const itemRows = await db.execute<PlanItemRow>(sql`
+      SELECT
+        bi.id,
+        bi.item_name,
+        bi.attribution,
+        bi.target_project_id,
+        pp.project_name,
+        COALESCE(fc.category_name, dc.category_name) AS category_name,
+        bi.fixed_category_id,
+        bi.planned_amount,
+        COALESCE(bi.actual_amount, '0') AS actual_amount,
+        COALESCE(bi.variance, '0') AS variance,
+        COALESCE(bi.variance_percentage, '0') AS variance_percentage,
+        bi.notes
+      FROM budget_items bi
+      LEFT JOIN payment_projects pp ON pp.id = bi.target_project_id
+      LEFT JOIN fixed_categories fc ON fc.id = bi.fixed_category_id
+      LEFT JOIN debt_categories dc ON dc.id = bi.category_id
+      WHERE bi.budget_plan_id = ${plan.id}
+        AND COALESCE(bi.is_deleted, false) = false
+      ORDER BY pp.project_name, bi.item_name
+    `)
+
+    const items = (itemRows.rows as PlanItemRow[]).map((r) => {
+      const planned = Number(r.planned_amount ?? "0")
+      const actual = Number(r.actual_amount ?? "0")
+      const variance = Number(r.variance ?? "0")
+      const variancePct = Number(r.variance_percentage ?? "0")
+      const completionPct = planned > 0 ? Math.round((actual / planned) * 1000) / 10 : 0
+
+      return {
+        id: r.id,
+        itemName: r.item_name,
+        attribution: r.attribution ?? "single",
+        targetProjectId: r.target_project_id,
+        projectName: r.project_name,
+        categoryName: r.category_name,
+        plannedAmount: planned,
+        actualAmount: actual,
+        variance,
+        variancePercentage: variancePct,
+        completionPercentage: completionPct,
+        notes: r.notes,
+      }
+    })
+
+    // 整體統計
+    const totals = items.reduce(
+      (acc, i) => {
+        acc.planned += i.plannedAmount
+        acc.actual += i.actualAmount
+        return acc
+      },
+      { planned: 0, actual: 0 }
+    )
+    const overallCompletion =
+      totals.planned > 0 ? Math.round((totals.actual / totals.planned) * 1000) / 10 : 0
+    const overallVariance = totals.actual - totals.planned
+
+    res.json({
+      exists: true,
+      planId: plan.id,
+      year,
+      month,
+      planName: plan.planName,
+      status: plan.status,
+      totals: {
+        planned: totals.planned,
+        actual: totals.actual,
+        variance: overallVariance,
+        completionPercent: overallCompletion,
+      },
+      items,
+    })
+  })
+)
+
+// ─────────────────────────────────────────────
 // POST /api/budget/estimates/shared-item
 // 新增共用費用到指定月份預估表（自動建立 plan 若不存在）
 // ─────────────────────────────────────────────
