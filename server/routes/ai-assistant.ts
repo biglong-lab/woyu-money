@@ -8,19 +8,17 @@
 import { Router } from "express"
 import OpenAI from "openai"
 import { asyncHandler, AppError } from "../middleware/error-handler"
-import {
-  getAiSettings,
-  getAiSettingsMasked,
-  updateAiSettings,
-} from "../storage/ai-settings"
-import {
-  getEmployees,
-  createEmployee,
-  getEmployee,
-} from "../storage/hr-costs"
+import { getAiSettings, getAiSettingsMasked, updateAiSettings } from "../storage/ai-settings"
+import { getEmployees, createEmployee, getEmployee } from "../storage/hr-costs"
 import { calculateInsurance } from "../../shared/insurance-utils"
 import { db } from "../db"
-import { dailyRevenues, paymentProjects, paymentRecords, incomeWebhooks, incomeSources } from "@shared/schema"
+import {
+  dailyRevenues,
+  paymentProjects,
+  paymentRecords,
+  incomeWebhooks,
+  incomeSources,
+} from "@shared/schema"
 import { sql, and, gte, lte, desc } from "drizzle-orm"
 import { z } from "zod"
 
@@ -35,20 +33,12 @@ interface ToolCallItem {
 
 // ─────────────────────────────────────────────
 // OpenRouter 可用模型清單
+// 已抽到獨立檔案 ai-assistant-models.ts（避免測試 import 連動到 db.ts）
+// 此 re-export 保持向後相容
 // ─────────────────────────────────────────────
 
-export const AVAILABLE_MODELS = [
-  // 付費模型（Function Calling 穩定，推薦）
-  { id: "openai/gpt-4o-mini", name: "GPT-4o Mini（推薦，最划算）", free: false },
-  { id: "deepseek/deepseek-chat", name: "DeepSeek Chat（便宜）", free: false },
-  { id: "anthropic/claude-3.5-haiku", name: "Claude 3.5 Haiku（快速）", free: false },
-  { id: "anthropic/claude-3.5-sonnet", name: "Claude 3.5 Sonnet（最強）", free: false },
-  { id: "openai/gpt-4o", name: "GPT-4o（旗艦）", free: false },
-  { id: "google/gemini-2.5-flash", name: "Gemini 2.5 Flash", free: false },
-  // 免費模型（Function Calling 較不穩定）
-  { id: "meta-llama/llama-3.3-70b-instruct:free", name: "Llama 3.3 70B（免費，不穩定）", free: true },
-  { id: "google/gemma-3-27b-it:free", name: "Gemma 3 27B（免費，不穩定）", free: true },
-]
+export { AVAILABLE_MODELS } from "./ai-assistant-models"
+export type { AvailableModel } from "./ai-assistant-models"
 
 // ─────────────────────────────────────────────
 // AI 系統提示詞
@@ -56,7 +46,10 @@ export const AVAILABLE_MODELS = [
 
 function buildSystemPrompt(extraPrompt?: string | null): string {
   const today = new Date().toLocaleDateString("zh-TW", {
-    year: "numeric", month: "long", day: "numeric", weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    weekday: "long",
   })
 
   const base = `你是浯島財務管理系統的 AI 助手，專精於台灣民宿業財務管理。
@@ -286,10 +279,10 @@ async function executeTool(name: string, args: Record<string, unknown>): Promise
 
     case "get_revenue_stats": {
       const now = new Date()
-      const startDate = (args.startDate as string | undefined) ||
+      const startDate =
+        (args.startDate as string | undefined) ||
         `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`
-      const endDate = (args.endDate as string | undefined) ||
-        now.toISOString().slice(0, 10)
+      const endDate = (args.endDate as string | undefined) || now.toISOString().slice(0, 10)
 
       const result = await db.execute(sql`
         SELECT
@@ -507,7 +500,7 @@ router.post(
       "google/gemma-3-27b-it:free",
       "meta-llama/llama-3.3-70b-instruct:free",
       "google/gemma-3-12b-it:free",
-    ].filter(m => m !== primaryModel)
+    ].filter((m) => m !== primaryModel)
 
     const modelsToTry = [primaryModel, ...fallbackModels]
     let lastError: Error | null = null
@@ -591,7 +584,8 @@ router.post(
     if (imageBase64 && messages.length > 0) {
       const lastMsg = chatMessages[chatMessages.length - 1]
       if (lastMsg.role === "user") {
-        const mimeType = (imageMimeType as "image/jpeg" | "image/png" | "image/gif" | "image/webp") ?? "image/jpeg"
+        const mimeType =
+          (imageMimeType as "image/jpeg" | "image/png" | "image/gif" | "image/webp") ?? "image/jpeg"
         chatMessages[chatMessages.length - 1] = {
           role: "user",
           content: [
@@ -611,7 +605,7 @@ router.post(
       "google/gemma-3-27b-it:free",
       "google/gemma-3-12b-it:free",
       "meta-llama/llama-3.3-70b-instruct:free",
-    ].filter(m => m !== primaryModel)
+    ].filter((m) => m !== primaryModel)
     let activeModel = primaryModel
 
     // 工具調用循環（最多 5 輪）
@@ -672,7 +666,6 @@ router.post(
             })
           }
         }
-
       } catch (err) {
         const apiErr = err as { status?: number; error?: { code?: number } }
         const status = apiErr?.status ?? apiErr?.error?.code
@@ -709,7 +702,9 @@ router.post(
             }
             // 把 code block 從顯示內容中移除
             assistantContent = assistantContent.replace(/```tool_code[\s\S]*?```/g, "").trim()
-          } catch { /* 解析失敗就當作一般文字 */ }
+          } catch {
+            /* 解析失敗就當作一般文字 */
+          }
         }
       }
 
@@ -729,7 +724,11 @@ router.post(
 
       const toolResults: { role: "tool"; tool_call_id: string; content: string }[] = []
       for (const tc of toolCalls) {
-        sendEvent({ type: "tool_start", toolName: tc.function.name, args: JSON.parse(tc.function.arguments) })
+        sendEvent({
+          type: "tool_start",
+          toolName: tc.function.name,
+          args: JSON.parse(tc.function.arguments),
+        })
         try {
           const result = await executeTool(tc.function.name, JSON.parse(tc.function.arguments))
           sendEvent({ type: "tool_result", toolName: tc.function.name, result })

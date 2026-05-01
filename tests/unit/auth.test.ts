@@ -6,11 +6,17 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 import type { Request, Response, NextFunction } from "express"
 
 // Mock storage 模組，避免真實資料庫連線
+// 預設 getUserById 回傳 active user（給 LINE session 路徑用）
+const mockGetUserById = vi.fn().mockResolvedValue({
+  id: 42,
+  username: "lineuser",
+  isActive: true,
+})
 vi.mock("../../server/storage", () => ({
   storage: {
     sessionStore: {},
     getUserByUsername: vi.fn(),
-    getUserById: vi.fn(),
+    getUserById: (id: number) => mockGetUserById(id),
     updateUserLoginAttempts: vi.fn(),
     updateUser: vi.fn(),
     createUser: vi.fn(),
@@ -51,34 +57,34 @@ describe("requireAuth", () => {
     mockNext = vi.fn()
   })
 
-  it("已認證且帳號啟用的使用者應通過", () => {
+  it("已認證且帳號啟用的使用者應通過", async () => {
     const req = createMockReq({
       isAuthenticated: vi.fn().mockReturnValue(true) as unknown as () => boolean,
       user: { id: 1, username: "test", isActive: true } as Express.User,
     })
     const res = createMockRes()
 
-    requireAuth(req, res, mockNext)
+    await requireAuth(req, res, mockNext)
 
     expect(mockNext).toHaveBeenCalled()
     expect(res.status).not.toHaveBeenCalled()
   })
 
-  it("已認證但帳號停用的使用者應回傳 403", () => {
+  it("已認證但帳號停用的使用者應回傳 403", async () => {
     const req = createMockReq({
       isAuthenticated: vi.fn().mockReturnValue(true) as unknown as () => boolean,
       user: { id: 1, username: "test", isActive: false } as Express.User,
     })
     const res = createMockRes()
 
-    requireAuth(req, res, mockNext)
+    await requireAuth(req, res, mockNext)
 
     expect(res.status).toHaveBeenCalledWith(403)
     expect(res.json).toHaveBeenCalledWith({ message: "帳號已被停用" })
     expect(mockNext).not.toHaveBeenCalled()
   })
 
-  it("未認證但 session 有 userId 且 isAuthenticated 為 true 應通過（LINE 登入）", () => {
+  it("未認證但 session 有 userId 且 isAuthenticated 為 true 應通過（LINE 登入）", async () => {
     const req = createMockReq({
       session: {
         userId: 42,
@@ -87,24 +93,27 @@ describe("requireAuth", () => {
     })
     const res = createMockRes()
 
-    requireAuth(req, res, mockNext)
+    await requireAuth(req, res, mockNext)
 
     expect(mockNext).toHaveBeenCalled()
     expect(res.status).not.toHaveBeenCalled()
+    // 應從 DB 補上 user 物件
+    expect(req.user).toBeDefined()
+    expect(mockGetUserById).toHaveBeenCalledWith(42)
   })
 
-  it("未認證且無 session 應回傳 401", () => {
+  it("未認證且無 session 應回傳 401", async () => {
     const req = createMockReq()
     const res = createMockRes()
 
-    requireAuth(req, res, mockNext)
+    await requireAuth(req, res, mockNext)
 
     expect(res.status).toHaveBeenCalledWith(401)
     expect(res.json).toHaveBeenCalledWith({ message: "需要登入才能訪問此資源" })
     expect(mockNext).not.toHaveBeenCalled()
   })
 
-  it("未認證且 session userId 為空應回傳 401", () => {
+  it("未認證且 session userId 為空應回傳 401", async () => {
     const req = createMockReq({
       session: {
         userId: undefined,
@@ -113,13 +122,13 @@ describe("requireAuth", () => {
     })
     const res = createMockRes()
 
-    requireAuth(req, res, mockNext)
+    await requireAuth(req, res, mockNext)
 
     expect(res.status).toHaveBeenCalledWith(401)
     expect(mockNext).not.toHaveBeenCalled()
   })
 
-  it("isAuthenticated 為 true 但 user 為 null 時應檢查 session", () => {
+  it("isAuthenticated 為 true 但 user 為 null 時應檢查 session", async () => {
     const req = createMockReq({
       isAuthenticated: vi.fn().mockReturnValue(true) as unknown as () => boolean,
       user: undefined,
@@ -130,12 +139,13 @@ describe("requireAuth", () => {
     })
     const res = createMockRes()
 
-    requireAuth(req, res, mockNext)
+    await requireAuth(req, res, mockNext)
 
     // passport isAuthenticated() 為 true 但 user 為 falsy，
     // 所以 if (req.isAuthenticated() && req.user) 不成立，
-    // 改走 session 路徑
+    // 改走 session 路徑（會 await getUserById 從 DB 載入 user）
     expect(mockNext).toHaveBeenCalled()
+    expect(req.user).toBeDefined()
   })
 })
 
