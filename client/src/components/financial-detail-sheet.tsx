@@ -16,7 +16,15 @@ import {
 } from "@/components/ui/sheet"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { ArrowRight, Copy, ExternalLink, AlertTriangle } from "lucide-react"
+import {
+  ArrowRight,
+  Copy,
+  ExternalLink,
+  AlertTriangle,
+  ChevronDown,
+  ChevronRight,
+} from "lucide-react"
+import { useState } from "react"
 import { formatNT } from "@/lib/utils"
 import { useCopyAmount } from "@/hooks/use-copy-amount"
 
@@ -189,34 +197,19 @@ function UnpaidView({ priority }: { priority: PriorityReport | undefined }) {
         </div>
       </Section>
 
-      {/* 按專案 */}
-      <Section title={`按專案分組（共 ${byProject.length} 個專案）`}>
+      {/* 按專案 — 可展開看每筆細項 */}
+      <Section title={`按專案分組（共 ${byProject.length} 個專案，點擊展開看細項）`}>
         <div className="space-y-1.5">
-          {byProject.slice(0, 8).map((g) => {
-            const pct = (g.total / priority.totalUnpaid) * 100
-            return (
-              <div key={g.name} className="rounded border p-2">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-sm font-medium truncate">{g.name}</span>
-                  <span className="text-sm font-semibold whitespace-nowrap">
-                    {formatNT(g.total)}
-                  </span>
-                </div>
-                <div className="mt-1 h-1.5 rounded-full bg-gray-100 overflow-hidden">
-                  <div className="h-full bg-blue-500" style={{ width: `${Math.min(100, pct)}%` }} />
-                </div>
-                <div className="mt-0.5 flex items-center justify-between text-xs text-gray-500">
-                  <span>{g.count} 筆</span>
-                  <span>{pct.toFixed(1)}%</span>
-                </div>
-              </div>
-            )
-          })}
-          {byProject.length > 8 && (
-            <div className="text-xs text-gray-500 text-center py-1">
-              還有 {byProject.length - 8} 個專案…
-            </div>
-          )}
+          {byProject.map((g) => (
+            <ProjectGroup
+              key={g.name}
+              name={g.name}
+              total={g.total}
+              count={g.count}
+              items={g.items}
+              totalUnpaid={priority.totalUnpaid}
+            />
+          ))}
         </div>
       </Section>
 
@@ -440,6 +433,66 @@ function Stat({
     <div className={`rounded border p-2 ${cls}`}>
       <div className="text-xs opacity-80">{label}</div>
       <div className="text-sm font-bold mt-0.5">{value}</div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────
+// 子元件：ProjectGroup（可展開看細項）
+// ─────────────────────────────────────────────
+
+function ProjectGroup({
+  name,
+  total,
+  count,
+  items,
+  totalUnpaid,
+}: {
+  name: string
+  total: number
+  count: number
+  items: PriorityResult[]
+  totalUnpaid: number
+}) {
+  const [expanded, setExpanded] = useState(false)
+  const pct = (total / totalUnpaid) * 100
+
+  // 預設按金額排序展示
+  const sortedItems = [...items].sort((a, b) => b.unpaidAmount - a.unpaidAmount)
+
+  return (
+    <div className="rounded border bg-white">
+      <button
+        type="button"
+        onClick={() => setExpanded(!expanded)}
+        className="w-full text-left p-2 hover:bg-gray-50 transition-colors"
+      >
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5 flex-1 min-w-0">
+            {expanded ? (
+              <ChevronDown className="h-4 w-4 shrink-0 text-gray-500" />
+            ) : (
+              <ChevronRight className="h-4 w-4 shrink-0 text-gray-500" />
+            )}
+            <span className="text-sm font-medium truncate">{name}</span>
+          </div>
+          <span className="text-sm font-semibold whitespace-nowrap">{formatNT(total)}</span>
+        </div>
+        <div className="mt-1 h-1.5 rounded-full bg-gray-100 overflow-hidden ml-5">
+          <div className="h-full bg-blue-500" style={{ width: `${Math.min(100, pct)}%` }} />
+        </div>
+        <div className="mt-0.5 flex items-center justify-between text-xs text-gray-500 ml-5">
+          <span>{count} 筆</span>
+          <span>{pct.toFixed(1)}%</span>
+        </div>
+      </button>
+      {expanded && (
+        <div className="border-t p-2 space-y-1.5 bg-gray-50/50">
+          {sortedItems.map((it) => (
+            <ItemRow key={it.id} item={it} showOverdue={true} />
+          ))}
+        </div>
+      )}
     </div>
   )
 }
