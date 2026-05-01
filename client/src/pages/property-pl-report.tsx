@@ -11,6 +11,7 @@
  */
 
 import { useState } from "react"
+import { useSearch } from "wouter"
 import { useQuery } from "@tanstack/react-query"
 import { useDocumentTitle } from "@/hooks/use-document-title"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
@@ -80,10 +81,16 @@ const MONTHS = Array.from({ length: 12 }, (_, i) => i + 1)
 
 export default function PropertyPLReport() {
   useDocumentTitle("館別損益")
+  const search = useSearch()
 
+  // 從 URL query 讀 year/month，沒有則用當月（讓 URL 可分享/書籤）
   const now = new Date()
-  const [year, setYear] = useState(now.getFullYear())
-  const [month, setMonth] = useState(now.getMonth() + 1)
+  const params = new URLSearchParams(search)
+  const initialYear = parseInt(params.get("year") ?? "") || now.getFullYear()
+  const initialMonth = parseInt(params.get("month") ?? "") || now.getMonth() + 1
+
+  const [year, setYear] = useState(initialYear)
+  const [month, setMonth] = useState(initialMonth)
   const [expandedId, setExpandedId] = useState<number | null>(null)
   const [showCompanyItems, setShowCompanyItems] = useState(false)
 

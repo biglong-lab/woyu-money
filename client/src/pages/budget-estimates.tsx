@@ -14,6 +14,7 @@
  */
 
 import { useState } from "react"
+import { useSearch } from "wouter"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiRequest } from "@/lib/queryClient"
 import { useToast } from "@/hooks/use-toast"
@@ -145,10 +146,16 @@ export default function BudgetEstimates() {
   useDocumentTitle("月度預估")
   const { toast } = useToast()
   const queryClient = useQueryClient()
+  const search = useSearch()
 
   const now = new Date()
-  const [year, setYear] = useState(now.getFullYear())
-  const [month, setMonth] = useState(now.getMonth() + 1)
+  // URL query 優先（讓書籤/分享可重現）
+  const params = new URLSearchParams(search)
+  const initialYear = parseInt(params.get("year") ?? "") || now.getFullYear()
+  const initialMonth = parseInt(params.get("month") ?? "") || now.getMonth() + 1
+
+  const [year, setYear] = useState(initialYear)
+  const [month, setMonth] = useState(initialMonth)
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const [sharedDialogOpen, setSharedDialogOpen] = useState(false)
 

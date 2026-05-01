@@ -83,6 +83,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use(adminRoutes)
   app.use(notificationRoutes)
   app.use(paymentScheduleRoutes)
+  // 注意：budgetAutoGenerateRoutes 必須在 budgetRoutes 之前註冊
+  // 因為 budgetRoutes 有 /api/budget/plans/:id 會吃掉 /api/budget/plans/by-month
+  // （即使 :id 已加 \d+ regex 雙保險，順序仍維持正確以防 regex 改動）
+  app.use(budgetAutoGenerateRoutes)
   app.use(budgetRoutes)
   app.use(documentInboxRoutes)
   app.use(invoiceRoutes)
@@ -100,7 +104,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use(cashflowForecastRoutes)
   app.use(receiptMatchRoutes)
   app.use(propertyGroupRoutes)
-  app.use(budgetAutoGenerateRoutes)
   app.use(propertyPlRoutes)
   app.use(varianceReportRoutes)
 
