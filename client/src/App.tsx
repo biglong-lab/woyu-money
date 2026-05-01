@@ -36,6 +36,7 @@ import IntegratedPaymentAnalysisOptimized from "@/pages/integrated-payment-analy
 import PaymentProjectStatsOptimized from "@/pages/payment-project-stats-optimized"
 import PaymentReports from "@/pages/payment-reports"
 import SimpleCategoryManagement from "@/pages/simple-category-management"
+import CategoriesUnifiedPage from "@/pages/categories-unified"
 import PropertyGroupsManagement from "@/pages/property-groups-management"
 import BudgetEstimates from "@/pages/budget-estimates"
 import PropertyPLReport from "@/pages/property-pl-report"
@@ -139,8 +140,9 @@ function Router() {
                 <ProtectedRoute path="/hr-cost-reports" component={HRCostReports} />
                 <ProtectedRoute path="/tax-reports" component={TaxReports} />
 
-                {/* Category Management */}
-                <ProtectedRoute path="/categories" component={SimpleCategoryManagement} />
+                {/* Category Management — PR-3 統一頁，舊路徑保留供回滾 */}
+                <ProtectedRoute path="/categories" component={CategoriesUnifiedPage} />
+                <ProtectedRoute path="/categories-legacy" component={SimpleCategoryManagement} />
                 <ProtectedRoute path="/category-management" component={CategoryManagement} />
                 <ProtectedRoute path="/property-groups" component={PropertyGroupsManagement} />
                 <ProtectedRoute path="/budget-estimates" component={BudgetEstimates} />

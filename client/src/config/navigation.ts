@@ -23,12 +23,10 @@ import {
   Receipt,
   FileText,
   Layers,
-  FolderOpen,
   User,
   Users,
   Trash2,
   Settings,
-  Link as LinkIcon,
   TrendingUp,
   PieChart,
   Banknote,
@@ -245,12 +243,7 @@ export const viewNavItems: NavItem[] = [
     icon: Banknote,
     description: "家庭收支預算管理",
   },
-  {
-    title: "家庭分類管理",
-    href: "/household-category-management",
-    icon: Layers,
-    description: "家庭收支分類設定",
-  },
+  // 「家庭分類管理」已合併至「分類管理」(/categories) — PR-3 整合
 ]
 
 // 系統管理分類（含模板管理，收合顯示）
@@ -265,28 +258,15 @@ export const systemNavItems: NavItem[] = [
     title: "分類管理",
     href: "/categories",
     icon: Layers,
+    description: "統一管理所有費用分類（含合併、清理、重複偵測）",
   },
-  {
-    title: "固定分類管理",
-    href: "/category-management",
-    icon: FolderOpen,
-  },
-  {
-    title: "專案專屬項目管理",
-    href: "/project-specific-items",
-    icon: Building2,
-    description: "管理「固定分類+專案」的專屬項目",
-  },
-  {
-    title: "統一專案模板管理",
-    href: "/unified-project-template-management",
-    icon: Clipboard,
-  },
-  {
-    title: "專案分類模板管理",
-    href: "/project-template-management",
-    icon: LinkIcon,
-  },
+  // 以下舊頁（PR-3）已合併至「分類管理」/categories：
+  //   - 固定分類管理 (/category-management)
+  //   - 專案專屬項目管理 (/project-specific-items)
+  //   - 統一專案模板管理 (/unified-project-template-management)
+  //   - 專案分類模板管理 (/project-template-management)
+  //   - 家庭分類管理 (/household-category-management)
+  // 路徑保留可訪問供回滾（30 天觀察期），但不顯示在導航
   {
     title: "用戶管理",
     href: "/user-management",
