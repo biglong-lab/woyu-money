@@ -139,11 +139,73 @@ function UnpaidView({ priority }: { priority: PriorityReport | undefined }) {
     return [...priority.all].sort((a, b) => b.unpaidAmount - a.unpaidAmount).slice(0, 10)
   }, [priority])
 
+  // 偵測疑似重複：同專案 + 同年月 + 同金額（典型重複建立的特徵）
+  const duplicateGroups = useMemo(() => {
+    if (!priority) return [] as { key: string; items: PriorityResult[] }[]
+    const map = new Map<string, PriorityResult[]>()
+    for (const r of priority.all) {
+      if (!r.projectName) continue
+      const yearMonth = r.dueDate?.slice(0, 7) ?? ""
+      if (!yearMonth) continue
+      const key = `${r.projectName}|${yearMonth}|${r.unpaidAmount}`
+      const arr = map.get(key) ?? []
+      arr.push(r)
+      map.set(key, arr)
+    }
+    return Array.from(map.entries())
+      .filter(([, arr]) => arr.length > 1)
+      .map(([key, arr]) => ({ key, items: arr.sort((a, b) => a.dueDate.localeCompare(b.dueDate)) }))
+  }, [priority])
+
+  // 把疑似重複的 id 集合化方便 ItemRow 查詢
+  const duplicateIds = useMemo(() => {
+    const set = new Set<number>()
+    for (const g of duplicateGroups) {
+      for (const r of g.items) set.add(r.id)
+    }
+    return set
+  }, [duplicateGroups])
+
   if (!priority) return <Skeleton />
   if (priority.all.length === 0) return <Empty msg="目前沒有未付款項目 🎉" />
 
   return (
     <div className="space-y-5">
+      {/* 疑似重複警告（同專案 + 同月 + 同金額） */}
+      {duplicateGroups.length > 0 && (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 p-3">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-semibold text-amber-900">
+                發現 {duplicateGroups.length} 組疑似重複項目
+              </div>
+              <div className="text-xs text-amber-700 mt-0.5">
+                同專案 + 同月份 + 同金額，可能是重複建立。建議到付款管理頁刪除多餘的。
+              </div>
+              <div className="mt-2 space-y-1">
+                {duplicateGroups.slice(0, 5).map((g) => (
+                  <div key={g.key} className="text-xs bg-white/70 rounded p-1.5">
+                    <div className="font-medium text-amber-900">
+                      {g.items[0].projectName} · {g.items[0].dueDate.slice(0, 7)} ·{" "}
+                      {formatNT(g.items[0].unpaidAmount)} × {g.items.length} 筆
+                    </div>
+                    <div className="text-amber-700 mt-0.5">
+                      {g.items.map((r) => `「${r.itemName}」`).join("、")}
+                    </div>
+                  </div>
+                ))}
+                {duplicateGroups.length > 5 && (
+                  <div className="text-xs text-amber-700 text-center">
+                    還有 {duplicateGroups.length - 5} 組…（往下看清單均有 ⚠️ 標記）
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 總額大數字 */}
       <div className="rounded-lg bg-gradient-to-br from-blue-50 to-indigo-50 p-3 border">
         <div className="text-xs text-gray-600">應付總額（14 天內到期 + 已逾期）</div>
@@ -208,6 +270,7 @@ function UnpaidView({ priority }: { priority: PriorityReport | undefined }) {
               count={g.count}
               items={g.items}
               totalUnpaid={priority.totalUnpaid}
+              duplicateIds={duplicateIds}
             />
           ))}
         </div>
@@ -218,7 +281,7 @@ function UnpaidView({ priority }: { priority: PriorityReport | undefined }) {
         <div className="space-y-1.5">
           {/* 顯示逾期天數讓使用者一眼看出「這筆是 N 天前的舊帳」 */}
           {top10.map((r) => (
-            <ItemRow key={r.id} item={r} showOverdue={true} />
+            <ItemRow key={r.id} item={r} showOverdue={true} isDuplicate={duplicateIds.has(r.id)} />
           ))}
         </div>
       </Section>
@@ -246,6 +309,24 @@ function OverdueView({ priority }: { priority: PriorityReport | undefined }) {
       .sort((a, b) => b.daysOverdue - a.daysOverdue)
   }, [priority])
 
+  // 偵測疑似重複（同邏輯）
+  const duplicateIds = useMemo(() => {
+    const set = new Set<number>()
+    if (!priority) return set
+    const map = new Map<string, PriorityResult[]>()
+    for (const r of priority.all) {
+      if (!r.projectName || !r.dueDate) continue
+      const key = `${r.projectName}|${r.dueDate.slice(0, 7)}|${r.unpaidAmount}`
+      const arr = map.get(key) ?? []
+      arr.push(r)
+      map.set(key, arr)
+    }
+    map.forEach((arr) => {
+      if (arr.length > 1) arr.forEach((r) => set.add(r.id))
+    })
+    return set
+  }, [priority])
+
   if (!priority) return <Skeleton />
   if (overdue.length === 0) return <Empty msg="沒有逾期項目 ✅" />
 
@@ -261,11 +342,11 @@ function OverdueView({ priority }: { priority: PriorityReport | undefined }) {
         <Stat label="累計滯納金" value={formatNT(totalLateFee)} variant="warning" />
       </div>
 
-      {/* 列表 */}
+      {/* 列表 — 標記疑似重複 */}
       <Section title={`逾期清單（按逾期天數排序）`}>
         <div className="space-y-1.5">
           {overdue.map((r) => (
-            <ItemRow key={r.id} item={r} showOverdue={true} />
+            <ItemRow key={r.id} item={r} showOverdue={true} isDuplicate={duplicateIds.has(r.id)} />
           ))}
         </div>
       </Section>
@@ -447,15 +528,18 @@ function ProjectGroup({
   count,
   items,
   totalUnpaid,
+  duplicateIds,
 }: {
   name: string
   total: number
   count: number
   items: PriorityResult[]
   totalUnpaid: number
+  duplicateIds?: Set<number>
 }) {
   const [expanded, setExpanded] = useState(false)
   const pct = (total / totalUnpaid) * 100
+  const dupInProject = items.filter((it) => duplicateIds?.has(it.id)).length
 
   // 預設按金額排序展示
   const sortedItems = [...items].sort((a, b) => b.unpaidAmount - a.unpaidAmount)
@@ -475,6 +559,14 @@ function ProjectGroup({
               <ChevronRight className="h-4 w-4 shrink-0 text-gray-500" />
             )}
             <span className="text-sm font-medium truncate">{name}</span>
+            {dupInProject > 0 && (
+              <Badge
+                variant="outline"
+                className="text-[10px] py-0 h-4 bg-amber-100 text-amber-800 border-amber-300 shrink-0"
+              >
+                ⚠️ {dupInProject} 筆疑似重複
+              </Badge>
+            )}
           </div>
           <span className="text-sm font-semibold whitespace-nowrap">{formatNT(total)}</span>
         </div>
@@ -489,7 +581,12 @@ function ProjectGroup({
       {expanded && (
         <div className="border-t p-2 space-y-1.5 bg-gray-50/50">
           {sortedItems.map((it) => (
-            <ItemRow key={it.id} item={it} showOverdue={true} />
+            <ItemRow
+              key={it.id}
+              item={it}
+              showOverdue={true}
+              isDuplicate={duplicateIds?.has(it.id) ?? false}
+            />
           ))}
         </div>
       )}
@@ -497,13 +594,34 @@ function ProjectGroup({
   )
 }
 
-function ItemRow({ item, showOverdue }: { item: PriorityResult; showOverdue: boolean }) {
+function ItemRow({
+  item,
+  showOverdue,
+  isDuplicate = false,
+}: {
+  item: PriorityResult
+  showOverdue: boolean
+  isDuplicate?: boolean
+}) {
   const copyAmount = useCopyAmount()
   return (
-    <div className="rounded border p-2 bg-white">
+    <div
+      className={`rounded border p-2 ${isDuplicate ? "bg-amber-50 border-amber-300" : "bg-white"}`}
+    >
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
-          <div className="text-sm font-medium truncate">{item.itemName}</div>
+          <div className="flex items-center gap-1.5">
+            {isDuplicate && (
+              <Badge
+                variant="outline"
+                className="text-[10px] py-0 h-4 bg-amber-100 text-amber-800 border-amber-300 shrink-0"
+                title="同專案 + 同月份 + 同金額，可能是重複建立"
+              >
+                ⚠️ 疑似重複
+              </Badge>
+            )}
+            <span className="text-sm font-medium truncate">{item.itemName}</span>
+          </div>
           <div className="mt-0.5 flex items-center gap-1.5 text-xs text-gray-500">
             <span className="truncate">{item.projectName ?? "—"}</span>
             <span>·</span>
