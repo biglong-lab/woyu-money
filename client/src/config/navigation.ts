@@ -279,6 +279,12 @@ export const systemNavItems: NavItem[] = [
     description: "查看和恢復已刪除的項目",
   },
   {
+    title: "資料品質中心",
+    href: "/settings/data-quality",
+    icon: AlertTriangle,
+    description: "偵測缺到期日 / 金額異常 / 殭屍項目 / 重複組",
+  },
+  {
     title: "設定",
     href: "/settings",
     icon: Settings,
@@ -440,6 +446,11 @@ export const breadcrumbConfig: Record<string, BreadcrumbItem[]> = {
   ],
   "/user-management": [{ title: "首頁", href: "/" }, { title: "系統管理" }, { title: "用戶管理" }],
   "/recycle-bin": [{ title: "首頁", href: "/" }, { title: "系統管理" }, { title: "回收站" }],
+  "/settings/data-quality": [
+    { title: "首頁", href: "/" },
+    { title: "系統管理" },
+    { title: "資料品質中心" },
+  ],
   "/settings": [{ title: "首頁", href: "/" }, { title: "系統管理" }, { title: "設定" }],
   "/account": [{ title: "首頁", href: "/" }, { title: "系統管理" }, { title: "帳戶設定" }],
 

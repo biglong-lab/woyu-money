@@ -37,6 +37,7 @@ import PaymentProjectStatsOptimized from "@/pages/payment-project-stats-optimize
 import PaymentReports from "@/pages/payment-reports"
 import SimpleCategoryManagement from "@/pages/simple-category-management"
 import CategoriesUnifiedPage from "@/pages/categories-unified"
+import DataQualityPage from "@/pages/data-quality"
 import PropertyGroupsManagement from "@/pages/property-groups-management"
 import BudgetEstimates from "@/pages/budget-estimates"
 import PropertyPLReport from "@/pages/property-pl-report"
@@ -142,6 +143,7 @@ function Router() {
 
                 {/* Category Management — PR-3 統一頁，舊路徑保留供回滾 */}
                 <ProtectedRoute path="/categories" component={CategoriesUnifiedPage} />
+                <ProtectedRoute path="/settings/data-quality" component={DataQualityPage} />
                 <ProtectedRoute path="/categories-legacy" component={SimpleCategoryManagement} />
                 <ProtectedRoute path="/category-management" component={CategoryManagement} />
                 <ProtectedRoute path="/property-groups" component={PropertyGroupsManagement} />
