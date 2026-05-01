@@ -224,15 +224,13 @@ export function GeneralPaymentFilterPanel({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">所有分類</SelectItem>
+                {/* PR-5：移除 source 標籤，已在資料層去重 */}
                 {allCategories.map((category) => (
                   <SelectItem
                     key={`${category.categoryType}-${category.id}`}
                     value={category.id.toString()}
                   >
-                    <div className="flex items-center justify-between w-full">
-                      <span>{category.categoryName}</span>
-                      <span className="text-xs text-gray-500 ml-2">{category.source}</span>
-                    </div>
+                    {category.categoryName}
                   </SelectItem>
                 ))}
               </SelectContent>

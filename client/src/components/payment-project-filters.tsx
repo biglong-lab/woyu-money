@@ -1,6 +1,7 @@
 // 專案付款管理 - 搜尋篩選區域元件（重構版）
 // 合併重複控制項，提供乾淨易用的介面
-import { Ref } from "react"
+import { Ref, useMemo } from "react"
+import { dedupeCategories } from "@/lib/dedupe-categories"
 import {
   Search,
   Filter,
@@ -228,6 +229,12 @@ export default function PaymentProjectFilters(props: PaymentProjectFiltersProps)
   } = props
 
   const activeFilterCount = countActiveFilters(props)
+
+  // PR-5：分類去重 — 同名 fixed/project 只顯示一次（優先 project），無「（固定）」「（專案）」suffix
+  const dedupedCategories = useMemo(
+    () => dedupeCategories(fixedCategoriesData, projectCategoriesData),
+    [fixedCategoriesData, projectCategoriesData]
+  )
 
   // 月份導航
   const goToPrevMonth = () => {
@@ -526,20 +533,11 @@ export default function PaymentProjectFilters(props: PaymentProjectFiltersProps)
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">全部分類</SelectItem>
-                    {(Array.isArray(fixedCategoriesData) ? fixedCategoriesData : []).map(
-                      (c: FixedCategory) => (
-                        <SelectItem key={`fixed:${c.id}`} value={`fixed:${c.id}`}>
-                          {c.categoryName}（固定）
-                        </SelectItem>
-                      )
-                    )}
-                    {(Array.isArray(projectCategoriesData) ? projectCategoriesData : []).map(
-                      (c: DebtCategory) => (
-                        <SelectItem key={`project:${c.id}`} value={`project:${c.id}`}>
-                          {c.categoryName}（專案）
-                        </SelectItem>
-                      )
-                    )}
+                    {dedupedCategories.map((c) => (
+                      <SelectItem key={c.value} value={c.value}>
+                        {c.label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
 
@@ -570,6 +568,7 @@ export default function PaymentProjectFilters(props: PaymentProjectFiltersProps)
                 </Select>
               </div>
 
+              {/* PR-5：移除重複「顯示已付清」toggle（已在月份列存在），只保留排序 */}
               <div className="flex flex-wrap gap-4">
                 <div className="flex items-center gap-2">
                   <Switch
@@ -579,16 +578,6 @@ export default function PaymentProjectFilters(props: PaymentProjectFiltersProps)
                   />
                   <Label htmlFor="sort-order-adv" className="text-xs cursor-pointer select-none">
                     降序排列
-                  </Label>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Switch
-                    id="show-paid-adv"
-                    checked={showPaidItems}
-                    onCheckedChange={setShowPaidItems}
-                  />
-                  <Label htmlFor="show-paid-adv" className="text-xs cursor-pointer select-none">
-                    顯示已付清項目
                   </Label>
                 </div>
               </div>
