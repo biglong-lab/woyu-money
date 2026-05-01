@@ -71,6 +71,13 @@ export const mainNavItems: NavItem[] = [
 // 財務助理分類（決策工具 — 解決記帳焦慮、拖延成本、現金缺口）
 export const decisionNavItems: NavItem[] = [
   {
+    title: "財務總覽 v2",
+    href: "/financial-overview-v2",
+    icon: BarChart3,
+    badge: "全新",
+    description: "預估 vs 實際 / 緊急事項 / 各館組損益一頁看完",
+  },
+  {
     title: "月度預估自動產生",
     href: "/budget-estimates",
     icon: Sparkles,
@@ -418,6 +425,11 @@ export const breadcrumbConfig: Record<string, BreadcrumbItem[]> = {
   "/budget-estimates": [{ title: "首頁", href: "/" }, { title: "財務助理" }, { title: "月度預估" }],
   "/property-pl": [{ title: "首頁", href: "/" }, { title: "財務助理" }, { title: "館別損益" }],
   "/variance-report": [{ title: "首頁", href: "/" }, { title: "財務助理" }, { title: "差異對賬" }],
+  "/financial-overview-v2": [
+    { title: "首頁", href: "/" },
+    { title: "財務助理" },
+    { title: "財務總覽 v2" },
+  ],
 
   // 系統管理
   "/property-groups": [
