@@ -21,13 +21,13 @@ const skipIfNoDb = !process.env.DATABASE_URL
 
 describe("AVAILABLE_MODELS 常數", () => {
   it("應匯出模型陣列且不為空", async () => {
-    const { AVAILABLE_MODELS } = await import("../../server/routes/ai-assistant")
+    const { AVAILABLE_MODELS } = await import("../../server/routes/ai-assistant-models")
     expect(Array.isArray(AVAILABLE_MODELS)).toBe(true)
     expect(AVAILABLE_MODELS.length).toBeGreaterThan(0)
   })
 
   it("每個模型應包含 id、name、free 屬性", async () => {
-    const { AVAILABLE_MODELS } = await import("../../server/routes/ai-assistant")
+    const { AVAILABLE_MODELS } = await import("../../server/routes/ai-assistant-models")
     for (const model of AVAILABLE_MODELS) {
       expect(model).toHaveProperty("id")
       expect(model).toHaveProperty("name")
@@ -39,7 +39,7 @@ describe("AVAILABLE_MODELS 常數", () => {
   })
 
   it("應同時包含付費和免費模型", async () => {
-    const { AVAILABLE_MODELS } = await import("../../server/routes/ai-assistant")
+    const { AVAILABLE_MODELS } = await import("../../server/routes/ai-assistant-models")
     const freeModels = AVAILABLE_MODELS.filter((m: { free: boolean }) => m.free)
     const paidModels = AVAILABLE_MODELS.filter((m: { free: boolean }) => !m.free)
     expect(freeModels.length).toBeGreaterThan(0)
@@ -47,7 +47,7 @@ describe("AVAILABLE_MODELS 常數", () => {
   })
 
   it("模型 id 不應重複", async () => {
-    const { AVAILABLE_MODELS } = await import("../../server/routes/ai-assistant")
+    const { AVAILABLE_MODELS } = await import("../../server/routes/ai-assistant-models")
     const ids = AVAILABLE_MODELS.map((m: { id: string }) => m.id)
     const uniqueIds = new Set(ids)
     expect(uniqueIds.size).toBe(ids.length)
@@ -131,7 +131,7 @@ describe.skipIf(skipIfNoDb)("AI 助手擴展整合測試", () => {
 
   describe("GET /api/ai/models - 結構驗證", () => {
     it("模型清單應與 AVAILABLE_MODELS 匯出一致", async () => {
-      const { AVAILABLE_MODELS } = await import("../../server/routes/ai-assistant")
+      const { AVAILABLE_MODELS } = await import("../../server/routes/ai-assistant-models")
       const res = await adminAgent.get("/api/ai/models")
 
       expect(res.status).toBe(200)
