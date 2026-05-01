@@ -40,6 +40,7 @@ import PropertyGroupsManagement from "@/pages/property-groups-management"
 import BudgetEstimates from "@/pages/budget-estimates"
 import PropertyPLReport from "@/pages/property-pl-report"
 import VarianceReport from "@/pages/variance-report"
+import FinancialOverviewV2 from "@/pages/financial-overview-v2"
 import ProjectSpecificItemsManagement from "@/pages/project-specific-items-management"
 import UnifiedProjectTemplateManagement from "@/pages/unified-project-template-management"
 import ProjectTemplateManagement from "@/pages/project-template-management"
@@ -145,6 +146,7 @@ function Router() {
                 <ProtectedRoute path="/budget-estimates" component={BudgetEstimates} />
                 <ProtectedRoute path="/property-pl" component={PropertyPLReport} />
                 <ProtectedRoute path="/variance-report" component={VarianceReport} />
+                <ProtectedRoute path="/financial-overview-v2" component={FinancialOverviewV2} />
 
                 {/* Template Management */}
                 <ProtectedRoute
