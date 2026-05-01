@@ -159,15 +159,25 @@ export default function PaymentRecords() {
     queryKey: ["/api/fixed-categories"],
   })
 
-  // 合併所有分類
-  const allCategories: MergedCategory[] = [
-    ...fixedCategories.map((cat) => ({ ...cat, categoryType: "fixed", source: "家用分類" })),
-    ...projectCategories.map((cat) => ({
-      ...cat,
-      categoryType: "project",
-      source: "專案分類",
-    })),
-  ]
+  // 合併所有分類 — PR-5：依名稱去重（同名優先 project 來源）
+  const allCategories: MergedCategory[] = (() => {
+    const map = new Map<string, MergedCategory>()
+    for (const cat of projectCategories) {
+      if (!cat.categoryName) continue
+      const key = cat.categoryName.trim().toLowerCase()
+      map.set(key, { ...cat, categoryType: "project", source: "專案分類" })
+    }
+    for (const cat of fixedCategories) {
+      if (!cat.categoryName) continue
+      const key = cat.categoryName.trim().toLowerCase()
+      if (!map.has(key)) {
+        map.set(key, { ...cat, categoryType: "fixed", source: "家用分類" })
+      }
+    }
+    return Array.from(map.values()).sort((a, b) =>
+      (a.categoryName ?? "").localeCompare(b.categoryName ?? "", "zh-Hant")
+    )
+  })()
 
   // 查詢付款項目（用於詳情顯示）
   const { data: paymentItemsResponse } = useQuery<{ items: PaymentItem[] }>({
@@ -488,15 +498,13 @@ export default function PaymentRecords() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">所有分類</SelectItem>
+                  {/* PR-5：移除 source 標籤，已在資料層去重 */}
                   {allCategories.map((category) => (
                     <SelectItem
                       key={`${category.categoryType}-${category.id}`}
                       value={category.id.toString()}
                     >
-                      <div className="flex items-center justify-between w-full">
-                        <span>{category.categoryName}</span>
-                        <span className="text-xs text-gray-500 ml-2">{category.source}</span>
-                      </div>
+                      {category.categoryName}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -855,15 +863,13 @@ export default function PaymentRecords() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">所有分類</SelectItem>
+                  {/* PR-5：移除 source 標籤，已在資料層去重 */}
                   {allCategories.map((category) => (
                     <SelectItem
                       key={`${category.categoryType}-${category.id}`}
                       value={category.id.toString()}
                     >
-                      <div className="flex items-center justify-between w-full">
-                        <span>{category.categoryName}</span>
-                        <span className="text-xs text-gray-500 ml-2">{category.source}</span>
-                      </div>
+                      {category.categoryName}
                     </SelectItem>
                   ))}
                 </SelectContent>

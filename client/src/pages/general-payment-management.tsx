@@ -175,19 +175,27 @@ export default function GeneralPaymentManagement() {
     refetchOnWindowFocus: false,
   })
 
-  // 合併所有分類
-  const allCategories: CategoryWithSource[] = [
-    ...fixedCategories.map((cat: FixedCategory) => ({
-      ...cat,
-      categoryType: "fixed",
-      source: "固定分類",
-    })),
-    ...projectCategories.map((cat: DebtCategory) => ({
-      ...cat,
-      categoryType: "project",
-      source: "專案分類",
-    })),
-  ]
+  // 合併所有分類 — PR-5：依名稱去重（同名優先 project 來源），不顯示 source 後綴
+  const allCategories: CategoryWithSource[] = (() => {
+    const map = new Map<string, CategoryWithSource>()
+    // 先處理 project（優先級高）
+    for (const cat of projectCategories) {
+      if (!cat.categoryName) continue
+      const key = cat.categoryName.trim().toLowerCase()
+      map.set(key, { ...cat, categoryType: "project", source: "專案分類" })
+    }
+    // 後處理 fixed（同名跳過）
+    for (const cat of fixedCategories) {
+      if (!cat.categoryName) continue
+      const key = cat.categoryName.trim().toLowerCase()
+      if (!map.has(key)) {
+        map.set(key, { ...cat, categoryType: "fixed", source: "固定分類" } as CategoryWithSource)
+      }
+    }
+    return Array.from(map.values()).sort((a, b) =>
+      (a.categoryName ?? "").localeCompare(b.categoryName ?? "", "zh-Hant")
+    )
+  })()
 
   // 伺服器已篩選一般付款項目
   const generalItems = useMemo(() => paymentItems, [paymentItems])
