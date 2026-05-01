@@ -1,41 +1,31 @@
 /**
  * 財務健康度摘要卡（首頁置頂）
- * 一目了然：本月應付/已付/逾期 + 年度滯納金損失
+ * PR-6 改造：4 張卡點擊改為展開明細抽屜（不再跳走），讓使用者立刻看到「為什麼這麼多」。
+ *
+ * 一目了然：未付總額、逾期筆數、已產生滯納金、年度損失
+ * 點擊任一張 → 展開該主題的詳細分解（按專案、按項目、按月份等）
  */
 
+import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { Link } from "wouter"
 import { AlertTriangle, CheckCircle2, TrendingDown, ArrowRight, Clock, Copy } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { formatNT } from "@/lib/utils"
 import { useCopyAmount } from "@/hooks/use-copy-amount"
+import {
+  FinancialDetailSheet,
+  type DetailMode,
+  type PriorityReport,
+  type AnnualLossReport,
+} from "./financial-detail-sheet"
 
 type UrgencyLevel = "critical" | "high" | "medium" | "low"
 
-interface PriorityResult {
-  itemName: string
-  unpaidAmount: number
-  urgency: UrgencyLevel
-  daysOverdue: number
-  daysUntilDue: number
-  lateFeeEstimate: number
-  dueDate: string
-}
-
-interface PriorityReport {
-  totalUnpaid: number
-  counts: Record<UrgencyLevel, number>
-  all: PriorityResult[]
-}
-
-interface AnnualLossReport {
-  totalLateFee: number
-  totalPrincipal: number
-  lossPercentage: number
-}
-
 export function FinancialHealthSummaryCard() {
   const copyAmount = useCopyAmount()
+  const [sheetMode, setSheetMode] = useState<DetailMode | null>(null)
+
   const { data: priority } = useQuery<PriorityReport>({
     queryKey: ["/api/payment/priority-report?includeLow=true"],
   })
@@ -85,163 +75,203 @@ export function FinancialHealthSummaryCard() {
   const nextItem = mostOverdue ?? nextUpcoming
 
   return (
-    <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200">
-      <CardContent className="p-3 sm:p-4">
-        <div className="flex items-center justify-between mb-2">
-          <h2 className="text-sm sm:text-base font-semibold text-gray-900">📊 財務健康度</h2>
-          <span className="text-xs text-gray-500">
-            {year}/{today.getMonth() + 1}
-            {daysLeftInMonth > 0 && (
-              <span
-                className={`ml-1.5 ${daysLeftInMonth <= 5 ? "text-red-600 font-semibold" : "text-gray-500"}`}
-                title={`本月還剩 ${daysLeftInMonth} 天`}
-              >
-                · 剩 {daysLeftInMonth} 天
-              </span>
-            )}
-          </span>
-        </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
-          <Link href="/cash-allocation">
-            <div className="bg-white/70 rounded p-2.5 cursor-pointer hover:bg-white transition-colors active:scale-95">
-              <div className="text-xs text-gray-500">未付總額</div>
-              <div className="text-base sm:text-lg font-bold text-gray-900">
-                {formatNT(priority.totalUnpaid)}
-              </div>
-            </div>
-          </Link>
-          <Link href="/cash-allocation">
-            <div
-              className={`rounded p-2.5 cursor-pointer hover:opacity-80 transition-opacity active:scale-95 ${
-                overdueCount > 0 ? "bg-red-50" : "bg-white/70"
-              }`}
-            >
-              <div className="text-xs text-gray-500 flex items-center gap-1">
-                {overdueCount > 0 && <AlertTriangle className="h-3 w-3 text-red-600" />}
-                逾期筆數
-              </div>
-              <div
-                className={`text-base sm:text-lg font-bold ${
-                  overdueCount > 0 ? "text-red-700" : "text-gray-900"
-                }`}
-              >
-                {overdueCount} 筆
-              </div>
-            </div>
-          </Link>
-          <Link href="/labor-insurance-watch">
-            <div
-              className={`rounded p-2.5 cursor-pointer hover:opacity-80 transition-opacity active:scale-95 ${
-                accumulatedLateFee > 0 ? "bg-amber-50" : "bg-white/70"
-              }`}
-            >
-              <div className="text-xs text-gray-500">已產生滯納金</div>
-              <div
-                className={`text-base sm:text-lg font-bold ${
-                  accumulatedLateFee > 0 ? "text-amber-700" : "text-gray-900"
-                }`}
-              >
-                {formatNT(accumulatedLateFee)}
-              </div>
-            </div>
-          </Link>
-          <Link href="/labor-insurance-watch">
-            <div
-              className={`rounded p-2.5 cursor-pointer hover:opacity-80 transition-opacity active:scale-95 ${
-                yearLateFee > 0 ? "bg-red-50" : "bg-green-50"
-              }`}
-            >
-              <div className="text-xs text-gray-500 flex items-center gap-1">
-                {yearLateFee > 0 ? (
+    <>
+      <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200">
+        <CardContent className="p-3 sm:p-4">
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-sm sm:text-base font-semibold text-gray-900">📊 財務健康度</h2>
+            <span className="text-xs text-gray-500">
+              {year}/{today.getMonth() + 1}
+              {daysLeftInMonth > 0 && (
+                <span
+                  className={`ml-1.5 ${daysLeftInMonth <= 5 ? "text-red-600 font-semibold" : "text-gray-500"}`}
+                  title={`本月還剩 ${daysLeftInMonth} 天`}
+                >
+                  · 剩 {daysLeftInMonth} 天
+                </span>
+              )}
+            </span>
+          </div>
+
+          {/* 4 張卡：點擊展開明細 Sheet（不再跳轉） */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+            <KpiCard
+              label="未付總額"
+              value={formatNT(priority.totalUnpaid)}
+              hint={`${priority.all.length} 筆 · 點看明細`}
+              variant="default"
+              onClick={() => setSheetMode("unpaid")}
+              testId="kpi-unpaid"
+            />
+            <KpiCard
+              label="逾期筆數"
+              value={`${overdueCount} 筆`}
+              hint={overdueCount > 0 ? "點看清單" : "無逾期 ✅"}
+              variant={overdueCount > 0 ? "danger" : "default"}
+              icon={overdueCount > 0 ? <AlertTriangle className="h-3 w-3 text-red-600" /> : null}
+              onClick={() => setSheetMode("overdue")}
+              testId="kpi-overdue"
+            />
+            <KpiCard
+              label="已產生滯納金"
+              value={formatNT(accumulatedLateFee)}
+              hint={accumulatedLateFee > 0 ? "點看來源" : "—"}
+              variant={accumulatedLateFee > 0 ? "warning" : "default"}
+              onClick={() => setSheetMode("lateFee")}
+              testId="kpi-late-fee"
+            />
+            <KpiCard
+              label="年度損失"
+              value={yearLateFee > 0 ? formatNT(yearLateFee) : "0"}
+              hint={
+                yearLateFee > 0
+                  ? `佔本金 ${(annual?.lossPercentage ?? 0).toFixed(1)}%`
+                  : "今年零損失"
+              }
+              variant={yearLateFee > 0 ? "danger" : "success"}
+              icon={
+                yearLateFee > 0 ? (
                   <TrendingDown className="h-3 w-3 text-red-600" />
                 ) : (
                   <CheckCircle2 className="h-3 w-3 text-green-600" />
-                )}
-                年度損失
-              </div>
-              <div
-                className={`text-base sm:text-lg font-bold ${
-                  yearLateFee > 0 ? "text-red-700" : "text-green-700"
-                }`}
-              >
-                {yearLateFee > 0 ? formatNT(yearLateFee) : "0"}
-              </div>
-            </div>
-          </Link>
-        </div>
-
-        <div className="mt-3">
-          <UrgencyProgressBar counts={priority.counts} />
-        </div>
-        <div className="mt-2 flex flex-wrap gap-2 text-xs">
-          <Badge level="critical" count={priority.counts.critical} label="緊急" />
-          <Badge level="high" count={priority.counts.high} label="本週" />
-          <Badge level="medium" count={priority.counts.medium} label="本月" />
-          <Badge level="low" count={priority.counts.low} label="可緩" />
-        </div>
-
-        {nextItem && (
-          <div
-            className={`mt-3 flex items-start gap-2 rounded p-2 text-xs ${
-              mostOverdue ? "bg-red-100 text-red-900" : "bg-blue-50 text-blue-900"
-            }`}
-          >
-            <Clock className="h-4 w-4 shrink-0 mt-0.5" />
-            <div className="flex-1 min-w-0">
-              <div className="truncate">
-                {mostOverdue ? "🔴 最久逾期：" : "⏰ 下一筆截止："}
-                <strong>{nextItem.itemName}</strong>
-                <span className="ml-1">
-                  {mostOverdue
-                    ? `（已逾期 ${nextItem.daysOverdue} 天）`
-                    : `（剩 ${nextItem.daysUntilDue} 天 · ${nextItem.dueDate}）`}
-                </span>
-              </div>
-              <div className="mt-0.5 flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    copyAmount(nextItem.unpaidAmount, nextItem.itemName)
-                  }}
-                  className="inline-flex items-center gap-1 font-bold text-sm hover:underline cursor-pointer"
-                  title="點擊複製金額（轉帳用）"
-                  data-testid="copy-next-item-amount"
-                >
-                  {formatNT(nextItem.unpaidAmount)}
-                  <Copy className="h-3 w-3 opacity-50" />
-                </button>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    window.dispatchEvent(new CustomEvent("open-quick-payment"))
-                  }}
-                  className="text-xs font-medium px-2 py-0.5 rounded bg-white border hover:bg-gray-50 active:scale-95 transition-all"
-                  title="開啟快速付款"
-                  data-testid="next-item-pay-now"
-                >
-                  立即付款 →
-                </button>
-              </div>
-            </div>
+                )
+              }
+              onClick={() => setSheetMode("annual")}
+              testId="kpi-annual"
+            />
           </div>
-        )}
 
-        {(overdueCount > 0 || priority.counts.critical > 0) && (
-          <Link href="/cash-allocation">
-            <div className="mt-2 flex items-center justify-between bg-amber-100 hover:bg-amber-200 rounded p-2 cursor-pointer transition-colors">
-              <span className="text-xs font-medium text-amber-900">
-                有 {priority.counts.critical + priority.counts.high} 件緊急事項，立刻分配現金
-              </span>
-              <ArrowRight className="h-4 w-4 text-amber-900" />
+          <div className="mt-3">
+            <UrgencyProgressBar counts={priority.counts} />
+          </div>
+          <div className="mt-2 flex flex-wrap gap-2 text-xs">
+            <BadgeChip level="critical" count={priority.counts.critical} label="緊急" />
+            <BadgeChip level="high" count={priority.counts.high} label="本週" />
+            <BadgeChip level="medium" count={priority.counts.medium} label="本月" />
+            <BadgeChip level="low" count={priority.counts.low} label="可緩" />
+          </div>
+
+          {nextItem && (
+            <div
+              className={`mt-3 flex items-start gap-2 rounded p-2 text-xs ${
+                mostOverdue ? "bg-red-100 text-red-900" : "bg-blue-50 text-blue-900"
+              }`}
+            >
+              <Clock className="h-4 w-4 shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <div className="truncate">
+                  {mostOverdue ? "🔴 最久逾期：" : "⏰ 下一筆截止："}
+                  <strong>{nextItem.itemName}</strong>
+                  <span className="ml-1">
+                    {mostOverdue
+                      ? `（已逾期 ${nextItem.daysOverdue} 天）`
+                      : `（剩 ${nextItem.daysUntilDue} 天 · ${nextItem.dueDate}）`}
+                  </span>
+                </div>
+                <div className="mt-0.5 flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      copyAmount(nextItem.unpaidAmount, nextItem.itemName)
+                    }}
+                    className="inline-flex items-center gap-1 font-bold text-sm hover:underline cursor-pointer"
+                    title="點擊複製金額（轉帳用）"
+                    data-testid="copy-next-item-amount"
+                  >
+                    {formatNT(nextItem.unpaidAmount)}
+                    <Copy className="h-3 w-3 opacity-50" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      window.dispatchEvent(new CustomEvent("open-quick-payment"))
+                    }}
+                    className="text-xs font-medium px-2 py-0.5 rounded bg-white border hover:bg-gray-50 active:scale-95 transition-all"
+                    title="開啟快速付款"
+                    data-testid="next-item-pay-now"
+                  >
+                    立即付款 →
+                  </button>
+                </div>
+              </div>
             </div>
-          </Link>
-        )}
-      </CardContent>
-    </Card>
+          )}
+
+          {(overdueCount > 0 || priority.counts.critical > 0) && (
+            <Link href="/cash-allocation">
+              <div className="mt-2 flex items-center justify-between bg-amber-100 hover:bg-amber-200 rounded p-2 cursor-pointer transition-colors">
+                <span className="text-xs font-medium text-amber-900">
+                  有 {priority.counts.critical + priority.counts.high} 件緊急事項，立刻分配現金
+                </span>
+                <ArrowRight className="h-4 w-4 text-amber-900" />
+              </div>
+            </Link>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* 明細抽屜 */}
+      <FinancialDetailSheet
+        open={sheetMode !== null}
+        onOpenChange={(open) => !open && setSheetMode(null)}
+        mode={sheetMode ?? "unpaid"}
+        priority={priority}
+        annual={annual}
+      />
+    </>
   )
 }
+
+// ─────────────────────────────────────────────
+// 子元件：KpiCard（可點擊卡片）
+// ─────────────────────────────────────────────
+
+interface KpiCardProps {
+  label: string
+  value: string
+  hint?: string
+  variant: "default" | "danger" | "warning" | "success"
+  icon?: React.ReactNode
+  onClick: () => void
+  testId?: string
+}
+
+function KpiCard({ label, value, hint, variant, icon, onClick, testId }: KpiCardProps) {
+  const variantClass = {
+    default: "bg-white/70 hover:bg-white",
+    danger: "bg-red-50 hover:bg-red-100",
+    warning: "bg-amber-50 hover:bg-amber-100",
+    success: "bg-green-50 hover:bg-green-100",
+  }[variant]
+  const valueClass = {
+    default: "text-gray-900",
+    danger: "text-red-700",
+    warning: "text-amber-700",
+    success: "text-green-700",
+  }[variant]
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      data-testid={testId}
+      className={`text-left rounded p-2.5 cursor-pointer transition-all active:scale-95 ${variantClass}`}
+    >
+      <div className="text-xs text-gray-500 flex items-center gap-1">
+        {icon}
+        {label}
+      </div>
+      <div className={`text-base sm:text-lg font-bold ${valueClass}`}>{value}</div>
+      {hint && <div className="text-[10px] text-gray-500 mt-0.5 truncate">{hint}</div>}
+    </button>
+  )
+}
+
+// ─────────────────────────────────────────────
+// 子元件：UrgencyProgressBar
+// ─────────────────────────────────────────────
 
 const URGENCY_BADGE: Record<UrgencyLevel, string> = {
   critical: "bg-red-100 text-red-800",
@@ -287,7 +317,7 @@ function UrgencyProgressBar({ counts }: { counts: Record<UrgencyLevel, number> }
   )
 }
 
-function Badge({ level, count, label }: { level: UrgencyLevel; count: number; label: string }) {
+function BadgeChip({ level, count, label }: { level: UrgencyLevel; count: number; label: string }) {
   return (
     <span
       className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full ${URGENCY_BADGE[level]}`}
