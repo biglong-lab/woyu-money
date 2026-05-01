@@ -9,6 +9,7 @@ import { uploadDir } from "./upload-config"
 // 匯入所有領域路由模組
 import authRoutes from "./auth"
 import categoryRoutes from "./categories"
+import categoriesUnifiedRoutes from "./categories-unified"
 import householdRoutes from "./household"
 import paymentItemRoutes from "./payment-items"
 import paymentRecordRoutes from "./payment-records"
@@ -73,6 +74,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // 註冊所有領域路由
   app.use(authRoutes)
+  // 統一 categories API 必須在 categoryRoutes 之前註冊
+  // 避免 /api/categories/:id 吃掉 /api/categories/unified 等子路徑
+  app.use(categoriesUnifiedRoutes)
   app.use(categoryRoutes)
   app.use(householdRoutes)
   app.use(paymentItemRoutes)

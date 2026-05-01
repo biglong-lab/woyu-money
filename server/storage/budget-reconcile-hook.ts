@@ -29,7 +29,6 @@ async function getMonthCandidates(
   const rows = await db.execute<{
     id: number
     budget_plan_id: number
-    fixed_category_id: number | null
     category_id: number | null
     target_project_id: number | null
     start_date: string | null
@@ -39,7 +38,6 @@ async function getMonthCandidates(
     SELECT
       bi.id,
       bi.budget_plan_id,
-      bi.fixed_category_id,
       bi.category_id,
       bi.target_project_id,
       bi.start_date::text,
@@ -56,7 +54,6 @@ async function getMonthCandidates(
     rows.rows as {
       id: number
       budget_plan_id: number
-      fixed_category_id: number | null
       category_id: number | null
       target_project_id: number | null
       start_date: string | null
@@ -66,7 +63,6 @@ async function getMonthCandidates(
   ).map((r) => ({
     id: r.id,
     budgetPlanId: r.budget_plan_id,
-    fixedCategoryId: r.fixed_category_id,
     categoryId: r.category_id,
     targetProjectId: r.target_project_id,
     startDate: r.start_date,
@@ -107,7 +103,6 @@ async function computeBudgetItemActual(
   const piRows = await db.execute<{
     id: number
     project_id: number | null
-    fixed_category_id: number | null
     category_id: number | null
     start_date: string
     paid_total: string
@@ -115,7 +110,6 @@ async function computeBudgetItemActual(
     SELECT
       pi.id,
       pi.project_id,
-      pi.fixed_category_id,
       pi.category_id,
       pi.start_date::text,
       COALESCE(SUM(pr.amount_paid::numeric), 0)::text AS paid_total
@@ -135,7 +129,6 @@ async function computeBudgetItemActual(
   for (const r of piRows.rows as {
     id: number
     project_id: number | null
-    fixed_category_id: number | null
     category_id: number | null
     start_date: string
     paid_total: string
@@ -146,7 +139,6 @@ async function computeBudgetItemActual(
     const pi: PaymentItemForMatch = {
       id: r.id,
       projectId: r.project_id,
-      fixedCategoryId: r.fixed_category_id,
       categoryId: r.category_id,
       startDate: r.start_date,
     }
@@ -186,7 +178,6 @@ export async function reconcileBudgetItemForPayment(
     .select({
       id: paymentItems.id,
       projectId: paymentItems.projectId,
-      fixedCategoryId: paymentItems.fixedCategoryId,
       categoryId: paymentItems.categoryId,
       startDate: paymentItems.startDate,
     })
@@ -226,7 +217,6 @@ export async function reconcileBudgetItemForPayment(
     {
       id: pi.id,
       projectId: pi.projectId,
-      fixedCategoryId: pi.fixedCategoryId,
       categoryId: pi.categoryId,
       startDate: startDateStr,
     },
@@ -338,7 +328,6 @@ export async function recomputeMonthBudgetActuals(
     id: number
     item_name: string
     target_project_id: number | null
-    fixed_category_id: number | null
     category_id: number | null
     start_date: string | null
     attribution: string | null
@@ -346,7 +335,7 @@ export async function recomputeMonthBudgetActuals(
     actual_amount: string | null
   }>(sql`
     SELECT
-      id, item_name, target_project_id, fixed_category_id, category_id,
+      id, item_name, target_project_id, category_id,
       start_date::text, attribution, planned_amount, actual_amount
     FROM budget_items
     WHERE budget_plan_id = ANY(${planIds})
@@ -368,7 +357,6 @@ export async function recomputeMonthBudgetActuals(
     id: number
     item_name: string
     target_project_id: number | null
-    fixed_category_id: number | null
     category_id: number | null
     start_date: string | null
     attribution: string | null
@@ -383,7 +371,6 @@ export async function recomputeMonthBudgetActuals(
     const candidate: BudgetItemCandidate = {
       id: r.id,
       budgetPlanId: 0, // 不影響配對
-      fixedCategoryId: r.fixed_category_id,
       categoryId: r.category_id,
       targetProjectId: r.target_project_id,
       startDate: r.start_date,
