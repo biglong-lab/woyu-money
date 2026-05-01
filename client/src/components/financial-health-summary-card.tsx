@@ -20,8 +20,6 @@ import {
   type AnnualLossReport,
 } from "./financial-detail-sheet"
 
-type UrgencyLevel = "critical" | "high" | "medium" | "low"
-
 export function FinancialHealthSummaryCard() {
   const copyAmount = useCopyAmount()
   const [sheetMode, setSheetMode] = useState<DetailMode | null>(null)
@@ -74,6 +72,15 @@ export function FinancialHealthSummaryCard() {
     .filter((r) => r.daysUntilDue > 0 && r.daysUntilDue <= 14)
     .sort((a, b) => a.daysUntilDue - b.daysUntilDue)[0]
   const nextItem = mostOverdue ?? nextUpcoming
+
+  // 按到期狀態分組（直觀，取代 priority engine 的 critical/high 標籤）
+  const dueGroups = {
+    overdue: priority.all.filter((r) => r.daysOverdue > 0).length,
+    thisWeek: priority.all.filter((r) => r.daysOverdue === 0 && r.daysUntilDue <= 7).length,
+    within2w: priority.all.filter(
+      (r) => r.daysOverdue === 0 && r.daysUntilDue > 7 && r.daysUntilDue <= 14
+    ).length,
+  }
 
   return (
     <>
@@ -143,13 +150,13 @@ export function FinancialHealthSummaryCard() {
           </div>
 
           <div className="mt-3">
-            <UrgencyProgressBar counts={priority.counts} />
+            <DueProgressBar groups={dueGroups} />
           </div>
-          {/* 緊急度分布 — 已排除「可緩」(>14 天)，避免顯示干擾 */}
+          {/* 按到期狀態分布 — 比 priority 引擎的 critical/high 直觀 */}
           <div className="mt-2 flex flex-wrap gap-2 text-xs">
-            <BadgeChip level="critical" count={priority.counts.critical} label="緊急" />
-            <BadgeChip level="high" count={priority.counts.high} label="本週" />
-            <BadgeChip level="medium" count={priority.counts.medium} label="14 天內" />
+            <DueBadge variant="overdue" count={dueGroups.overdue} label="已逾期" />
+            <DueBadge variant="thisWeek" count={dueGroups.thisWeek} label="7 天內" />
+            <DueBadge variant="within2w" count={dueGroups.within2w} label="8-14 天" />
           </div>
 
           {nextItem && (
@@ -271,25 +278,31 @@ function KpiCard({ label, value, hint, variant, icon, onClick, testId }: KpiCard
 }
 
 // ─────────────────────────────────────────────
-// 子元件：UrgencyProgressBar
+// 子元件：DueProgressBar / DueBadge（按到期狀態）
 // ─────────────────────────────────────────────
 
-const URGENCY_BADGE: Record<UrgencyLevel, string> = {
-  critical: "bg-red-100 text-red-800",
-  high: "bg-orange-100 text-orange-800",
-  medium: "bg-yellow-100 text-yellow-800",
-  low: "bg-gray-100 text-gray-700",
+type DueVariant = "overdue" | "thisWeek" | "within2w"
+
+const DUE_BAR: Record<DueVariant, string> = {
+  overdue: "bg-red-500",
+  thisWeek: "bg-orange-400",
+  within2w: "bg-yellow-400",
 }
 
-const URGENCY_BAR: Record<UrgencyLevel, string> = {
-  critical: "bg-red-500",
-  high: "bg-orange-400",
-  medium: "bg-yellow-400",
-  low: "bg-gray-300",
+const DUE_BADGE: Record<DueVariant, string> = {
+  overdue: "bg-red-100 text-red-800",
+  thisWeek: "bg-orange-100 text-orange-800",
+  within2w: "bg-yellow-100 text-yellow-800",
 }
 
-function UrgencyProgressBar({ counts }: { counts: Record<UrgencyLevel, number> }) {
-  const total = counts.critical + counts.high + counts.medium + counts.low
+interface DueGroups {
+  overdue: number
+  thisWeek: number
+  within2w: number
+}
+
+function DueProgressBar({ groups }: { groups: DueGroups }) {
+  const total = groups.overdue + groups.thisWeek + groups.within2w
   if (total === 0) {
     return (
       <div className="flex h-2 rounded-full bg-green-200 overflow-hidden">
@@ -299,29 +312,30 @@ function UrgencyProgressBar({ counts }: { counts: Record<UrgencyLevel, number> }
       </div>
     )
   }
-  const levels: UrgencyLevel[] = ["critical", "high", "medium", "low"]
+  const variants: DueVariant[] = ["overdue", "thisWeek", "within2w"]
   return (
     <div className="flex h-2 rounded-full overflow-hidden bg-gray-100">
-      {levels.map((level) => {
-        const pct = (counts[level] / total) * 100
+      {variants.map((v) => {
+        const pct = (groups[v] / total) * 100
         if (pct === 0) return null
-        return (
-          <div
-            key={level}
-            className={URGENCY_BAR[level]}
-            style={{ width: `${pct}%` }}
-            title={`${level}: ${counts[level]} 筆`}
-          />
-        )
+        return <div key={v} className={DUE_BAR[v]} style={{ width: `${pct}%` }} />
       })}
     </div>
   )
 }
 
-function BadgeChip({ level, count, label }: { level: UrgencyLevel; count: number; label: string }) {
+function DueBadge({
+  variant,
+  count,
+  label,
+}: {
+  variant: DueVariant
+  count: number
+  label: string
+}) {
   return (
     <span
-      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full ${URGENCY_BADGE[level]}`}
+      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full ${DUE_BADGE[variant]}`}
     >
       <span className="font-semibold">{count}</span>
       <span>{label}</span>
