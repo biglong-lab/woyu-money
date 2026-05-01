@@ -334,7 +334,40 @@ router.post(
         receiptImageUrl || (req.file ? `/uploads/receipts/${req.file.filename}` : null),
     })
 
+    // PR-1: 付款後嘗試回沖對應的 budget_item.actualAmount
+    // 不阻擋付款流程，失敗只記 log
+    try {
+      const { reconcileBudgetItemForPayment } = await import("../storage/budget-reconcile-hook")
+      const reconcile = await reconcileBudgetItemForPayment(itemId)
+      if (reconcile.matched) {
+        console.log(
+          `[budget-reconcile] payment ${itemId} → budget_item ${reconcile.budgetItemId}（${reconcile.priority}），actualAmount=${reconcile.newActualAmount}`
+        )
+      }
+    } catch (err) {
+      console.error("[budget-reconcile] 回沖失敗（不影響付款）:", err)
+    }
+
     res.json(updatedItem)
+  })
+)
+
+// ─────────────────────────────────────────────
+// Admin 工具：整月重算 budget_items.actualAmount
+// 用於：歷史資料補回沖、配對邏輯改動後重新跑
+// ─────────────────────────────────────────────
+
+router.post(
+  "/api/admin/recompute-actuals",
+  asyncHandler(async (req, res) => {
+    const year = parseInt((req.query.year as string) || "0")
+    const month = parseInt((req.query.month as string) || "0")
+    if (!year || !month || month < 1 || month > 12) {
+      throw new AppError(400, "請提供有效的 year 與 month")
+    }
+    const { recomputeMonthBudgetActuals } = await import("../storage/budget-reconcile-hook")
+    const result = await recomputeMonthBudgetActuals(year, month)
+    res.json(result)
   })
 )
 
