@@ -3,21 +3,20 @@
  *
  * 目的：付款記錄發生時，找到對應的 budget_item 並更新 actualAmount。
  *
- * 配對策略（先嚴格後寬鬆）：
- *   優先級 1：projectId + fixedCategoryId + month(start_date)
- *   優先級 2：projectId + categoryId + month
- *   優先級 3：projectId + month（同月同館，無分類）
+ * 配對策略（PR-2 簡化：fixed_categories 已合併至 debt_categories）：
+ *   優先級 1：projectId + categoryId + month(start_date)
+ *   優先級 2：projectId + month（同月同館，無分類，且唯一一筆）
  *   都找不到：返回 null（payment 不阻擋，僅記 log）
  *
  * 重要：
- * - actualAmount 用 SUM 重算（idempotent），不用 +=
+ * - actualAmount 由呼叫端用 SUM 重算（idempotent），不用 +=
  * - 配對是純函式，不直接動 DB（呼叫端自己 update）
+ * - 已移除 fixedCategoryId 路徑（migration 0010+0011 已遷移到 categoryId）
  */
 
 export interface PaymentItemForMatch {
   id: number
   projectId: number | null
-  fixedCategoryId: number | null
   categoryId: number | null
   startDate: string // YYYY-MM-DD
 }
@@ -25,7 +24,6 @@ export interface PaymentItemForMatch {
 export interface BudgetItemCandidate {
   id: number
   budgetPlanId: number
-  fixedCategoryId: number | null
   categoryId: number | null
   targetProjectId: number | null
   startDate: string | null // 該預估所屬月份的第一天 (yyyy-mm-dd)
@@ -33,7 +31,7 @@ export interface BudgetItemCandidate {
   plannedAmount: string | null // numeric, decimal
 }
 
-export type MatchPriority = "exact" | "category" | "project_month" | "none"
+export type MatchPriority = "category" | "project_month" | "none"
 
 export interface MatchResult {
   budgetItemId: number | null
@@ -85,19 +83,7 @@ export function matchBudgetItem(
     }
   }
 
-  // 優先級 1：fixedCategoryId 完全相同
-  if (paymentItem.fixedCategoryId !== null) {
-    const exact = eligible.find((c) => c.fixedCategoryId === paymentItem.fixedCategoryId)
-    if (exact) {
-      return {
-        budgetItemId: exact.id,
-        priority: "exact",
-        reason: `精準配對：相同 fixedCategoryId=${paymentItem.fixedCategoryId}`,
-      }
-    }
-  }
-
-  // 優先級 2：categoryId 完全相同
+  // 優先級 1：categoryId 完全相同
   if (paymentItem.categoryId !== null) {
     const matchByCategory = eligible.find((c) => c.categoryId === paymentItem.categoryId)
     if (matchByCategory) {
@@ -109,10 +95,8 @@ export function matchBudgetItem(
     }
   }
 
-  // 優先級 3：同 project 同 month 但無分類資訊（單一候選才採用，避免錯配）
-  const noCategoryItems = eligible.filter(
-    (c) => c.fixedCategoryId === null && c.categoryId === null
-  )
+  // 優先級 2：同 project 同 month 但無分類資訊（單一候選才採用，避免錯配）
+  const noCategoryItems = eligible.filter((c) => c.categoryId === null)
   if (noCategoryItems.length === 1) {
     return {
       budgetItemId: noCategoryItems[0].id,

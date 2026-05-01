@@ -338,12 +338,8 @@ router.post(
     // 不阻擋付款流程，失敗只記 log
     try {
       const { reconcileBudgetItemForPayment } = await import("../storage/budget-reconcile-hook")
-      const reconcile = await reconcileBudgetItemForPayment(itemId)
-      if (reconcile.matched) {
-        console.log(
-          `[budget-reconcile] payment ${itemId} → budget_item ${reconcile.budgetItemId}（${reconcile.priority}），actualAmount=${reconcile.newActualAmount}`
-        )
-      }
+      // 回沖成功僅供觀察用，不需 log（避免污染日誌）
+      await reconcileBudgetItemForPayment(itemId)
     } catch (err) {
       console.error("[budget-reconcile] 回沖失敗（不影響付款）:", err)
     }
