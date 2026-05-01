@@ -6,10 +6,18 @@
  * 點擊任一張 → 展開該主題的詳細分解（按專案、按項目、按月份等）
  */
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { Link } from "wouter"
-import { AlertTriangle, CheckCircle2, TrendingDown, ArrowRight, Clock, Copy } from "lucide-react"
+import {
+  AlertTriangle,
+  CheckCircle2,
+  TrendingDown,
+  ArrowRight,
+  Clock,
+  Copy,
+  CalendarClock,
+} from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { formatNT } from "@/lib/utils"
 import { useCopyAmount } from "@/hooks/use-copy-amount"
@@ -20,20 +28,53 @@ import {
   type AnnualLossReport,
 } from "./financial-detail-sheet"
 
+type WindowDays = 7 | 14 | 30
+
 export function FinancialHealthSummaryCard() {
   const copyAmount = useCopyAmount()
   const [sheetMode, setSheetMode] = useState<DetailMode | null>(null)
+  const [windowDays, setWindowDays] = useState<WindowDays>(14)
 
-  // 排除「可緩」(>14 天才到期) 項目，避免 totalUnpaid 被未來未發生項目灌水
-  const { data: priority } = useQuery<PriorityReport>({
-    queryKey: ["/api/payment/priority-report?includeLow=false"],
+  // 一次取「全部未付款」（含未來），前端依 windowDays 過濾
+  const { data: priorityRaw } = useQuery<PriorityReport>({
+    queryKey: ["/api/payment/priority-report?includeLow=true"],
   })
   const year = new Date().getFullYear()
   const { data: annual } = useQuery<AnnualLossReport>({
     queryKey: [`/api/late-fee/annual-loss?year=${year}`],
   })
 
-  if (!priority) {
+  // 依 windowDays 過濾出「應付總額」基準（已逾期 + windowDays 內）
+  const priority = useMemo<PriorityReport | undefined>(() => {
+    if (!priorityRaw) return undefined
+    const filtered = priorityRaw.all.filter(
+      (r) => r.daysOverdue > 0 || r.daysUntilDue <= windowDays
+    )
+    const newTotal = filtered.reduce((s, r) => s + r.unpaidAmount, 0)
+    return {
+      ...priorityRaw,
+      totalUnpaid: newTotal,
+      all: filtered,
+    }
+  }, [priorityRaw, windowDays])
+
+  // 下月應付預估（dueDate 落在下個月的全部未付項目）
+  const nextMonthSummary = useMemo(() => {
+    if (!priorityRaw) return { count: 0, total: 0, label: "" }
+    const today = new Date()
+    const nextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1)
+    const nmYear = nextMonth.getFullYear()
+    const nmMonth = nextMonth.getMonth() + 1
+    const ymKey = `${nmYear}-${String(nmMonth).padStart(2, "0")}`
+    const items = priorityRaw.all.filter((r) => r.dueDate?.slice(0, 7) === ymKey)
+    return {
+      count: items.length,
+      total: items.reduce((s, r) => s + r.unpaidAmount, 0),
+      label: `${nmYear}/${nmMonth}`,
+    }
+  }, [priorityRaw])
+
+  if (!priorityRaw || !priority) {
     // 載入中骨架（避免突然出現造成 layout shift）
     return (
       <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200">
@@ -55,25 +96,26 @@ export function FinancialHealthSummaryCard() {
     )
   }
 
-  const overdueCount = priority.all.filter((r) => r.daysOverdue > 0).length
-  const accumulatedLateFee = priority.all.reduce((s, r) => s + (r.lateFeeEstimate ?? 0), 0)
+  // 逾期筆數 / 已累計滯納金：用 raw（事實，不受 windowDays 影響）
+  const overdueCount = priorityRaw.all.filter((r) => r.daysOverdue > 0).length
+  const accumulatedLateFee = priorityRaw.all.reduce((s, r) => s + (r.lateFeeEstimate ?? 0), 0)
   const yearLateFee = annual?.totalLateFee ?? 0
 
-  // 本月還剩天數（給時間壓迫感）
+  // 本月還剩天數
   const today = new Date()
   const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate()
   const daysLeftInMonth = lastDayOfMonth - today.getDate()
 
-  // 找最緊急的：有逾期就顯示最久逾期，否則顯示最近到期
-  const mostOverdue = priority.all
+  // 找最緊急的（用 raw 找）
+  const mostOverdue = priorityRaw.all
     .filter((r) => r.daysOverdue > 0)
     .sort((a, b) => b.daysOverdue - a.daysOverdue)[0]
-  const nextUpcoming = priority.all
+  const nextUpcoming = priorityRaw.all
     .filter((r) => r.daysUntilDue > 0 && r.daysUntilDue <= 14)
     .sort((a, b) => a.daysUntilDue - b.daysUntilDue)[0]
   const nextItem = mostOverdue ?? nextUpcoming
 
-  // 按到期狀態分組（直觀，取代 priority engine 的 critical/high 標籤）
+  // 按到期狀態分組（用 priority filtered 版本）
   const dueGroups = {
     overdue: priority.all.filter((r) => r.daysOverdue > 0).length,
     thisWeek: priority.all.filter((r) => r.daysOverdue === 0 && r.daysUntilDue <= 7).length,
@@ -101,12 +143,30 @@ export function FinancialHealthSummaryCard() {
             </span>
           </div>
 
+          {/* 時間窗口切換 chip */}
+          <div className="flex gap-1 mb-2">
+            {([7, 14, 30] as WindowDays[]).map((d) => (
+              <button
+                key={d}
+                type="button"
+                onClick={() => setWindowDays(d)}
+                className={`px-2.5 py-0.5 rounded-full text-xs transition-colors ${
+                  windowDays === d
+                    ? "bg-blue-600 text-white"
+                    : "bg-white/70 text-gray-700 hover:bg-white"
+                }`}
+              >
+                {d} 天內
+              </button>
+            ))}
+          </div>
+
           {/* 4 張卡：點擊展開明細 Sheet（不再跳轉） */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
             <KpiCard
               label="應付總額"
               value={formatNT(priority.totalUnpaid)}
-              hint={`${priority.all.length} 筆 · 14 天內到期`}
+              hint={`${priority.all.length} 筆 · ${windowDays} 天內到期`}
               variant="default"
               onClick={() => setSheetMode("unpaid")}
               testId="kpi-unpaid"
@@ -158,6 +218,34 @@ export function FinancialHealthSummaryCard() {
             <DueBadge variant="thisWeek" count={dueGroups.thisWeek} label="7 天內" />
             <DueBadge variant="within2w" count={dueGroups.within2w} label="8-14 天" />
           </div>
+
+          {/* 下月應付預估 */}
+          {nextMonthSummary.count > 0 && (
+            <div className="mt-3 flex items-center justify-between gap-2 rounded-md bg-white/70 p-2 border border-blue-100">
+              <div className="flex items-center gap-2 min-w-0">
+                <CalendarClock className="h-4 w-4 text-blue-600 shrink-0" />
+                <div className="min-w-0">
+                  <div className="text-xs text-gray-500">{nextMonthSummary.label} 預估應付</div>
+                  <div className="text-sm font-bold text-gray-900">
+                    {formatNT(nextMonthSummary.total)}
+                    <span className="ml-1 text-xs font-normal text-gray-500">
+                      · {nextMonthSummary.count} 筆
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() =>
+                  copyAmount(nextMonthSummary.total, `${nextMonthSummary.label} 預估應付`)
+                }
+                className="text-xs text-gray-500 hover:text-gray-900 inline-flex items-center gap-1"
+                title="複製金額"
+              >
+                <Copy className="h-3 w-3" />
+              </button>
+            </div>
+          )}
 
           {nextItem && (
             <div

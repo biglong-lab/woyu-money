@@ -5,8 +5,9 @@
  * 顯示對應「為什麼這麼多」的明細，避免使用者只看到大數字找不到答案。
  */
 
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import { Link } from "wouter"
+import { useMutation } from "@tanstack/react-query"
 import {
   Sheet,
   SheetContent,
@@ -17,16 +18,33 @@ import {
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import {
   ArrowRight,
   Copy,
   ExternalLink,
   AlertTriangle,
   ChevronDown,
   ChevronRight,
+  CheckSquare,
+  Sparkles,
+  Wallet,
+  Trash2,
+  X,
 } from "lucide-react"
-import { useState } from "react"
 import { formatNT } from "@/lib/utils"
 import { useCopyAmount } from "@/hooks/use-copy-amount"
+import { useToast } from "@/hooks/use-toast"
+import { apiRequest, queryClient } from "@/lib/queryClient"
+import { FinancialItemRow } from "./financial-item-row"
 
 type UrgencyLevel = "critical" | "high" | "medium" | "low"
 
@@ -38,6 +56,7 @@ interface PriorityResult {
   daysOverdue: number
   daysUntilDue: number
   lateFeeEstimate: number
+  dailyLateFee?: number
   dueDate: string
   projectName?: string
   categoryLabel?: string
@@ -114,7 +133,97 @@ export function FinancialDetailSheet({ open, onOpenChange, mode, priority, annua
 // ─────────────────────────────────────────────
 
 function UnpaidView({ priority }: { priority: PriorityReport | undefined }) {
+  const { toast } = useToast()
   const copyAmount = useCopyAmount()
+  const [selectMode, setSelectMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
+  const [batchPaidOpen, setBatchPaidOpen] = useState(false)
+  const [smartCleanOpen, setSmartCleanOpen] = useState(false)
+
+  const handleSelectChange = (id: number, checked: boolean) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (checked) next.add(id)
+      else next.delete(id)
+      return next
+    })
+  }
+
+  const exitSelectMode = () => {
+    setSelectMode(false)
+    setSelectedIds(new Set())
+  }
+
+  // 批量標記已付清
+  const batchPaidMutation = useMutation({
+    mutationFn: async (ids: number[]) => {
+      // 為每個 id 建立一筆 payment_record（金額 = 該項目剩餘未付）
+      // 用 sequential 處理避免單次失敗影響全部
+      const errors: string[] = []
+      for (const id of ids) {
+        const item = priority?.all.find((r) => r.id === id)
+        if (!item) continue
+        try {
+          await apiRequest("POST", `/api/payment/items/${id}/payments`, {
+            amountPaid: item.unpaidAmount,
+            paymentDate: new Date().toISOString().slice(0, 10),
+            notes: "批量記為已付清",
+          })
+        } catch (e) {
+          errors.push(`${item.itemName}: ${(e as Error).message}`)
+        }
+      }
+      return errors
+    },
+    onSuccess: (errors) => {
+      void queryClient.invalidateQueries({
+        queryKey: ["/api/payment/priority-report?includeLow=false"],
+      })
+      void queryClient.invalidateQueries({ queryKey: ["/api/payment/items"] })
+      if (errors.length === 0) {
+        toast({ title: `已記為已付清 ${selectedIds.size} 筆` })
+      } else {
+        toast({
+          title: `部分成功（${selectedIds.size - errors.length}/${selectedIds.size}）`,
+          description: errors.slice(0, 3).join("\n"),
+          variant: "destructive",
+        })
+      }
+      exitSelectMode()
+      setBatchPaidOpen(false)
+    },
+  })
+
+  // 重複智能清理：每組保留 id 最小（早期建立、語意豐富）
+  const smartCleanMutation = useMutation({
+    mutationFn: async (idsToDelete: number[]) => {
+      const errors: string[] = []
+      for (const id of idsToDelete) {
+        try {
+          await apiRequest("DELETE", `/api/payment/items/${id}`)
+        } catch (e) {
+          errors.push(`#${id}: ${(e as Error).message}`)
+        }
+      }
+      return errors
+    },
+    onSuccess: (errors) => {
+      void queryClient.invalidateQueries({
+        queryKey: ["/api/payment/priority-report?includeLow=false"],
+      })
+      void queryClient.invalidateQueries({ queryKey: ["/api/payment/items"] })
+      if (errors.length === 0) {
+        toast({ title: "重複清理完成" })
+      } else {
+        toast({
+          title: "部分失敗",
+          description: errors.slice(0, 3).join("\n"),
+          variant: "destructive",
+        })
+      }
+      setSmartCleanOpen(false)
+    },
+  })
 
   // 按專案分組
   const byProject = useMemo(() => {
@@ -201,10 +310,48 @@ function UnpaidView({ priority }: { priority: PriorityReport | undefined }) {
                   </div>
                 )}
               </div>
+              {/* 智能清理按鈕：保留每組 id 最小者（早期建立、語意豐富） */}
+              <Button
+                size="sm"
+                variant="default"
+                className="mt-3 bg-amber-600 hover:bg-amber-700"
+                onClick={() => setSmartCleanOpen(true)}
+              >
+                <Sparkles className="h-3.5 w-3.5 mr-1" />
+                智能清理（保留每組最早建立）
+              </Button>
             </div>
           </div>
         </div>
       )}
+
+      {/* 批量選取模式切換列 */}
+      <div className="flex items-center justify-between gap-2">
+        <Button
+          size="sm"
+          variant={selectMode ? "default" : "outline"}
+          onClick={() => (selectMode ? exitSelectMode() : setSelectMode(true))}
+        >
+          <CheckSquare className="h-4 w-4 mr-1" />
+          {selectMode ? `已選 ${selectedIds.size} 筆` : "批量選取"}
+        </Button>
+        {selectMode && (
+          <div className="flex items-center gap-1.5">
+            <Button
+              size="sm"
+              variant="default"
+              disabled={selectedIds.size === 0}
+              onClick={() => setBatchPaidOpen(true)}
+            >
+              <Wallet className="h-3.5 w-3.5 mr-1" />
+              批量記為已付清
+            </Button>
+            <Button size="sm" variant="ghost" onClick={exitSelectMode}>
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
+      </div>
 
       {/* 總額大數字 */}
       <div className="rounded-lg bg-gradient-to-br from-blue-50 to-indigo-50 p-3 border">
@@ -271,6 +418,9 @@ function UnpaidView({ priority }: { priority: PriorityReport | undefined }) {
               items={g.items}
               totalUnpaid={priority.totalUnpaid}
               duplicateIds={duplicateIds}
+              selectMode={selectMode}
+              selectedIds={selectedIds}
+              onSelectChange={handleSelectChange}
             />
           ))}
         </div>
@@ -279,12 +429,89 @@ function UnpaidView({ priority }: { priority: PriorityReport | undefined }) {
       {/* Top 10 大筆 */}
       <Section title="最大筆 Top 10">
         <div className="space-y-1.5">
-          {/* 顯示逾期天數讓使用者一眼看出「這筆是 N 天前的舊帳」 */}
           {top10.map((r) => (
-            <ItemRow key={r.id} item={r} showOverdue={true} isDuplicate={duplicateIds.has(r.id)} />
+            <FinancialItemRow
+              key={r.id}
+              item={r}
+              showOverdue={true}
+              isDuplicate={duplicateIds.has(r.id)}
+              selectMode={selectMode}
+              selected={selectedIds.has(r.id)}
+              onSelectChange={handleSelectChange}
+            />
           ))}
         </div>
       </Section>
+
+      {/* 批量已付清確認 */}
+      <AlertDialog open={batchPaidOpen} onOpenChange={setBatchPaidOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>批量記為已付清</AlertDialogTitle>
+            <AlertDialogDescription>
+              將為已選 {selectedIds.size} 筆建立付款記錄，金額 = 該筆剩餘未付。
+              <span className="block mt-2 font-semibold text-foreground">
+                合計{" "}
+                {formatNT(
+                  Array.from(selectedIds).reduce(
+                    (s, id) => s + (priority.all.find((r) => r.id === id)?.unpaidAmount ?? 0),
+                    0
+                  )
+                )}
+              </span>
+              <span className="block mt-1 text-amber-700 text-xs">
+                此操作不可一鍵還原（要逐筆刪除付款記錄）
+              </span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => batchPaidMutation.mutate(Array.from(selectedIds))}
+              disabled={batchPaidMutation.isPending}
+            >
+              {batchPaidMutation.isPending ? "處理中…" : "確認"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* 智能清理重複確認 */}
+      <AlertDialog open={smartCleanOpen} onOpenChange={setSmartCleanOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>智能清理疑似重複</AlertDialogTitle>
+            <AlertDialogDescription>
+              將軟刪除每組重複中「id 較大者」（保留 id 最小、較早建立、命名通常較完整的版本）。
+              <span className="block mt-2 font-semibold text-foreground">
+                總共軟刪除 {duplicateGroups.reduce((s, g) => s + g.items.length - 1, 0)} 筆， 影響{" "}
+                {duplicateGroups.length} 組
+              </span>
+              <span className="block mt-1 text-amber-700 text-xs">若刪錯了可從「回收站」恢復</span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                // 每組保留 id 最小，刪其他
+                const toDelete: number[] = []
+                for (const g of duplicateGroups) {
+                  const sorted = [...g.items].sort((a, b) => a.id - b.id)
+                  for (let i = 1; i < sorted.length; i++) {
+                    toDelete.push(sorted[i].id)
+                  }
+                }
+                smartCleanMutation.mutate(toDelete)
+              }}
+              disabled={smartCleanMutation.isPending}
+              className="bg-amber-600 hover:bg-amber-700"
+            >
+              {smartCleanMutation.isPending ? "清理中…" : "確認清理"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* CTA */}
       <Link href="/cash-allocation">
@@ -346,7 +573,12 @@ function OverdueView({ priority }: { priority: PriorityReport | undefined }) {
       <Section title={`逾期清單（按逾期天數排序）`}>
         <div className="space-y-1.5">
           {overdue.map((r) => (
-            <ItemRow key={r.id} item={r} showOverdue={true} isDuplicate={duplicateIds.has(r.id)} />
+            <FinancialItemRow
+              key={r.id}
+              item={r}
+              showOverdue={true}
+              isDuplicate={duplicateIds.has(r.id)}
+            />
           ))}
         </div>
       </Section>
@@ -529,6 +761,9 @@ function ProjectGroup({
   items,
   totalUnpaid,
   duplicateIds,
+  selectMode = false,
+  selectedIds,
+  onSelectChange,
 }: {
   name: string
   total: number
@@ -536,8 +771,13 @@ function ProjectGroup({
   items: PriorityResult[]
   totalUnpaid: number
   duplicateIds?: Set<number>
+  selectMode?: boolean
+  selectedIds?: Set<number>
+  onSelectChange?: (id: number, checked: boolean) => void
 }) {
+  // 進入選取模式自動展開所有專案，方便批量勾選
   const [expanded, setExpanded] = useState(false)
+  const isExpanded = expanded || selectMode
   const pct = (total / totalUnpaid) * 100
   const dupInProject = items.filter((it) => duplicateIds?.has(it.id)).length
 
@@ -553,7 +793,7 @@ function ProjectGroup({
       >
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5 flex-1 min-w-0">
-            {expanded ? (
+            {isExpanded ? (
               <ChevronDown className="h-4 w-4 shrink-0 text-gray-500" />
             ) : (
               <ChevronRight className="h-4 w-4 shrink-0 text-gray-500" />
@@ -578,14 +818,17 @@ function ProjectGroup({
           <span>{pct.toFixed(1)}%</span>
         </div>
       </button>
-      {expanded && (
+      {isExpanded && (
         <div className="border-t p-2 space-y-1.5 bg-gray-50/50">
           {sortedItems.map((it) => (
-            <ItemRow
+            <FinancialItemRow
               key={it.id}
               item={it}
               showOverdue={true}
               isDuplicate={duplicateIds?.has(it.id) ?? false}
+              selectMode={selectMode}
+              selected={selectedIds?.has(it.id) ?? false}
+              onSelectChange={onSelectChange}
             />
           ))}
         </div>
@@ -594,80 +837,7 @@ function ProjectGroup({
   )
 }
 
-function ItemRow({
-  item,
-  showOverdue,
-  isDuplicate = false,
-}: {
-  item: PriorityResult
-  showOverdue: boolean
-  isDuplicate?: boolean
-}) {
-  const copyAmount = useCopyAmount()
-  return (
-    <div
-      className={`rounded border p-2 ${isDuplicate ? "bg-amber-50 border-amber-300" : "bg-white"}`}
-    >
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5">
-            {isDuplicate && (
-              <Badge
-                variant="outline"
-                className="text-[10px] py-0 h-4 bg-amber-100 text-amber-800 border-amber-300 shrink-0"
-                title="同專案 + 同月份 + 同金額，可能是重複建立"
-              >
-                ⚠️ 疑似重複
-              </Badge>
-            )}
-            <span className="text-sm font-medium truncate">{item.itemName}</span>
-          </div>
-          <div className="mt-0.5 flex items-center gap-1.5 text-xs text-gray-500">
-            <span className="truncate">{item.projectName ?? "—"}</span>
-            <span>·</span>
-            <span className="whitespace-nowrap">{item.dueDate}</span>
-            {showOverdue && item.daysOverdue > 0 && (
-              <Badge
-                className="ml-auto text-[10px] py-0 h-4 bg-red-100 text-red-800 border-red-200"
-                variant="outline"
-              >
-                逾期 {item.daysOverdue} 天
-              </Badge>
-            )}
-            {showOverdue && item.daysOverdue === 0 && item.daysUntilDue >= 0 && (
-              <Badge
-                className={`ml-auto text-[10px] py-0 h-4 ${
-                  item.daysUntilDue <= 3
-                    ? "bg-orange-100 text-orange-800 border-orange-200"
-                    : item.daysUntilDue <= 7
-                      ? "bg-yellow-100 text-yellow-800 border-yellow-200"
-                      : "bg-blue-100 text-blue-800 border-blue-200"
-                }`}
-                variant="outline"
-              >
-                {item.daysUntilDue === 0 ? "今天到期" : `剩 ${item.daysUntilDue} 天`}
-              </Badge>
-            )}
-          </div>
-        </div>
-        <button
-          type="button"
-          onClick={() => copyAmount(item.unpaidAmount, item.itemName)}
-          className="text-sm font-bold whitespace-nowrap inline-flex items-center gap-1 hover:underline"
-          title="點擊複製金額"
-        >
-          {formatNT(item.unpaidAmount)}
-          <Copy className="h-3 w-3 opacity-50" />
-        </button>
-      </div>
-      {item.lateFeeEstimate > 0 && (
-        <div className="mt-1 text-[11px] text-amber-700">
-          已累計滯納金 +{formatNT(item.lateFeeEstimate)}
-        </div>
-      )}
-    </div>
-  )
-}
+// ItemRow 已抽離至 financial-item-row.tsx（PR-7：含立即付款/編輯/軟刪除動作）
 
 function Skeleton() {
   return (
