@@ -36,12 +36,18 @@ interface MonthlyRow {
   paid: string | number
 }
 
-// 只看 item_name 是「租金/房租/租約/租賃」的項目，避免把雜費（洗滌、水肥、暫繳款）誤算
+// 租金 match 規則（雙條件 OR，避免漏算各館不同命名習慣）：
+//   規則 1：項目名含「租」字（涵蓋 租金/房租/租約/租賃/月租...）
+//   規則 2：項目名以 YYYY-MM- 或 YYYY-MM 空格開頭，且包含 rental_contracts.contract_name
+//          → 抓得到「2026-04-總兵招待所-軍友社」「2026-04-魁星背包棧」這類命名
+// 排除：「Super8-浯島輕旅」這類雜支（不含「租」+ 非 YYYY-MM 前綴）
 const RENT_ITEM_FILTER = `
-  pi.item_name ILIKE '%租金%'
-  OR pi.item_name ILIKE '%房租%'
-  OR pi.item_name ILIKE '%租約%'
-  OR pi.item_name ILIKE '%租賃%'
+  pi.item_name ILIKE '%租%'
+  OR (
+    pi.item_name ~ '^[0-9]{4}-[0-9]{2}[- ]'
+    AND rc.contract_name IS NOT NULL
+    AND pi.item_name ILIKE '%' || rc.contract_name || '%'
+  )
 `
 
 // 合約列：以 rental_contracts 為唯一真理源（與 /rental-management-enhanced 一致）
