@@ -6,6 +6,28 @@
 
 ---
 
+## [1.0.2] - 2026-05-14
+
+### 修復
+- 修復文件收件箱多檔上傳「未預期的檔案欄位」誤導性錯誤 (f817490)
+  - 一次上傳上限 10 → 20 個
+  - 超過上限的錯誤訊息改為「一次最多上傳 20 個檔案，請分批上傳」
+  - 前端 handleUpload 加入 files.length > 20 預檢
+- 修復 `/api/budget/plans/:id` 無效 ID 回 404 而非 400 (5dce558)
+  - 移除過度防禦的 regex 限制（`:id(\\d+)`），讓 isNaN 檢查生效
+
+### 維運 / 文件
+- 補齊 `docs/` 骨架（architecture / domains / decisions / runbooks / changes / archive）
+- 新增 [部署 SOP](docs/runbooks/deploy.md)（SSH 連線、一鍵部署、驗證、回滾、踩坑）
+- 新增 [DB Schema 同步 SOP](docs/runbooks/db-migration.md)（drizzle-kit push、生產紀律）
+- 新增 [Git 分叉處理 SOP](docs/runbooks/git-divergence.md)（auto-save hook 配 reset --hard 流程）
+- 完整變動紀錄：[docs/changes/2026-05-14-document-inbox-upload-fix.md](docs/changes/2026-05-14-document-inbox-upload-fix.md)
+
+### 工程紀律
+- 本地 DB 跑 `drizzle-kit push --force` 補齊與 origin/main 漂移的 schema（budget_items.attribution 等）
+
+---
+
 ## [1.0.1] - 2026-03-03
 
 ### 新功能
