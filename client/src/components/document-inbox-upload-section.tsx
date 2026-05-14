@@ -1,17 +1,17 @@
 // 單據上傳區塊
-import { useRef, useCallback, useState } from "react";
-import { Camera, Upload, Loader2 } from "lucide-react";
+import { useRef, useCallback, useState } from "react"
+import { Camera, Upload, Loader2 } from "lucide-react"
 
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { DOCUMENT_TYPES } from "@/components/document-inbox-types";
+import { Card, CardContent } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Textarea } from "@/components/ui/textarea"
+import { DOCUMENT_TYPES } from "@/components/document-inbox-types"
 
 export interface DocumentInboxUploadSectionProps {
-  selectedType: 'bill' | 'payment' | 'invoice';
-  onSelectedTypeChange: (type: 'bill' | 'payment' | 'invoice') => void;
-  onUpload: (files: FileList, notes: string) => Promise<void>;
-  isUploading: boolean;
+  selectedType: "bill" | "payment" | "invoice"
+  onSelectedTypeChange: (type: "bill" | "payment" | "invoice") => void
+  onUpload: (files: FileList, notes: string) => Promise<void>
+  isUploading: boolean
 }
 
 export default function DocumentInboxUploadSection({
@@ -20,26 +20,32 @@ export default function DocumentInboxUploadSection({
   onUpload,
   isUploading,
 }: DocumentInboxUploadSectionProps) {
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const cameraInputRef = useRef<HTMLInputElement>(null);
-  const [uploadNotes, setUploadNotes] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const cameraInputRef = useRef<HTMLInputElement>(null)
+  const [uploadNotes, setUploadNotes] = useState("")
 
-  const handleFileSelect = useCallback(async (files: FileList | null) => {
-    if (!files || files.length === 0) return;
-    await onUpload(files, uploadNotes.trim());
-    setUploadNotes('');
-    if (fileInputRef.current) fileInputRef.current.value = '';
-    if (cameraInputRef.current) cameraInputRef.current.value = '';
-  }, [onUpload, uploadNotes]);
+  const handleFileSelect = useCallback(
+    async (files: FileList | null) => {
+      if (!files || files.length === 0) return
+      await onUpload(files, uploadNotes.trim())
+      setUploadNotes("")
+      if (fileInputRef.current) fileInputRef.current.value = ""
+      if (cameraInputRef.current) cameraInputRef.current.value = ""
+    },
+    [onUpload, uploadNotes]
+  )
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    handleFileSelect(e.dataTransfer.files);
-  }, [handleFileSelect]);
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault()
+      handleFileSelect(e.dataTransfer.files)
+    },
+    [handleFileSelect]
+  )
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-  }, []);
+    e.preventDefault()
+  }, [])
 
   return (
     <Card className="border-2 border-dashed border-gray-300 hover:border-primary transition-colors">
@@ -48,7 +54,7 @@ export default function DocumentInboxUploadSection({
           {/* 文件類型選擇 */}
           <div className="flex gap-2 flex-wrap justify-center">
             {DOCUMENT_TYPES.map((type) => {
-              const Icon = type.icon;
+              const Icon = type.icon
               return (
                 <Button
                   key={type.value}
@@ -60,12 +66,12 @@ export default function DocumentInboxUploadSection({
                   <Icon className="h-4 w-4" />
                   {type.label}
                 </Button>
-              );
+              )
             })}
           </div>
 
           <p className="text-sm text-gray-500">
-            {DOCUMENT_TYPES.find(t => t.value === selectedType)?.description}
+            {DOCUMENT_TYPES.find((t) => t.value === selectedType)?.description}
           </p>
 
           {/* 備註輸入 */}
@@ -97,7 +103,9 @@ export default function DocumentInboxUploadSection({
               <>
                 <Upload className="h-12 w-12 text-gray-400 mx-auto mb-2" />
                 <p className="text-gray-600 font-medium">拖曳檔案到這裡，或點擊選擇</p>
-                <p className="text-sm text-gray-400 mt-1">支援 JPEG, PNG, GIF, WebP（可一次選擇多張）</p>
+                <p className="text-sm text-gray-400 mt-1">
+                  支援 JPEG, PNG, GIF, WebP（一次最多 20 張）
+                </p>
               </>
             )}
           </div>
@@ -145,5 +153,5 @@ export default function DocumentInboxUploadSection({
         </div>
       </CardContent>
     </Card>
-  );
+  )
 }

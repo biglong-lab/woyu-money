@@ -16,9 +16,16 @@ const router = Router()
 /** multer 錯誤處理中間件 */
 function handleMulterError(err: Error, _req: Request, res: Response, next: NextFunction) {
   if (err instanceof multer.MulterError) {
+    // 對「file」欄位的 LIMIT_UNEXPECTED_FILE 其實是超過 maxCount，給友善訊息
+    if (err.code === "LIMIT_UNEXPECTED_FILE" && err.field === "file") {
+      return res.status(400).json({
+        success: false,
+        message: "一次最多上傳 20 個檔案，請分批上傳",
+      })
+    }
     const messages: Record<string, string> = {
       LIMIT_FILE_SIZE: "檔案大小超過限制（最大 20MB）",
-      LIMIT_FILE_COUNT: "上傳檔案數量超過限制（最多 10 個）",
+      LIMIT_FILE_COUNT: "上傳檔案數量超過限制（最多 20 個）",
       LIMIT_FIELD_KEY: "欄位名稱過長",
       LIMIT_FIELD_VALUE: "欄位值過長",
       LIMIT_FIELD_COUNT: "表單欄位過多",
@@ -93,7 +100,7 @@ router.get(
   })
 )
 
-// 上傳並辨識單據（支援多檔上傳，最多 10 個）
+// 上傳並辨識單據（支援多檔上傳，最多 20 個）
 router.post(
   "/api/document-inbox/upload",
   requireAuth,
@@ -112,7 +119,7 @@ router.post(
     }
     next()
   },
-  documentUpload.array("file", 10),
+  documentUpload.array("file", 20),
   handleMulterError,
   asyncHandler(async (req, res) => {
     const files = req.files as Express.Multer.File[]
