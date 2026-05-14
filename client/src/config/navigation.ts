@@ -69,10 +69,9 @@ export const mainNavItems: NavItem[] = [
 // 財務助理分類（決策工具 — 解決記帳焦慮、拖延成本、現金缺口）
 export const decisionNavItems: NavItem[] = [
   {
-    title: "財務總覽 v2",
+    title: "財務總覽",
     href: "/financial-overview-v2",
     icon: BarChart3,
-    badge: "全新",
     description: "預估 vs 實際 / 緊急事項 / 各館組損益一頁看完",
   },
   {
@@ -174,12 +173,15 @@ export const managementNavItems: NavItem[] = [
   },
 ]
 
-// 統一查看分類（合併原來的「檢視功能」和「分析報表」）
+// 統一查看分類（重排序：常用直達 → 報表類 → 分析類 → 預算類）
+// 註：舊版 /financial-overview 已下架（從導航移除），統一改用財務助理區的「財務總覽」(/financial-overview-v2)
+// 路由保留可訪問供深度連結，但不再列入導航
 export const viewNavItems: NavItem[] = [
+  // ── 主視直達：每日操作高頻 ──
   {
-    title: "財務總覽",
-    href: "/financial-overview",
-    icon: BarChart3,
+    title: "付款記錄",
+    href: "/payment-records",
+    icon: Receipt,
   },
   {
     title: "專案付款管理",
@@ -187,58 +189,53 @@ export const viewNavItems: NavItem[] = [
     icon: Clipboard,
   },
   {
-    title: "付款記錄",
-    href: "/payment-records",
-    icon: Receipt,
-  },
-  {
     title: "付款時間計劃",
     href: "/payment-schedule",
     icon: Calendar,
   },
+  // ── 📊 報表類 ──
   {
-    title: "專案預算管理",
-    href: "/project-budget",
-    icon: Target,
+    title: "📊 財務三表",
+    href: "/financial-statements",
+    icon: FileText,
+    description: "損益表、資產負債表、現金流量表",
   },
   {
-    title: "付款分析",
-    href: "/payment-analysis",
-    icon: PieChart,
+    title: "📊 稅務報表",
+    href: "/tax-reports",
+    icon: Receipt,
+    description: "營業稅、薪資扣繳、二代健保",
   },
   {
-    title: "付款報表",
+    title: "📊 人事費報表",
+    href: "/hr-cost-reports",
+    icon: Users,
+    description: "年度總覽、月度明細、趨勢分析",
+  },
+  {
+    title: "📊 付款報表",
     href: "/payment/reports",
     icon: FileText,
   },
   {
-    title: "收入分析",
+    title: "📊 收入分析",
     href: "/revenue/reports",
     icon: TrendingUp,
   },
+  // ── 🔍 分析類 ──
   {
-    title: "財務三表",
-    href: "/financial-statements",
-    icon: FileText,
-    badge: "NEW",
-    description: "損益表、資產負債表、現金流量表",
+    title: "🔍 付款分析",
+    href: "/payment-analysis",
+    icon: PieChart,
+  },
+  // ── 💰 預算類 ──
+  {
+    title: "💰 專案預算",
+    href: "/project-budget",
+    icon: Target,
   },
   {
-    title: "人事費報表",
-    href: "/hr-cost-reports",
-    icon: Users,
-    badge: "NEW",
-    description: "年度總覽、月度明細、趨勢分析",
-  },
-  {
-    title: "稅務報表",
-    href: "/tax-reports",
-    icon: Receipt,
-    badge: "NEW",
-    description: "營業稅、薪資扣繳、二代健保",
-  },
-  {
-    title: "家庭預算",
+    title: "💰 家庭預算",
     href: "/household-budget",
     icon: Banknote,
     description: "家庭收支預算管理",
@@ -353,11 +350,7 @@ export const breadcrumbConfig: Record<string, BreadcrumbItem[]> = {
     { title: "付款方式管理" },
     { title: "借貸投資" },
   ],
-  "/loan-investment": [
-    { title: "首頁", href: "/" },
-    { title: "付款方式管理" },
-    { title: "借貸投資" },
-  ],
+  // /loan-investment 是 /loan-investment-management 的別名，路由保留但不列入 breadcrumb
   "/hr-cost-management": [
     { title: "首頁", href: "/" },
     { title: "付款方式管理" },
@@ -365,11 +358,7 @@ export const breadcrumbConfig: Record<string, BreadcrumbItem[]> = {
   ],
 
   // 統一查看
-  "/financial-overview": [
-    { title: "首頁", href: "/" },
-    { title: "統一查看" },
-    { title: "財務總覽" },
-  ],
+  // /financial-overview 已下架，僅供深度連結保留路由（無 breadcrumb 入口）
   "/project-budget": [
     { title: "首頁", href: "/" },
     { title: "統一查看" },
@@ -388,7 +377,7 @@ export const breadcrumbConfig: Record<string, BreadcrumbItem[]> = {
   "/payment-records": [{ title: "首頁", href: "/" }, { title: "統一查看" }, { title: "付款記錄" }],
   "/payment-analysis": [{ title: "首頁", href: "/" }, { title: "統一查看" }, { title: "付款分析" }],
   "/payment/reports": [{ title: "首頁", href: "/" }, { title: "統一查看" }, { title: "付款報表" }],
-  "/payment-reports": [{ title: "首頁", href: "/" }, { title: "統一查看" }, { title: "付款報表" }],
+  // /payment-reports 是 /payment/reports 的別名，路由保留但不列入 breadcrumb
   "/revenue/reports": [{ title: "首頁", href: "/" }, { title: "統一查看" }, { title: "收入分析" }],
   "/payment-project-stats": [
     { title: "首頁", href: "/" },
@@ -424,26 +413,9 @@ export const breadcrumbConfig: Record<string, BreadcrumbItem[]> = {
     { title: "館別共用組" },
   ],
   "/categories": [{ title: "首頁", href: "/" }, { title: "系統管理" }, { title: "分類管理" }],
-  "/category-management": [
-    { title: "首頁", href: "/" },
-    { title: "系統管理" },
-    { title: "固定分類管理" },
-  ],
-  "/project-specific-items": [
-    { title: "首頁", href: "/" },
-    { title: "系統管理" },
-    { title: "專案專屬項目管理" },
-  ],
-  "/unified-project-template-management": [
-    { title: "首頁", href: "/" },
-    { title: "系統管理" },
-    { title: "統一專案模板管理" },
-  ],
-  "/project-template-management": [
-    { title: "首頁", href: "/" },
-    { title: "系統管理" },
-    { title: "專案分類模板管理" },
-  ],
+  // 以下 5 個舊分類管理頁已合併至 /categories，路由保留供深度連結，不列入 breadcrumb：
+  //   /category-management、/project-specific-items、/unified-project-template-management、
+  //   /project-template-management、/household-category-management
   "/user-management": [{ title: "首頁", href: "/" }, { title: "系統管理" }, { title: "用戶管理" }],
   "/recycle-bin": [{ title: "首頁", href: "/" }, { title: "系統管理" }, { title: "回收站" }],
   "/settings/data-quality": [
@@ -456,11 +428,7 @@ export const breadcrumbConfig: Record<string, BreadcrumbItem[]> = {
 
   // 家庭財務
   "/household-budget": [{ title: "首頁", href: "/" }, { title: "統一查看" }, { title: "家庭預算" }],
-  "/household-category-management": [
-    { title: "首頁", href: "/" },
-    { title: "統一查看" },
-    { title: "家庭分類管理" },
-  ],
+  // /household-category-management 已合併至 /categories（含家庭分類）
 
   // 財務助理
   "/cash-allocation": [
@@ -489,9 +457,7 @@ export const breadcrumbConfig: Record<string, BreadcrumbItem[]> = {
     { title: "收據對應助手" },
   ],
 
-  // 其他
-  "/unified-payment": [{ title: "首頁", href: "/" }, { title: "統一付款" }],
-  "/features": [{ title: "首頁", href: "/" }, { title: "功能展示" }],
+  // /unified-payment 與 /features 為舊路由，已從導航移除（路由保留供深度連結）
 }
 
 // 根據路徑獲取麵包屑
