@@ -114,6 +114,14 @@ export default function DocumentInboxPage() {
 
   const handleUpload = useCallback(
     async (files: FileList, notes: string) => {
+      if (files.length > 20) {
+        toast({
+          title: "選擇檔案過多",
+          description: `一次最多上傳 20 個檔案，您選擇了 ${files.length} 個，請分批上傳`,
+          variant: "destructive",
+        })
+        return
+      }
       setIsUploading(true)
       const formData = new FormData()
       for (const file of Array.from(files)) {
