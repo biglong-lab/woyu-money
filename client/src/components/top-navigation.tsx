@@ -34,6 +34,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { useState } from "react"
 import { Badge } from "@/components/ui/badge"
+import { CommandPaletteTriggerButton } from "@/components/command-palette"
 import { useAuth } from "@/hooks/use-auth"
 import { useQuery } from "@tanstack/react-query"
 import {
@@ -236,6 +237,8 @@ export default function TopNavigation() {
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-1">
+            {/* Cmd+K 搜尋觸發 */}
+            <CommandPaletteTriggerButton />
             {/* 核心功能按鈕 */}
             {mainNavItems.map((item) => {
               const Icon = item.icon
