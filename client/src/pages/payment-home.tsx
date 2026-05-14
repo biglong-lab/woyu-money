@@ -430,14 +430,14 @@ export default function PaymentHome() {
         )}
       </div>
 
-      {/* ===== 財務健康度摘要（一眼看現狀）===== */}
-      <FinancialHealthSummaryCard />
+      {/* ===== 今日焦點（破解「看到欠款就逃避」的惡性循環）— 第一眼就看到「今天 1 件事」===== */}
+      <TodayFocusCard />
 
-      {/* ===== 財務助理快速入口（5 大決策工具）===== */}
+      {/* ===== 財務助理快速入口（決策工具）— 解決今天的事之後、下一步要往哪走 ===== */}
       <FinancialAssistantQuickCard />
 
-      {/* ===== 今日焦點（破解「看到欠款就逃避」的惡性循環）===== */}
-      <TodayFocusCard />
+      {/* ===== 財務健康度摘要（總體狀況一眼看）===== */}
+      <FinancialHealthSummaryCard />
 
       {/* ===== 本月主要租金狀態（一鍵付款）===== */}
       <ActiveRentalsCard />

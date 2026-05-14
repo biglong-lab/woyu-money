@@ -14,7 +14,7 @@ import {
 } from "@/config/navigation"
 import { useQuery } from "@tanstack/react-query"
 import { useState, useRef, useEffect } from "react"
-import { Home, Inbox, Plus, CreditCard, User, X, BarChart3, Settings } from "lucide-react"
+import { Home, Inbox, Plus, CreditCard, X, BarChart3 } from "lucide-react"
 import { QuickAddDrawer, useQuickCameraUpload } from "@/components/quick-add-drawer"
 import { QuickPaymentDialog } from "@/components/quick-payment-dialog"
 
@@ -67,19 +67,28 @@ interface SubMenuItem {
   badge?: string
 }
 
-interface PopupMenuProps {
+// 分組資料：可選的 section header
+interface MenuSection {
+  label: string
+  color?: "blue" | "green" | "orange" | "amber"
   items: SubMenuItem[]
+}
+
+interface PopupMenuProps {
+  items?: SubMenuItem[]
+  sections?: MenuSection[]
   isOpen: boolean
   onClose: () => void
   title: string
   color?: "blue" | "green" | "orange"
 }
 
-function PopupMenu({ items, isOpen, onClose, title, color = "blue" }: PopupMenuProps) {
+function PopupMenu({ items, sections, isOpen, onClose, title, color = "blue" }: PopupMenuProps) {
   const colorClasses = {
     blue: { bg: "bg-blue-50", text: "text-blue-600", header: "text-blue-900" },
     green: { bg: "bg-green-50", text: "text-green-600", header: "text-green-900" },
     orange: { bg: "bg-orange-50", text: "text-orange-600", header: "text-orange-900" },
+    amber: { bg: "bg-amber-50", text: "text-amber-600", header: "text-amber-900" },
   }
   const menuRef = useRef<HTMLDivElement>(null)
 
@@ -121,35 +130,90 @@ function PopupMenu({ items, isOpen, onClose, title, color = "blue" }: PopupMenuP
             <X className="w-4 h-4 text-gray-500" />
           </button>
         </div>
-        <div className="grid grid-cols-3 gap-1 p-3 max-h-[50vh] overflow-y-auto">
-          {items.map((item) => {
-            const Icon = item.icon
+        <div className="max-h-[60vh] overflow-y-auto">
+          {/* 分組模式：顯示每個 section 含 label */}
+          {sections?.map((section) => {
+            const sectionColor = section.color || color
             return (
-              <Link key={item.href} href={item.href}>
-                <div
-                  className="flex flex-col items-center gap-1.5 p-3 rounded-xl hover:bg-gray-50 active:bg-gray-100 transition-colors"
-                  onClick={onClose}
-                >
-                  <div
+              <div key={section.label} className="px-3 pt-3 pb-1">
+                <div className="flex items-center gap-2 px-2 pb-2">
+                  <span
                     className={cn(
-                      "w-10 h-10 rounded-xl flex items-center justify-center",
-                      colorClasses[color].bg
+                      "text-[11px] font-bold tracking-wider uppercase",
+                      colorClasses[sectionColor].header
                     )}
                   >
-                    <Icon className={cn("w-5 h-5", colorClasses[color].text)} />
-                  </div>
-                  <span className="text-[11px] text-gray-700 font-medium text-center leading-tight">
-                    {item.title}
+                    {section.label}
                   </span>
-                  {item.badge && (
-                    <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 font-medium">
-                      {item.badge}
-                    </span>
-                  )}
+                  <div className="flex-1 h-px bg-gray-200" />
                 </div>
-              </Link>
+                <div className="grid grid-cols-3 gap-1">
+                  {section.items.map((item) => {
+                    const Icon = item.icon
+                    return (
+                      <Link key={item.href} href={item.href}>
+                        <div
+                          className="flex flex-col items-center gap-1.5 p-3 rounded-xl hover:bg-gray-50 active:bg-gray-100 transition-colors"
+                          onClick={onClose}
+                        >
+                          <div
+                            className={cn(
+                              "w-10 h-10 rounded-xl flex items-center justify-center",
+                              colorClasses[sectionColor].bg
+                            )}
+                          >
+                            <Icon className={cn("w-5 h-5", colorClasses[sectionColor].text)} />
+                          </div>
+                          <span className="text-[11px] text-gray-700 font-medium text-center leading-tight">
+                            {item.title}
+                          </span>
+                          {item.badge && (
+                            <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 font-medium">
+                              {item.badge}
+                            </span>
+                          )}
+                        </div>
+                      </Link>
+                    )
+                  })}
+                </div>
+              </div>
             )
           })}
+
+          {/* 平坦模式：給原本的 managementNavItems / systemNavItems 用 */}
+          {items && (
+            <div className="grid grid-cols-3 gap-1 p-3">
+              {items.map((item) => {
+                const Icon = item.icon
+                return (
+                  <Link key={item.href} href={item.href}>
+                    <div
+                      className="flex flex-col items-center gap-1.5 p-3 rounded-xl hover:bg-gray-50 active:bg-gray-100 transition-colors"
+                      onClick={onClose}
+                    >
+                      <div
+                        className={cn(
+                          "w-10 h-10 rounded-xl flex items-center justify-center",
+                          colorClasses[color].bg
+                        )}
+                      >
+                        <Icon className={cn("w-5 h-5", colorClasses[color].text)} />
+                      </div>
+                      <span className="text-[11px] text-gray-700 font-medium text-center leading-tight">
+                        {item.title}
+                      </span>
+                      {item.badge && (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 font-medium">
+                          {item.badge}
+                        </span>
+                      )}
+                    </div>
+                  </Link>
+                )
+              })}
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -262,7 +326,7 @@ function QuickMenu({
 
 export function MobileTabBar() {
   const [location] = useLocation()
-  const [openMenu, setOpenMenu] = useState<"payment" | "view" | "more" | "quick" | null>(null)
+  const [openMenu, setOpenMenu] = useState<"payment" | "view" | "quick" | null>(null)
   const [showQuickAdd, setShowQuickAdd] = useState(false)
   const [showQuickPay, setShowQuickPay] = useState(false)
   const { openCamera } = useQuickCameraUpload()
@@ -292,7 +356,7 @@ export function MobileTabBar() {
     (item) => location === item.href || location.startsWith(item.href)
   )
 
-  const toggleMenu = (menu: "payment" | "view" | "more" | "quick") => {
+  const toggleMenu = (menu: "payment" | "view" | "quick") => {
     // 觸覺回饋（Android Chrome 支援；iOS Safari 會 silently no-op）
     if (typeof navigator !== "undefined" && "vibrate" in navigator) {
       try {
@@ -315,18 +379,15 @@ export function MobileTabBar() {
         color="blue"
       />
       <PopupMenu
-        title="報表與查看（含財務助理）"
-        items={[...decisionNavItems, ...viewNavItems]}
+        title="報表 & 設定"
+        sections={[
+          { label: "💡 財務助理", color: "amber", items: decisionNavItems },
+          { label: "📊 查看 & 報表", color: "green", items: viewNavItems },
+          { label: "⚙️ 系統管理", color: "orange", items: systemNavItems },
+        ]}
         isOpen={openMenu === "view"}
         onClose={() => setOpenMenu(null)}
         color="green"
-      />
-      <PopupMenu
-        title="系統管理"
-        items={systemNavItems}
-        isOpen={openMenu === "more"}
-        onClose={() => setOpenMenu(null)}
-        color="orange"
       />
 
       {/* 快速記帳選單 */}
@@ -406,13 +467,11 @@ export function MobileTabBar() {
             badge={inboxStats?.pending}
           />
 
-          {/* 更多（報表 + 設定） */}
+          {/* 更多（💡 助理 + 📊 報表 + ⚙️ 設定 三組分區） */}
           <TabItem
             title="更多"
             icon={BarChart3}
-            isActive={
-              isInViewSection || isInSystemSection || openMenu === "view" || openMenu === "more"
-            }
+            isActive={isInViewSection || isInSystemSection || openMenu === "view"}
             onClick={() => toggleMenu("view")}
           />
         </div>
