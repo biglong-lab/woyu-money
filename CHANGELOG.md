@@ -6,6 +6,27 @@
 
 ---
 
+## [1.0.3] - 2026-05-14
+
+### 新功能 / UX
+- 新增 Cmd+K 全域快速跳轉（CommandPalette）(b7dd915)
+  - 桌面 TopNavigation 加搜尋按鈕，含快捷鍵提示
+  - 模糊搜尋所有導航項目、按分類顯示
+  - 「/」鍵也能在非編輯狀態觸發
+
+### 重構 / 對焦
+- 網站工具聚焦優化（5 phase）(6b7e097)
+  - 首頁 TodayFocusCard 推到第 1 位（原排第 3）
+  - 手機「更多」popup 從 22 項 flat 改為 3 分區（助理/查看/系統）
+  - 「統一查看」12 項重排序：直達 → 報表 → 分析 → 預算（emoji 視覺分群）
+  - 清理舊頁面導航入口（/financial-overview 舊版、5 個舊分類管理頁、雙路徑別名）
+  - 路由全部保留供深度連結
+
+### 文件
+- 新增 [docs/changes/2026-05-14-navigation-focus-optimization.md](docs/changes/2026-05-14-navigation-focus-optimization.md)
+
+---
+
 ## [1.0.2] - 2026-05-14
 
 ### 修復
