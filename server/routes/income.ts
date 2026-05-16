@@ -1,6 +1,11 @@
 import { Router } from "express"
 import { asyncHandler, AppError } from "../middleware/error-handler"
-import { insertIncomeSourceSchema, confirmWebhookSchema, batchConfirmWebhookSchema } from "@shared/schema"
+import {
+  insertIncomeSourceSchema,
+  confirmWebhookSchema,
+  batchConfirmWebhookSchema,
+} from "@shared/schema"
+import { logEvent } from "../storage/integration-events"
 import {
   getIncomeSources,
   getIncomeSourceById,
@@ -230,33 +235,77 @@ router.post(
   "/api/income/webhook/:sourceKey",
   asyncHandler(async (req, res) => {
     const { sourceKey } = req.params
+    const t0 = Date.now()
 
     // 取得來源設定
     const source = await getIncomeSourceByKey(sourceKey)
     if (!source) {
+      // 紀錄未知來源（給管理者追查探測 / 設定錯誤）
+      await logEvent({
+        integrationType: "income",
+        sourceId: 0,
+        sourceKey,
+        direction: "inbound",
+        httpMethod: "POST",
+        httpPath: `/api/income/webhook/${sourceKey}`,
+        statusCode: 200,
+        requestPayload: req.body,
+        outcome: "error",
+        errorMessage: `unknown source_key: ${sourceKey}`,
+        latencyMs: Date.now() - t0,
+        requestIp: String(req.headers["x-forwarded-for"] ?? req.socket.remoteAddress ?? "")
+          .split(",")[0]
+          .trim(),
+      })
       // 故意回傳 200 避免探測
       return res.status(200).json({ received: true })
     }
 
     // 取得原始 body（用於 HMAC 驗證）
-    // Express 需設定 raw body middleware，這裡取 JSON stringify 作為 fallback
-    const rawBody =
-      (req as unknown as { rawBody?: string }).rawBody ?? JSON.stringify(req.body)
+    const rawBody = (req as unknown as { rawBody?: string }).rawBody ?? JSON.stringify(req.body)
 
-    const requestIp =
-      String(req.headers["x-forwarded-for"] ?? req.socket.remoteAddress ?? "")
-        .split(",")[0]
-        .trim()
+    const requestIp = String(req.headers["x-forwarded-for"] ?? req.socket.remoteAddress ?? "")
+      .split(",")[0]
+      .trim()
 
     const result = await receiveWebhook({
       source,
       rawPayload: req.body,
       rawBody,
-      signatureHeader:
-        String(req.headers["x-signature"] ?? req.headers["x-hub-signature-256"] ?? ""),
+      signatureHeader: String(
+        req.headers["x-signature"] ?? req.headers["x-hub-signature-256"] ?? ""
+      ),
       tokenHeader: String(req.headers["authorization"] ?? ""),
       requestIp,
       requestHeaders: req.headers as Record<string, string>,
+    })
+
+    // 寫入通用 events 紀錄（不影響業務流程，failed 只 log）
+    let outcome: "success" | "auth_failed" | "duplicate" | "error" = "success"
+    let statusCode = 200
+    if (!result.success) {
+      outcome = "auth_failed"
+      statusCode = 401
+    } else if (result.isDuplicate) {
+      outcome = "duplicate"
+    }
+    await logEvent({
+      integrationType: "income",
+      sourceId: source.id,
+      sourceKey,
+      direction: "inbound",
+      httpMethod: "POST",
+      httpPath: `/api/income/webhook/${sourceKey}`,
+      statusCode,
+      requestPayload: req.body,
+      responseBody: result.success
+        ? { received: true, duplicate: result.isDuplicate, id: result.webhookId }
+        : { error: result.error },
+      outcome,
+      errorMessage: result.success ? null : result.error,
+      latencyMs: Date.now() - t0,
+      linkedWebhookId: result.webhookId ?? null,
+      requestIp,
     })
 
     if (!result.success) {
@@ -279,12 +328,8 @@ router.post(
 function maskSource(source: Record<string, unknown>) {
   return {
     ...source,
-    apiToken: source.apiToken
-      ? `****${String(source.apiToken).slice(-4)}`
-      : null,
-    webhookSecret: source.webhookSecret
-      ? `****${String(source.webhookSecret).slice(-4)}`
-      : null,
+    apiToken: source.apiToken ? `****${String(source.apiToken).slice(-4)}` : null,
+    webhookSecret: source.webhookSecret ? `****${String(source.webhookSecret).slice(-4)}` : null,
   }
 }
 

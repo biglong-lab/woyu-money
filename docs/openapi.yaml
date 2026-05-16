@@ -1,0 +1,505 @@
+openapi: 3.0.3
+info:
+  title: 浯島財務管理系統 — Integration API
+  description: |
+    通用對外整合 API。讓 PM、POS、ERP 等外部系統可推送收入 / 支出資料進入本系統。
+
+    詳細串接說明：see [`docs/integration-api.md`](integration-api.md)
+  version: "2.0.0"
+  contact:
+    name: 大哉實業
+    url: https://money.homi.cc
+
+servers:
+  - url: https://money.homi.cc
+    description: 生產環境
+  - url: http://localhost:5001
+    description: 本地開發
+
+# ─────────────────────────────────────────────
+# 三類安全方案
+# ─────────────────────────────────────────────
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      description: |
+        Bearer Token 驗證。authType=token 或 both 時必須提供。
+        Token 由管理員在後台建立來源時設定。
+    HmacAuth:
+      type: apiKey
+      in: header
+      name: X-Signature
+      description: |
+        HMAC-SHA256 簽章。authType=hmac 或 both 時必須提供。
+        格式：`sha256=<hex>`，用 webhookSecret 對 raw body 簽。
+
+  schemas:
+    IncomeWebhookPayload:
+      type: object
+      description: |
+        收入端 webhook 推送 payload。實際欄位結構由 fieldMapping 決定，
+        以下是建議的扁平格式。系統會用 JSONPath 抽出標準欄位。
+      properties:
+        amount:
+          type: number
+          example: 1500
+        currency:
+          type: string
+          example: "TWD"
+        transactionId:
+          type: string
+          description: 外部交易唯一 ID（強烈建議帶，防重複）
+          example: "TX-20260516-001"
+        paidAt:
+          type: string
+          format: date-time
+          example: "2026-05-16T14:30:00+08:00"
+        description:
+          type: string
+          example: "Airbnb 訂房收入"
+        payerName:
+          type: string
+          example: "John Doe"
+        payerContact:
+          type: string
+          example: "john@example.com"
+        orderId:
+          type: string
+          example: "ORD-12345"
+
+    ExpenseWebhookPayload:
+      type: object
+      properties:
+        amount:
+          type: number
+          example: 3500
+        currency:
+          type: string
+          example: "TWD"
+        transactionId:
+          type: string
+          example: "EXP-20260516-001"
+        paidAt:
+          type: string
+          format: date-time
+          description: 已付款時間（若已扣款）
+        dueAt:
+          type: string
+          format: date-time
+          description: 應付截止日（若尚未付）
+        description:
+          type: string
+          example: "中華電信網路費"
+        vendor:
+          type: string
+          example: "中華電信"
+        invoiceNumber:
+          type: string
+          example: "INV-2026051601"
+        categoryHint:
+          type: string
+          example: "辦公雜支"
+        tags:
+          type: array
+          items:
+            type: string
+          example: ["pm", "utility"]
+
+    WebhookResponse:
+      type: object
+      properties:
+        received:
+          type: boolean
+          example: true
+        id:
+          type: integer
+          description: 系統內部 webhook ID
+          example: 12345
+        duplicate:
+          type: boolean
+          description: 是否為重複推送
+          example: false
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          example: "Token 驗證失敗"
+
+    SourceConfig:
+      type: object
+      properties:
+        id:
+          type: integer
+        sourceName:
+          type: string
+        sourceKey:
+          type: string
+        sourceType:
+          type: string
+          enum: [linepay, jkopay, airbnb, booking, pm_expense, accounting_system, erp, custom_api, manual]
+        authType:
+          type: string
+          enum: [token, hmac, both]
+        webhookMode:
+          type: string
+          enum: [as_pending, as_paid]
+          description: 支出端專用
+        autoConfirm:
+          type: boolean
+        isActive:
+          type: boolean
+        totalReceived:
+          type: integer
+        lastReceivedAt:
+          type: string
+          format: date-time
+
+    IntegrationEvent:
+      type: object
+      properties:
+        id:
+          type: integer
+        integrationType:
+          type: string
+          enum: [income, expense]
+        sourceId:
+          type: integer
+        sourceKey:
+          type: string
+        direction:
+          type: string
+          enum: [inbound, outbound]
+        httpMethod:
+          type: string
+        httpPath:
+          type: string
+        statusCode:
+          type: integer
+        outcome:
+          type: string
+          enum: [success, auth_failed, validation_failed, duplicate, error, retried]
+        errorMessage:
+          type: string
+          nullable: true
+        latencyMs:
+          type: integer
+          nullable: true
+        attempt:
+          type: integer
+        parentEventId:
+          type: integer
+          nullable: true
+        linkedWebhookId:
+          type: integer
+          nullable: true
+        requestIp:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    SourceHealth:
+      type: object
+      properties:
+        last24hTotal:
+          type: integer
+        last24hSuccess:
+          type: integer
+        last24hFailure:
+          type: integer
+        successRate:
+          type: number
+          description: 0.0 ~ 1.0
+        avgLatencyMs:
+          type: integer
+          nullable: true
+        lastSuccessAt:
+          type: string
+          format: date-time
+          nullable: true
+        lastFailureAt:
+          type: string
+          format: date-time
+          nullable: true
+
+# ─────────────────────────────────────────────
+# Endpoints
+# ─────────────────────────────────────────────
+paths:
+  # ── 入站 Webhooks（不需 session 認證）──
+  /api/income/webhook/{sourceKey}:
+    post:
+      summary: 接收收入資料推送
+      description: 外部系統推送收入紀錄。回 200 表示已收到（即使 sourceKey 不存在也回 200 防探測）。
+      tags: [Webhooks - Inbound]
+      security:
+        - BearerAuth: []
+        - HmacAuth: []
+      parameters:
+        - name: sourceKey
+          in: path
+          required: true
+          schema: { type: string }
+          example: "linepay"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IncomeWebhookPayload"
+      responses:
+        "200":
+          description: 已收到（含重複、含未知 sourceKey）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookResponse"
+        "401":
+          description: 驗證失敗
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/expense/webhook/{sourceKey}:
+    post:
+      summary: 接收支出資料推送
+      description: 外部系統推送支出 / 待付款項目。回應規則同 income。
+      tags: [Webhooks - Inbound]
+      security:
+        - BearerAuth: []
+        - HmacAuth: []
+      parameters:
+        - name: sourceKey
+          in: path
+          required: true
+          schema: { type: string }
+          example: "pm_expense"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExpenseWebhookPayload"
+      responses:
+        "200":
+          description: 已收到
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookResponse"
+        "401":
+          description: 驗證失敗
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ── 來源管理 ──
+  /api/income/sources:
+    get:
+      summary: 列出所有進帳來源
+      tags: [Sources Management]
+      responses:
+        "200":
+          description: 來源陣列（apiToken / webhookSecret 已遮罩）
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SourceConfig"
+
+  /api/expense/sources:
+    get:
+      summary: 列出所有支出來源
+      tags: [Sources Management]
+      responses:
+        "200":
+          description: 來源陣列（apiToken / webhookSecret 已遮罩）
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SourceConfig"
+    post:
+      summary: 新增支出來源
+      tags: [Sources Management]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SourceConfig"
+      responses:
+        "201":
+          description: 已建立
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SourceConfig"
+
+  # ── 通用整合（events / health / test / replay） ──
+  /api/integrations/events:
+    get:
+      summary: 查詢拋接紀錄
+      tags: [Integration]
+      parameters:
+        - name: integrationType
+          in: query
+          schema: { type: string, enum: [income, expense] }
+        - name: sourceId
+          in: query
+          schema: { type: integer }
+        - name: sourceKey
+          in: query
+          schema: { type: string }
+        - name: direction
+          in: query
+          schema: { type: string, enum: [inbound, outbound] }
+        - name: outcome
+          in: query
+          schema:
+            type: string
+            enum: [success, auth_failed, validation_failed, duplicate, error, retried]
+        - name: since
+          in: query
+          schema: { type: string, format: date-time }
+        - name: until
+          in: query
+          schema: { type: string, format: date-time }
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+        - name: pageSize
+          in: query
+          schema: { type: integer, default: 50, maximum: 200 }
+      responses:
+        "200":
+          description: 分頁結果
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/IntegrationEvent"
+                  total: { type: integer }
+                  page: { type: integer }
+                  pageSize: { type: integer }
+
+  /api/integrations/events/{id}:
+    get:
+      summary: 取得單筆事件詳情
+      tags: [Integration]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: 事件詳情
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntegrationEvent"
+        "404":
+          description: 事件不存在
+
+  /api/integrations/events/{id}/replay:
+    post:
+      summary: Replay — 將指定事件的 payload 重新送一次
+      description: 用原本的 source 設定重新計算簽章並送出；結果寫入新 event，parent_event_id 指向原 event。
+      tags: [Integration]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: 已重送
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  replayed: { type: boolean }
+                  originalEventId: { type: integer }
+                  newEvent:
+                    $ref: "#/components/schemas/IntegrationEvent"
+                  result:
+                    type: object
+
+  /api/integrations/sources/{type}/{id}/health:
+    get:
+      summary: 取得 source 24h 健康指標
+      tags: [Integration]
+      parameters:
+        - name: type
+          in: path
+          required: true
+          schema: { type: string, enum: [income, expense] }
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: 健康指標
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SourceHealth"
+
+  /api/integrations/sources/{type}/{id}/test:
+    post:
+      summary: 產生測試 payload（可選實際送出）
+      description: |
+        後端依 source 的 fieldMapping 產生 sample payload + 正確簽章。
+        executeForReal=true 時會真的走完整 webhook 流程。
+      tags: [Integration]
+      parameters:
+        - name: type
+          in: path
+          required: true
+          schema: { type: string, enum: [income, expense] }
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                executeForReal:
+                  type: boolean
+                  default: false
+      responses:
+        "200":
+          description: 測試結果
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sourceKey: { type: string }
+                  payload: { type: object }
+                  headers: { type: object }
+                  curl: { type: string, description: 可複製貼上的 curl 指令 }
+                  executed: { type: boolean }
+                  result:
+                    type: object
+                    nullable: true
+                    description: executeForReal=true 時提供

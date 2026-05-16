@@ -33,6 +33,7 @@ import {
   AlertTriangle,
   Sparkles,
   Scale,
+  Activity,
   type LucideIcon,
 } from "lucide-react"
 
@@ -282,6 +283,12 @@ export const systemNavItems: NavItem[] = [
     description: "偵測缺到期日 / 金額異常 / 殭屍項目 / 重複組",
   },
   {
+    title: "整合中心",
+    href: "/integrations",
+    icon: Activity,
+    description: "外部 API 嫁接（收入 / 支出 webhook、拋接紀錄、串接測試）",
+  },
+  {
     title: "設定",
     href: "/settings",
     icon: Settings,
@@ -423,6 +430,7 @@ export const breadcrumbConfig: Record<string, BreadcrumbItem[]> = {
     { title: "系統管理" },
     { title: "資料品質中心" },
   ],
+  "/integrations": [{ title: "首頁", href: "/" }, { title: "系統管理" }, { title: "整合中心" }],
   "/settings": [{ title: "首頁", href: "/" }, { title: "系統管理" }, { title: "設定" }],
   "/account": [{ title: "首頁", href: "/" }, { title: "系統管理" }, { title: "帳戶設定" }],
 

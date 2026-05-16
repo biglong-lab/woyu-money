@@ -25,6 +25,8 @@ import invoiceRoutes from "./invoice"
 import hrCostRoutes from "./hr-costs"
 import reportRoutes from "./reports"
 import incomeRoutes from "./income"
+import expenseRoutes from "./expense"
+import integrationsRoutes from "./integrations"
 import pmBridgeRoutes from "./pm-bridge"
 import pmsBridgeRoutes from "./pms-bridge"
 import dailyRevenueRoutes from "./daily-revenues"
@@ -64,9 +66,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // - /auth/line：LINE OAuth 起點（line-auth.ts），同樣早於此 middleware 註冊
     // - /line/callback：LINE OAuth 回呼（admin.ts），晚於此 middleware 註冊，必須在白名單
     const publicPaths = ["/login", "/register", "/logout", "/user", "/auth/line", "/line/callback"]
-    // Webhook 接收端點：以 /income/webhook/ 開頭的 POST 請求不需 session 認證
+    // Webhook 接收端點：/income/webhook/ 和 /expense/webhook/ 開頭的 POST 請求不需 session 認證
     // （改用 secret/token 驗證，在路由層處理）
-    const isWebhookReceiver = req.method === "POST" && req.path.startsWith("/income/webhook/")
+    const isWebhookReceiver =
+      req.method === "POST" &&
+      (req.path.startsWith("/income/webhook/") || req.path.startsWith("/expense/webhook/"))
 
     const isPublic = publicPaths.some((p) => req.path === p) || isWebhookReceiver
     if (isPublic) return next()
@@ -98,6 +102,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use(hrCostRoutes)
   app.use(reportRoutes)
   app.use(incomeRoutes)
+  app.use(expenseRoutes)
+  app.use(integrationsRoutes)
   app.use(pmBridgeRoutes)
   app.use(pmsBridgeRoutes)
   app.use(dailyRevenueRoutes)
