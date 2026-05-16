@@ -1,5 +1,5 @@
 // 單據收件箱頁面 - 主框架
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
 import { useQuery, useMutation } from "@tanstack/react-query"
 import { queryClient, apiRequest } from "@/lib/queryClient"
 import { Card, CardContent } from "@/components/ui/card"
@@ -148,6 +148,48 @@ export default function DocumentInboxPage() {
     },
     [selectedType, uploadMutation, toast]
   )
+
+  // Share Target：處理從外部分享進來的圖片（PWA 安裝後可用）
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const params = new URLSearchParams(window.location.search)
+    if (params.get("shared") !== "1") return
+    if (!("caches" in window)) return
+
+    void (async () => {
+      try {
+        const cache = await caches.open("share-target-staging")
+        const keys = await cache.keys()
+        if (keys.length === 0) return
+
+        const files: File[] = []
+        for (const req of keys) {
+          const res = await cache.match(req)
+          if (res) {
+            const blob = await res.blob()
+            const filename = req.url.split("/").pop() || "shared-image"
+            const cleanName = filename.replace(/^\d+-/, "") // 去掉前綴 index
+            files.push(new File([blob], cleanName, { type: blob.type }))
+          }
+          await cache.delete(req) // 清理已處理的
+        }
+
+        if (files.length > 0) {
+          // 轉成 FileList-like 給 handleUpload
+          const dt = new DataTransfer()
+          files.forEach((f) => dt.items.add(f))
+          await handleUpload(dt.files, "從相簿分享進來")
+        }
+
+        // 清掉 URL 上的 ?shared=1
+        const url = new URL(window.location.href)
+        url.searchParams.delete("shared")
+        window.history.replaceState({}, "", url.toString())
+      } catch (err) {
+        console.error("[share-target] processing failed:", err)
+      }
+    })()
+  }, [handleUpload])
 
   // 重新辨識
   const reRecognizeMutation = useMutation({

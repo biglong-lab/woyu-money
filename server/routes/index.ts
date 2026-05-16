@@ -27,6 +27,7 @@ import reportRoutes from "./reports"
 import incomeRoutes from "./income"
 import expenseRoutes from "./expense"
 import integrationsRoutes from "./integrations"
+import pushRoutes from "./push"
 import pmBridgeRoutes from "./pm-bridge"
 import pmsBridgeRoutes from "./pms-bridge"
 import dailyRevenueRoutes from "./daily-revenues"
@@ -76,6 +77,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // 端點內部自己用 requireApiKey middleware 驗 key
       "/integrations/spec",
       "/integrations/openapi",
+      // Push VAPID public key（任何人都可拿、不含敏感資訊）
+      "/push/public-key",
     ]
     // Webhook 接收端點：/income/webhook/ 和 /expense/webhook/ 開頭的 POST 請求不需 session 認證
     // （改用 secret/token 驗證，在路由層處理）
@@ -115,6 +118,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use(incomeRoutes)
   app.use(expenseRoutes)
   app.use(integrationsRoutes)
+  app.use(pushRoutes)
   app.use(pmBridgeRoutes)
   app.use(pmsBridgeRoutes)
   app.use(dailyRevenueRoutes)
