@@ -28,13 +28,18 @@ import {
   BookOpen,
   CheckCircle2,
   Copy,
-  ExternalLink,
+  Eye,
+  EyeOff,
   FileCode,
   Inbox,
+  Key,
   Link2,
+  Lock,
+  Plus,
   Repeat,
   Send,
   Settings as SettingsIcon,
+  Trash2,
   TrendingDown,
   TrendingUp,
 } from "lucide-react"
@@ -81,7 +86,7 @@ interface IntegrationEvent {
 
 export default function IntegrationsCenter() {
   useDocumentTitle("整合中心")
-  const [activeTab, setActiveTab] = useState<"income" | "expense" | "events">("income")
+  const [activeTab, setActiveTab] = useState<"income" | "expense" | "events" | "api-keys">("income")
 
   return (
     <div className="container mx-auto py-6 space-y-6">
@@ -95,10 +100,10 @@ export default function IntegrationsCenter() {
         </p>
       </div>
 
-      <SpecLinksCard />
+      <SpecLinksCard onGoToKeys={() => setActiveTab("api-keys")} />
 
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)}>
-        <TabsList className="grid w-full grid-cols-3 max-w-md">
+        <TabsList className="grid w-full grid-cols-4 max-w-2xl">
           <TabsTrigger value="income">
             <TrendingUp className="h-4 w-4 mr-1 text-green-600" />
             進帳來源
@@ -111,6 +116,10 @@ export default function IntegrationsCenter() {
             <Inbox className="h-4 w-4 mr-1" />
             拋接紀錄
           </TabsTrigger>
+          <TabsTrigger value="api-keys">
+            <Key className="h-4 w-4 mr-1 text-amber-600" />
+            API Keys
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="income" className="mt-4">
@@ -121,6 +130,9 @@ export default function IntegrationsCenter() {
         </TabsContent>
         <TabsContent value="events" className="mt-4">
           <EventsPanel />
+        </TabsContent>
+        <TabsContent value="api-keys" className="mt-4">
+          <ApiKeysPanel />
         </TabsContent>
       </Tabs>
     </div>
@@ -643,9 +655,10 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 // ─────────────────────────────────────────────
-// 對接規範連結卡片（公開：給對接方 / AI / Swagger UI 讀）
+// 對接規範連結卡片
+// 端點公開可達、但需要 API Key 才能讀（bcrypt 儲存、可撤銷、可過期）
 // ─────────────────────────────────────────────
-function SpecLinksCard() {
+function SpecLinksCard({ onGoToKeys }: { onGoToKeys: () => void }) {
   const { toast } = useToast()
   const origin = typeof window !== "undefined" ? window.location.origin : "https://money.homi.cc"
   const specUrl = `${origin}/api/integrations/spec`
@@ -665,76 +678,357 @@ function SpecLinksCard() {
       <CardHeader className="pb-3">
         <CardTitle className="text-base flex items-center gap-2">
           <BookOpen className="h-5 w-5 text-blue-600" />
-          對接規範文件（公開連結，免登入）
+          對接規範文件
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] bg-amber-100 text-amber-700 font-medium">
+            <Key className="h-3 w-3" />需 API Key
+          </span>
         </CardTitle>
         <CardDescription>
-          把下列連結傳給對接方工程師或 AI、讓他們直接讀規範。免帳號、可內嵌 Swagger UI。
+          端點公開可達，但對接方需用 API Key 才能讀（防止任意爬取）。
+          <Button
+            variant="link"
+            size="sm"
+            className="h-auto p-0 ml-1 text-blue-600"
+            onClick={onGoToKeys}
+          >
+            前往 API Keys 管理 →
+          </Button>
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-2">
+      <CardContent className="space-y-3">
         {/* Markdown 規範 */}
-        <div className="flex items-center gap-2 p-2 bg-white rounded-lg border">
-          <BookOpen className="h-4 w-4 text-blue-600 flex-shrink-0" />
-          <div className="flex-1 min-w-0">
-            <div className="text-sm font-medium">完整規範（Markdown）</div>
-            <div className="text-xs font-mono text-gray-500 truncate">{specUrl}</div>
+        <div className="bg-white rounded-lg border p-3 space-y-2">
+          <div className="flex items-center gap-2">
+            <BookOpen className="h-4 w-4 text-blue-600 flex-shrink-0" />
+            <div className="flex-1">
+              <div className="text-sm font-medium">完整規範（Markdown）</div>
+            </div>
+            <Button size="sm" variant="outline" onClick={() => copy(specUrl, "Markdown URL")}>
+              <Link2 className="h-3 w-3 mr-1" />
+              複製 URL
+            </Button>
           </div>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => copy(specUrl, "Markdown 規範連結")}
-            title="複製連結"
-          >
-            <Link2 className="h-3 w-3" />
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => window.open(specUrl, "_blank")}
-            title="開新分頁瀏覽"
-          >
-            <ExternalLink className="h-3 w-3" />
-          </Button>
+          <pre className="text-[11px] font-mono bg-gray-50 rounded p-2 overflow-x-auto whitespace-pre-wrap break-all">
+            {specUrl}
+          </pre>
         </div>
 
         {/* OpenAPI Spec */}
-        <div className="flex items-center gap-2 p-2 bg-white rounded-lg border">
-          <FileCode className="h-4 w-4 text-purple-600 flex-shrink-0" />
-          <div className="flex-1 min-w-0">
-            <div className="text-sm font-medium">OpenAPI 3.0 Spec（YAML）</div>
-            <div className="text-xs font-mono text-gray-500 truncate">{openapiUrl}</div>
+        <div className="bg-white rounded-lg border p-3 space-y-2">
+          <div className="flex items-center gap-2">
+            <FileCode className="h-4 w-4 text-purple-600 flex-shrink-0" />
+            <div className="flex-1">
+              <div className="text-sm font-medium">OpenAPI 3.0 Spec（YAML）</div>
+            </div>
+            <Button size="sm" variant="outline" onClick={() => copy(openapiUrl, "OpenAPI URL")}>
+              <Link2 className="h-3 w-3 mr-1" />
+              複製 URL
+            </Button>
           </div>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => copy(openapiUrl, "OpenAPI 連結")}
-            title="複製連結"
-          >
-            <Link2 className="h-3 w-3" />
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => window.open(openapiUrl, "_blank")}
-            title="開新分頁下載"
-          >
-            <ExternalLink className="h-3 w-3" />
-          </Button>
+          <pre className="text-[11px] font-mono bg-gray-50 rounded p-2 overflow-x-auto whitespace-pre-wrap break-all">
+            {openapiUrl}
+          </pre>
         </div>
 
-        <div className="text-xs text-gray-600 pt-1 flex items-center gap-1">
-          <span>💡 Swagger UI 對接：把 OpenAPI URL 貼到</span>
-          <a
-            href="https://editor.swagger.io/"
-            target="_blank"
-            rel="noreferrer"
-            className="text-blue-600 underline"
-          >
-            editor.swagger.io
-          </a>
-          <span>即可互動式測試 API。</span>
+        {/* 對接方使用範例 */}
+        <div className="bg-gray-50 rounded-lg p-3 text-xs text-gray-700 space-y-1">
+          <div className="font-semibold flex items-center gap-1 text-gray-900">
+            <Lock className="h-3 w-3" /> 對接方使用方式（兩種 header 都接受）：
+          </div>
+          <pre className="font-mono text-[11px] bg-white border rounded p-2 mt-1 overflow-x-auto">
+            {`curl -H "Authorization: Bearer moneykey_xxxxx" \\
+     ${specUrl}
+
+# 或
+curl -H "X-API-Key: moneykey_xxxxx" \\
+     ${openapiUrl}`}
+          </pre>
+          <div className="pt-1">
+            💡 對接方拿到 openapi.yaml 後可貼到{" "}
+            <a
+              href="https://editor.swagger.io/"
+              target="_blank"
+              rel="noreferrer"
+              className="text-blue-600 underline"
+            >
+              editor.swagger.io
+            </a>{" "}
+            互動式測試。
+          </div>
         </div>
       </CardContent>
     </Card>
   )
 }
+
+// ─────────────────────────────────────────────
+// API Keys 管理 panel
+// ─────────────────────────────────────────────
+interface ApiKeyRow {
+  id: number
+  name: string
+  keyPrefix: string
+  scope: string
+  description: string | null
+  expiresAt: string | null
+  lastUsedAt: string | null
+  lastUsedIp: string | null
+  usageCount: number | null
+  isActive: boolean | null
+  createdAt: string
+}
+
+function ApiKeysPanel() {
+  const { toast } = useToast()
+  const queryClient = useQueryClient()
+  const { data: keys = [], isLoading } = useQuery<ApiKeyRow[]>({
+    queryKey: ["/api/integrations/api-keys"],
+  })
+  const [showCreate, setShowCreate] = useState(false)
+  const [newKey, setNewKey] = useState<string | null>(null)
+
+  const revokeMutation = useMutation({
+    mutationFn: async (id: number) => apiRequest("DELETE", `/api/integrations/api-keys/${id}`),
+    onSuccess: () => {
+      toast({ title: "✅ 已撤銷" })
+      queryClient.invalidateQueries({ queryKey: ["/api/integrations/api-keys"] })
+    },
+    onError: (err: Error) => {
+      toast({ title: "撤銷失敗", description: err.message, variant: "destructive" })
+    },
+  })
+
+  const activeKeys = keys.filter((k) => k.isActive)
+  const revokedKeys = keys.filter((k) => !k.isActive)
+
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <p className="text-sm text-gray-600">
+          產生 read-only API Key 給對接方 fetch 規範文件用。Scope 僅
+          <code className="text-xs bg-gray-100 px-1 rounded mx-1">spec:read</code>
+          、無法寫任何資料。
+        </p>
+        <Button size="sm" onClick={() => setShowCreate(true)}>
+          <Plus className="h-4 w-4 mr-1" />
+          產生新 Key
+        </Button>
+      </div>
+
+      {newKey && (
+        <Card className="border-amber-300 bg-amber-50">
+          <CardContent className="py-4 space-y-2">
+            <div className="flex items-center gap-2 text-amber-900 font-semibold">
+              <AlertTriangle className="h-4 w-4" />
+              ⚠️ 此 Key 只會顯示這一次，請立即複製保存
+            </div>
+            <div className="flex gap-2">
+              <code className="flex-1 bg-white px-3 py-2 rounded border font-mono text-sm break-all">
+                {newKey}
+              </code>
+              <Button
+                size="sm"
+                onClick={() => {
+                  navigator.clipboard.writeText(newKey)
+                  toast({ title: "✅ 已複製" })
+                }}
+              >
+                <Copy className="h-3 w-3 mr-1" />
+                複製
+              </Button>
+            </div>
+            <Button size="sm" variant="outline" onClick={() => setNewKey(null)}>
+              我已保存、關閉
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {isLoading ? (
+        <p className="text-center text-gray-400 py-8">載入中...</p>
+      ) : keys.length === 0 ? (
+        <Card>
+          <CardContent className="py-8 text-center text-gray-500">
+            尚無 API Key。點上方「產生新 Key」開始。
+          </CardContent>
+        </Card>
+      ) : (
+        <>
+          {/* 啟用中 */}
+          <div className="space-y-2">
+            <div className="text-xs font-semibold text-gray-500 tracking-wider">
+              啟用中（{activeKeys.length}）
+            </div>
+            {activeKeys.map((k) => (
+              <ApiKeyRowCard
+                key={k.id}
+                k={k}
+                onRevoke={() => {
+                  if (confirm(`確定撤銷「${k.name}」？對接方將立即失效。`)) {
+                    revokeMutation.mutate(k.id)
+                  }
+                }}
+              />
+            ))}
+          </div>
+
+          {/* 已撤銷 */}
+          {revokedKeys.length > 0 && (
+            <div className="space-y-2">
+              <div className="text-xs font-semibold text-gray-400 tracking-wider">
+                已撤銷（{revokedKeys.length}）
+              </div>
+              {revokedKeys.map((k) => (
+                <ApiKeyRowCard key={k.id} k={k} onRevoke={null} />
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
+      {showCreate && (
+        <CreateApiKeyDialog
+          onClose={() => setShowCreate(false)}
+          onCreated={(key) => {
+            setNewKey(key)
+            queryClient.invalidateQueries({ queryKey: ["/api/integrations/api-keys"] })
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+function ApiKeyRowCard({ k, onRevoke }: { k: ApiKeyRow; onRevoke: (() => void) | null }) {
+  return (
+    <Card className={k.isActive ? "" : "opacity-60"}>
+      <CardContent className="py-3 px-4 flex items-center gap-3">
+        <Key
+          className={`h-4 w-4 flex-shrink-0 ${k.isActive ? "text-amber-600" : "text-gray-400"}`}
+        />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-sm font-medium">{k.name}</span>
+            <span className="text-[11px] px-1.5 py-0.5 bg-gray-100 rounded font-mono">
+              {k.keyPrefix}…
+            </span>
+            <span className="text-[11px] px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded font-mono">
+              {k.scope}
+            </span>
+            {k.expiresAt && (
+              <span className="text-[11px] text-orange-600">
+                到期：{new Date(k.expiresAt).toLocaleDateString("zh-TW")}
+              </span>
+            )}
+          </div>
+          {k.description && <div className="text-xs text-gray-500 mt-0.5">{k.description}</div>}
+          <div className="text-[11px] text-gray-400 mt-0.5">
+            建立：{new Date(k.createdAt).toLocaleString("zh-TW")}
+            {k.lastUsedAt && (
+              <>
+                {" · 最後使用："}
+                {new Date(k.lastUsedAt).toLocaleString("zh-TW")}
+                {k.lastUsedIp ? ` (${k.lastUsedIp})` : ""}
+              </>
+            )}
+            {" · 使用 "}
+            {k.usageCount ?? 0}
+            {" 次"}
+          </div>
+        </div>
+        {onRevoke && (
+          <Button size="sm" variant="outline" onClick={onRevoke} title="撤銷">
+            <Trash2 className="h-3 w-3 text-red-600" />
+          </Button>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+function CreateApiKeyDialog({
+  onClose,
+  onCreated,
+}: {
+  onClose: () => void
+  onCreated: (key: string) => void
+}) {
+  const { toast } = useToast()
+  const [name, setName] = useState("")
+  const [description, setDescription] = useState("")
+  const [expiresAt, setExpiresAt] = useState("")
+
+  const createMutation = useMutation({
+    mutationFn: async (): Promise<{ key: string }> => {
+      return apiRequest<{ key: string }>("POST", "/api/integrations/api-keys", {
+        name,
+        description: description || undefined,
+        expiresAt: expiresAt ? new Date(expiresAt).toISOString() : undefined,
+        scope: "spec:read",
+      })
+    },
+    onSuccess: (data) => {
+      onCreated(data.key)
+      onClose()
+    },
+    onError: (err: Error) => {
+      toast({ title: "建立失敗", description: err.message, variant: "destructive" })
+    },
+  })
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+      <Card className="w-full max-w-md">
+        <CardHeader>
+          <CardTitle>產生新 API Key</CardTitle>
+          <CardDescription>給對接方 fetch 規範文件用（read-only）</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm">
+          <Field label="名稱（給管理員辨識）">
+            <input
+              className="w-full border rounded px-3 py-1.5"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="例：PM 系統 / 對接窗口 Alice"
+            />
+          </Field>
+          <Field label="說明（選填）">
+            <input
+              className="w-full border rounded px-3 py-1.5"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="例：用於每日同步規範到對接方系統"
+            />
+          </Field>
+          <Field label="過期日（選填，留空永不過期）">
+            <input
+              type="date"
+              className="w-full border rounded px-3 py-1.5"
+              value={expiresAt}
+              onChange={(e) => setExpiresAt(e.target.value)}
+            />
+          </Field>
+          <div className="text-xs text-gray-500 bg-amber-50 border border-amber-200 rounded p-2">
+            <strong>⚠️ 注意：</strong>產生後完整 Key 只會顯示一次，請立即複製保存。
+          </div>
+        </CardContent>
+        <div className="p-4 border-t flex justify-end gap-2">
+          <Button variant="outline" onClick={onClose}>
+            取消
+          </Button>
+          <Button
+            onClick={() => createMutation.mutate()}
+            disabled={!name || createMutation.isPending}
+          >
+            <CheckCircle2 className="h-4 w-4 mr-1" />
+            產生 Key
+          </Button>
+        </div>
+      </Card>
+    </div>
+  )
+}
+
+// 為了 lint：標記未用 imports（Eye/EyeOff 預留未來顯示/隱藏 key 功能用）
+void Eye
+void EyeOff

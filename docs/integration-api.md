@@ -7,14 +7,47 @@
 
 ---
 
-## 公開連結（給對接方 / AI / Swagger UI）
+## 文件取得方式
 
-| 用途 | 公開 URL（免登入）|
-|------|-------------------|
+本規範端點**公開可達**，但需要 read-only API Key 才能讀取（避免未授權者爬取完整 API surface）。
+
+### 公開 URL
+
+| 用途 | URL |
+|------|-----|
 | 本規範（Markdown） | `https://money.homi.cc/api/integrations/spec` |
 | OpenAPI 3.0 Spec | `https://money.homi.cc/api/integrations/openapi` |
 
-把 OpenAPI URL 貼到 [editor.swagger.io](https://editor.swagger.io/) 即可看到完整互動式 API explorer。
+### 取得 API Key
+
+1. 管理員在浯島系統 `/integrations`「API Keys」分頁點「產生新 Key」
+2. 填入對接方識別名稱（例：「PM 系統 Alice」）+ 過期日（選填）
+3. 系統產生一把 `moneykey_xxxxx` 格式的 key（**只顯示一次**，需立即複製保存）
+4. 透過安全管道把 key 傳給對接方
+
+### 對接方使用方式
+
+兩種 header 任一即可：
+
+```bash
+# 方式 1：Authorization Bearer
+curl -H "Authorization: Bearer moneykey_xxxxx" \
+     https://money.homi.cc/api/integrations/spec
+
+# 方式 2：X-API-Key
+curl -H "X-API-Key: moneykey_xxxxx" \
+     https://money.homi.cc/api/integrations/openapi
+```
+
+### 安全機制
+
+- **Read-only**：scope 限 `spec:read`，**完全無法寫資料**
+- **bcrypt 儲存**：DB 只存 hash、key 外洩時無法反推
+- **可撤銷**：管理員按一鈕立即失效
+- **可過期**：可設定過期日自動失效
+- **使用追蹤**：每次使用記 lastUsedAt / IP / 累計次數，異常用量易察覺
+
+對接方拿到 `openapi.yaml` 後可貼到 [editor.swagger.io](https://editor.swagger.io/) 互動式測試（純前端、檔案不上傳）。
 
 ---
 

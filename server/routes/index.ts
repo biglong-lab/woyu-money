@@ -72,7 +72,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       "/user",
       "/auth/line",
       "/line/callback",
-      // 整合規範文件（給對接方 / AI / Swagger UI 公開讀取）
+      // 規範文件端點：對接方用 API Key 驗證、不走 session
+      // 端點內部自己用 requireApiKey middleware 驗 key
       "/integrations/spec",
       "/integrations/openapi",
     ]
