@@ -114,6 +114,31 @@
 
 ---
 
+## 部署踩坑紀錄
+
+### 1. 生產 DB schema 同步（重要）
+原本想直接 `docker exec woyu-money sh -c "npx drizzle-kit push --force"` 但會跳互動 prompt 問是否 truncate `property_group_members`（生產既有資料 drift）。**絕對不可選 truncate**。
+改為手動 SQL 方案：本地 `pg_dump -t integration_events -t expense_sources -t expense_webhooks --schema-only > new-tables.sql` → `scp` 上傳 → `docker exec ... psql -f` 套用。
+只 CREATE 新表，零風險、生產資料完全不動。
+
+### 2. `router.use(requireAuth)` 全域掛載引發 / 401 regression（hotfix）
+原始 `integrations.ts` 開頭寫 `router.use(requireAuth)`，這會對**所有走過此 router 的請求**做 auth 檢查（不論 path）。
+當 `app.use(integrationsRoutes)` 掛在 root path，所有 GET / 也會經過此 router → requireAuth 失敗 → 直接回 401 JSON（不再走 SPA fallback）。
+**修法**：移除 `router.use(requireAuth)`，改在每個 individual route 加 `requireAuth` 參數。Commit `b814055`。
+**教訓**：Express router middleware 的 scope 是 router 本身、不是 router 的 path prefix。掛 root path 的 router 必須在 individual route 加 middleware。
+
+### 3. 部署順序
+正確順序：
+1. push commit
+2. SSH `git reset --hard` + `docker compose up --build`
+3. **先在 prod DB 套 schema**（SQL CREATE TABLE）
+4. **再** `docker compose restart app`（讓新 code 抓到新表）
+5. 驗證 / 200、新 endpoint 401（需登入）
+
+若第 3 步漏掉，新 code 啟動跑到查詢新表時會炸 500。
+
+---
+
 ## 給對接方（重要）
 
 新對接系統前請先讀：[`docs/integration-api.md`](../integration-api.md)
