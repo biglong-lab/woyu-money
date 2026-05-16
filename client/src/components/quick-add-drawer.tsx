@@ -103,12 +103,32 @@ export function QuickAddDrawer({ open, onOpenChange }: QuickAddDrawerProps) {
   const nameInputRef = useRef<HTMLInputElement>(null)
   const [itemName, setItemName] = useState("")
   const [totalAmount, setTotalAmount] = useState("")
-  const [projectId, setProjectId] = useState<string>("")
+  // 智慧預設：載入上次用過的專案 ID（localStorage）
+  const [projectId, setProjectId] = useState<string>(() => {
+    if (typeof window === "undefined") return ""
+    try {
+      return localStorage.getItem("quickadd:lastProjectId") || ""
+    } catch {
+      return ""
+    }
+  })
   const [endDate, setEndDate] = useState("")
   const [attachedFile, setAttachedFile] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [isDone, setIsDone] = useState(false)
   const [recentItems, setRecentItems] = useState<RecentItem[]>(loadRecentItems)
+
+  // 每次選專案時、同步寫入 localStorage 供下次預設
+  const handleProjectChange = useCallback((newProjectId: string) => {
+    setProjectId(newProjectId)
+    if (typeof window !== "undefined" && newProjectId) {
+      try {
+        localStorage.setItem("quickadd:lastProjectId", newProjectId)
+      } catch {
+        /* 忽略 localStorage 寫入失敗 */
+      }
+    }
+  }, [])
 
   // 查詢專案列表
   const { data: projectsData } = useQuery<ProjectItem[]>({
@@ -209,10 +229,11 @@ export function QuickAddDrawer({ open, onOpenChange }: QuickAddDrawerProps) {
   }
 
   // 「再記一筆」：清空表單但不關閉 drawer
+  // 保留 projectId（連續記同專案多筆很常見、減少重複操作）
   const handleAddAnother = () => {
     setItemName("")
     setTotalAmount("")
-    setProjectId("")
+    // 不清 projectId — 保留為下一筆預設
     setEndDate("")
     removePhoto()
     setIsDone(false)
@@ -344,7 +365,7 @@ export function QuickAddDrawer({ open, onOpenChange }: QuickAddDrawerProps) {
                   <Label className="text-sm font-medium">
                     專案 <span className="text-gray-400 font-normal">（選填）</span>
                   </Label>
-                  <Select value={projectId} onValueChange={setProjectId}>
+                  <Select value={projectId} onValueChange={handleProjectChange}>
                     <SelectTrigger className="mt-1 h-11">
                       <SelectValue placeholder="不指定" />
                     </SelectTrigger>
