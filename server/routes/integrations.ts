@@ -26,34 +26,55 @@ import { db } from "../db"
 import { incomeSources } from "@shared/schema"
 import type { IncomeSource, ExpenseSource } from "@shared/schema"
 import { eq } from "drizzle-orm"
+import { insertIntegrationApiKeySchema } from "@shared/schema"
+import {
+  generateApiKey,
+  listApiKeys,
+  revokeApiKey,
+  requireApiKey,
+} from "../storage/integration-api-keys"
 
 const router = Router()
 
 // ─────────────────────────────────────────────
-// 公開規範文件端點（不需 auth — 供對接方 / AI / Swagger UI 讀取）
-// 對應 public path 白名單在 routes/index.ts 已加入
+// 規範文件端點（公開可達、但要 API Key 才能讀）
+//
+// 對接方流程：
+//   1. 管理員在 /integrations「API Keys」tab 產生 read-only key
+//      （key 只顯示一次、之後只看前綴）
+//   2. 把 key 傳給對接方
+//   3. 對接方 fetch 時帶 header：
+//        Authorization: Bearer moneykey_xxxxx
+//        或 X-API-Key: moneykey_xxxxx
+//
+// 安全機制：
+//   - bcrypt 儲存（不可反推）
+//   - per-key 撤銷
+//   - 過期時間（可選）
+//   - 使用紀錄（lastUsedAt、IP、usageCount）
+//   - read-only scope（spec:read）— 完全無法寫資料
 // ─────────────────────────────────────────────
 
-/** GET /api/integrations/spec — 公開的對接規範（Markdown raw） */
+/** GET /api/integrations/spec — 對接規範（Markdown），需 API Key */
 router.get(
   "/api/integrations/spec",
+  requireApiKey("spec:read"),
   asyncHandler(async (_req, res) => {
-    // 從 dist/index.js 反推到專案根 /app/docs/integration-api.md
-    // import.meta.dirname 在 production 是 /app/dist
     const docsPath = path.resolve(import.meta.dirname, "..", "docs", "integration-api.md")
     if (!fs.existsSync(docsPath)) {
       throw new AppError(500, "規範文件暫時無法取得，請聯繫管理員")
     }
     const content = fs.readFileSync(docsPath, "utf-8")
     res.setHeader("Content-Type", "text/markdown; charset=utf-8")
-    res.setHeader("Cache-Control", "public, max-age=300")
+    res.setHeader("Cache-Control", "private, max-age=300")
     res.send(content)
   })
 )
 
-/** GET /api/integrations/openapi — 公開的 OpenAPI 3.0 spec */
+/** GET /api/integrations/openapi — OpenAPI 3.0 spec，需 API Key */
 router.get(
   "/api/integrations/openapi",
+  requireApiKey("spec:read"),
   asyncHandler(async (_req, res) => {
     const yamlPath = path.resolve(import.meta.dirname, "..", "docs", "openapi.yaml")
     if (!fs.existsSync(yamlPath)) {
@@ -61,8 +82,69 @@ router.get(
     }
     const content = fs.readFileSync(yamlPath, "utf-8")
     res.setHeader("Content-Type", "application/yaml; charset=utf-8")
-    res.setHeader("Cache-Control", "public, max-age=300")
+    res.setHeader("Cache-Control", "private, max-age=300")
     res.send(content)
+  })
+)
+
+// ─────────────────────────────────────────────
+// API Keys 管理 API（需管理員 session）
+// ─────────────────────────────────────────────
+
+/** GET /api/integrations/api-keys — 列出所有 keys（不含 hash）*/
+router.get(
+  "/api/integrations/api-keys",
+  requireAuth,
+  asyncHandler(async (_req, res) => {
+    const keys = await listApiKeys()
+    res.json(keys)
+  })
+)
+
+/** POST /api/integrations/api-keys — 產生新 key（一次回傳完整 key，之後永遠看不到）*/
+router.post(
+  "/api/integrations/api-keys",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    try {
+      const parsed = insertIntegrationApiKeySchema.parse(req.body)
+      const userId = (req.user as { id?: number } | undefined)?.id ?? null
+
+      const expiresAt =
+        parsed.expiresAt && parsed.expiresAt !== "" ? new Date(parsed.expiresAt) : null
+
+      const result = await generateApiKey({
+        name: parsed.name,
+        description: parsed.description ?? null,
+        expiresAt,
+        createdByUserId: userId,
+        scope: parsed.scope ?? "spec:read",
+      })
+
+      res.status(201).json({
+        key: result.key,
+        ...result.row,
+        warning: "⚠️ 此 key 完整內容只會顯示這一次，請立即複製保存。",
+      })
+    } catch (err) {
+      if (err instanceof ZodError) {
+        throw new AppError(400, "資料格式錯誤：" + err.errors.map((e) => e.message).join(", "))
+      }
+      throw err
+    }
+  })
+)
+
+/** DELETE /api/integrations/api-keys/:id — 撤銷 key */
+router.delete(
+  "/api/integrations/api-keys/:id",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const id = Number(req.params.id)
+    if (!Number.isInteger(id) || id < 1) throw new AppError(400, "無效的 key ID")
+    const ok = await revokeApiKey(id)
+    if (!ok) throw new AppError(404, "Key 不存在")
+    res.json({ success: true })
   })
 )
 
