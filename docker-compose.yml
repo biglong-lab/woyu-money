@@ -10,6 +10,11 @@ services:
       - SESSION_SECRET=${SESSION_SECRET:-change-me-to-random-string}
       - NODE_ENV=production
       - PORT=5001
+      # AI 辨識（Gemini）— 從 .env 注入；未設定則 AI 辨識會回「Gemini API key 未設定」
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      # LINE Bot（可選）
+      - LINE_BOT_CHANNEL_ACCESS_TOKEN=${LINE_BOT_CHANNEL_ACCESS_TOKEN:-}
+      - LINE_BOT_CHANNEL_SECRET=${LINE_BOT_CHANNEL_SECRET:-}
     volumes:
       - uploads:/app/uploads
     depends_on:
