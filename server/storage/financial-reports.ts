@@ -127,6 +127,7 @@ export async function getIncomeStatement(year: number, month: number) {
 export async function getBalanceSheet(year: number, month: number) {
   const { endDate } = getDateRange(year, month)
 
+  // 主表累計現金
   const cashResult = await db.execute(sql`
     SELECT
       COALESCE(SUM(CASE WHEN pi.item_type = 'income' THEN CAST(pr.amount_paid AS DECIMAL(12,2)) ELSE 0 END), 0) as total_income,
@@ -136,9 +137,29 @@ export async function getBalanceSheet(year: number, month: number) {
     WHERE pr.payment_date < ${endDate}
   `)
 
+  // 外部同步累計現金（PM bridge / POS / 等）
+  const externalCashResult = await db.execute(sql`
+    SELECT
+      COALESCE((SELECT SUM(CAST(parsed_amount_twd AS DECIMAL(12,2)))
+                FROM income_webhooks iw
+                LEFT JOIN income_sources s ON s.id = iw.source_id
+                WHERE iw.parsed_paid_at < ${endDate}
+                  AND iw.status IN ('pending', 'confirmed')
+                  AND s.is_active = true), 0) AS ext_income,
+      COALESCE((SELECT SUM(CAST(parsed_amount_twd AS DECIMAL(12,2)))
+                FROM expense_webhooks ew
+                LEFT JOIN expense_sources s ON s.id = ew.source_id
+                WHERE ew.parsed_paid_at < ${endDate}
+                  AND ew.status = 'confirmed'
+                  AND s.is_active = true), 0) AS ext_expense
+  `)
+
   const cashRow = (cashResult.rows || [])[0] as SqlRow
-  const totalIncome = parseFloat(cashRow?.total_income || "0")
-  const totalExpense = parseFloat(cashRow?.total_expense || "0")
+  const externalCashRow = (externalCashResult.rows || [])[0] as SqlRow
+  const totalIncome =
+    parseFloat(cashRow?.total_income || "0") + parseFloat(externalCashRow?.ext_income || "0")
+  const totalExpense =
+    parseFloat(cashRow?.total_expense || "0") + parseFloat(externalCashRow?.ext_expense || "0")
 
   const receivableResult = await db.execute(sql`
     SELECT COALESCE(SUM(CAST(base_amount AS DECIMAL(12,2))), 0) as receivable
@@ -201,6 +222,7 @@ export async function getBalanceSheet(year: number, month: number) {
 export async function getCashFlowStatement(year: number, month: number) {
   const { startDate, endDate } = getDateRange(year, month)
 
+  // 主表收入/支出（payment_records）
   const operatingResult = await db.execute(sql`
     SELECT
       COALESCE(SUM(CASE WHEN pi.item_type = 'income' THEN CAST(pr.amount_paid AS DECIMAL(12,2)) ELSE 0 END), 0) as income,
@@ -211,9 +233,33 @@ export async function getCashFlowStatement(year: number, month: number) {
       AND pr.payment_date < ${endDate}
   `)
 
+  // 外部同步收入（income_webhooks）— PM bridge / POS 等同步進來、唯讀資料
+  const externalIncomeResult = await db.execute(sql`
+    SELECT COALESCE(SUM(CAST(parsed_amount_twd AS DECIMAL(12,2))), 0) AS amount
+    FROM income_webhooks iw
+    LEFT JOIN income_sources s ON s.id = iw.source_id
+    WHERE iw.parsed_paid_at >= ${startDate}
+      AND iw.parsed_paid_at < ${endDate}
+      AND iw.status IN ('pending', 'confirmed')
+      AND s.is_active = true
+  `)
+
+  // 外部同步支出（expense_webhooks）— PM 帳單推進來、已確認的算進現金流
+  const externalExpenseResult = await db.execute(sql`
+    SELECT COALESCE(SUM(CAST(parsed_amount_twd AS DECIMAL(12,2))), 0) AS amount
+    FROM expense_webhooks ew
+    LEFT JOIN expense_sources s ON s.id = ew.source_id
+    WHERE ew.parsed_paid_at >= ${startDate}
+      AND ew.parsed_paid_at < ${endDate}
+      AND ew.status = 'confirmed'
+      AND s.is_active = true
+  `)
+
   const opRow = (operatingResult.rows || [])[0] as SqlRow
-  const opIncome = parseFloat(opRow?.income || "0")
-  const opExpense = parseFloat(opRow?.expense || "0")
+  const externalIncRow = (externalIncomeResult.rows || [])[0] as SqlRow
+  const externalExpRow = (externalExpenseResult.rows || [])[0] as SqlRow
+  const opIncome = parseFloat(opRow?.income || "0") + parseFloat(externalIncRow?.amount || "0")
+  const opExpense = parseFloat(opRow?.expense || "0") + parseFloat(externalExpRow?.amount || "0")
 
   let investReturn = 0,
     newInvest = 0,
