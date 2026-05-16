@@ -335,7 +335,7 @@ function EditItemDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="w-[95vw] max-w-md">
         <DialogHeader>
           <DialogTitle>編輯項目</DialogTitle>
           <DialogDescription>修改名稱、金額、到期日。其他欄位請到付款管理頁。</DialogDescription>

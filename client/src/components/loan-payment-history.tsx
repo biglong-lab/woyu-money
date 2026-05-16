@@ -367,7 +367,7 @@ export default function LoanPaymentHistory({ recordId, recordTitle }: LoanPaymen
             </Button>
           </DialogTrigger>
           <DialogContent
-            className="max-w-4xl max-h-[90vh] overflow-y-auto"
+            className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto"
             aria-describedby="add-payment-description"
           >
             <DialogHeader>
@@ -577,7 +577,7 @@ export default function LoanPaymentHistory({ recordId, recordTitle }: LoanPaymen
                         </Button>
                       </DialogTrigger>
                       <DialogContent
-                        className="max-w-3xl"
+                        className="w-[95vw] max-w-3xl"
                         aria-describedby="file-upload-description"
                       >
                         <DialogHeader>
@@ -704,7 +704,7 @@ export default function LoanPaymentHistory({ recordId, recordTitle }: LoanPaymen
 
       {/* 編輯對話框 */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="w-[95vw] max-w-2xl">
           <DialogHeader>
             <DialogTitle>編輯還款記錄</DialogTitle>
           </DialogHeader>

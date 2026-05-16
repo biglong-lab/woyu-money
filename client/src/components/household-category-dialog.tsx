@@ -160,7 +160,7 @@ export function HouseholdCategoryDialog({ open, onOpenChange }: HouseholdCategor
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+      <DialogContent className="w-[95vw] max-w-4xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>家用生活分類管理</DialogTitle>
           <DialogDescription>管理家用支出分類，包括食衣住行等生活相關類別</DialogDescription>

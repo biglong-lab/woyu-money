@@ -1,60 +1,79 @@
-import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Upload, Download, Trash2, Eye, FileText, Clock } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { useState } from "react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import { Upload, Download, Trash2, Eye, FileText, Clock } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
 // 租約簡要型別（僅使用到的欄位）
 interface RentalContractInfo {
-  readonly id: number;
-  readonly contractName: string;
-  readonly projectId: number;
-  readonly isActive?: boolean | null;
+  readonly id: number
+  readonly contractName: string
+  readonly projectId: number
+  readonly isActive?: boolean | null
 }
 
 // 專案簡要型別（僅使用到的欄位）
 interface ProjectInfo {
-  readonly id: number;
-  readonly projectName: string;
+  readonly id: number
+  readonly projectName: string
 }
 
 // 文件顯示型別（對應 API 返回 + UI 使用的欄位）
 interface DocumentDisplayItem {
-  readonly id: number;
-  readonly contractId: number;
-  readonly fileName: string;
-  readonly documentType?: string;
-  readonly mimeType?: string;
-  readonly version: string;
-  readonly uploadDate?: string;
-  readonly uploadedAt?: Date | null;
-  readonly fileSize?: number | string;
-  readonly uploadedBy?: string | null;
-  readonly description?: string;
-  readonly notes?: string | null;
+  readonly id: number
+  readonly contractId: number
+  readonly fileName: string
+  readonly documentType?: string
+  readonly mimeType?: string
+  readonly version: string
+  readonly uploadDate?: string
+  readonly uploadedAt?: Date | null
+  readonly fileSize?: number | string
+  readonly uploadedBy?: string | null
+  readonly description?: string
+  readonly notes?: string | null
 }
 
 // ==========================================
 // 合約文件 Tab
 // ==========================================
 interface RentalDocumentsTabProps {
-  readonly contracts: RentalContractInfo[];
-  readonly projects: ProjectInfo[];
-  readonly selectedContract: RentalContractInfo | null;
-  readonly onSelectContract: (contract: RentalContractInfo | null) => void;
-  readonly documents: DocumentDisplayItem[];
-  readonly onDocumentDownload: (document: DocumentDisplayItem) => void;
-  readonly onDocumentDelete: (documentId: number) => void;
-  readonly isDocumentDialogOpen: boolean;
-  readonly onDocumentDialogOpenChange: (open: boolean) => void;
-  readonly onUploadDocument: (file: File, version: string, description: string) => void;
-  readonly isUploading: boolean;
+  readonly contracts: RentalContractInfo[]
+  readonly projects: ProjectInfo[]
+  readonly selectedContract: RentalContractInfo | null
+  readonly onSelectContract: (contract: RentalContractInfo | null) => void
+  readonly documents: DocumentDisplayItem[]
+  readonly onDocumentDownload: (document: DocumentDisplayItem) => void
+  readonly onDocumentDelete: (documentId: number) => void
+  readonly isDocumentDialogOpen: boolean
+  readonly onDocumentDialogOpenChange: (open: boolean) => void
+  readonly onUploadDocument: (file: File, version: string, description: string) => void
+  readonly isUploading: boolean
 }
 
 export function RentalDocumentsTab({
@@ -70,8 +89,8 @@ export function RentalDocumentsTab({
   onUploadDocument,
   isUploading,
 }: RentalDocumentsTabProps) {
-  const [viewingDocument, setViewingDocument] = useState<DocumentDisplayItem | null>(null);
-  const [isDocumentViewOpen, setIsDocumentViewOpen] = useState(false);
+  const [viewingDocument, setViewingDocument] = useState<DocumentDisplayItem | null>(null)
+  const [isDocumentViewOpen, setIsDocumentViewOpen] = useState(false)
 
   return (
     <>
@@ -95,8 +114,10 @@ export function RentalDocumentsTab({
             <Select
               value={selectedContract?.id?.toString() || ""}
               onValueChange={(value) => {
-                const contract = contracts?.find((c: RentalContractInfo) => c.id.toString() === value);
-                onSelectContract(contract || null);
+                const contract = contracts?.find(
+                  (c: RentalContractInfo) => c.id.toString() === value
+                )
+                onSelectContract(contract || null)
               }}
             >
               <SelectTrigger className="w-64">
@@ -104,15 +125,17 @@ export function RentalDocumentsTab({
               </SelectTrigger>
               <SelectContent>
                 {contracts?.map((contract: RentalContractInfo) => {
-                  const project = projects?.find((p: ProjectInfo) => p.id === contract.projectId);
+                  const project = projects?.find((p: ProjectInfo) => p.id === contract.projectId)
                   return (
                     <SelectItem key={contract.id} value={contract.id.toString()}>
                       <div className="flex flex-col">
                         <span className="font-medium">{contract.contractName}</span>
-                        <span className="text-xs text-gray-500">專案：{project?.projectName || "未知專案"}</span>
+                        <span className="text-xs text-gray-500">
+                          專案：{project?.projectName || "未知專案"}
+                        </span>
                       </div>
                     </SelectItem>
-                  );
+                  )
                 })}
               </SelectContent>
             </Select>
@@ -133,7 +156,9 @@ export function RentalDocumentsTab({
                   <div>
                     <h3 className="font-semibold text-blue-900">{selectedContract.contractName}</h3>
                     <p className="text-sm text-blue-700">
-                      專案：{projects?.find((p: ProjectInfo) => p.id === selectedContract.projectId)?.projectName || "未知專案"}
+                      專案：
+                      {projects?.find((p: ProjectInfo) => p.id === selectedContract.projectId)
+                        ?.projectName || "未知專案"}
                     </p>
                   </div>
                   <div className="text-right text-sm text-blue-600">
@@ -163,7 +188,11 @@ export function RentalDocumentsTab({
                       <TableRow key={doc.id}>
                         <TableCell className="font-medium">{doc.fileName}</TableCell>
                         <TableCell>{doc.documentType}</TableCell>
-                        <TableCell>{doc.uploadDate ? new Date(doc.uploadDate).toLocaleDateString('zh-TW') : '-'}</TableCell>
+                        <TableCell>
+                          {doc.uploadDate
+                            ? new Date(doc.uploadDate).toLocaleDateString("zh-TW")
+                            : "-"}
+                        </TableCell>
                         <TableCell>{doc.version}</TableCell>
                         <TableCell>
                           <div className="flex gap-2">
@@ -171,8 +200,8 @@ export function RentalDocumentsTab({
                               variant="outline"
                               size="sm"
                               onClick={() => {
-                                setViewingDocument(doc);
-                                setIsDocumentViewOpen(true);
+                                setViewingDocument(doc)
+                                setIsDocumentViewOpen(true)
                               }}
                             >
                               <Eye className="w-4 h-4" />
@@ -219,22 +248,22 @@ export function RentalDocumentsTab({
         document={viewingDocument}
         onDownload={onDocumentDownload}
         onDelete={(docId) => {
-          setIsDocumentViewOpen(false);
-          onDocumentDelete(docId);
+          setIsDocumentViewOpen(false)
+          onDocumentDelete(docId)
         }}
       />
     </>
-  );
+  )
 }
 
 // ==========================================
 // 文件上傳對話框
 // ==========================================
 interface DocumentUploadDialogProps {
-  readonly isOpen: boolean;
-  readonly onOpenChange: (open: boolean) => void;
-  readonly onUpload: (file: File, version: string, description: string) => void;
-  readonly isUploading: boolean;
+  readonly isOpen: boolean
+  readonly onOpenChange: (open: boolean) => void
+  readonly onUpload: (file: File, version: string, description: string) => void
+  readonly isUploading: boolean
 }
 
 function DocumentUploadDialog({
@@ -243,17 +272,17 @@ function DocumentUploadDialog({
   onUpload,
   isUploading,
 }: DocumentUploadDialogProps) {
-  const [uploadFile, setUploadFile] = useState<File | null>(null);
-  const [uploadVersion, setUploadVersion] = useState("");
-  const [uploadDescription, setUploadDescription] = useState("");
-  const { toast } = useToast();
+  const [uploadFile, setUploadFile] = useState<File | null>(null)
+  const [uploadVersion, setUploadVersion] = useState("")
+  const [uploadDescription, setUploadDescription] = useState("")
+  const { toast } = useToast()
 
   const handleClose = () => {
-    onOpenChange(false);
-    setUploadFile(null);
-    setUploadVersion("");
-    setUploadDescription("");
-  };
+    onOpenChange(false)
+    setUploadFile(null)
+    setUploadVersion("")
+    setUploadDescription("")
+  }
 
   const handleUpload = () => {
     if (!uploadFile) {
@@ -261,12 +290,12 @@ function DocumentUploadDialog({
         title: "請選擇文件",
         description: "請先選擇要上傳的文件",
         variant: "destructive",
-      });
-      return;
+      })
+      return
     }
-    onUpload(uploadFile, uploadVersion, uploadDescription);
-    handleClose();
-  };
+    onUpload(uploadFile, uploadVersion, uploadDescription)
+    handleClose()
+  }
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -285,24 +314,22 @@ function DocumentUploadDialog({
               type="file"
               accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
               onChange={(e) => {
-                const file = e.target.files?.[0];
+                const file = e.target.files?.[0]
                 if (file) {
                   if (file.size > 20 * 1024 * 1024) {
                     toast({
                       title: "文件過大",
                       description: "文件大小不能超過 20MB",
                       variant: "destructive",
-                    });
-                    return;
+                    })
+                    return
                   }
-                  setUploadFile(file);
+                  setUploadFile(file)
                 }
               }}
             />
             {uploadFile && (
-              <div className="mt-2 p-2 bg-blue-50 rounded text-sm">
-                已選擇：{uploadFile.name}
-              </div>
+              <div className="mt-2 p-2 bg-blue-50 rounded text-sm">已選擇：{uploadFile.name}</div>
             )}
           </div>
 
@@ -331,28 +358,25 @@ function DocumentUploadDialog({
             <Button variant="outline" onClick={handleClose}>
               取消
             </Button>
-            <Button
-              onClick={handleUpload}
-              disabled={!uploadFile || isUploading}
-            >
+            <Button onClick={handleUpload} disabled={!uploadFile || isUploading}>
               {isUploading ? "上傳中..." : "上傳"}
             </Button>
           </div>
         </div>
       </DialogContent>
     </Dialog>
-  );
+  )
 }
 
 // ==========================================
 // 文件查看對話框
 // ==========================================
 interface DocumentViewDialogProps {
-  readonly isOpen: boolean;
-  readonly onOpenChange: (open: boolean) => void;
-  readonly document: DocumentDisplayItem | null;
-  readonly onDownload: (document: DocumentDisplayItem) => void;
-  readonly onDelete: (documentId: number) => void;
+  readonly isOpen: boolean
+  readonly onOpenChange: (open: boolean) => void
+  readonly document: DocumentDisplayItem | null
+  readonly onDownload: (document: DocumentDisplayItem) => void
+  readonly onDelete: (documentId: number) => void
 }
 
 function DocumentViewDialog({
@@ -362,16 +386,14 @@ function DocumentViewDialog({
   onDownload,
   onDelete,
 }: DocumentViewDialogProps) {
-  if (!doc) return null;
+  if (!doc) return null
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>文件詳細資訊</DialogTitle>
-          <DialogDescription>
-            查看合約文件的詳細資訊和版本記錄
-          </DialogDescription>
+          <DialogDescription>查看合約文件的詳細資訊和版本記錄</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6">
@@ -395,19 +417,21 @@ function DocumentViewDialog({
                 </div>
                 <div>
                   <Label className="text-sm font-medium text-gray-500">版本</Label>
-                  <p className="text-base">{doc.version || 'v1.0'}</p>
+                  <p className="text-base">{doc.version || "v1.0"}</p>
                 </div>
                 <div>
                   <Label className="text-sm font-medium text-gray-500">上傳日期</Label>
-                  <p className="text-base">{doc.uploadDate ? new Date(doc.uploadDate).toLocaleDateString('zh-TW') : '-'}</p>
+                  <p className="text-base">
+                    {doc.uploadDate ? new Date(doc.uploadDate).toLocaleDateString("zh-TW") : "-"}
+                  </p>
                 </div>
                 <div>
                   <Label className="text-sm font-medium text-gray-500">文件大小</Label>
-                  <p className="text-base">{doc.fileSize || '未知'}</p>
+                  <p className="text-base">{doc.fileSize || "未知"}</p>
                 </div>
                 <div>
                   <Label className="text-sm font-medium text-gray-500">上傳者</Label>
-                  <p className="text-base">{doc.uploadedBy || '系統'}</p>
+                  <p className="text-base">{doc.uploadedBy || "系統"}</p>
                 </div>
               </div>
 
@@ -439,12 +463,12 @@ function DocumentViewDialog({
                   下載文件
                 </Button>
 
-                {doc.fileName?.toLowerCase().endsWith('.pdf') && (
+                {doc.fileName?.toLowerCase().endsWith(".pdf") && (
                   <Button
                     variant="outline"
                     className="flex items-center gap-2"
                     onClick={() => {
-                      window.open(`/api/rental/documents/${doc.id}/preview`, '_blank');
+                      window.open(`/api/rental/documents/${doc.id}/preview`, "_blank")
                     }}
                   >
                     <Eye className="w-4 h-4" />
@@ -476,9 +500,10 @@ function DocumentViewDialog({
               <div className="space-y-3">
                 <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-200">
                   <div>
-                    <p className="font-medium text-blue-900">當前版本 {doc.version || 'v1.0'}</p>
+                    <p className="font-medium text-blue-900">當前版本 {doc.version || "v1.0"}</p>
                     <p className="text-sm text-blue-700">
-                      上傳於 {doc.uploadDate ? new Date(doc.uploadDate).toLocaleDateString('zh-TW') : '-'}
+                      上傳於{" "}
+                      {doc.uploadDate ? new Date(doc.uploadDate).toLocaleDateString("zh-TW") : "-"}
                     </p>
                   </div>
                   <Badge className="bg-blue-100 text-blue-800">最新</Badge>
@@ -499,5 +524,5 @@ function DocumentViewDialog({
         </div>
       </DialogContent>
     </Dialog>
-  );
+  )
 }

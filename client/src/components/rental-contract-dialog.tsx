@@ -130,7 +130,7 @@ export function RentalContractDialog({
 }: RentalContractDialogProps) {
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto w-[95vw] sm:w-full">
+      <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto w-[95vw] sm:w-full">
         <DialogHeader>
           <DialogTitle className="text-lg md:text-xl font-semibold">
             {editingContract ? "編輯租約" : "新增租約"}
@@ -427,7 +427,7 @@ export function SmartAdjustDialog({
 }: SmartAdjustDialogProps) {
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="w-[95vw] max-w-2xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <TrendingUp className="w-5 h-5" />

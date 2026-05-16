@@ -6,12 +6,7 @@ import { useToast } from "@/hooks/use-toast"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -52,10 +47,7 @@ import {
 import type { IncomeWebhook, IncomeSource, PaymentProject } from "@shared/schema"
 
 // ─── 狀態設定 ────────────────────────────────────
-const STATUS_CONFIG: Record<
-  string,
-  { label: string; color: string; icon: React.ReactNode }
-> = {
+const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
   pending: {
     label: "待確認",
     color: "bg-yellow-100 text-yellow-800",
@@ -126,7 +118,7 @@ function WebhookDetailDialog({
 
   return (
     <Dialog open onOpenChange={onClose}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="w-[95vw] max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             進帳詳情
@@ -159,10 +151,26 @@ function WebhookDetailDialog({
         <div className="space-y-2 text-sm">
           {[
             { icon: <User className="h-4 w-4" />, label: "來源", value: source?.sourceName ?? "-" },
-            { icon: <User className="h-4 w-4" />, label: "付款方", value: webhook.parsedPayerName ?? "-" },
-            { icon: <Hash className="h-4 w-4" />, label: "訂單號", value: webhook.parsedOrderId ?? "-" },
-            { icon: <Hash className="h-4 w-4" />, label: "交易 ID", value: webhook.externalTransactionId ?? "-" },
-            { icon: <Banknote className="h-4 w-4" />, label: "說明", value: webhook.parsedDescription ?? "-" },
+            {
+              icon: <User className="h-4 w-4" />,
+              label: "付款方",
+              value: webhook.parsedPayerName ?? "-",
+            },
+            {
+              icon: <Hash className="h-4 w-4" />,
+              label: "訂單號",
+              value: webhook.parsedOrderId ?? "-",
+            },
+            {
+              icon: <Hash className="h-4 w-4" />,
+              label: "交易 ID",
+              value: webhook.externalTransactionId ?? "-",
+            },
+            {
+              icon: <Banknote className="h-4 w-4" />,
+              label: "說明",
+              value: webhook.parsedDescription ?? "-",
+            },
           ].map(({ icon, label, value }) =>
             value && value !== "-" ? (
               <div key={label} className="flex items-center gap-2 text-muted-foreground">
@@ -229,7 +237,9 @@ function WebhookDetailDialog({
               <Label>項目名稱（選填）</Label>
               <input
                 className="w-full border rounded-md px-3 py-2 text-sm"
-                placeholder={webhook.parsedDescription ?? `進帳 ${new Date().toLocaleDateString("zh-TW")}`}
+                placeholder={
+                  webhook.parsedDescription ?? `進帳 ${new Date().toLocaleDateString("zh-TW")}`
+                }
                 {...form.register("itemName")}
               />
             </div>
@@ -427,22 +437,22 @@ function PmSyncDialog({ onClose, onDone }: { onClose: () => void; onDone: () => 
 
   return (
     <Dialog open onOpenChange={onClose}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="w-[95vw] max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Building2 className="h-5 w-5 text-blue-600" />
-            從 PM 旅館系統同步收入
+            <Building2 className="h-5 w-5 text-blue-600" />從 PM 旅館系統同步收入
           </DialogTitle>
           <DialogDescription>
-            唯讀讀取 PM 系統的收入記錄，轉入待確認收件箱。
-            不會修改 PM 任何資料。
+            唯讀讀取 PM 系統的收入記錄，轉入待確認收件箱。 不會修改 PM 任何資料。
           </DialogDescription>
         </DialogHeader>
 
         {/* 連線狀態 */}
-        <div className={`flex items-center gap-2 text-sm rounded-md p-2 ${
-          pmOk ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"
-        }`}>
+        <div
+          className={`flex items-center gap-2 text-sm rounded-md p-2 ${
+            pmOk ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"
+          }`}
+        >
           <div className={`h-2 w-2 rounded-full ${pmOk ? "bg-green-500" : "bg-red-500"}`} />
           {pmOk
             ? `PM 系統已連線（共 ${status?.pm.totalRevenues ?? 0} 筆收入）`
@@ -473,7 +483,10 @@ function PmSyncDialog({ onClose, onDone }: { onClose: () => void; onDone: () => 
           {companies.length > 0 && (
             <div className="space-y-1.5">
               <Label>館舍（選填）</Label>
-              <Select value={companyId || "all"} onValueChange={(v) => setCompanyId(v === "all" ? "" : v)}>
+              <Select
+                value={companyId || "all"}
+                onValueChange={(v) => setCompanyId(v === "all" ? "" : v)}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="所有館舍" />
                 </SelectTrigger>
@@ -648,7 +661,11 @@ export default function IncomeWebhooksInboxPage() {
   const toggleSelect = (id: number) => {
     setSelectedIds((prev) => {
       const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
       return next
     })
   }
@@ -671,9 +688,7 @@ export default function IncomeWebhooksInboxPage() {
             <Inbox className="h-6 w-6 text-primary" />
             進帳收件箱
             {(pendingCount?.count ?? 0) > 0 && (
-              <Badge className="bg-red-500 text-white">
-                {pendingCount!.count}
-              </Badge>
+              <Badge className="bg-red-500 text-white">{pendingCount!.count}</Badge>
             )}
           </h1>
           <p className="text-muted-foreground text-sm mt-1">
@@ -688,8 +703,7 @@ export default function IncomeWebhooksInboxPage() {
             onClick={() => setShowPmSync(true)}
             className="gap-2 text-blue-600 border-blue-200 hover:bg-blue-50"
           >
-            <Building2 className="h-4 w-4" />
-            從 PM 同步
+            <Building2 className="h-4 w-4" />從 PM 同步
           </Button>
 
           {selectedIds.size > 0 && statusFilter === "pending" && (
@@ -762,11 +776,7 @@ export default function IncomeWebhooksInboxPage() {
         <Card>
           <CardContent className="py-12 text-center text-muted-foreground">
             <Inbox className="h-12 w-12 mx-auto mb-3 opacity-30" />
-            <p>
-              {statusFilter === "pending"
-                ? "目前沒有待確認的進帳"
-                : "查無符合條件的進帳紀錄"}
-            </p>
+            <p>{statusFilter === "pending" ? "目前沒有待確認的進帳" : "查無符合條件的進帳紀錄"}</p>
           </CardContent>
         </Card>
       ) : (
@@ -905,10 +915,7 @@ export default function IncomeWebhooksInboxPage() {
 
       {/* PM 同步 Dialog */}
       {showPmSync && (
-        <PmSyncDialog
-          onClose={() => setShowPmSync(false)}
-          onDone={() => setShowPmSync(false)}
-        />
+        <PmSyncDialog onClose={() => setShowPmSync(false)} onDone={() => setShowPmSync(false)} />
       )}
     </div>
   )

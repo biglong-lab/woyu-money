@@ -162,7 +162,7 @@ export function PaymentItemDetails({ item, open, onOpenChange }: PaymentItemDeta
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[95vh] overflow-hidden sm:max-w-3xl">
+      <DialogContent className="w-[95vw] max-w-4xl max-h-[95vh] overflow-hidden sm:max-w-3xl">
         <DialogHeader className="pb-2">
           <DialogTitle className="flex items-center gap-2 text-lg">
             <Eye className="w-5 h-5" />
@@ -374,7 +374,7 @@ export function PaymentItemDetails({ item, open, onOpenChange }: PaymentItemDeta
                                         查看收據
                                       </Button>
                                     </DialogTrigger>
-                                    <DialogContent className="max-w-2xl">
+                                    <DialogContent className="w-[95vw] max-w-2xl">
                                       <DialogHeader>
                                         <DialogTitle>付款收據</DialogTitle>
                                       </DialogHeader>

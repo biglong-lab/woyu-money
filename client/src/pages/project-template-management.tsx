@@ -1,20 +1,39 @@
-import { useState, useEffect } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { useToast } from "@/hooks/use-toast";
-import { Plus, Edit2, Trash2, Phone, Zap, Droplets, Wifi, Building } from "lucide-react";
-import type { ProjectCategoryTemplate, DebtCategory, PaymentProject } from "@shared/schema";
+import { useState, useEffect } from "react"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { apiRequest } from "@/lib/queryClient"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { z } from "zod"
+import { useToast } from "@/hooks/use-toast"
+import { Plus, Edit2, Trash2, Phone, Zap, Droplets, Wifi, Building } from "lucide-react"
+import type { ProjectCategoryTemplate, DebtCategory, PaymentProject } from "@shared/schema"
 
 const templateFormSchema = z.object({
   projectId: z.number(),
@@ -22,17 +41,17 @@ const templateFormSchema = z.object({
   templateName: z.string().min(1, "模板名稱不能為空"),
   accountInfo: z.string().optional(),
   notes: z.string().optional(),
-});
+})
 
-type TemplateFormData = z.infer<typeof templateFormSchema>;
+type TemplateFormData = z.infer<typeof templateFormSchema>
 
 export default function ProjectTemplateManagement() {
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
-  const [selectedProject, setSelectedProject] = useState<number | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingTemplate, setEditingTemplate] = useState<ProjectCategoryTemplate | null>(null);
+  const { toast } = useToast()
+  const queryClient = useQueryClient()
+  const [selectedProject, setSelectedProject] = useState<number | null>(null)
+  const [selectedCategory, setSelectedCategory] = useState<number | null>(null)
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [editingTemplate, setEditingTemplate] = useState<ProjectCategoryTemplate | null>(null)
 
   const form = useForm<TemplateFormData>({
     resolver: zodResolver(templateFormSchema),
@@ -41,118 +60,118 @@ export default function ProjectTemplateManagement() {
       accountInfo: "",
       notes: "",
     },
-  });
+  })
 
   // Fetch projects
   const { data: projects = [] } = useQuery<PaymentProject[]>({
     queryKey: ["/api/payment/projects"],
-  });
+  })
 
   // Fetch project categories
   const { data: categories = [] } = useQuery<DebtCategory[]>({
     queryKey: ["/api/categories/project"],
-  });
+  })
 
   // Fetch templates for selected project
   const { data: templates = [], refetch: refetchTemplates } = useQuery<ProjectCategoryTemplate[]>({
     queryKey: ["/api/project-category-templates", selectedProject],
     enabled: !!selectedProject,
-  });
+  })
 
   // Create template mutation
   const createTemplateMutation = useMutation({
     mutationFn: async (data: TemplateFormData) => {
-      return await apiRequest("POST", "/api/project-category-templates", data);
+      return await apiRequest("POST", "/api/project-category-templates", data)
     },
     onSuccess: () => {
       toast({
         title: "成功",
         description: "模板已創建",
-      });
-      setDialogOpen(false);
-      form.reset();
-      setEditingTemplate(null);
-      refetchTemplates();
+      })
+      setDialogOpen(false)
+      form.reset()
+      setEditingTemplate(null)
+      refetchTemplates()
     },
     onError: (error) => {
       toast({
         title: "錯誤",
         description: "創建模板失敗",
         variant: "destructive",
-      });
+      })
     },
-  });
+  })
 
   // Update template mutation
   const updateTemplateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: Partial<TemplateFormData> }) => {
-      return await apiRequest("PUT", `/api/project-category-templates/${id}`, data);
+      return await apiRequest("PUT", `/api/project-category-templates/${id}`, data)
     },
     onSuccess: () => {
       toast({
         title: "成功",
         description: "模板已更新",
-      });
-      setDialogOpen(false);
-      form.reset();
-      setEditingTemplate(null);
-      refetchTemplates();
+      })
+      setDialogOpen(false)
+      form.reset()
+      setEditingTemplate(null)
+      refetchTemplates()
     },
     onError: (error) => {
       toast({
         title: "錯誤",
         description: "更新模板失敗",
         variant: "destructive",
-      });
+      })
     },
-  });
+  })
 
   // Delete template mutation
   const deleteTemplateMutation = useMutation({
     mutationFn: async (id: number) => {
-      return await apiRequest("DELETE", `/api/project-category-templates/${id}`);
+      return await apiRequest("DELETE", `/api/project-category-templates/${id}`)
     },
     onSuccess: () => {
       toast({
         title: "成功",
         description: "模板已刪除",
-      });
-      refetchTemplates();
+      })
+      refetchTemplates()
     },
     onError: (error) => {
       toast({
         title: "錯誤",
         description: "刪除模板失敗",
         variant: "destructive",
-      });
+      })
     },
-  });
+  })
 
   const handleSubmit = (data: TemplateFormData) => {
     if (editingTemplate) {
-      updateTemplateMutation.mutate({ id: editingTemplate.id, data });
+      updateTemplateMutation.mutate({ id: editingTemplate.id, data })
     } else {
-      createTemplateMutation.mutate(data);
+      createTemplateMutation.mutate(data)
     }
-  };
+  }
 
   const handleEdit = (template: ProjectCategoryTemplate) => {
-    setEditingTemplate(template);
+    setEditingTemplate(template)
     form.reset({
       projectId: template.projectId ?? undefined,
       categoryId: template.categoryId ?? undefined,
       templateName: template.templateName,
       accountInfo: template.accountInfo || "",
       notes: template.notes || "",
-    });
-    setDialogOpen(true);
-  };
+    })
+    setDialogOpen(true)
+  }
 
   const handleDelete = (id: number) => {
     if (confirm("確定要刪除此模板嗎？")) {
-      deleteTemplateMutation.mutate(id);
+      deleteTemplateMutation.mutate(id)
     }
-  };
+  }
 
   const openCreateDialog = () => {
     if (!selectedProject || !selectedCategory) {
@@ -160,42 +179,47 @@ export default function ProjectTemplateManagement() {
         title: "請選擇專案和分類",
         description: "需要先選擇專案和分類才能創建模板",
         variant: "destructive",
-      });
-      return;
+      })
+      return
     }
 
-    setEditingTemplate(null);
+    setEditingTemplate(null)
     form.reset({
       projectId: selectedProject,
       categoryId: selectedCategory,
       templateName: "",
       accountInfo: "",
       notes: "",
-    });
-    setDialogOpen(true);
-  };
+    })
+    setDialogOpen(true)
+  }
 
   // Group templates by category
-  const templatesByCategory = templates.reduce((acc, template) => {
-    const categoryId = template.categoryId ?? 0;
-    if (!acc[categoryId]) {
-      acc[categoryId] = [];
-    }
-    acc[categoryId].push(template);
-    return acc;
-  }, {} as Record<number, ProjectCategoryTemplate[]>);
+  const templatesByCategory = templates.reduce(
+    (acc, template) => {
+      const categoryId = template.categoryId ?? 0
+      if (!acc[categoryId]) {
+        acc[categoryId] = []
+      }
+      acc[categoryId].push(template)
+      return acc
+    },
+    {} as Record<number, ProjectCategoryTemplate[]>
+  )
 
   const getCategoryIcon = (categoryName: string) => {
-    const name = categoryName.toLowerCase();
-    if (name.includes('電話') || name.includes('phone')) return <Phone className="h-4 w-4" />;
-    if (name.includes('電') || name.includes('electric')) return <Zap className="h-4 w-4" />;
-    if (name.includes('水') || name.includes('water')) return <Droplets className="h-4 w-4" />;
-    if (name.includes('網') || name.includes('internet')) return <Wifi className="h-4 w-4" />;
-    return <Building className="h-4 w-4" />;
-  };
+    const name = categoryName.toLowerCase()
+    if (name.includes("電話") || name.includes("phone")) return <Phone className="h-4 w-4" />
+    if (name.includes("電") || name.includes("electric")) return <Zap className="h-4 w-4" />
+    if (name.includes("水") || name.includes("water")) return <Droplets className="h-4 w-4" />
+    if (name.includes("網") || name.includes("internet")) return <Wifi className="h-4 w-4" />
+    return <Building className="h-4 w-4" />
+  }
 
-  const selectedProjectName = projects.find(p => p.id === selectedProject)?.projectName || "請選擇專案";
-  const selectedCategoryName = categories.find(c => c.id === selectedCategory)?.categoryName || "請選擇分類";
+  const selectedProjectName =
+    projects.find((p) => p.id === selectedProject)?.projectName || "請選擇專案"
+  const selectedCategoryName =
+    categories.find((c) => c.id === selectedCategory)?.categoryName || "請選擇分類"
 
   return (
     <div className="space-y-6 p-6">
@@ -257,7 +281,7 @@ export default function ProjectTemplateManagement() {
             </div>
 
             <div className="flex items-end">
-              <Button 
+              <Button
                 onClick={openCreateDialog}
                 disabled={!selectedProject || !selectedCategory}
                 className="w-full"
@@ -278,9 +302,7 @@ export default function ProjectTemplateManagement() {
               {getCategoryIcon(selectedCategoryName)}
               {selectedProjectName} - {selectedCategoryName} 的模板
             </CardTitle>
-            <CardDescription>
-              當前專案分類的所有帳號資訊模板
-            </CardDescription>
+            <CardDescription>當前專案分類的所有帳號資訊模板</CardDescription>
           </CardHeader>
           <CardContent>
             {templatesByCategory[selectedCategory]?.length > 0 ? (
@@ -291,11 +313,7 @@ export default function ProjectTemplateManagement() {
                       <div className="flex justify-between items-start mb-2">
                         <h4 className="font-medium text-lg">{template.templateName}</h4>
                         <div className="flex gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleEdit(template)}
-                          >
+                          <Button variant="ghost" size="sm" onClick={() => handleEdit(template)}>
                             <Edit2 className="h-3 w-3" />
                           </Button>
                           <Button
@@ -308,13 +326,13 @@ export default function ProjectTemplateManagement() {
                           </Button>
                         </div>
                       </div>
-                      
+
                       {template.accountInfo && (
                         <div className="text-sm text-gray-600 mb-2">
                           <strong>帳號資訊：</strong> {template.accountInfo}
                         </div>
                       )}
-                      
+
                       {template.notes && (
                         <div className="text-sm text-gray-500">
                           <strong>備註：</strong> {template.notes}
@@ -338,15 +356,13 @@ export default function ProjectTemplateManagement() {
         <Card>
           <CardHeader>
             <CardTitle>{selectedProjectName} 的所有模板總覽</CardTitle>
-            <CardDescription>
-              專案中所有分類的模板統計
-            </CardDescription>
+            <CardDescription>專案中所有分類的模板統計</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
               {Object.entries(templatesByCategory).map(([categoryId, categoryTemplates]) => {
-                const category = categories.find(c => c.id === parseInt(categoryId));
-                if (!category) return null;
+                const category = categories.find((c) => c.id === parseInt(categoryId))
+                if (!category) return null
 
                 return (
                   <div key={categoryId} className="border rounded-lg p-4">
@@ -359,7 +375,7 @@ export default function ProjectTemplateManagement() {
                         </span>
                       </div>
                     </div>
-                    
+
                     <div className="flex flex-wrap gap-2">
                       {categoryTemplates.map((template) => (
                         <span
@@ -371,7 +387,7 @@ export default function ProjectTemplateManagement() {
                       ))}
                     </div>
                   </div>
-                );
+                )
               })}
             </div>
           </CardContent>
@@ -380,16 +396,13 @@ export default function ProjectTemplateManagement() {
 
       {/* Template Form Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="w-[95vw] max-w-md">
           <DialogHeader>
-            <DialogTitle>
-              {editingTemplate ? "編輯模板" : "新增模板"}
-            </DialogTitle>
+            <DialogTitle>{editingTemplate ? "編輯模板" : "新增模板"}</DialogTitle>
             <DialogDescription>
-              {editingTemplate 
-                ? "修改模板的帳號資訊和備註" 
-                : `為 ${selectedProjectName} - ${selectedCategoryName} 新增帳號資訊模板`
-              }
+              {editingTemplate
+                ? "修改模板的帳號資訊和備註"
+                : `為 ${selectedProjectName} - ${selectedCategoryName} 新增帳號資訊模板`}
             </DialogDescription>
           </DialogHeader>
 
@@ -402,10 +415,7 @@ export default function ProjectTemplateManagement() {
                   <FormItem>
                     <FormLabel>模板名稱 *</FormLabel>
                     <FormControl>
-                      <Input 
-                        placeholder="例：088219194、948883776、主線電話"
-                        {...field} 
-                      />
+                      <Input placeholder="例：088219194、948883776、主線電話" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -419,10 +429,10 @@ export default function ProjectTemplateManagement() {
                   <FormItem>
                     <FormLabel>帳號資訊</FormLabel>
                     <FormControl>
-                      <Textarea 
+                      <Textarea
                         placeholder="詳細的帳號資訊，如電話號碼、電號、水號等"
                         rows={3}
-                        {...field} 
+                        {...field}
                       />
                     </FormControl>
                     <FormMessage />
@@ -437,11 +447,7 @@ export default function ProjectTemplateManagement() {
                   <FormItem>
                     <FormLabel>備註</FormLabel>
                     <FormControl>
-                      <Textarea 
-                        placeholder="額外備註資訊"
-                        rows={2}
-                        {...field} 
-                      />
+                      <Textarea placeholder="額外備註資訊" rows={2} {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -470,5 +476,5 @@ export default function ProjectTemplateManagement() {
         </DialogContent>
       </Dialog>
     </div>
-  );
+  )
 }

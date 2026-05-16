@@ -22,7 +22,7 @@ export function GeneralPaymentDeleteDialog({
 }: GeneralPaymentDeleteDialogProps) {
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="w-[95vw] max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Trash2 className="w-5 h-5 text-amber-500" />

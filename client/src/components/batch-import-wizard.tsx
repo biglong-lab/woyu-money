@@ -150,7 +150,11 @@ export function BatchImportWizard({ isOpen, onClose }: BatchImportWizardProps) {
       const formData = new FormData()
       formData.append("file", file)
 
-      const result = await apiRequest<ParseFileResponse>("POST", "/api/payment/batch-import/parse", formData)
+      const result = await apiRequest<ParseFileResponse>(
+        "POST",
+        "/api/payment/batch-import/parse",
+        formData
+      )
       setImportData(result.records || [])
       setCurrentStep(2)
 
@@ -216,7 +220,7 @@ export function BatchImportWizard({ isOpen, onClose }: BatchImportWizardProps) {
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>批量導入付款項目</DialogTitle>
         </DialogHeader>

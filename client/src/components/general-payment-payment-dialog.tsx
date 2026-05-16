@@ -84,7 +84,7 @@ export function GeneralPaymentPaymentDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="w-[95vw] max-w-md">
         <DialogHeader>
           <DialogTitle>付款記錄</DialogTitle>
           {paymentItem && (

@@ -1,44 +1,63 @@
 // 系統管理 Tab 面板
-import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import {
-  Settings as SettingsIcon, User, BarChart3, FileText,
-  Save, CheckCircle2, X, Trash2, Loader2
-} from "lucide-react";
+  Settings as SettingsIcon,
+  User,
+  BarChart3,
+  FileText,
+  Save,
+  CheckCircle2,
+  X,
+  Trash2,
+  Loader2,
+} from "lucide-react"
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { apiRequest } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
-import type { SystemUser } from "@/components/settings-types";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { apiRequest } from "@/lib/queryClient"
+import { useToast } from "@/hooks/use-toast"
+import type { SystemUser } from "@/components/settings-types"
 
 export default function SettingsAdminTab() {
-  const [isUserListDialogOpen, setIsUserListDialogOpen] = useState(false);
-  const [isUserPermissionDialogOpen, setIsUserPermissionDialogOpen] = useState(false);
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
+  const [isUserListDialogOpen, setIsUserListDialogOpen] = useState(false)
+  const [isUserPermissionDialogOpen, setIsUserPermissionDialogOpen] = useState(false)
+  const { toast } = useToast()
+  const queryClient = useQueryClient()
 
   const { data: systemUsers = [], isLoading: usersLoading } = useQuery<SystemUser[]>({
     queryKey: ["/api/admin/users"],
     enabled: isUserListDialogOpen || isUserPermissionDialogOpen,
-  });
+  })
 
   // 更新用戶角色
   const updateUserRoleMutation = useMutation({
     mutationFn: async ({ userId, role }: { userId: number; role: string }) => {
-      return await apiRequest("PUT", `/api/admin/users/${userId}/role`, { role });
+      return await apiRequest("PUT", `/api/admin/users/${userId}/role`, { role })
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
-      toast({ title: "權限更新成功", description: "用戶權限已成功更新" });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] })
+      toast({ title: "權限更新成功", description: "用戶權限已成功更新" })
     },
     onError: (error: Error) => {
-      toast({ title: "權限更新失敗", description: error.message, variant: "destructive" });
+      toast({ title: "權限更新失敗", description: error.message, variant: "destructive" })
     },
-  });
+  })
 
   return (
     <>
@@ -48,12 +67,9 @@ export default function SettingsAdminTab() {
             <SettingsIcon className="w-5 h-5" />
             系統管理介面
           </CardTitle>
-          <CardDescription>
-            系統監控、用戶管理和維護工具
-          </CardDescription>
+          <CardDescription>系統監控、用戶管理和維護工具</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-
           {/* 用戶管理 / 系統監控 / 資料管理 卡片 */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {/* 用戶管理 */}
@@ -149,9 +165,7 @@ export default function SettingsAdminTab() {
                 <SettingsIcon className="w-5 h-5" />
                 系統維護
               </CardTitle>
-              <CardDescription>
-                系統維護和故障排除工具
-              </CardDescription>
+              <CardDescription>系統維護和故障排除工具</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -178,21 +192,18 @@ export default function SettingsAdminTab() {
               </div>
             </CardContent>
           </Card>
-
         </CardContent>
       </Card>
 
       {/* 用戶列表 Dialog */}
       <Dialog open={isUserListDialogOpen} onOpenChange={setIsUserListDialogOpen}>
-        <DialogContent className="max-w-4xl">
+        <DialogContent className="w-[95vw] max-w-4xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <User className="w-5 h-5" />
               所有用戶列表
             </DialogTitle>
-            <DialogDescription>
-              查看系統中的所有用戶資訊和登入狀態
-            </DialogDescription>
+            <DialogDescription>查看系統中的所有用戶資訊和登入狀態</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             {usersLoading ? (
@@ -217,20 +228,22 @@ export default function SettingsAdminTab() {
                     {systemUsers.map((user: SystemUser) => (
                       <tr key={user.id} className="border-t">
                         <td className="px-4 py-3">{user.username}</td>
-                        <td className="px-4 py-3">{user.fullName || '-'}</td>
-                        <td className="px-4 py-3">{user.email || '-'}</td>
+                        <td className="px-4 py-3">{user.fullName || "-"}</td>
+                        <td className="px-4 py-3">{user.email || "-"}</td>
                         <td className="px-4 py-3">
-                          <Badge variant={user.role === 'admin' ? 'default' : 'secondary'}>
-                            {user.role === 'admin' ? '管理員' : '一般用戶'}
+                          <Badge variant={user.role === "admin" ? "default" : "secondary"}>
+                            {user.role === "admin" ? "管理員" : "一般用戶"}
                           </Badge>
                         </td>
                         <td className="px-4 py-3">
-                          <Badge variant={user.isActive ? 'default' : 'secondary'}>
-                            {user.isActive ? '啟用' : '停用'}
+                          <Badge variant={user.isActive ? "default" : "secondary"}>
+                            {user.isActive ? "啟用" : "停用"}
                           </Badge>
                         </td>
                         <td className="px-4 py-3">
-                          {user.lastLogin ? new Date(user.lastLogin).toLocaleString('zh-TW') : '從未登入'}
+                          {user.lastLogin
+                            ? new Date(user.lastLogin).toLocaleString("zh-TW")
+                            : "從未登入"}
                         </td>
                       </tr>
                     ))}
@@ -244,15 +257,13 @@ export default function SettingsAdminTab() {
 
       {/* 權限管理 Dialog */}
       <Dialog open={isUserPermissionDialogOpen} onOpenChange={setIsUserPermissionDialogOpen}>
-        <DialogContent className="max-w-3xl">
+        <DialogContent className="w-[95vw] max-w-3xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <User className="w-5 h-5" />
               權限管理
             </DialogTitle>
-            <DialogDescription>
-              管理用戶角色和權限設定
-            </DialogDescription>
+            <DialogDescription>管理用戶角色和權限設定</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             {usersLoading ? (
@@ -275,7 +286,7 @@ export default function SettingsAdminTab() {
                         <Select
                           value={user.role}
                           onValueChange={(newRole) => {
-                            updateUserRoleMutation.mutate({ userId: user.id, role: newRole });
+                            updateUserRoleMutation.mutate({ userId: user.id, role: newRole })
                           }}
                         >
                           <SelectTrigger className="w-32">
@@ -286,8 +297,8 @@ export default function SettingsAdminTab() {
                             <SelectItem value="admin">管理員</SelectItem>
                           </SelectContent>
                         </Select>
-                        <Badge variant={user.isActive ? 'default' : 'secondary'}>
-                          {user.isActive ? '啟用' : '停用'}
+                        <Badge variant={user.isActive ? "default" : "secondary"}>
+                          {user.isActive ? "啟用" : "停用"}
                         </Badge>
                       </div>
                     </div>
@@ -299,5 +310,5 @@ export default function SettingsAdminTab() {
         </DialogContent>
       </Dialog>
     </>
-  );
+  )
 }

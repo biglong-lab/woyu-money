@@ -558,7 +558,7 @@ ${calculation?.totalPayment ? `總還款：NT$ ${calculation.totalPayment.toLoca
                     建立借貸紀錄
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                <DialogContent className="w-[95vw] max-w-2xl max-h-[80vh] overflow-y-auto">
                   <DialogHeader>
                     <DialogTitle>建立借貸紀錄</DialogTitle>
                   </DialogHeader>

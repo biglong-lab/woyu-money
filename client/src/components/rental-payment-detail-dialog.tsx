@@ -49,7 +49,7 @@ export function RentalPaymentDetailDialog({
 }: RentalPaymentDetailDialogProps) {
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>租金付款項目詳細資訊</DialogTitle>
           <DialogDescription>查看租金付款項目的完整狀態和付款記錄</DialogDescription>

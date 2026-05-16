@@ -1,24 +1,36 @@
 // 月付管理 - 編輯對話框元件
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { UseFormReturn, FieldValues } from "react-hook-form";
-import type { PaymentItem, PaymentProject, DebtCategory, FixedCategory } from "./monthly-payment-types";
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form"
+import { UseFormReturn, FieldValues } from "react-hook-form"
+import type {
+  PaymentItem,
+  PaymentProject,
+  DebtCategory,
+  FixedCategory,
+} from "./monthly-payment-types"
 
 export interface MonthlyPaymentEditDialogProps {
-  isOpen: boolean;
-  onOpenChange: (open: boolean) => void;
-  editForm: UseFormReturn<FieldValues>;
-  editingItem: PaymentItem | null;
-  isEditUnlocked: boolean;
-  onToggleEditLock: () => void;
-  onSubmit: (data: FieldValues) => void;
-  isPending: boolean;
-  projects: PaymentProject[];
-  categories: DebtCategory[];
-  fixedCategories: FixedCategory[];
+  isOpen: boolean
+  onOpenChange: (open: boolean) => void
+  editForm: UseFormReturn<FieldValues>
+  editingItem: PaymentItem | null
+  isEditUnlocked: boolean
+  onToggleEditLock: () => void
+  onSubmit: (data: FieldValues) => void
+  isPending: boolean
+  projects: PaymentProject[]
+  categories: DebtCategory[]
+  fixedCategories: FixedCategory[]
 }
 
 export function MonthlyPaymentEditDialog({
@@ -36,7 +48,7 @@ export function MonthlyPaymentEditDialog({
 }: MonthlyPaymentEditDialogProps) {
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center justify-between">
             <span>編輯月付項目</span>
@@ -50,15 +62,16 @@ export function MonthlyPaymentEditDialog({
               {isEditUnlocked ? "鎖定編輯" : "解鎖編輯"}
             </Button>
           </DialogTitle>
-          <div className={`text-sm p-3 rounded-lg ${isEditUnlocked ? 'bg-red-50 border border-red-200' : 'bg-blue-50 border border-blue-200'}`}>
-            <p className={`font-medium mb-1 ${isEditUnlocked ? 'text-red-800' : 'text-blue-800'}`}>
-              {isEditUnlocked ? '編輯模式已解鎖' : '編輯模式已鎖定'}
+          <div
+            className={`text-sm p-3 rounded-lg ${isEditUnlocked ? "bg-red-50 border border-red-200" : "bg-blue-50 border border-blue-200"}`}
+          >
+            <p className={`font-medium mb-1 ${isEditUnlocked ? "text-red-800" : "text-blue-800"}`}>
+              {isEditUnlocked ? "編輯模式已解鎖" : "編輯模式已鎖定"}
             </p>
-            <p className={isEditUnlocked ? 'text-red-700' : 'text-blue-700'}>
+            <p className={isEditUnlocked ? "text-red-700" : "text-blue-700"}>
               {isEditUnlocked
-                ? '現在可以編輯所有項目資訊，請謹慎修改以避免數據不一致'
-                : '預設僅能修改付款狀態、實際付款日期和備註，其他欄位為唯讀'
-              }
+                ? "現在可以編輯所有項目資訊，請謹慎修改以避免數據不一致"
+                : "預設僅能修改付款狀態、實際付款日期和備註，其他欄位為唯讀"}
             </p>
           </div>
         </DialogHeader>
@@ -77,16 +90,16 @@ export function MonthlyPaymentEditDialog({
                 <div>
                   <span className="text-gray-500">專案: </span>
                   <span className="font-medium">
-                    {projects.find(p => p.id === editingItem?.projectId)?.projectName || "未設定"}
+                    {projects.find((p) => p.id === editingItem?.projectId)?.projectName || "未設定"}
                   </span>
                 </div>
                 <div>
                   <span className="text-gray-500">分類: </span>
                   <span className="font-medium">
                     {editingItem?.fixedCategoryId
-                      ? fixedCategories.find(c => c.id === editingItem.fixedCategoryId)?.categoryName
-                      : categories.find(c => c.id === editingItem?.categoryId)?.categoryName
-                    }
+                      ? fixedCategories.find((c) => c.id === editingItem.fixedCategoryId)
+                          ?.categoryName
+                      : categories.find((c) => c.id === editingItem?.categoryId)?.categoryName}
                   </span>
                 </div>
               </div>
@@ -99,9 +112,7 @@ export function MonthlyPaymentEditDialog({
                 name="itemName"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>
-                      項目名稱{!isEditUnlocked && "（鎖定）"}
-                    </FormLabel>
+                    <FormLabel>項目名稱{!isEditUnlocked && "（鎖定）"}</FormLabel>
                     <FormControl>
                       <Input
                         {...field}
@@ -118,9 +129,7 @@ export function MonthlyPaymentEditDialog({
                 name="amount"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>
-                      月付金額{!isEditUnlocked && "（鎖定）"}
-                    </FormLabel>
+                    <FormLabel>月付金額{!isEditUnlocked && "（鎖定）"}</FormLabel>
                     <FormControl>
                       <Input
                         {...field}
@@ -141,9 +150,7 @@ export function MonthlyPaymentEditDialog({
                 name="startDate"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>
-                      預計付款日期{!isEditUnlocked && "（鎖定）"}
-                    </FormLabel>
+                    <FormLabel>預計付款日期{!isEditUnlocked && "（鎖定）"}</FormLabel>
                     <FormControl>
                       <Input
                         {...field}
@@ -208,11 +215,7 @@ export function MonthlyPaymentEditDialog({
             />
 
             <div className="flex justify-end gap-2 pt-4">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-              >
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 取消
               </Button>
               <Button type="submit" disabled={isPending}>
@@ -223,5 +226,5 @@ export function MonthlyPaymentEditDialog({
         </Form>
       </DialogContent>
     </Dialog>
-  );
+  )
 }
