@@ -7,6 +7,7 @@ import { ObjectStorageService, ObjectNotFoundError } from "../objectStorage"
 import { recognizeDocument } from "../document-ai"
 import { documentUpload, inboxDir } from "./upload-config"
 import * as docInboxStorage from "../storage/document-inbox"
+import { sendPushToUser } from "../storage/push-subscriptions"
 import multer from "multer"
 import fs from "fs"
 import path from "path"
@@ -211,6 +212,20 @@ router.post(
                 extractedData: result.extractedData,
                 rawResponse: result.rawResponse,
               })
+              // 推播通知（背景）— 失敗不影響業務流程
+              if (userId) {
+                const vendor = result.extractedData?.vendor
+                const amount = result.extractedData?.amount
+                void sendPushToUser(userId, {
+                  title: "✅ AI 辨識完成",
+                  body: vendor
+                    ? `「${vendor}」${amount ? `$${Number(amount).toLocaleString()}` : ""} 已辨識，請進收件箱確認`
+                    : "新單據已辨識完成、請進收件箱確認",
+                  url: "/document-inbox",
+                  tag: `doc-${newDoc.id}`,
+                  data: { docId: newDoc.id },
+                }).catch((err) => console.error("[push] AI 完成通知失敗:", err))
+              }
             } else {
               await docInboxStorage.updateDocumentAiResult(newDoc.id, {
                 success: false,
