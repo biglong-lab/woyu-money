@@ -6,6 +6,28 @@
 
 ---
 
+## [1.0.4] - 2026-05-16
+
+### 新功能 / 對外 API
+- **通用整合 API 框架（5 phase）**：擴展原本的 income webhook 為通用「integration」框架
+  - Phase 1：新建 `integration_events` 通用拋接紀錄表（跨 income/expense）
+  - Phase 2：新建 `/api/expense/webhook/:sourceKey` 端點 + `expense_sources` / `expense_webhooks` 表（鏡像 income 架構）
+  - Phase 3：新建「整合中心」UI `/integrations`（3 tab：進帳 / 支出 / 拋接紀錄）
+  - Phase 4：串接測試工具 — 後端可產含正確簽章的 sample payload + Replay 功能
+  - Phase 5：規範文件 `docs/integration-api.md` v2.0 + `docs/openapi.yaml`
+
+### 規範文件
+- 新增 [`docs/integration-api.md`](docs/integration-api.md) — 通用 API 對接規範（給對接人 / AI 看）
+- 新增 [`docs/openapi.yaml`](docs/openapi.yaml) — OpenAPI 3.0 spec（可導入 Swagger UI / Postman / openapi-generator）
+- 完整變動紀錄：[`docs/changes/2026-05-16-integration-api-spec.md`](docs/changes/2026-05-16-integration-api-spec.md)
+
+### 影響
+- DB：新增 3 張表（`integration_events`、`expense_sources`、`expense_webhooks`）
+- 既有 `/api/income/webhook/*` 完全相容、無 breaking change
+- 「整合中心」入口已加入導航「系統管理」區
+
+---
+
 ## [1.0.3] - 2026-05-14
 
 ### 新功能 / UX
