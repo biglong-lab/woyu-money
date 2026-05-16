@@ -6,7 +6,8 @@ services:
     ports:
       - "5001:5001"
     environment:
-      - DATABASE_URL=postgresql://woyu:woyu123@db:5432/woyu_money
+      # 用 container_name 而非 service name 避免跟 PM network 內的 "db" 衝突
+      - DATABASE_URL=postgresql://woyu:woyu123@woyu-money-db:5432/woyu_money
       - SESSION_SECRET=${SESSION_SECRET:-change-me-to-random-string}
       - NODE_ENV=production
       - PORT=5001
