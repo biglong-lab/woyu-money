@@ -227,6 +227,7 @@ interface QuickMenuProps {
   onQuickAdd: () => void
   onQuickPay: () => void
   onCamera: () => void
+  onGallery: () => void
   onCashAllocation: () => void
 }
 
@@ -236,6 +237,7 @@ function QuickMenu({
   onQuickAdd,
   onQuickPay,
   onCamera,
+  onGallery,
   onCashAllocation,
 }: QuickMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null)
@@ -266,6 +268,15 @@ function QuickMenu({
       onClick: () => {
         onClose()
         onCamera()
+      },
+    },
+    {
+      label: "從相簿",
+      icon: "🖼️",
+      color: "bg-pink-50 text-pink-700",
+      onClick: () => {
+        onClose()
+        onGallery()
       },
     },
     {
@@ -303,13 +314,13 @@ function QuickMenu({
         ref={menuRef}
         className="absolute bottom-20 left-1/2 -translate-x-1/2 bg-white rounded-2xl shadow-2xl border border-gray-200 p-3 animate-in slide-in-from-bottom-4 duration-200"
       >
-        <div className="flex gap-3">
+        <div className="grid grid-cols-3 gap-2">
           {quickActions.map((action) => (
             <button
               key={action.label}
               onClick={action.onClick}
               className={cn(
-                "flex flex-col items-center gap-1.5 p-3 rounded-xl min-w-[72px]",
+                "flex flex-col items-center gap-1.5 p-3 rounded-xl",
                 "active:scale-95 transition-transform",
                 action.color
               )}
@@ -329,7 +340,7 @@ export function MobileTabBar() {
   const [openMenu, setOpenMenu] = useState<"payment" | "view" | "quick" | null>(null)
   const [showQuickAdd, setShowQuickAdd] = useState(false)
   const [showQuickPay, setShowQuickPay] = useState(false)
-  const { openCamera } = useQuickCameraUpload()
+  const { openCamera, openGallery } = useQuickCameraUpload()
 
   // 獲取單據收件箱未處理數量
   const { data: inboxStats } = useQuery<{ pending?: number }>({
@@ -397,6 +408,7 @@ export function MobileTabBar() {
         onQuickAdd={() => setShowQuickAdd(true)}
         onQuickPay={() => setShowQuickPay(true)}
         onCamera={openCamera}
+        onGallery={openGallery}
         onCashAllocation={() => {
           window.location.href = "/cash-allocation"
         }}

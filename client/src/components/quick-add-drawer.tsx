@@ -99,6 +99,7 @@ export function QuickAddDrawer({ open, onOpenChange }: QuickAddDrawerProps) {
   const { toast } = useToast()
   const isOnline = useOnlineStatus()
   const cameraRef = useRef<HTMLInputElement>(null)
+  const galleryRef = useRef<HTMLInputElement>(null)
   const nameInputRef = useRef<HTMLInputElement>(null)
   const [itemName, setItemName] = useState("")
   const [totalAmount, setTotalAmount] = useState("")
@@ -181,6 +182,7 @@ export function QuickAddDrawer({ open, onOpenChange }: QuickAddDrawerProps) {
     if (previewUrl) URL.revokeObjectURL(previewUrl)
     setPreviewUrl(null)
     if (cameraRef.current) cameraRef.current.value = ""
+    if (galleryRef.current) galleryRef.current.value = ""
   }, [previewUrl])
 
   const handleSubmit = () => {
@@ -425,20 +427,37 @@ export function QuickAddDrawer({ open, onOpenChange }: QuickAddDrawerProps) {
                     </button>
                   </div>
                 ) : (
-                  <Button
-                    variant="outline"
-                    className="w-full h-11 gap-2 border-dashed"
-                    onClick={() => cameraRef.current?.click()}
-                  >
-                    <ImagePlus className="w-4 h-4" />
-                    附加單據照片（選填）
-                  </Button>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      variant="outline"
+                      className="h-11 gap-2 border-dashed"
+                      onClick={() => cameraRef.current?.click()}
+                    >
+                      <Camera className="w-4 h-4" />
+                      拍照
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="h-11 gap-2 border-dashed"
+                      onClick={() => galleryRef.current?.click()}
+                    >
+                      <ImagePlus className="w-4 h-4" />
+                      從相簿選
+                    </Button>
+                  </div>
                 )}
                 <input
                   ref={cameraRef}
                   type="file"
                   accept="image/*"
                   capture="environment"
+                  className="hidden"
+                  onChange={handlePhotoCapture}
+                />
+                <input
+                  ref={galleryRef}
+                  type="file"
+                  accept="image/*"
                   className="hidden"
                   onChange={handlePhotoCapture}
                 />
@@ -498,22 +517,35 @@ export function useQuickCameraUpload() {
     },
   })
 
-  const openCamera = useCallback(() => {
-    // 動態建立 input 避免 DOM 殘留
-    const input = document.createElement("input")
-    input.type = "file"
-    input.accept = "image/*"
-    input.capture = "environment"
-    input.onchange = (e) => {
-      const file = (e.target as HTMLInputElement).files?.[0]
-      if (file) uploadMutation.mutate(file)
-    }
-    input.click()
-    cameraRef.current = input
-  }, [uploadMutation])
+  /**
+   * 動態建立 file input、可選擇要拍照 (camera) 還是從相簿選 (gallery)
+   * - source="camera"：強制開相機（手機適用）
+   * - source="gallery"：開檔案選擇器（手機可選相簿、桌面選檔案）
+   */
+  const triggerUpload = useCallback(
+    (source: "camera" | "gallery" = "camera") => {
+      const input = document.createElement("input")
+      input.type = "file"
+      input.accept = "image/*"
+      // 只在拍照模式才加 capture，否則讓使用者選相簿
+      if (source === "camera") input.capture = "environment"
+      input.onchange = (e) => {
+        const file = (e.target as HTMLInputElement).files?.[0]
+        if (file) uploadMutation.mutate(file)
+      }
+      input.click()
+      cameraRef.current = input
+    },
+    [uploadMutation]
+  )
+
+  // 保留舊 API 相容（既有呼叫者）
+  const openCamera = useCallback(() => triggerUpload("camera"), [triggerUpload])
+  const openGallery = useCallback(() => triggerUpload("gallery"), [triggerUpload])
 
   return {
     openCamera,
+    openGallery,
     isUploading: uploadMutation.isPending,
   }
 }

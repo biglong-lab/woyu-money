@@ -190,10 +190,19 @@ router.post(
 
         const imageBase64 = imageBuffer.toString("base64")
 
-        // 背景 AI 辨識（不阻塞回應）
+        // 背景 AI 辨識（不阻塞回應）— 60 秒 timeout 避免 hang
         void (async () => {
+          const AI_TIMEOUT_MS = 60_000
           try {
-            const result = await recognizeDocument(imageBase64, mimeType, documentType)
+            const result = await Promise.race([
+              recognizeDocument(imageBase64, mimeType, documentType),
+              new Promise<never>((_, reject) =>
+                setTimeout(
+                  () => reject(new Error(`AI 辨識逾時（超過 ${AI_TIMEOUT_MS / 1000} 秒）`)),
+                  AI_TIMEOUT_MS
+                )
+              ),
+            ])
 
             if (result.success) {
               await docInboxStorage.updateDocumentAiResult(newDoc.id, {
@@ -209,17 +218,25 @@ router.post(
             }
           } catch (aiError: unknown) {
             console.error("[upload] AI 辨識錯誤:", aiError)
+            // 多層 try：確保不論如何都會把 status 從 processing 改掉
             try {
-              const errorNotes =
-                (uploadNotes ? uploadNotes + "\n" : "") +
-                `AI辨識錯誤: ${aiError instanceof Error ? aiError.message : "未知錯誤"}`
-
+              const errorMsg = aiError instanceof Error ? aiError.message : "未知錯誤"
+              const errorNotes = (uploadNotes ? uploadNotes + "\n" : "") + `AI辨識錯誤: ${errorMsg}`
               await docInboxStorage.updateDocumentAiResult(newDoc.id, {
                 success: false,
                 notes: errorNotes,
               })
             } catch (fallbackError: unknown) {
-              console.error("[upload] 更新文件狀態失敗:", fallbackError)
+              console.error(
+                "[upload] updateDocumentAiResult 失敗，改用 setDocumentFailed:",
+                fallbackError
+              )
+              // 最後一層保險：用最簡單的方式把 status 改掉、避免永遠卡 processing
+              try {
+                await docInboxStorage.setDocumentFailed(newDoc.id)
+              } catch (lastErr) {
+                console.error("[upload] setDocumentFailed 也失敗:", lastErr)
+              }
             }
           }
         })()
