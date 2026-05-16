@@ -9,6 +9,8 @@
  */
 import { Router } from "express"
 import crypto from "crypto"
+import fs from "fs"
+import path from "path"
 import { requireAuth } from "../auth"
 import { asyncHandler, AppError } from "../middleware/error-handler"
 import { eventQuerySchema } from "@shared/schema"
@@ -26,6 +28,43 @@ import type { IncomeSource, ExpenseSource } from "@shared/schema"
 import { eq } from "drizzle-orm"
 
 const router = Router()
+
+// ─────────────────────────────────────────────
+// 公開規範文件端點（不需 auth — 供對接方 / AI / Swagger UI 讀取）
+// 對應 public path 白名單在 routes/index.ts 已加入
+// ─────────────────────────────────────────────
+
+/** GET /api/integrations/spec — 公開的對接規範（Markdown raw） */
+router.get(
+  "/api/integrations/spec",
+  asyncHandler(async (_req, res) => {
+    // 從 dist/index.js 反推到專案根 /app/docs/integration-api.md
+    // import.meta.dirname 在 production 是 /app/dist
+    const docsPath = path.resolve(import.meta.dirname, "..", "docs", "integration-api.md")
+    if (!fs.existsSync(docsPath)) {
+      throw new AppError(500, "規範文件暫時無法取得，請聯繫管理員")
+    }
+    const content = fs.readFileSync(docsPath, "utf-8")
+    res.setHeader("Content-Type", "text/markdown; charset=utf-8")
+    res.setHeader("Cache-Control", "public, max-age=300")
+    res.send(content)
+  })
+)
+
+/** GET /api/integrations/openapi — 公開的 OpenAPI 3.0 spec */
+router.get(
+  "/api/integrations/openapi",
+  asyncHandler(async (_req, res) => {
+    const yamlPath = path.resolve(import.meta.dirname, "..", "docs", "openapi.yaml")
+    if (!fs.existsSync(yamlPath)) {
+      throw new AppError(500, "OpenAPI spec 暫時無法取得，請聯繫管理員")
+    }
+    const content = fs.readFileSync(yamlPath, "utf-8")
+    res.setHeader("Content-Type", "application/yaml; charset=utf-8")
+    res.setHeader("Cache-Control", "public, max-age=300")
+    res.send(content)
+  })
+)
 
 // 注意：requireAuth 必須加在個別 route 上，
 // 不能用 router.use(requireAuth) — 那會對所有走過此 router 的請求做 auth 檢查

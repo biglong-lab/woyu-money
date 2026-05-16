@@ -26,6 +26,10 @@ COPY drizzle.config.ts ./
 COPY shared ./shared
 COPY migrations ./migrations
 
+# 複製對外公開的整合規範文件（給對接方讀）
+COPY docs/integration-api.md ./docs/integration-api.md
+COPY docs/openapi.yaml ./docs/openapi.yaml
+
 # 建立上傳目錄（含所有子目錄）
 RUN mkdir -p uploads/inbox uploads/receipts uploads/contracts uploads/documents uploads/images
 
