@@ -8,12 +8,13 @@ function getAI(): GoogleGenAI {
     if (!apiKey) {
       throw new Error("Gemini API key 未設定，AI 辨識功能無法使用")
     }
+    // 只有設了自架 Gemini proxy 時才覆寫 baseUrl 與 apiVersion
+    // 直連 Google 官方 API 時保留 SDK 預設（會用 /v1beta/models/...）
+    // 之前寫死 apiVersion:"" 會讓直連時組出 /models/... → 404 Not Found
+    const customBaseUrl = process.env.AI_INTEGRATIONS_GEMINI_BASE_URL
     _ai = new GoogleGenAI({
       apiKey,
-      httpOptions: {
-        apiVersion: "",
-        baseUrl: process.env.AI_INTEGRATIONS_GEMINI_BASE_URL || undefined,
-      },
+      ...(customBaseUrl ? { httpOptions: { apiVersion: "", baseUrl: customBaseUrl } } : {}),
     })
   }
   return _ai
