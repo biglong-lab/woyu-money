@@ -27,8 +27,9 @@ import { eq } from "drizzle-orm"
 
 const router = Router()
 
-// 全部需要登入
-router.use(requireAuth)
+// 注意：requireAuth 必須加在個別 route 上，
+// 不能用 router.use(requireAuth) — 那會對所有走過此 router 的請求做 auth 檢查
+// （包含 /、/auth 等 SPA 路由），導致非 /api/integrations/* 的 GET 也被攔成 401
 
 /** GET /api/integrations/events — 查詢拋接紀錄
  *
@@ -45,6 +46,7 @@ router.use(requireAuth)
  */
 router.get(
   "/api/integrations/events",
+  requireAuth,
   asyncHandler(async (req, res) => {
     try {
       const query = eventQuerySchema.parse(req.query)
@@ -62,6 +64,7 @@ router.get(
 /** GET /api/integrations/events/:id — 取得單筆事件詳情（給 Replay 用）*/
 router.get(
   "/api/integrations/events/:id",
+  requireAuth,
   asyncHandler(async (req, res) => {
     const id = Number(req.params.id)
     if (!Number.isInteger(id) || id < 1) {
@@ -76,6 +79,7 @@ router.get(
 /** GET /api/integrations/sources/:type/:id/health — 24h 健康指標 */
 router.get(
   "/api/integrations/sources/:type/:id/health",
+  requireAuth,
   asyncHandler(async (req, res) => {
     const type = req.params.type
     if (type !== "income" && type !== "expense") {
@@ -156,6 +160,7 @@ function buildSamplePayload(
  */
 router.post(
   "/api/integrations/sources/:type/:id/test",
+  requireAuth,
   asyncHandler(async (req, res) => {
     const type = req.params.type
     if (type !== "income" && type !== "expense")
@@ -268,6 +273,7 @@ router.post(
  */
 router.post(
   "/api/integrations/events/:id/replay",
+  requireAuth,
   asyncHandler(async (req, res) => {
     const id = Number(req.params.id)
     if (!Number.isInteger(id) || id < 1) throw new AppError(400, "無效的 event ID")
