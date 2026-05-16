@@ -9,7 +9,8 @@ export default defineConfig({
     VitePWA({
       registerType: "prompt", // 有新版時跳「重新整理」提示（不要自動更新）
       strategies: "injectManifest", // 改用 injectManifest 模式以自訂 SW（含 push handler）
-      srcDir: "client/src/sw",
+      // root 是 client/，srcDir 用相對路徑（指向 client/src/sw）
+      srcDir: "src/sw",
       filename: "sw.ts",
       // 直接讀現有的 manifest.json（已維護好）
       manifest: false,
