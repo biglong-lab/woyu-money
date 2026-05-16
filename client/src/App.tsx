@@ -10,6 +10,9 @@ import TopNavigation from "@/components/top-navigation"
 import { OfflineBanner } from "@/components/offline-banner"
 import { KeyboardShortcutsDialog } from "@/components/keyboard-shortcuts-dialog"
 import { CommandPalette } from "@/components/command-palette"
+import { PwaInstallPrompt } from "@/components/pwa-install-prompt"
+import { PwaUpdatePrompt } from "@/components/pwa-update-prompt"
+import { PushPermissionPrompt } from "@/components/push-permission-prompt"
 import MobileTabBar from "@/components/mobile-tab-bar"
 import AppBreadcrumb from "@/components/app-breadcrumb"
 import QuickActionFAB from "@/components/quick-action-fab"
@@ -88,6 +91,9 @@ function Router() {
             <OfflineBanner />
             <KeyboardShortcutsDialog />
             <CommandPalette />
+            <PwaInstallPrompt />
+            <PwaUpdatePrompt />
+            <PushPermissionPrompt />
             <TopNavigation />
             {/* 主要內容區域 - 底部留空間給手機 Tab Bar */}
             <main className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6 pb-20 md:pb-6">

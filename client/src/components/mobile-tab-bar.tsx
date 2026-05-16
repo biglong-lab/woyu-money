@@ -356,6 +356,29 @@ export function MobileTabBar() {
   })
   const urgentCount = (priorityReport?.counts?.critical ?? 0) + (priorityReport?.counts?.high ?? 0)
 
+  // App icon badge：在 PWA 安裝後桌面 icon 顯示總待辦數
+  // 支援度：Chrome/Edge desktop + Android Chrome；iOS 暫不支援（會 silent fail）
+  useEffect(() => {
+    if (typeof navigator === "undefined") return
+    const totalUnread = urgentCount + (inboxStats?.pending ?? 0)
+    const setBadge = (
+      navigator as Navigator & {
+        setAppBadge?: (count?: number) => Promise<void>
+        clearAppBadge?: () => Promise<void>
+      }
+    ).setAppBadge
+    const clearBadge = (
+      navigator as Navigator & {
+        clearAppBadge?: () => Promise<void>
+      }
+    ).clearAppBadge
+    if (totalUnread > 0 && setBadge) {
+      setBadge(totalUnread).catch(() => {})
+    } else if (clearBadge) {
+      clearBadge().catch(() => {})
+    }
+  }, [urgentCount, inboxStats?.pending])
+
   // 判斷當前路徑是否在某個分類下
   const isInPaymentSection = managementNavItems.some(
     (item) => location === item.href || location.startsWith(item.href)
