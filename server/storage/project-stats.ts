@@ -39,13 +39,13 @@ export async function getProjectsWithStats(): Promise<ProjectStatItem[]> {
         projectType: paymentProjects.projectType,
         totalAmount: sql<string>`COALESCE(SUM(CASE WHEN ${paymentItems.isDeleted} = false THEN ${paymentItems.totalAmount}::numeric ELSE 0 END), 0)`,
         paidAmount: sql<string>`COALESCE(SUM(CASE WHEN ${paymentItems.isDeleted} = false THEN ${paymentItems.paidAmount}::numeric ELSE 0 END), 0)`,
-        unpaidAmount: sql<string>`COALESCE(SUM(CASE WHEN ${paymentItems.isDeleted} = false AND ${paymentItems.status} != "paid" THEN (${paymentItems.totalAmount}::numeric - ${paymentItems.paidAmount}::numeric) ELSE 0 END), 0)`,
-        overdueAmount: sql<string>`COALESCE(SUM(CASE WHEN ${paymentItems.isDeleted} = false AND ${paymentItems.status} = "overdue" THEN (${paymentItems.totalAmount}::numeric - ${paymentItems.paidAmount}::numeric) ELSE 0 END), 0)`,
-        overdueCount: sql<number>`COUNT(CASE WHEN ${paymentItems.isDeleted} = false AND ${paymentItems.status} = "overdue" THEN 1 END)`,
+        unpaidAmount: sql<string>`COALESCE(SUM(CASE WHEN ${paymentItems.isDeleted} = false AND ${paymentItems.status} != 'paid' THEN (${paymentItems.totalAmount}::numeric - ${paymentItems.paidAmount}::numeric) ELSE 0 END), 0)`,
+        overdueAmount: sql<string>`COALESCE(SUM(CASE WHEN ${paymentItems.isDeleted} = false AND ${paymentItems.status} = 'overdue' THEN (${paymentItems.totalAmount}::numeric - ${paymentItems.paidAmount}::numeric) ELSE 0 END), 0)`,
+        overdueCount: sql<number>`COUNT(CASE WHEN ${paymentItems.isDeleted} = false AND ${paymentItems.status} = 'overdue' THEN 1 END)`,
         totalCount: sql<number>`COUNT(CASE WHEN ${paymentItems.isDeleted} = false THEN 1 END)`,
-        paidCount: sql<number>`COUNT(CASE WHEN ${paymentItems.isDeleted} = false AND ${paymentItems.status} = "paid" THEN 1 END)`,
-        pendingCount: sql<number>`COUNT(CASE WHEN ${paymentItems.isDeleted} = false AND ${paymentItems.status} = "pending" THEN 1 END)`,
-        partialCount: sql<number>`COUNT(CASE WHEN ${paymentItems.isDeleted} = false AND ${paymentItems.status} = "partial" THEN 1 END)`,
+        paidCount: sql<number>`COUNT(CASE WHEN ${paymentItems.isDeleted} = false AND ${paymentItems.status} = 'paid' THEN 1 END)`,
+        pendingCount: sql<number>`COUNT(CASE WHEN ${paymentItems.isDeleted} = false AND ${paymentItems.status} = 'pending' THEN 1 END)`,
+        partialCount: sql<number>`COUNT(CASE WHEN ${paymentItems.isDeleted} = false AND ${paymentItems.status} = 'partial' THEN 1 END)`,
       })
       .from(paymentProjects)
       .leftJoin(paymentItems, eq(paymentItems.projectId, paymentProjects.id))

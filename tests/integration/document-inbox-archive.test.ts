@@ -132,7 +132,9 @@ describe.skipIf(skipIfNoDb)("Document Inbox API - 歸檔操作", () => {
   // ── 歸檔為付款記錄 - 正向流程與驗證 ─────────────────────────────────
 
   describe("POST archive-to-payment-record - 歸檔正向流程與驗證", () => {
-    it("存在的文件但缺少 paymentItemId 應回傳 400", async () => {
+    it("缺少 paymentItemId 且缺少建新模式必填欄位應回傳 400", async () => {
+      // 改版後：缺 paymentItemId → 走「建新並標記已付」分支
+      // 缺 projectId（建新模式必填）會回 400
       const doc = await createTestDocument({ documentType: "payment" })
       createdDocIds.push(doc.id)
 
@@ -140,11 +142,12 @@ describe.skipIf(skipIfNoDb)("Document Inbox API - 歸檔操作", () => {
         .post(`/api/document-inbox/${doc.id}/archive-to-payment-record`)
         .send({
           amount: "5000",
-          // 故意不傳 paymentItemId
+          // 故意不傳 paymentItemId 也不傳 projectId
         })
 
       expect(res.status).toBe(400)
-      expect(res.body.message).toContain("請選擇要關聯的付款項目")
+      // 新版錯誤訊息：「建新模式：請選擇專案」
+      expect(res.body.message).toMatch(/專案|payment/i)
     })
 
     it("應成功將文件歸檔為付款記錄（需先建立付款項目）", async () => {

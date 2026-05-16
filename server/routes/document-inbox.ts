@@ -423,6 +423,7 @@ router.post(
 )
 
 // 帳單歸檔為付款項目
+// markAsPaid=true 時同步建付款紀錄並標記已付（方式三：拿到帳單已逾期、直接付）
 router.post(
   "/api/document-inbox/:id/archive-to-payment-item",
   requireAuth,
@@ -437,8 +438,24 @@ router.post(
       throw new AppError(404, "找不到該項目")
     }
 
+    // Idempotency 防呆
+    if (doc.status === "archived") {
+      throw new AppError(400, "此單據已歸檔，無法重複歸檔")
+    }
+
     const userId = req.session.userId
-    const { projectId, categoryId, itemName, totalAmount, dueDate, notes } = req.body
+    const {
+      projectId,
+      categoryId,
+      itemName,
+      totalAmount,
+      dueDate,
+      notes,
+      // Phase 4：建立後立即標記已付
+      markAsPaid,
+      paymentDate,
+      paymentMethod,
+    } = req.body
 
     const archivedByUsername = await resolveDisplayName(userId)
     const trackingNotes = buildTrackingNotes(doc, archivedByUsername, notes)
@@ -446,15 +463,70 @@ router.post(
     const docDate = dueDate || doc.confirmedDate || doc.recognizedDate
     const startDateValue = docDate ? docDate : localDateTPE()
 
+    const effectiveItemName =
+      itemName || doc.confirmedDescription || doc.recognizedDescription || "待確認項目"
+    const effectiveTotalAmount = totalAmount || doc.confirmedAmount || doc.recognizedAmount || "0"
+    const effectiveEndDate = dueDate || doc.confirmedDate || doc.recognizedDate || null
+
+    // ─── 模式：建立後立即標記已付（同步建付款紀錄）───
+    if (markAsPaid) {
+      if (!projectId) throw new AppError(400, "標記已付模式：請選擇專案")
+      if (parseFloat(effectiveTotalAmount) <= 0) {
+        throw new AppError(400, "標記已付模式：請輸入有效的金額")
+      }
+      const effectivePaymentDate = paymentDate || startDateValue
+
+      const result = await docInboxStorage.archiveToNewPaidPaymentItem(
+        id,
+        {
+          projectId,
+          categoryId: categoryId || null,
+          itemName: effectiveItemName,
+          totalAmount: effectiveTotalAmount.toString(),
+          startDate: startDateValue,
+          endDate: effectiveEndDate,
+          notes: trackingNotes,
+          source: "ai_scan",
+          sourceDocumentId: doc.id,
+          documentUploadedAt: doc.createdAt,
+          documentUploadedByUserId: doc.userId,
+          documentUploadedByUsername: doc.uploadedByUsername,
+          archivedByUserId: userId,
+          archivedByUsername,
+        },
+        {
+          amountPaid: effectiveTotalAmount.toString(),
+          paymentDate: effectivePaymentDate,
+          paymentMethod: paymentMethod || "cash",
+          receiptImageUrl: doc.imagePath,
+          notes: trackingNotes,
+        },
+        {
+          archivedToType: "payment_item",
+          archivedToId: 0,
+          archivedByUserId: userId,
+          archivedByUsername,
+        }
+      )
+
+      return res.json({
+        message: "已建立付款項目並標記為已付",
+        paymentItem: result.paymentItem,
+        paymentRecord: result.paymentRecord,
+        markedAsPaid: true,
+      })
+    }
+
+    // ─── 原本模式：純建付款項目（待付）───
     const newItem = await docInboxStorage.archiveToPaymentItem(
       id,
       {
         projectId: projectId || null,
         categoryId: categoryId || null,
-        itemName: itemName || doc.confirmedDescription || doc.recognizedDescription || "待確認項目",
-        totalAmount: totalAmount || doc.confirmedAmount || doc.recognizedAmount || "0",
+        itemName: effectiveItemName,
+        totalAmount: effectiveTotalAmount,
         startDate: startDateValue,
-        endDate: dueDate || doc.confirmedDate || doc.recognizedDate || null,
+        endDate: effectiveEndDate,
         notes: trackingNotes,
         source: "ai_scan",
         sourceDocumentId: doc.id,
@@ -466,7 +538,7 @@ router.post(
       },
       {
         archivedToType: "payment_item",
-        archivedToId: 0, // 由 storage 層用實際 id 替代
+        archivedToId: 0,
         archivedByUserId: userId,
         archivedByUsername,
       }
@@ -477,6 +549,10 @@ router.post(
 )
 
 // 付款憑證歸檔為付款記錄
+// 支援兩種模式：
+//   A. 對沖既有付款項目（傳 paymentItemId）— 原本流程
+//   B. 直接建新項目並標記已付（不傳 paymentItemId，需傳 projectId/itemName/totalAmount）
+//      適用「逾期繳費 / 拿到收據時沒事前帳單」實務情境
 router.post(
   "/api/document-inbox/:id/archive-to-payment-record",
   requireAuth,
@@ -491,16 +567,83 @@ router.post(
       throw new AppError(404, "找不到該項目")
     }
 
-    const userId = req.session.userId
-    const { paymentItemId, amount, paymentDate, paymentMethod, notes } = req.body
-
-    if (!paymentItemId) {
-      throw new AppError(400, "請選擇要關聯的付款項目")
+    // Idempotency 防呆：已歸檔的不能再歸檔
+    if (doc.status === "archived") {
+      throw new AppError(400, "此單據已歸檔，無法重複歸檔")
     }
+
+    const userId = req.session.userId
+    const {
+      paymentItemId,
+      amount,
+      paymentDate,
+      paymentMethod,
+      notes,
+      // 模式 B 額外參數
+      projectId,
+      categoryId,
+      itemName,
+      totalAmount,
+    } = req.body
 
     const archivedByUsername = await resolveDisplayName(userId)
     const trackingNotes = buildTrackingNotes(doc, archivedByUsername, notes)
 
+    // ─── 模式 B：建新項目並標記已付 ───
+    if (!paymentItemId) {
+      if (!projectId) throw new AppError(400, "建新模式：請選擇專案")
+      const effectiveItemName = itemName || doc.confirmedDescription || doc.recognizedDescription
+      if (!effectiveItemName) throw new AppError(400, "建新模式：請輸入項目名稱")
+      const effectiveTotalAmount =
+        totalAmount || amount || doc.confirmedAmount || doc.recognizedAmount
+      if (!effectiveTotalAmount || parseFloat(effectiveTotalAmount) <= 0) {
+        throw new AppError(400, "建新模式：請輸入有效的金額")
+      }
+      const effectivePaymentDate =
+        paymentDate || doc.confirmedDate || doc.recognizedDate || localDateTPE()
+
+      const result = await docInboxStorage.archiveToNewPaidPaymentItem(
+        id,
+        {
+          projectId: projectId,
+          categoryId: categoryId || null,
+          itemName: effectiveItemName,
+          totalAmount: effectiveTotalAmount.toString(),
+          startDate: effectivePaymentDate,
+          endDate: effectivePaymentDate,
+          notes: trackingNotes,
+          source: "ai_scan",
+          sourceDocumentId: doc.id,
+          documentUploadedAt: doc.createdAt,
+          documentUploadedByUserId: doc.userId,
+          documentUploadedByUsername: doc.uploadedByUsername,
+          archivedByUserId: userId,
+          archivedByUsername,
+        },
+        {
+          amountPaid: effectiveTotalAmount.toString(),
+          paymentDate: effectivePaymentDate,
+          paymentMethod: paymentMethod || "cash",
+          receiptImageUrl: doc.imagePath,
+          notes: trackingNotes,
+        },
+        {
+          archivedToType: "payment_record",
+          archivedToId: 0,
+          archivedByUserId: userId,
+          archivedByUsername,
+        }
+      )
+
+      return res.json({
+        message: "已建立付款項目並標記為已付",
+        paymentItem: result.paymentItem,
+        paymentRecord: result.paymentRecord,
+        createdNewItem: true,
+      })
+    }
+
+    // ─── 模式 A：對沖既有付款項目 ───
     const newRecord = await docInboxStorage.archiveToPaymentRecord(
       id,
       {

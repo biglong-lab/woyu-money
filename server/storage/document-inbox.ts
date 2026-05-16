@@ -184,13 +184,8 @@ export async function getDocumentInboxItems(
 }
 
 /** 取得單一文件收件箱項目 */
-export async function getDocumentInboxItem(
-  id: number
-): Promise<DocumentInbox | undefined> {
-  const [doc] = await db
-    .select()
-    .from(documentInbox)
-    .where(eq(documentInbox.id, id))
+export async function getDocumentInboxItem(id: number): Promise<DocumentInbox | undefined> {
+  const [doc] = await db.select().from(documentInbox).where(eq(documentInbox.id, id))
   return doc
 }
 
@@ -262,8 +257,7 @@ export async function getDocumentInboxStats(): Promise<DocumentInboxStats> {
     }
   }
 
-  summary.totalPending =
-    summary.bill.total + summary.payment.total + summary.invoice.total
+  summary.totalPending = summary.bill.total + summary.payment.total + summary.invoice.total
 
   return summary
 }
@@ -271,9 +265,7 @@ export async function getDocumentInboxStats(): Promise<DocumentInboxStats> {
 // --- 輔助查詢 ---
 
 /** 取得使用者顯示名稱 */
-export async function getUserDisplayName(
-  userId: number
-): Promise<UserDisplayName | undefined> {
+export async function getUserDisplayName(userId: number): Promise<UserDisplayName | undefined> {
   const [user] = await db
     .select({ username: users.username, fullName: users.fullName })
     .from(users)
@@ -322,10 +314,7 @@ export async function updateDocumentAiResult(
       updateData.notes = result.notes
     }
 
-    await db
-      .update(documentInbox)
-      .set(updateData)
-      .where(eq(documentInbox.id, id))
+    await db.update(documentInbox).set(updateData).where(eq(documentInbox.id, id))
   }
 }
 
@@ -448,12 +437,8 @@ export async function archiveToPaymentRecord(
 
     if (item) {
       const newPaidAmount =
-        parseFloat(item.paidAmount || "0") +
-        parseFloat(newRecord.amountPaid || "0")
-      const newStatus =
-        newPaidAmount >= parseFloat(item.totalAmount || "0")
-          ? "paid"
-          : "partial"
+        parseFloat(item.paidAmount || "0") + parseFloat(newRecord.amountPaid || "0")
+      const newStatus = newPaidAmount >= parseFloat(item.totalAmount || "0") ? "paid" : "partial"
 
       await tx
         .update(paymentItems)
@@ -479,6 +464,82 @@ export async function archiveToPaymentRecord(
       .where(eq(documentInbox.id, docId))
 
     return newRecord
+  })
+}
+
+/**
+ * 歸檔為「新建已付項目」（方式二實務情境）
+ *
+ * 一個 transaction 內：
+ *   1. 建 paymentItem（status=paid、paidAmount=totalAmount）
+ *   2. 建 paymentRecord 指向新 item
+ *   3. 更新 documentInbox 為 archived（archivedToType=payment_record，連結到 record）
+ *
+ * 使用情境：使用者拿到「已付收據」但系統內沒事前帳單（逾期繳費場景）
+ */
+export async function archiveToNewPaidPaymentItem(
+  docId: number,
+  itemData: ArchiveToPaymentItemData,
+  recordData: Omit<ArchiveToPaymentRecordData, "itemId">,
+  archiveData: ArchiveStatusData
+): Promise<{ paymentItem: PaymentItem; paymentRecord: PaymentRecord }> {
+  return await db.transaction(async (tx) => {
+    const now = new Date()
+
+    // 1. 建 payment_item（status=paid、paidAmount = totalAmount）
+    const [newItem] = await tx
+      .insert(paymentItems)
+      .values({
+        projectId: itemData.projectId,
+        categoryId: itemData.categoryId,
+        itemName: itemData.itemName,
+        totalAmount: itemData.totalAmount,
+        paidAmount: itemData.totalAmount, // 全額已付
+        status: "paid",
+        startDate: itemData.startDate,
+        endDate: itemData.endDate,
+        notes: itemData.notes,
+        createdAt: now,
+        updatedAt: now,
+        source: itemData.source,
+        sourceDocumentId: itemData.sourceDocumentId,
+        documentUploadedAt: itemData.documentUploadedAt,
+        documentUploadedByUserId: itemData.documentUploadedByUserId,
+        documentUploadedByUsername: itemData.documentUploadedByUsername,
+        archivedByUserId: itemData.archivedByUserId,
+        archivedByUsername: itemData.archivedByUsername,
+        archivedAt: now,
+      })
+      .returning()
+
+    // 2. 建 payment_record 指向新 item
+    const [newRecord] = await tx
+      .insert(paymentRecords)
+      .values({
+        itemId: newItem.id,
+        amountPaid: recordData.amountPaid,
+        paymentDate: recordData.paymentDate,
+        paymentMethod: recordData.paymentMethod,
+        receiptImageUrl: recordData.receiptImageUrl,
+        notes: recordData.notes,
+      })
+      .returning()
+
+    // 3. 更新 documentInbox 為 archived（archivedToId 指向 record 保持與舊路徑一致）
+    await tx
+      .update(documentInbox)
+      .set({
+        status: "archived",
+        archivedToType: archiveData.archivedToType,
+        archivedToId: newRecord.id,
+        archivedAt: now,
+        archivedByUserId: archiveData.archivedByUserId,
+        archivedByUsername: archiveData.archivedByUsername,
+        updatedAt: now,
+      })
+      .where(eq(documentInbox.id, docId))
+
+    return { paymentItem: newItem, paymentRecord: newRecord }
   })
 }
 

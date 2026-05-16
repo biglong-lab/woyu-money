@@ -177,22 +177,47 @@ export default function DocumentInboxPage() {
   })
 
   // 歸檔
+  interface ArchiveResponse {
+    message?: string
+    paymentItem?: { id: number; itemName?: string; totalAmount?: string }
+    paymentRecord?: { id: number; amountPaid?: string }
+    createdNewItem?: boolean
+    markedAsPaid?: boolean
+  }
   const archiveMutation = useMutation({
     mutationFn: async ({ id, type, data }: { id: number; type: string; data: ArchiveData }) => {
-      return apiRequest("POST", `/api/document-inbox/${id}/archive-to-${type}`, data)
+      return apiRequest<ArchiveResponse>(
+        "POST",
+        `/api/document-inbox/${id}/archive-to-${type}`,
+        data
+      )
     },
-    onSuccess: (_, variables) => {
+    onSuccess: (resp, variables) => {
       invalidateDocumentInboxQueries()
       queryClient.invalidateQueries({ queryKey: ["/api/payment/items"] })
       queryClient.invalidateQueries({ queryKey: ["/api/payment/records"] })
       queryClient.invalidateQueries({ queryKey: ["/api/invoice-records"] })
 
-      const typeLabels: Record<string, string> = {
-        "payment-item": "付款項目",
-        "payment-record": "付款記錄",
-        invoice: "發票記錄",
+      // 智慧 Toast：依後端回傳判斷實際做了什麼
+      let title = "✅ 歸檔成功"
+      let description: string
+      if (resp?.createdNewItem || resp?.markedAsPaid) {
+        // 建新並標記已付 / 帳單同步已付
+        title = "✅ 已建立並標記已付"
+        const itemName = resp.paymentItem?.itemName || "新項目"
+        const amount = resp.paymentItem?.totalAmount
+          ? `$${Number(resp.paymentItem.totalAmount).toLocaleString()}`
+          : ""
+        description = `「${itemName}」${amount} — 已自動建項目 + 付款紀錄`
+      } else {
+        const typeLabels: Record<string, string> = {
+          "payment-item": "付款項目",
+          "payment-record": "付款記錄",
+          invoice: "發票記錄",
+        }
+        description = `已轉為${typeLabels[variables.type]}`
       }
-      toast({ title: "歸檔成功", description: `已轉為${typeLabels[variables.type]}` })
+      toast({ title, description })
       setShowArchiveDialog(false)
       setSelectedDoc(null)
     },

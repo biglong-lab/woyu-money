@@ -104,8 +104,8 @@ export async function getSystemStats(): Promise<SystemStatsResult> {
         total: count(),
         active: sql<number>`COUNT(CASE WHEN is_active = true THEN 1 END)`,
         inactive: sql<number>`COUNT(CASE WHEN is_active = false THEN 1 END)`,
-        lineUsers: sql<number>`COUNT(CASE WHEN auth_provider = "line" THEN 1 END)`,
-        localUsers: sql<number>`COUNT(CASE WHEN auth_provider = "local" THEN 1 END)`,
+        lineUsers: sql<number>`COUNT(CASE WHEN auth_provider = 'line' THEN 1 END)`,
+        localUsers: sql<number>`COUNT(CASE WHEN auth_provider = 'local' THEN 1 END)`,
       })
       .from(users)
 
@@ -113,9 +113,9 @@ export async function getSystemStats(): Promise<SystemStatsResult> {
     const paymentStats = await db
       .select({
         totalItems: count(),
-        paidItems: sql<number>`COUNT(CASE WHEN status = "paid" THEN 1 END)`,
-        pendingItems: sql<number>`COUNT(CASE WHEN status = "pending" THEN 1 END)`,
-        overdueItems: sql<number>`COUNT(CASE WHEN status = "overdue" THEN 1 END)`,
+        paidItems: sql<number>`COUNT(CASE WHEN status = 'paid' THEN 1 END)`,
+        pendingItems: sql<number>`COUNT(CASE WHEN status = 'pending' THEN 1 END)`,
+        overdueItems: sql<number>`COUNT(CASE WHEN status = 'overdue' THEN 1 END)`,
         totalAmount: sql<string>`COALESCE(SUM(total_amount::numeric), 0)`,
         paidAmount: sql<string>`COALESCE(SUM(paid_amount::numeric), 0)`,
       })
@@ -134,8 +134,8 @@ export async function getSystemStats(): Promise<SystemStatsResult> {
     const categoryStats = await db
       .select({
         totalCategories: count(),
-        projectCategories: sql<number>`COUNT(CASE WHEN category_type = "project" THEN 1 END)`,
-        householdCategories: sql<number>`COUNT(CASE WHEN category_type = "household" THEN 1 END)`,
+        projectCategories: sql<number>`COUNT(CASE WHEN category_type = 'project' THEN 1 END)`,
+        householdCategories: sql<number>`COUNT(CASE WHEN category_type = 'household' THEN 1 END)`,
       })
       .from(debtCategories)
 
