@@ -15,6 +15,10 @@ services:
       # LINE Bot（可選）
       - LINE_BOT_CHANNEL_ACCESS_TOKEN=${LINE_BOT_CHANNEL_ACCESS_TOKEN:-}
       - LINE_BOT_CHANNEL_SECRET=${LINE_BOT_CHANNEL_SECRET:-}
+      # Web Push（VAPID）— 未設定則 Push 端點回 503
+      - VAPID_PUBLIC_KEY=${VAPID_PUBLIC_KEY:-}
+      - VAPID_PRIVATE_KEY=${VAPID_PRIVATE_KEY:-}
+      - VAPID_SUBJECT=${VAPID_SUBJECT:-mailto:admin@homi.cc}
     volumes:
       - uploads:/app/uploads
     depends_on:
