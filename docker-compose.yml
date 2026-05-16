@@ -19,6 +19,12 @@ services:
       - VAPID_PUBLIC_KEY=${VAPID_PUBLIC_KEY:-}
       - VAPID_PRIVATE_KEY=${VAPID_PRIVATE_KEY:-}
       - VAPID_SUBJECT=${VAPID_SUBJECT:-mailto:admin@homi.cc}
+      # PM / PMS Bridge — 唯讀同步源資料庫（直連 docker network 內的 PM postgres）
+      - PM_DATABASE_URL=${PM_DATABASE_URL:-}
+      - PMS_DATABASE_URL=${PMS_DATABASE_URL:-}
+    networks:
+      - default
+      - pm_pm-network
     volumes:
       - uploads:/app/uploads
     depends_on:
@@ -40,6 +46,13 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+networks:
+  default:
+    name: woyu_default
+  # PM 系統的 docker network — 透過 external 引用、woyu-money 加入後可解析 pm-postgres-prod
+  pm_pm-network:
+    external: true
 
 volumes:
   pgdata:

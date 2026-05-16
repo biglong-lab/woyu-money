@@ -44,15 +44,27 @@ export async function getIncomeStatement(year: number, month: number) {
     ORDER BY amount DESC
   `)
 
-  const rentalIncomeResult = await db.execute(sql`
+  // 從 income_webhooks 撈該月外部同步進來的收入（PM bridge / POS 等）
+  // 包含 pending 與 confirmed，排除 rejected/duplicate/error
+  // 用 income_sources.source_name 當 category 名稱
+  const externalIncomeResult = await db.execute(sql`
     SELECT
-      '租金收入' as category,
-      COALESCE(SUM(CAST(base_amount AS DECIMAL(12,2))), 0) as amount
-    FROM rental_contracts
-    WHERE is_active = true
-      AND start_date < ${endDate}
-      AND (end_date IS NULL OR end_date >= ${startDate})
+      COALESCE(s.source_name, '外部收入') AS category,
+      COALESCE(SUM(CAST(iw.parsed_amount_twd AS DECIMAL(12,2))), 0) AS amount
+    FROM income_webhooks iw
+    LEFT JOIN income_sources s ON s.id = iw.source_id
+    WHERE iw.parsed_paid_at >= ${startDate}
+      AND iw.parsed_paid_at < ${endDate}
+      AND iw.status IN ('pending', 'confirmed')
+      AND s.is_active = true
+    GROUP BY s.source_name
+    ORDER BY amount DESC
   `)
+
+  // 註：舊版 rentalIncomeResult 用 rental_contracts.base_amount 直接 sum
+  // 是 buggy fallback（不按月份、每月一樣）。已移除。
+  // 租金收入應該透過 payment_records 主表（item_type='income'）流入，
+  // 已在上方 incomeResult 涵蓋；外部來源（PM）走 externalIncomeResult。
 
   const expenseResult = await db.execute(sql`
     SELECT
@@ -77,11 +89,12 @@ export async function getIncomeStatement(year: number, month: number) {
     WHERE year = ${year} AND month = ${month}
   `)
 
-  const rentalRows = (rentalIncomeResult.rows || []) as SqlRow[]
   const incomeRows = (incomeResult.rows || []) as SqlRow[]
+  const externalRows = (externalIncomeResult.rows || []) as SqlRow[]
   const incomeItems: StatementItem[] = [
-    ...rentalRows.filter((r) => parseFloat(r.amount) > 0),
-    ...incomeRows,
+    ...incomeRows.filter((r) => parseFloat(r.amount) > 0),
+    // 外部系統（PM bridge / POS）同步進來的收入 — 唯讀資料、不影響主表
+    ...externalRows.filter((r) => parseFloat(r.amount) > 0),
   ].map((r) => ({ category: r.category, amount: parseFloat(r.amount || "0") }))
   const incomeTotal = incomeItems.reduce((sum, i) => sum + i.amount, 0)
 
@@ -202,7 +215,10 @@ export async function getCashFlowStatement(year: number, month: number) {
   const opIncome = parseFloat(opRow?.income || "0")
   const opExpense = parseFloat(opRow?.expense || "0")
 
-  let investReturn = 0, newInvest = 0, borrowed = 0, repaid = 0
+  let investReturn = 0,
+    newInvest = 0,
+    borrowed = 0,
+    repaid = 0
   try {
     const investResult = await db.execute(sql`
       SELECT
@@ -247,7 +263,7 @@ export async function getCashFlowStatement(year: number, month: number) {
       ],
       total: borrowed - repaid,
     },
-    netCashFlow: (opIncome - opExpense) + (investReturn - newInvest) + (borrowed - repaid),
+    netCashFlow: opIncome - opExpense + (investReturn - newInvest) + (borrowed - repaid),
   }
 }
 
@@ -481,7 +497,7 @@ export async function getSupplementaryHealthReport(year: number) {
   `)
 
   const employeeMap = new Map<string, { name: string; totalSalary: number; months: number }>()
-  for (const r of ((bonusResult.rows || []) as SqlRow[])) {
+  for (const r of (bonusResult.rows || []) as SqlRow[]) {
     const name = r.employee_name
     const existing = employeeMap.get(name) || { name, totalSalary: 0, months: 0 }
     existing.totalSalary += parseFloat(r.monthly_salary || "0")
