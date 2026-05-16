@@ -25,9 +25,13 @@ import { apiRequest } from "@/lib/queryClient"
 import {
   Activity,
   AlertTriangle,
+  BookOpen,
   CheckCircle2,
   Copy,
+  ExternalLink,
+  FileCode,
   Inbox,
+  Link2,
   Repeat,
   Send,
   Settings as SettingsIcon,
@@ -90,6 +94,8 @@ export default function IntegrationsCenter() {
           管理收入 / 支出端的外部 API 嫁接、檢查拋接紀錄與健康指標
         </p>
       </div>
+
+      <SpecLinksCard />
 
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)}>
         <TabsList className="grid w-full grid-cols-3 max-w-md">
@@ -633,5 +639,102 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       <label className="block text-xs text-gray-600 mb-1">{label}</label>
       {children}
     </div>
+  )
+}
+
+// ─────────────────────────────────────────────
+// 對接規範連結卡片（公開：給對接方 / AI / Swagger UI 讀）
+// ─────────────────────────────────────────────
+function SpecLinksCard() {
+  const { toast } = useToast()
+  const origin = typeof window !== "undefined" ? window.location.origin : "https://money.homi.cc"
+  const specUrl = `${origin}/api/integrations/spec`
+  const openapiUrl = `${origin}/api/integrations/openapi`
+
+  const copy = async (text: string, label: string) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      toast({ title: "✅ 已複製", description: label })
+    } catch {
+      toast({ title: "複製失敗", description: "請手動複製", variant: "destructive" })
+    }
+  }
+
+  return (
+    <Card className="border-blue-200 bg-blue-50/50">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base flex items-center gap-2">
+          <BookOpen className="h-5 w-5 text-blue-600" />
+          對接規範文件（公開連結，免登入）
+        </CardTitle>
+        <CardDescription>
+          把下列連結傳給對接方工程師或 AI、讓他們直接讀規範。免帳號、可內嵌 Swagger UI。
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        {/* Markdown 規範 */}
+        <div className="flex items-center gap-2 p-2 bg-white rounded-lg border">
+          <BookOpen className="h-4 w-4 text-blue-600 flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-medium">完整規範（Markdown）</div>
+            <div className="text-xs font-mono text-gray-500 truncate">{specUrl}</div>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => copy(specUrl, "Markdown 規範連結")}
+            title="複製連結"
+          >
+            <Link2 className="h-3 w-3" />
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => window.open(specUrl, "_blank")}
+            title="開新分頁瀏覽"
+          >
+            <ExternalLink className="h-3 w-3" />
+          </Button>
+        </div>
+
+        {/* OpenAPI Spec */}
+        <div className="flex items-center gap-2 p-2 bg-white rounded-lg border">
+          <FileCode className="h-4 w-4 text-purple-600 flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-medium">OpenAPI 3.0 Spec（YAML）</div>
+            <div className="text-xs font-mono text-gray-500 truncate">{openapiUrl}</div>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => copy(openapiUrl, "OpenAPI 連結")}
+            title="複製連結"
+          >
+            <Link2 className="h-3 w-3" />
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => window.open(openapiUrl, "_blank")}
+            title="開新分頁下載"
+          >
+            <ExternalLink className="h-3 w-3" />
+          </Button>
+        </div>
+
+        <div className="text-xs text-gray-600 pt-1 flex items-center gap-1">
+          <span>💡 Swagger UI 對接：把 OpenAPI URL 貼到</span>
+          <a
+            href="https://editor.swagger.io/"
+            target="_blank"
+            rel="noreferrer"
+            className="text-blue-600 underline"
+          >
+            editor.swagger.io
+          </a>
+          <span>即可互動式測試 API。</span>
+        </div>
+      </CardContent>
+    </Card>
   )
 }

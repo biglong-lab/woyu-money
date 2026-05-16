@@ -65,7 +65,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     //   保留為雙保險
     // - /auth/line：LINE OAuth 起點（line-auth.ts），同樣早於此 middleware 註冊
     // - /line/callback：LINE OAuth 回呼（admin.ts），晚於此 middleware 註冊，必須在白名單
-    const publicPaths = ["/login", "/register", "/logout", "/user", "/auth/line", "/line/callback"]
+    const publicPaths = [
+      "/login",
+      "/register",
+      "/logout",
+      "/user",
+      "/auth/line",
+      "/line/callback",
+      // 整合規範文件（給對接方 / AI / Swagger UI 公開讀取）
+      "/integrations/spec",
+      "/integrations/openapi",
+    ]
     // Webhook 接收端點：/income/webhook/ 和 /expense/webhook/ 開頭的 POST 請求不需 session 認證
     // （改用 secret/token 驗證，在路由層處理）
     const isWebhookReceiver =

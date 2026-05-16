@@ -7,6 +7,17 @@
 
 ---
 
+## 公開連結（給對接方 / AI / Swagger UI）
+
+| 用途 | 公開 URL（免登入）|
+|------|-------------------|
+| 本規範（Markdown） | `https://money.homi.cc/api/integrations/spec` |
+| OpenAPI 3.0 Spec | `https://money.homi.cc/api/integrations/openapi` |
+
+把 OpenAPI URL 貼到 [editor.swagger.io](https://editor.swagger.io/) 即可看到完整互動式 API explorer。
+
+---
+
 ## 0. 給對接方的快速 Onboarding
 
 > 你是要把資料推進浯島財務管理系統的工程師 / AI 助手嗎？看這節 3 分鐘就懂。
