@@ -1,18 +1,18 @@
 // 一般付款管理 - 詳情對話框元件
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Label } from "@/components/ui/label";
-import { Progress } from "@/components/ui/progress";
-import { Card, CardContent } from "@/components/ui/card";
+import { useState } from "react"
+import { useQuery } from "@tanstack/react-query"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Label } from "@/components/ui/label"
+import { Progress } from "@/components/ui/progress"
+import { Card, CardContent } from "@/components/ui/card"
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog";
+} from "@/components/ui/dialog"
 import {
   Clock,
   ChevronUp,
@@ -23,23 +23,23 @@ import {
   Image,
   DollarSign,
   CreditCard,
-} from "lucide-react";
-import type { PaymentItem } from "./general-payment-types";
-import type { AuditLog } from "@shared/schema";
+} from "lucide-react"
+import type { PaymentItem } from "./general-payment-types"
+import type { AuditLog } from "@shared/schema"
 
 // 付款紀錄型別
 interface PaymentRecordData {
-  id: number;
-  itemId: number;
-  amount?: string;
-  amountPaid?: string;
-  paymentDate: string;
-  paymentMethod?: string;
-  notes?: string;
-  receiptImageUrl?: string;
-  receiptText?: string;
-  isPartialPayment?: boolean;
-  createdAt?: string;
+  id: number
+  itemId: number
+  amount?: string
+  amountPaid?: string
+  paymentDate: string
+  paymentMethod?: string
+  notes?: string
+  receiptImageUrl?: string
+  receiptText?: string
+  isPartialPayment?: boolean
+  createdAt?: string
 }
 
 // 付款方式中文對照
@@ -50,16 +50,16 @@ const PAYMENT_METHOD_MAP: Record<string, string> = {
   digital_payment: "數位支付",
   check: "支票",
   other: "其他",
-};
+}
 
 function getPaymentMethodText(method: string): string {
-  return PAYMENT_METHOD_MAP[method] || method || "未指定";
+  return PAYMENT_METHOD_MAP[method] || method || "未指定"
 }
 
 export interface GeneralPaymentDetailDialogProps {
-  isOpen: boolean;
-  onOpenChange: (open: boolean) => void;
-  detailItem: PaymentItem | null;
+  isOpen: boolean
+  onOpenChange: (open: boolean) => void
+  detailItem: PaymentItem | null
 }
 
 export function GeneralPaymentDetailDialog({
@@ -67,48 +67,39 @@ export function GeneralPaymentDetailDialog({
   onOpenChange,
   detailItem,
 }: GeneralPaymentDetailDialogProps) {
-  const [showAuditHistory, setShowAuditHistory] = useState(false);
-  const [showPaymentRecords, setShowPaymentRecords] = useState(true);
+  const [showAuditHistory, setShowAuditHistory] = useState(false)
+  const [showPaymentRecords, setShowPaymentRecords] = useState(true)
 
   // 獲取付款紀錄
-  const { data: paymentRecords = [], isLoading: isLoadingRecords } = useQuery<
-    PaymentRecordData[]
-  >({
+  const { data: paymentRecords = [], isLoading: isLoadingRecords } = useQuery<PaymentRecordData[]>({
     queryKey: ["/api/payment/items", detailItem?.id, "records"],
     queryFn: async () => {
-      if (!detailItem?.id) return [];
-      const response = await fetch(
-        `/api/payment/items/${detailItem.id}/records`
-      );
-      if (!response.ok) return [];
-      return response.json();
+      if (!detailItem?.id) return []
+      const response = await fetch(`/api/payment/items/${detailItem.id}/records`)
+      if (!response.ok) return []
+      return response.json()
     },
     enabled: isOpen && !!detailItem?.id,
     staleTime: 30000,
-  });
+  })
 
   // 獲取審計日誌
-  const { data: auditLogs = [], isLoading: isLoadingAuditLogs } = useQuery<
-    AuditLog[]
-  >({
+  const { data: auditLogs = [], isLoading: isLoadingAuditLogs } = useQuery<AuditLog[]>({
     queryKey: [`/api/payment/items/${detailItem?.id}/audit-logs`],
     enabled: !!detailItem && showAuditHistory,
-  });
+  })
 
   // 計算付款進度
-  const totalAmount = parseFloat(detailItem?.totalAmount || "0");
-  const paidAmount = parseFloat(detailItem?.paidAmount || "0");
-  const remainingAmount = totalAmount - paidAmount;
-  const progressPercent =
-    totalAmount > 0 ? Math.min((paidAmount / totalAmount) * 100, 100) : 0;
+  const totalAmount = parseFloat(detailItem?.totalAmount || "0")
+  const paidAmount = parseFloat(detailItem?.paidAmount || "0")
+  const remainingAmount = totalAmount - paidAmount
+  const progressPercent = totalAmount > 0 ? Math.min((paidAmount / totalAmount) * 100, 100) : 0
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+      <DialogContent className="w-[95vw] max-w-3xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-lg">
-            {detailItem?.itemName || "付款項目詳情"}
-          </DialogTitle>
+          <DialogTitle className="text-lg">{detailItem?.itemName || "付款項目詳情"}</DialogTitle>
         </DialogHeader>
         {detailItem && (
           <div className="space-y-4">
@@ -124,10 +115,7 @@ export function GeneralPaymentDetailDialog({
             {/* 基本資訊 */}
             <div className="grid grid-cols-2 gap-4">
               <InfoField label="專案" value={detailItem.projectName || "無"} />
-              <InfoField
-                label="分類"
-                value={detailItem.categoryName || "無"}
-              />
+              <InfoField label="分類" value={detailItem.categoryName || "無"} />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <InfoField
@@ -139,9 +127,7 @@ export function GeneralPaymentDetailDialog({
                 }
               />
               <div>
-                <Label className="text-sm font-medium text-gray-500">
-                  付款狀態
-                </Label>
+                <Label className="text-sm font-medium text-gray-500">付款狀態</Label>
                 <div className="mt-1">
                   <StatusBadge status={detailItem.status} />
                 </div>
@@ -150,9 +136,7 @@ export function GeneralPaymentDetailDialog({
 
             {detailItem.notes && (
               <div>
-                <Label className="text-sm font-medium text-gray-500">
-                  項目備註
-                </Label>
+                <Label className="text-sm font-medium text-gray-500">項目備註</Label>
                 <p className="mt-1 p-3 bg-gray-50 rounded whitespace-pre-wrap text-sm">
                   {detailItem.notes}
                 </p>
@@ -171,10 +155,7 @@ export function GeneralPaymentDetailDialog({
                   <Receipt className="w-4 h-4" />
                   付款紀錄
                   {paymentRecords.length > 0 && (
-                    <Badge
-                      variant="secondary"
-                      className="text-xs px-1.5 py-0"
-                    >
+                    <Badge variant="secondary" className="text-xs px-1.5 py-0">
                       {paymentRecords.length}
                     </Badge>
                   )}
@@ -187,10 +168,7 @@ export function GeneralPaymentDetailDialog({
               </Button>
 
               {showPaymentRecords && (
-                <PaymentRecordsList
-                  records={paymentRecords}
-                  isLoading={isLoadingRecords}
-                />
+                <PaymentRecordsList records={paymentRecords} isLoading={isLoadingRecords} />
               )}
             </div>
 
@@ -218,10 +196,7 @@ export function GeneralPaymentDetailDialog({
               </Button>
 
               {showAuditHistory && (
-                <AuditHistoryList
-                  auditLogs={auditLogs}
-                  isLoading={isLoadingAuditLogs}
-                />
+                <AuditHistoryList auditLogs={auditLogs} isLoading={isLoadingAuditLogs} />
               )}
             </div>
           </div>
@@ -231,7 +206,7 @@ export function GeneralPaymentDetailDialog({
         </div>
       </DialogContent>
     </Dialog>
-  );
+  )
 }
 
 // 簡易資訊欄位
@@ -241,19 +216,22 @@ function InfoField({ label, value }: { label: string; value: string }) {
       <Label className="text-sm font-medium text-gray-500">{label}</Label>
       <p className="mt-0.5">{value}</p>
     </div>
-  );
+  )
 }
 
 // 狀態 Badge
 function StatusBadge({ status }: { status: string }) {
-  const config: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
+  const config: Record<
+    string,
+    { label: string; variant: "default" | "secondary" | "destructive" | "outline" }
+  > = {
     paid: { label: "已付款", variant: "default" },
     partial: { label: "部分付款", variant: "outline" },
     overdue: { label: "逾期", variant: "destructive" },
     pending: { label: "未付款", variant: "secondary" },
-  };
-  const { label, variant } = config[status] || { label: "未付款", variant: "secondary" };
-  return <Badge variant={variant}>{label}</Badge>;
+  }
+  const { label, variant } = config[status] || { label: "未付款", variant: "secondary" }
+  return <Badge variant={variant}>{label}</Badge>
 }
 
 // 付款進度條
@@ -264,11 +242,11 @@ function PaymentProgressBar({
   progressPercent,
   status,
 }: {
-  totalAmount: number;
-  paidAmount: number;
-  remainingAmount: number;
-  progressPercent: number;
-  status: string;
+  totalAmount: number
+  paidAmount: number
+  remainingAmount: number
+  progressPercent: number
+  status: string
 }) {
   return (
     <Card className="border-l-4 border-l-blue-500 bg-gradient-to-r from-blue-50 to-transparent">
@@ -291,9 +269,7 @@ function PaymentProgressBar({
               <DollarSign className="w-3 h-3" />
               已付款
             </div>
-            <p className="font-bold text-green-600">
-              NT${paidAmount.toLocaleString()}
-            </p>
+            <p className="font-bold text-green-600">NT${paidAmount.toLocaleString()}</p>
           </div>
           <div className="text-center">
             <div className="text-xs text-red-600 mb-0.5 flex items-center justify-center gap-1">
@@ -307,7 +283,7 @@ function PaymentProgressBar({
         </div>
       </CardContent>
     </Card>
-  );
+  )
 }
 
 // 付款紀錄列表
@@ -315,8 +291,8 @@ function PaymentRecordsList({
   records,
   isLoading,
 }: {
-  records: PaymentRecordData[];
-  isLoading: boolean;
+  records: PaymentRecordData[]
+  isLoading: boolean
 }) {
   if (isLoading) {
     return (
@@ -324,7 +300,7 @@ function PaymentRecordsList({
         <RefreshCw className="w-4 h-4 animate-spin mr-2" />
         <span className="text-sm text-gray-500">載入付款紀錄...</span>
       </div>
-    );
+    )
   }
 
   if (records.length === 0) {
@@ -333,13 +309,12 @@ function PaymentRecordsList({
         <Receipt className="w-10 h-10 mx-auto mb-2 opacity-30" />
         <p className="text-sm">尚無付款紀錄</p>
       </div>
-    );
+    )
   }
 
   const sorted = [...records].sort(
-    (a, b) =>
-      new Date(b.paymentDate).getTime() - new Date(a.paymentDate).getTime()
-  );
+    (a, b) => new Date(b.paymentDate).getTime() - new Date(a.paymentDate).getTime()
+  )
 
   return (
     <div className="mt-3 space-y-3">
@@ -347,14 +322,12 @@ function PaymentRecordsList({
         <PaymentRecordCard key={record.id} record={record} />
       ))}
     </div>
-  );
+  )
 }
 
 // 單筆付款紀錄卡片
 function PaymentRecordCard({ record }: { record: PaymentRecordData }) {
-  const amount = parseFloat(
-    record.amount || record.amountPaid || "0"
-  );
+  const amount = parseFloat(record.amount || record.amountPaid || "0")
 
   return (
     <Card className="hover:shadow-sm transition-shadow">
@@ -401,16 +374,15 @@ function PaymentRecordCard({ record }: { record: PaymentRecordData }) {
                     alt="收據縮圖"
                     className="w-10 h-10 object-cover rounded ml-auto border"
                     onError={(e) => {
-                      (e.target as HTMLImageElement).style.display = "none";
+                      ;(e.target as HTMLImageElement).style.display = "none"
                     }}
                   />
                 </button>
               </DialogTrigger>
-              <DialogContent className="max-w-2xl">
+              <DialogContent className="w-[95vw] max-w-2xl">
                 <DialogHeader>
                   <DialogTitle>
-                    付款憑證 -{" "}
-                    {new Date(record.paymentDate).toLocaleDateString("zh-TW")}
+                    付款憑證 - {new Date(record.paymentDate).toLocaleDateString("zh-TW")}
                   </DialogTitle>
                 </DialogHeader>
                 <div className="flex justify-center">
@@ -419,20 +391,16 @@ function PaymentRecordCard({ record }: { record: PaymentRecordData }) {
                     alt="付款憑證"
                     className="max-w-full max-h-[60vh] object-contain rounded-lg border"
                     onError={(e) => {
-                      (e.target as HTMLImageElement).src =
-                        "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjNmNGY2Ii8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzk5YTNhZiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPuWcluePh+eEoeazleaoquWFpTwvdGV4dD48L3N2Zz4=";
+                      ;(e.target as HTMLImageElement).src =
+                        "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjNmNGY2Ii8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzk5YTNhZiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPuWcluePh+eEoeazleaoquWFpTwvdGV4dD48L3N2Zz4="
                     }}
                   />
                 </div>
                 {/* AI 辨識文字 */}
                 {record.receiptText && (
                   <div className="mt-3 p-3 bg-gray-50 rounded border text-sm">
-                    <p className="text-xs text-gray-500 mb-1 font-medium">
-                      AI 辨識內容：
-                    </p>
-                    <p className="whitespace-pre-wrap text-gray-700">
-                      {record.receiptText}
-                    </p>
+                    <p className="text-xs text-gray-500 mb-1 font-medium">AI 辨識內容：</p>
+                    <p className="whitespace-pre-wrap text-gray-700">{record.receiptText}</p>
                   </div>
                 )}
               </DialogContent>
@@ -444,26 +412,19 @@ function PaymentRecordCard({ record }: { record: PaymentRecordData }) {
         {record.createdAt && (
           <p className="text-xs text-gray-400 flex items-center gap-1">
             <Clock className="w-3 h-3" />
-            紀錄建立於{" "}
-            {new Date(record.createdAt).toLocaleString("zh-TW")}
+            紀錄建立於 {new Date(record.createdAt).toLocaleString("zh-TW")}
           </p>
         )}
       </CardContent>
     </Card>
-  );
+  )
 }
 
 // 來源追蹤區塊
-function SourceTrackingSection({
-  detailItem,
-}: {
-  detailItem: PaymentItem;
-}) {
+function SourceTrackingSection({ detailItem }: { detailItem: PaymentItem }) {
   return (
     <div className="border-t pt-4">
-      <Label className="text-sm font-medium text-gray-500 block mb-2">
-        項目來源
-      </Label>
+      <Label className="text-sm font-medium text-gray-500 block mb-2">項目來源</Label>
       <div className="p-3 bg-gray-50 rounded space-y-2">
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium">來源類型：</span>
@@ -483,11 +444,7 @@ function SourceTrackingSection({
                 <span>{detailItem.documentUploadedByUsername}</span>
                 {detailItem.documentUploadedAt && (
                   <span className="text-gray-500 ml-2">
-                    (
-                    {new Date(
-                      detailItem.documentUploadedAt
-                    ).toLocaleString("zh-TW")}
-                    )
+                    ({new Date(detailItem.documentUploadedAt).toLocaleString("zh-TW")})
                   </span>
                 )}
               </div>
@@ -498,36 +455,25 @@ function SourceTrackingSection({
                 <span>{detailItem.archivedByUsername}</span>
                 {detailItem.archivedAt && (
                   <span className="text-gray-500 ml-2">
-                    (
-                    {new Date(detailItem.archivedAt).toLocaleString(
-                      "zh-TW"
-                    )}
-                    )
+                    ({new Date(detailItem.archivedAt).toLocaleString("zh-TW")})
                   </span>
                 )}
               </div>
             )}
             {detailItem.sourceDocumentId && (
               <div className="text-sm text-gray-500">
-                <span className="font-medium">來源單據ID：</span>#
-                {detailItem.sourceDocumentId}
+                <span className="font-medium">來源單據ID：</span>#{detailItem.sourceDocumentId}
               </div>
             )}
           </>
         )}
       </div>
     </div>
-  );
+  )
 }
 
 // 審計歷史列表
-function AuditHistoryList({
-  auditLogs,
-  isLoading,
-}: {
-  auditLogs: AuditLog[];
-  isLoading: boolean;
-}) {
+function AuditHistoryList({ auditLogs, isLoading }: { auditLogs: AuditLog[]; isLoading: boolean }) {
   return (
     <div className="mt-3 space-y-2 max-h-60 overflow-y-auto">
       {isLoading ? (
@@ -536,15 +482,10 @@ function AuditHistoryList({
           <span className="text-sm text-gray-500">載入中...</span>
         </div>
       ) : auditLogs.length === 0 ? (
-        <div className="text-center py-4 text-sm text-gray-500">
-          暫無操作記錄
-        </div>
+        <div className="text-center py-4 text-sm text-gray-500">暫無操作記錄</div>
       ) : (
         auditLogs.map((log) => (
-          <div
-            key={log.id}
-            className="border rounded-lg p-3 text-sm bg-gray-50"
-          >
+          <div key={log.id} className="border rounded-lg p-3 text-sm bg-gray-50">
             <div className="flex items-center justify-between mb-1">
               <Badge
                 variant={
@@ -572,9 +513,7 @@ function AuditHistoryList({
                           : log.action}
               </Badge>
               <span className="text-xs text-gray-500">
-                {log.createdAt
-                  ? new Date(log.createdAt).toLocaleString("zh-TW")
-                  : "未知時間"}
+                {log.createdAt ? new Date(log.createdAt).toLocaleString("zh-TW") : "未知時間"}
               </span>
             </div>
             <div className="text-gray-600">
@@ -590,5 +529,5 @@ function AuditHistoryList({
         ))
       )}
     </div>
-  );
+  )
 }

@@ -47,7 +47,7 @@ export function MonthlyPaymentCreateDialog({
           <span className="text-sm sm:text-base">新增月付項目</span>
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>新增月付項目</DialogTitle>
           <div className="text-sm text-gray-600 bg-blue-50 p-3 rounded-lg">

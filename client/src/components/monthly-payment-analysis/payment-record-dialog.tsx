@@ -58,7 +58,7 @@ export function PaymentRecordDialog({
 }: PaymentRecordDialogProps) {
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="w-[95vw] max-w-md">
         <DialogHeader>
           <DialogTitle>記錄付款</DialogTitle>
           <DialogDescription>為「{selectedItem?.itemName}」記錄付款</DialogDescription>

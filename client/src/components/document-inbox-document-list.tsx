@@ -1,13 +1,77 @@
 // 單據文件列表
+import { useEffect, useState } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Loader2, Image as ImageIcon, Sparkles, RefreshCw, StickyNote, User } from "lucide-react"
+import {
+  Loader2,
+  Image as ImageIcon,
+  Sparkles,
+  RefreshCw,
+  StickyNote,
+  User,
+  AlertTriangle,
+} from "lucide-react"
 import { format } from "date-fns"
 import { formatNT } from "@/lib/utils"
 import { zhTW } from "date-fns/locale"
 import type { DocumentInbox } from "@shared/schema"
 import { getStatusConfig, getTypeConfig } from "@/components/document-inbox-types"
+
+/**
+ * AI 辨識進度指示器
+ * - 顯示已等候時間（秒）
+ * - 超過 30s 變色提醒
+ * - 超過 60s 顯示重試按鈕
+ */
+function ProcessingIndicator({
+  createdAt,
+  onRetry,
+}: {
+  createdAt: Date | string | null
+  onRetry: (e: React.MouseEvent) => void
+}) {
+  const [elapsedSec, setElapsedSec] = useState(0)
+
+  useEffect(() => {
+    if (!createdAt) return
+    const startMs = new Date(createdAt).getTime()
+    const tick = () => setElapsedSec(Math.floor((Date.now() - startMs) / 1000))
+    tick()
+    const timer = setInterval(tick, 1000)
+    return () => clearInterval(timer)
+  }, [createdAt])
+
+  const isStuck = elapsedSec > 60
+  const isSlow = elapsedSec > 30
+  const colorClass = isStuck
+    ? "text-red-600 bg-red-50 border-red-200"
+    : isSlow
+      ? "text-orange-600 bg-orange-50 border-orange-200"
+      : "text-amber-600 bg-amber-50 border-amber-200"
+
+  return (
+    <div className={`flex items-center gap-2 p-2 rounded-lg border ${colorClass}`}>
+      {isStuck ? (
+        <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+      ) : (
+        <Loader2 className="h-4 w-4 animate-spin flex-shrink-0" />
+      )}
+      <div className="flex-1 min-w-0">
+        <div className="text-sm font-medium">{isStuck ? "辨識超時，建議重試" : "AI 辨識中..."}</div>
+        <div className="text-xs opacity-80">
+          已等候 {elapsedSec} 秒{isSlow && !isStuck && "（正常範圍）"}
+        </div>
+      </div>
+      {isStuck && (
+        <Button size="sm" onClick={onRetry} className="h-9 px-3 flex-shrink-0">
+          <RefreshCw className="h-4 w-4 mr-1" />
+          重試
+        </Button>
+      )}
+    </div>
+  )
+}
 
 export interface DocumentInboxDocumentListProps {
   documents: DocumentInbox[]
@@ -134,25 +198,31 @@ export default function DocumentInboxDocumentList({
             )}
 
             {doc.status === "processing" && (
-              <div className="flex items-center gap-2 text-amber-600">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                <span>AI 正在辨識中...</span>
-              </div>
+              <ProcessingIndicator
+                createdAt={doc.createdAt}
+                onRetry={(e) => {
+                  e.stopPropagation()
+                  onReRecognize(doc.id)
+                }}
+              />
             )}
 
             {doc.status === "failed" && (
-              <div className="flex items-center justify-between">
-                <span className="text-red-500 text-sm">辨識失敗</span>
+              <div className="flex items-center justify-between gap-2 p-2 bg-red-50 border border-red-200 rounded-lg">
+                <div className="flex items-center gap-2 text-red-700 text-sm">
+                  <span>⚠️</span>
+                  <span className="font-medium">辨識失敗</span>
+                </div>
                 <Button
                   size="sm"
-                  variant="outline"
                   onClick={(e) => {
                     e.stopPropagation()
                     onReRecognize(doc.id)
                   }}
+                  className="h-9 px-3"
                 >
                   <RefreshCw className="h-4 w-4 mr-1" />
-                  重試
+                  重試辨識
                 </Button>
               </div>
             )}

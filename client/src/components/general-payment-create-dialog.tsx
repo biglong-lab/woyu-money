@@ -48,7 +48,7 @@ export function GeneralPaymentCreateDialog({
           </Button>
         </DialogTrigger>
         <DialogContent
-          className="max-w-2xl max-h-[90vh] overflow-y-auto"
+          className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto"
           aria-describedby="create-payment-description"
         >
           <DialogHeader>

@@ -1,22 +1,42 @@
 // 預算計劃建立/編輯對話框元件
 
-import { UseFormReturn, FieldValues } from "react-hook-form";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { RefreshCw } from "lucide-react";
-import type { BudgetPlan, Project } from "./project-budget-types";
+import { UseFormReturn, FieldValues } from "react-hook-form"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form"
+import { RefreshCw } from "lucide-react"
+import type { BudgetPlan, Project } from "./project-budget-types"
 
 export interface ProjectBudgetPlanDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  form: UseFormReturn<FieldValues>;
-  onSubmit: (data: FieldValues) => void;
-  isPending: boolean;
-  editingPlan: BudgetPlan | null;
-  projects: Project[];
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  form: UseFormReturn<FieldValues>
+  onSubmit: (data: FieldValues) => void
+  isPending: boolean
+  editingPlan: BudgetPlan | null
+  projects: Project[]
 }
 
 export default function ProjectBudgetPlanDialog({
@@ -30,15 +50,11 @@ export default function ProjectBudgetPlanDialog({
 }: ProjectBudgetPlanDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="w-[95vw] max-w-lg">
         <DialogHeader>
-          <DialogTitle>
-            {editingPlan ? "編輯預算計劃" : "新增預算計劃"}
-          </DialogTitle>
+          <DialogTitle>{editingPlan ? "編輯預算計劃" : "新增預算計劃"}</DialogTitle>
           <DialogDescription>
-            {editingPlan
-              ? "修改預算計劃的詳細資訊"
-              : "建立一個新的預算計劃來規劃支出"}
+            {editingPlan ? "修改預算計劃的詳細資訊" : "建立一個新的預算計劃來規劃支出"}
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -112,10 +128,7 @@ export default function ProjectBudgetPlanDialog({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>關聯專案</FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    value={field.value || "none"}
-                  >
+                  <Select onValueChange={field.onChange} value={field.value || "none"}>
                     <FormControl>
                       <SelectTrigger data-testid="select-plan-project">
                         <SelectValue placeholder="選擇專案（選填）" />
@@ -124,10 +137,7 @@ export default function ProjectBudgetPlanDialog({
                     <SelectContent>
                       <SelectItem value="none">不指定專案</SelectItem>
                       {projects.map((project) => (
-                        <SelectItem
-                          key={project.id}
-                          value={project.id.toString()}
-                        >
+                        <SelectItem key={project.id} value={project.id.toString()}>
                           {project.projectName}
                         </SelectItem>
                       ))}
@@ -145,11 +155,7 @@ export default function ProjectBudgetPlanDialog({
                   <FormItem>
                     <FormLabel>開始日期</FormLabel>
                     <FormControl>
-                      <Input
-                        type="date"
-                        {...field}
-                        data-testid="input-plan-start-date"
-                      />
+                      <Input type="date" {...field} data-testid="input-plan-start-date" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -162,11 +168,7 @@ export default function ProjectBudgetPlanDialog({
                   <FormItem>
                     <FormLabel>結束日期</FormLabel>
                     <FormControl>
-                      <Input
-                        type="date"
-                        {...field}
-                        data-testid="input-plan-end-date"
-                      />
+                      <Input type="date" {...field} data-testid="input-plan-end-date" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -192,21 +194,11 @@ export default function ProjectBudgetPlanDialog({
               )}
             />
             <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-              >
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 取消
               </Button>
-              <Button
-                type="submit"
-                disabled={isPending}
-                data-testid="button-submit-plan"
-              >
-                {isPending && (
-                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                )}
+              <Button type="submit" disabled={isPending} data-testid="button-submit-plan">
+                {isPending && <RefreshCw className="w-4 h-4 mr-2 animate-spin" />}
                 {editingPlan ? "更新" : "建立"}
               </Button>
             </DialogFooter>
@@ -214,5 +206,5 @@ export default function ProjectBudgetPlanDialog({
         </Form>
       </DialogContent>
     </Dialog>
-  );
+  )
 }

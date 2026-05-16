@@ -51,7 +51,7 @@ export function LoanEnhancedQuickPaymentDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="w-[95vw] max-w-md">
         <DialogHeader>
           <DialogTitle>快速還款記錄</DialogTitle>
           <DialogDescription>為 {record?.itemName} 記錄還款</DialogDescription>

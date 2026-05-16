@@ -377,7 +377,7 @@ export function LoanDocumentExport({ recordId, recordTitle, recordData }: LoanDo
           文件輸出
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-md">
+      <DialogContent className="w-[95vw] max-w-md">
         <DialogHeader>
           <DialogTitle>文件輸出選項</DialogTitle>
         </DialogHeader>

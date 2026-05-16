@@ -1,26 +1,46 @@
 // 專案付款管理 - 付款對話框元件
-import { Upload, X, Image } from "lucide-react";
-import { UseFormReturn } from "react-hook-form";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import type { PaymentItem, PaymentFormValues } from "./payment-project-types";
+import { Upload, X, Image } from "lucide-react"
+import { UseFormReturn } from "react-hook-form"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form"
+import type { PaymentItem, PaymentFormValues } from "./payment-project-types"
 
 export interface PaymentProjectPaymentDialogProps {
-  isOpen: boolean;
-  onOpenChange: (open: boolean) => void;
-  paymentItem: PaymentItem | null;
-  paymentForm: UseFormReturn<PaymentFormValues>;
-  onSubmit: (data: PaymentFormValues) => void;
-  isPending: boolean;
+  isOpen: boolean
+  onOpenChange: (open: boolean) => void
+  paymentItem: PaymentItem | null
+  paymentForm: UseFormReturn<PaymentFormValues>
+  onSubmit: (data: PaymentFormValues) => void
+  isPending: boolean
   // 圖片上傳
-  selectedImage: File | null;
-  imagePreview: string | null;
-  onImageSelect: (event: React.ChangeEvent<HTMLInputElement>) => void;
-  onRemoveImage: () => void;
+  selectedImage: File | null
+  imagePreview: string | null
+  onImageSelect: (event: React.ChangeEvent<HTMLInputElement>) => void
+  onRemoveImage: () => void
 }
 
 export default function PaymentProjectPaymentDialog({
@@ -36,18 +56,19 @@ export default function PaymentProjectPaymentDialog({
   onRemoveImage,
 }: PaymentProjectPaymentDialogProps) {
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => {
-      if (!open) {
-        paymentForm.reset();
-      }
-      onOpenChange(open);
-    }}>
-      <DialogContent className="max-w-md">
+    <Dialog
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open) {
+          paymentForm.reset()
+        }
+        onOpenChange(open)
+      }}
+    >
+      <DialogContent className="w-[95vw] max-w-md">
         <DialogHeader>
           <DialogTitle>新增付款記錄</DialogTitle>
-          <DialogDescription>
-            為「{paymentItem?.itemName}」新增付款記錄
-          </DialogDescription>
+          <DialogDescription>為「{paymentItem?.itemName}」新增付款記錄</DialogDescription>
         </DialogHeader>
 
         {paymentItem && (
@@ -55,16 +76,23 @@ export default function PaymentProjectPaymentDialog({
             <div className="grid grid-cols-2 gap-4 p-3 bg-gray-50 rounded-lg text-sm">
               <div>
                 <span className="text-gray-600">總金額:</span>
-                <div className="font-medium">${parseFloat(paymentItem.totalAmount).toLocaleString()}</div>
+                <div className="font-medium">
+                  ${parseFloat(paymentItem.totalAmount).toLocaleString()}
+                </div>
               </div>
               <div>
                 <span className="text-gray-600">已付金額:</span>
-                <div className="font-medium">${parseFloat(paymentItem.paidAmount).toLocaleString()}</div>
+                <div className="font-medium">
+                  ${parseFloat(paymentItem.paidAmount).toLocaleString()}
+                </div>
               </div>
               <div>
                 <span className="text-gray-600">剩餘金額:</span>
                 <div className="font-medium text-orange-600">
-                  ${(parseFloat(paymentItem.totalAmount) - parseFloat(paymentItem.paidAmount)).toLocaleString()}
+                  $
+                  {(
+                    parseFloat(paymentItem.totalAmount) - parseFloat(paymentItem.paidAmount)
+                  ).toLocaleString()}
                 </div>
               </div>
               <div>
@@ -214,14 +242,14 @@ export default function PaymentProjectPaymentDialog({
                     type="button"
                     variant="outline"
                     onClick={() => {
-                      onOpenChange(false);
-                      onRemoveImage();
+                      onOpenChange(false)
+                      onRemoveImage()
                     }}
                   >
                     取消
                   </Button>
                   <Button type="submit" disabled={isPending}>
-                    {isPending ? '處理中...' : '確認付款'}
+                    {isPending ? "處理中..." : "確認付款"}
                   </Button>
                 </DialogFooter>
               </form>
@@ -230,5 +258,5 @@ export default function PaymentProjectPaymentDialog({
         )}
       </DialogContent>
     </Dialog>
-  );
+  )
 }

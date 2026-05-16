@@ -1,22 +1,51 @@
 // 專案付款管理 - 編輯項目對話框 + 刪除確認對話框
-import { Trash2 } from "lucide-react";
-import { UseFormReturn } from "react-hook-form";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import type { PaymentItem, EditItemFormValues } from "./payment-project-types";
+import { Trash2 } from "lucide-react"
+import { UseFormReturn } from "react-hook-form"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form"
+import type { PaymentItem, EditItemFormValues } from "./payment-project-types"
 
 // -- 編輯對話框 --
 
 export interface PaymentProjectEditDialogProps {
-  isOpen: boolean;
-  onOpenChange: (open: boolean) => void;
-  editForm: UseFormReturn<EditItemFormValues>;
-  onSubmit: (data: EditItemFormValues) => void;
-  isPending: boolean;
+  isOpen: boolean
+  onOpenChange: (open: boolean) => void
+  editForm: UseFormReturn<EditItemFormValues>
+  onSubmit: (data: EditItemFormValues) => void
+  isPending: boolean
 }
 
 export function PaymentProjectEditDialog({
@@ -28,12 +57,10 @@ export function PaymentProjectEditDialog({
 }: PaymentProjectEditDialogProps) {
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="w-[95vw] max-w-md">
         <DialogHeader>
           <DialogTitle>修改付款項目</DialogTitle>
-          <DialogDescription>
-            修改項目的基本資訊
-          </DialogDescription>
+          <DialogDescription>修改項目的基本資訊</DialogDescription>
         </DialogHeader>
 
         <Form {...editForm}>
@@ -160,32 +187,28 @@ export function PaymentProjectEditDialog({
             />
 
             <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-              >
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 取消
               </Button>
               <Button type="submit" disabled={isPending}>
-                {isPending ? '修改中...' : '確認修改'}
+                {isPending ? "修改中..." : "確認修改"}
               </Button>
             </DialogFooter>
           </form>
         </Form>
       </DialogContent>
     </Dialog>
-  );
+  )
 }
 
 // -- 刪除確認對話框 --
 
 export interface PaymentProjectDeleteDialogProps {
-  isOpen: boolean;
-  onOpenChange: (open: boolean) => void;
-  deleteItem: PaymentItem | null;
-  onConfirm: () => void;
-  isPending: boolean;
+  isOpen: boolean
+  onOpenChange: (open: boolean) => void
+  deleteItem: PaymentItem | null
+  onConfirm: () => void
+  isPending: boolean
 }
 
 export function PaymentProjectDeleteDialog({
@@ -211,14 +234,14 @@ export function PaymentProjectDeleteDialog({
               此項目將移至回收站，您可以在回收站中恢復或永久刪除。
             </p>
             <div className="bg-gray-50 p-3 rounded-lg text-sm">
-              <p>金額：NT$ {deleteItem ? parseFloat(deleteItem.totalAmount).toLocaleString() : 0}</p>
+              <p>
+                金額：NT$ {deleteItem ? parseFloat(deleteItem.totalAmount).toLocaleString() : 0}
+              </p>
             </div>
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel onClick={() => onOpenChange(false)}>
-            取消
-          </AlertDialogCancel>
+          <AlertDialogCancel onClick={() => onOpenChange(false)}>取消</AlertDialogCancel>
           <AlertDialogAction
             onClick={onConfirm}
             disabled={isPending}
@@ -230,5 +253,5 @@ export function PaymentProjectDeleteDialog({
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
-  );
+  )
 }

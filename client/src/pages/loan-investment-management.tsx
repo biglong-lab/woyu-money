@@ -1,15 +1,15 @@
-import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Plus } from "lucide-react";
-import LoanPaymentHistory from "@/components/loan-payment-history";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { useState } from "react"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Plus } from "lucide-react"
+import LoanPaymentHistory from "@/components/loan-payment-history"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { useToast } from "@/hooks/use-toast"
+import { apiRequest } from "@/lib/queryClient"
 
 import {
   StatCards,
@@ -17,36 +17,36 @@ import {
   RecordCardList,
   RecordFormDialog,
   loanInvestmentSchema,
-} from "@/components/loan-investment-mgmt";
+} from "@/components/loan-investment-mgmt"
 import type {
   LoanInvestmentFormData,
   LoanInvestmentRecord,
   LoanInvestmentStats,
-} from "@/components/loan-investment-mgmt";
+} from "@/components/loan-investment-mgmt"
 
 /**
  * 借貸投資管理頁面
  * 負責狀態管理、API 互動與子元件組合
  */
 export default function LoanInvestmentManagement() {
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingRecord, setEditingRecord] = useState<LoanInvestmentRecord | null>(null);
-  const [selectedTab, setSelectedTab] = useState("all");
-  const [paymentHistoryOpen, setPaymentHistoryOpen] = useState(false);
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [editingRecord, setEditingRecord] = useState<LoanInvestmentRecord | null>(null)
+  const [selectedTab, setSelectedTab] = useState("all")
+  const [paymentHistoryOpen, setPaymentHistoryOpen] = useState(false)
   const [selectedRecordForPayments, setSelectedRecordForPayments] =
-    useState<LoanInvestmentRecord | null>(null);
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
+    useState<LoanInvestmentRecord | null>(null)
+  const { toast } = useToast()
+  const queryClient = useQueryClient()
 
   // 取得借貸投資記錄
   const { data: records = [], isLoading } = useQuery<LoanInvestmentRecord[]>({
     queryKey: ["/api/loan-investment/records"],
-  });
+  })
 
   // 取得統計資料
   const { data: stats = {} as LoanInvestmentStats } = useQuery<LoanInvestmentStats>({
     queryKey: ["/api/loan-investment/stats"],
-  });
+  })
 
   const form = useForm<LoanInvestmentFormData>({
     resolver: zodResolver(loanInvestmentSchema),
@@ -56,81 +56,81 @@ export default function LoanInvestmentManagement() {
       paymentMethod: "monthly",
       riskLevel: "medium",
     },
-  });
+  })
 
   // ========== Mutations ==========
 
   const createMutation = useMutation({
     mutationFn: async (data: LoanInvestmentFormData) => {
-      return await apiRequest("POST", "/api/loan-investment/records", data);
+      return await apiRequest("POST", "/api/loan-investment/records", data)
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/loan-investment/records"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/loan-investment/stats"] });
-      setIsDialogOpen(false);
-      form.reset();
-      toast({ title: "成功", description: "借貸投資記錄已建立" });
+      queryClient.invalidateQueries({ queryKey: ["/api/loan-investment/records"] })
+      queryClient.invalidateQueries({ queryKey: ["/api/loan-investment/stats"] })
+      setIsDialogOpen(false)
+      form.reset()
+      toast({ title: "成功", description: "借貸投資記錄已建立" })
     },
     onError: (error: Error) => {
       toast({
         title: "錯誤",
         description: error.message || "建立記錄時發生錯誤",
         variant: "destructive",
-      });
+      })
     },
-  });
+  })
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: Partial<LoanInvestmentFormData> }) => {
-      return await apiRequest("PUT", `/api/loan-investment/records/${id}`, data);
+      return await apiRequest("PUT", `/api/loan-investment/records/${id}`, data)
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/loan-investment/records"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/loan-investment/stats"] });
-      setIsDialogOpen(false);
-      setEditingRecord(null);
-      form.reset();
-      toast({ title: "成功", description: "借貸投資記錄已更新" });
+      queryClient.invalidateQueries({ queryKey: ["/api/loan-investment/records"] })
+      queryClient.invalidateQueries({ queryKey: ["/api/loan-investment/stats"] })
+      setIsDialogOpen(false)
+      setEditingRecord(null)
+      form.reset()
+      toast({ title: "成功", description: "借貸投資記錄已更新" })
     },
     onError: (error: Error) => {
       toast({
         title: "錯誤",
         description: error.message || "更新記錄時發生錯誤",
         variant: "destructive",
-      });
+      })
     },
-  });
+  })
 
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
-      return await apiRequest("DELETE", `/api/loan-investment/records/${id}`);
+      return await apiRequest("DELETE", `/api/loan-investment/records/${id}`)
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/loan-investment/records"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/loan-investment/stats"] });
-      toast({ title: "成功", description: "借貸投資記錄已刪除" });
+      queryClient.invalidateQueries({ queryKey: ["/api/loan-investment/records"] })
+      queryClient.invalidateQueries({ queryKey: ["/api/loan-investment/stats"] })
+      toast({ title: "成功", description: "借貸投資記錄已刪除" })
     },
     onError: (error: Error) => {
       toast({
         title: "錯誤",
         description: error.message || "刪除記錄時發生錯誤",
         variant: "destructive",
-      });
+      })
     },
-  });
+  })
 
   // ========== 事件處理 ==========
 
   const onSubmit = (data: LoanInvestmentFormData) => {
     if (editingRecord) {
-      updateMutation.mutate({ id: editingRecord.id, data });
+      updateMutation.mutate({ id: editingRecord.id, data })
     } else {
-      createMutation.mutate(data);
+      createMutation.mutate(data)
     }
-  };
+  }
 
   const handleEdit = (record: LoanInvestmentRecord) => {
-    setEditingRecord(record);
+    setEditingRecord(record)
     form.reset({
       itemName: record.itemName,
       recordType: record.recordType as "loan" | "investment",
@@ -153,36 +153,36 @@ export default function LoanInvestmentManagement() {
       guarantorInfo: record.guarantorInfo || "",
       legalDocuments: record.legalDocuments || "",
       documentNotes: record.documentNotes || "",
-    });
-    setIsDialogOpen(true);
-  };
+    })
+    setIsDialogOpen(true)
+  }
 
   const handleDelete = (id: number) => {
     if (confirm("確定要刪除這筆記錄嗎？此操作無法復原。")) {
-      deleteMutation.mutate(id);
+      deleteMutation.mutate(id)
     }
-  };
+  }
 
   const openNewDialog = () => {
-    setEditingRecord(null);
-    form.reset();
-    setIsDialogOpen(true);
-  };
+    setEditingRecord(null)
+    form.reset()
+    setIsDialogOpen(true)
+  }
 
   const handleViewPayments = (record: LoanInvestmentRecord) => {
-    setSelectedRecordForPayments(record);
-    setPaymentHistoryOpen(true);
-  };
+    setSelectedRecordForPayments(record)
+    setPaymentHistoryOpen(true)
+  }
 
   // ========== 資料篩選 ==========
 
   const filteredRecords = records.filter((record) => {
-    if (selectedTab === "all") return true;
-    if (selectedTab === "loans") return record.recordType === "loan";
-    if (selectedTab === "investments") return record.recordType === "investment";
-    if (selectedTab === "high-risk") return record.riskLevel === "high";
-    return true;
-  });
+    if (selectedTab === "all") return true
+    if (selectedTab === "loans") return record.recordType === "loan"
+    if (selectedTab === "investments") return record.recordType === "investment"
+    if (selectedTab === "high-risk") return record.riskLevel === "high"
+    return true
+  })
 
   // ========== 載入中 ==========
 
@@ -191,7 +191,7 @@ export default function LoanInvestmentManagement() {
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
       </div>
-    );
+    )
   }
 
   // ========== 渲染 ==========
@@ -258,7 +258,7 @@ export default function LoanInvestmentManagement() {
 
       {/* 還款記錄對話框 */}
       <Dialog open={paymentHistoryOpen} onOpenChange={setPaymentHistoryOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>還款記錄管理</DialogTitle>
           </DialogHeader>
@@ -271,5 +271,5 @@ export default function LoanInvestmentManagement() {
         </DialogContent>
       </Dialog>
     </div>
-  );
+  )
 }

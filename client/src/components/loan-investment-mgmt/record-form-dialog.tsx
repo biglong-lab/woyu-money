@@ -1,15 +1,15 @@
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Form } from "@/components/ui/form";
-import { UseFormReturn } from "react-hook-form";
-import type { LoanInvestmentFormData, LoanInvestmentRecord } from "./types";
+import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Form } from "@/components/ui/form"
+import { UseFormReturn } from "react-hook-form"
+import type { LoanInvestmentFormData, LoanInvestmentRecord } from "./types"
 import {
   BasicInfoSection,
   PartyInfoSection,
   ContractDetailsSection,
   RiskStatusSection,
   AdditionalInfoSection,
-} from "./form-sections";
+} from "./form-sections"
 
 /**
  * 借貸投資管理 -- 新增/編輯對話框
@@ -18,17 +18,17 @@ import {
 
 interface RecordFormDialogProps {
   /** 對話框開關狀態 */
-  open: boolean;
+  open: boolean
   /** 切換對話框開關 */
-  onOpenChange: (open: boolean) => void;
+  onOpenChange: (open: boolean) => void
   /** react-hook-form 表單實例 */
-  form: UseFormReturn<LoanInvestmentFormData>;
+  form: UseFormReturn<LoanInvestmentFormData>
   /** 目前正在編輯的記錄（null 表示新增模式） */
-  editingRecord: LoanInvestmentRecord | null;
+  editingRecord: LoanInvestmentRecord | null
   /** 表單送出回呼 */
-  onSubmit: (data: LoanInvestmentFormData) => void;
+  onSubmit: (data: LoanInvestmentFormData) => void
   /** 送出中（用於停用按鈕） */
-  isSubmitting: boolean;
+  isSubmitting: boolean
 }
 
 export default function RecordFormDialog({
@@ -41,11 +41,9 @@ export default function RecordFormDialog({
 }: RecordFormDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>
-            {editingRecord ? "編輯借貸投資記錄" : "新增借貸投資記錄"}
-          </DialogTitle>
+          <DialogTitle>{editingRecord ? "編輯借貸投資記錄" : "新增借貸投資記錄"}</DialogTitle>
         </DialogHeader>
 
         <Form {...form}>
@@ -83,5 +81,5 @@ export default function RecordFormDialog({
         </Form>
       </DialogContent>
     </Dialog>
-  );
+  )
 }

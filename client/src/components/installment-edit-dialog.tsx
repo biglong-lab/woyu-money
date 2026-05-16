@@ -1,19 +1,26 @@
 // 分期付款編輯對話框元件（僅可編輯備註）
 
-import { UseFormReturn, FieldValues } from "react-hook-form";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import type { PaymentItem } from "./installment-types";
+import { UseFormReturn, FieldValues } from "react-hook-form"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Button } from "@/components/ui/button"
+import { Textarea } from "@/components/ui/textarea"
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form"
+import type { PaymentItem } from "./installment-types"
 
 export interface InstallmentEditDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  form: UseFormReturn<FieldValues>;
-  onSubmit: (data: FieldValues) => void;
-  isPending: boolean;
-  editingItem: PaymentItem | null;
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  form: UseFormReturn<FieldValues>
+  onSubmit: (data: FieldValues) => void
+  isPending: boolean
+  editingItem: PaymentItem | null
 }
 
 export default function InstallmentEditDialog({
@@ -26,7 +33,7 @@ export default function InstallmentEditDialog({
 }: InstallmentEditDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="w-[95vw] max-w-2xl">
         <DialogHeader>
           <DialogTitle>編輯分期項目</DialogTitle>
           <p className="text-sm text-gray-600">
@@ -70,10 +77,7 @@ export default function InstallmentEditDialog({
               <div className="mt-3">
                 <p className="text-sm text-gray-500">每期金額</p>
                 <p className="font-medium">
-                  NT${" "}
-                  {editingItem?.amount
-                    ? parseFloat(editingItem.amount).toLocaleString()
-                    : "0"}
+                  NT$ {editingItem?.amount ? parseFloat(editingItem.amount).toLocaleString() : "0"}
                 </p>
               </div>
             </div>
@@ -105,5 +109,5 @@ export default function InstallmentEditDialog({
         </Form>
       </DialogContent>
     </Dialog>
-  );
+  )
 }

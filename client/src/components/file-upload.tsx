@@ -1,121 +1,135 @@
-import { useState, useRef } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
-import { 
-  Upload, 
-  File, 
-  Image, 
-  Download, 
-  Trash2, 
+import { useState, useRef } from "react"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import { useToast } from "@/hooks/use-toast"
+import { apiRequest } from "@/lib/queryClient"
+import {
+  Upload,
+  File,
+  Image,
+  Download,
+  Trash2,
   FileText,
   FileImage,
   AlertCircle,
-  CheckCircle
-} from "lucide-react";
-import type { FileAttachment } from "@shared/schema";
+  CheckCircle,
+} from "lucide-react"
+import type { FileAttachment } from "@shared/schema"
 
 interface FileUploadProps {
-  entityType: string;
-  entityId: number;
-  allowedTypes?: string[];
-  maxFileSize?: number;
-  title?: string;
+  entityType: string
+  entityId: number
+  allowedTypes?: string[]
+  maxFileSize?: number
+  title?: string
 }
 
-export function FileUpload({ 
-  entityType, 
-  entityId, 
-  allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/plain'],
+export function FileUpload({
+  entityType,
+  entityId,
+  allowedTypes = [
+    "image/jpeg",
+    "image/png",
+    "image/gif",
+    "application/pdf",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "text/plain",
+  ],
   maxFileSize = 10 * 1024 * 1024, // 10MB
-  title = "文件管理"
+  title = "文件管理",
 }: FileUploadProps) {
-  const [isUploading, setIsUploading] = useState(false);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [description, setDescription] = useState("");
-  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
+  const [isUploading, setIsUploading] = useState(false)
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [description, setDescription] = useState("")
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const { toast } = useToast()
+  const queryClient = useQueryClient()
 
   // Fetch existing attachments
   const { data: attachments = [], isLoading } = useQuery({
-    queryKey: ['/api/file-attachments', entityType, entityId],
+    queryKey: ["/api/file-attachments", entityType, entityId],
     queryFn: async () => {
-      const response = await fetch(`/api/file-attachments/${entityType}/${entityId}`);
-      if (!response.ok) throw new Error('Failed to fetch attachments');
-      return response.json() as Promise<FileAttachment[]>;
-    }
-  });
+      const response = await fetch(`/api/file-attachments/${entityType}/${entityId}`)
+      if (!response.ok) throw new Error("Failed to fetch attachments")
+      return response.json() as Promise<FileAttachment[]>
+    },
+  })
 
   // Upload mutation
   const uploadMutation = useMutation({
     mutationFn: async (formData: FormData) => {
-      const response = await fetch('/api/file-attachments/upload', {
-        method: 'POST',
+      const response = await fetch("/api/file-attachments/upload", {
+        method: "POST",
         body: formData,
-      });
+      })
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Upload failed');
+        const error = await response.json()
+        throw new Error(error.message || "Upload failed")
       }
-      return response.json();
+      return response.json()
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/file-attachments', entityType, entityId] });
-      setSelectedFile(null);
-      setDescription("");
-      setUploadDialogOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["/api/file-attachments", entityType, entityId] })
+      setSelectedFile(null)
+      setDescription("")
+      setUploadDialogOpen(false)
       toast({
         title: "上傳成功",
         description: "文件已成功上傳",
-      });
+      })
     },
     onError: (error: Error) => {
       toast({
         title: "上傳失敗",
         description: error.message,
         variant: "destructive",
-      });
+      })
     },
     onSettled: () => {
-      setIsUploading(false);
-    }
-  });
+      setIsUploading(false)
+    },
+  })
 
   // Delete mutation
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
       const response = await fetch(`/api/file-attachments/${id}`, {
-        method: 'DELETE',
-      });
-      if (!response.ok) throw new Error('Failed to delete file');
+        method: "DELETE",
+      })
+      if (!response.ok) throw new Error("Failed to delete file")
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/file-attachments', entityType, entityId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/file-attachments", entityType, entityId] })
       toast({
         title: "刪除成功",
         description: "文件已成功刪除",
-      });
+      })
     },
     onError: (error: Error) => {
       toast({
         title: "刪除失敗",
         description: error.message,
         variant: "destructive",
-      });
-    }
-  });
+      })
+    },
+  })
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+    const file = event.target.files?.[0]
+    if (!file) return
 
     // Validate file type
     if (!allowedTypes.includes(file.type)) {
@@ -123,8 +137,8 @@ export function FileUpload({
         title: "不支援的文件類型",
         description: "請選擇圖片文件（JPEG、PNG、GIF）或文檔文件（PDF、DOC、DOCX、TXT）",
         variant: "destructive",
-      });
-      return;
+      })
+      return
     }
 
     // Validate file size
@@ -133,68 +147,68 @@ export function FileUpload({
         title: "文件過大",
         description: `文件大小不能超過 ${(maxFileSize / 1024 / 1024).toFixed(1)}MB`,
         variant: "destructive",
-      });
-      return;
+      })
+      return
     }
 
-    setSelectedFile(file);
-  };
+    setSelectedFile(file)
+  }
 
   const handleUpload = async () => {
-    if (!selectedFile) return;
+    if (!selectedFile) return
 
-    setIsUploading(true);
-    const formData = new FormData();
-    formData.append('file', selectedFile);
-    formData.append('entityType', entityType);
-    formData.append('entityId', entityId.toString());
-    formData.append('description', description);
+    setIsUploading(true)
+    const formData = new FormData()
+    formData.append("file", selectedFile)
+    formData.append("entityType", entityType)
+    formData.append("entityId", entityId.toString())
+    formData.append("description", description)
 
-    uploadMutation.mutate(formData);
-  };
+    uploadMutation.mutate(formData)
+  }
 
   const handleDownload = async (attachment: FileAttachment) => {
     try {
-      const response = await fetch(`/api/file-attachments/download/${attachment.id}`);
-      if (!response.ok) throw new Error('Download failed');
-      
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = attachment.originalName;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
+      const response = await fetch(`/api/file-attachments/download/${attachment.id}`)
+      if (!response.ok) throw new Error("Download failed")
+
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement("a")
+      link.href = url
+      link.download = attachment.originalName
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
     } catch (error) {
       toast({
         title: "下載失敗",
         description: "無法下載文件，請稍後重試",
         variant: "destructive",
-      });
+      })
     }
-  };
+  }
 
   const getFileIcon = (mimeType: string) => {
-    if (mimeType.startsWith('image/')) {
-      return <FileImage className="h-5 w-5 text-blue-500" />;
-    } else if (mimeType === 'application/pdf') {
-      return <FileText className="h-5 w-5 text-red-500" />;
+    if (mimeType.startsWith("image/")) {
+      return <FileImage className="h-5 w-5 text-blue-500" />
+    } else if (mimeType === "application/pdf") {
+      return <FileText className="h-5 w-5 text-red-500" />
     } else {
-      return <File className="h-5 w-5 text-gray-500" />;
+      return <File className="h-5 w-5 text-gray-500" />
     }
-  };
+  }
 
   const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  };
+    if (bytes === 0) return "0 Bytes"
+    const k = 1024
+    const sizes = ["Bytes", "KB", "MB", "GB"]
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i]
+  }
 
-  const isImageFile = (mimeType: string) => mimeType.startsWith('image/');
+  const isImageFile = (mimeType: string) => mimeType.startsWith("image/")
 
   return (
     <Card>
@@ -211,7 +225,7 @@ export function FileUpload({
                 上傳文件
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-md">
+            <DialogContent className="w-[95vw] max-w-md">
               <DialogHeader>
                 <DialogTitle>上傳新文件</DialogTitle>
               </DialogHeader>
@@ -223,7 +237,7 @@ export function FileUpload({
                     type="file"
                     ref={fileInputRef}
                     onChange={handleFileSelect}
-                    accept={allowedTypes.join(',')}
+                    accept={allowedTypes.join(",")}
                     className="mt-1"
                   />
                   <p className="text-sm text-gray-500 mt-1">
@@ -269,9 +283,9 @@ export function FileUpload({
                   <Button
                     variant="outline"
                     onClick={() => {
-                      setSelectedFile(null);
-                      setDescription("");
-                      setUploadDialogOpen(false);
+                      setSelectedFile(null)
+                      setDescription("")
+                      setUploadDialogOpen(false)
                     }}
                   >
                     取消
@@ -296,7 +310,10 @@ export function FileUpload({
         ) : (
           <div className="space-y-3">
             {attachments.map((attachment) => (
-              <div key={attachment.id} className="flex items-center gap-3 p-3 border rounded-lg hover:bg-gray-50">
+              <div
+                key={attachment.id}
+                className="flex items-center gap-3 p-3 border rounded-lg hover:bg-gray-50"
+              >
                 {getFileIcon(attachment.mimeType)}
                 <div className="flex-1 min-w-0">
                   <p className="font-medium truncate">{attachment.originalName}</p>
@@ -305,8 +322,12 @@ export function FileUpload({
                   )}
                   <div className="flex items-center gap-4 text-xs text-gray-500 mt-1">
                     <span>{formatFileSize(attachment.fileSize)}</span>
-                    <span>{attachment.fileType === 'image' ? '圖片' : '文檔'}</span>
-                    <span>{attachment.createdAt ? new Date(attachment.createdAt).toLocaleDateString('zh-TW') : ''}</span>
+                    <span>{attachment.fileType === "image" ? "圖片" : "文檔"}</span>
+                    <span>
+                      {attachment.createdAt
+                        ? new Date(attachment.createdAt).toLocaleDateString("zh-TW")
+                        : ""}
+                    </span>
                   </div>
                 </div>
                 <div className="flex gap-1">
@@ -335,7 +356,7 @@ export function FileUpload({
         )}
       </CardContent>
     </Card>
-  );
+  )
 }
 
 // Specialized component for loan investment records
@@ -346,14 +367,16 @@ export function LoanDocumentUpload({ recordId }: { recordId: number }) {
       entityId={recordId}
       title="借貸投資文件"
       allowedTypes={[
-        'image/jpeg', 'image/png', 'image/gif',
-        'application/pdf',
-        'application/msword',
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        'text/plain'
+        "image/jpeg",
+        "image/png",
+        "image/gif",
+        "application/pdf",
+        "application/msword",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "text/plain",
       ]}
     />
-  );
+  )
 }
 
 // Specialized component for payment records
@@ -363,7 +386,7 @@ export function PaymentReceiptUpload({ recordId }: { recordId: number }) {
       entityType="payment_record"
       entityId={recordId}
       title="付款憑證"
-      allowedTypes={['image/jpeg', 'image/png', 'image/gif', 'application/pdf']}
+      allowedTypes={["image/jpeg", "image/png", "image/gif", "application/pdf"]}
     />
-  );
+  )
 }

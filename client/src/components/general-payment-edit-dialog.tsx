@@ -1,17 +1,24 @@
 // 一般付款管理 - 編輯對話框元件
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { UseFormReturn, FieldValues } from "react-hook-form";
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form"
+import { UseFormReturn, FieldValues } from "react-hook-form"
 
 export interface GeneralPaymentEditDialogProps {
-  isOpen: boolean;
-  onOpenChange: (open: boolean) => void;
-  editForm: UseFormReturn<FieldValues>;
-  onSubmit: (data: FieldValues) => void;
-  isPending: boolean;
+  isOpen: boolean
+  onOpenChange: (open: boolean) => void
+  editForm: UseFormReturn<FieldValues>
+  onSubmit: (data: FieldValues) => void
+  isPending: boolean
 }
 
 export function GeneralPaymentEditDialog({
@@ -23,7 +30,7 @@ export function GeneralPaymentEditDialog({
 }: GeneralPaymentEditDialogProps) {
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="w-[95vw] max-w-md">
         <DialogHeader>
           <DialogTitle>編輯付款項目</DialogTitle>
         </DialogHeader>
@@ -83,11 +90,7 @@ export function GeneralPaymentEditDialog({
             />
 
             <div className="flex justify-end gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-              >
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 取消
               </Button>
               <Button type="submit" disabled={isPending}>
@@ -98,5 +101,5 @@ export function GeneralPaymentEditDialog({
         </Form>
       </DialogContent>
     </Dialog>
-  );
+  )
 }

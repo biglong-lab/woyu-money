@@ -53,7 +53,7 @@ export default function InstallmentCreateDialog({
           <span className="text-sm sm:text-base">新增分期項目</span>
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>新增分期項目</DialogTitle>
         </DialogHeader>

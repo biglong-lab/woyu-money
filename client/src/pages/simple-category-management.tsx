@@ -282,7 +282,7 @@ export default function SimpleCategoryManagement() {
                   新增固定分類
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-md">
+              <DialogContent className="w-[95vw] max-w-md">
                 <DialogHeader>
                   <DialogTitle>新增固定分類</DialogTitle>
                 </DialogHeader>
@@ -539,7 +539,7 @@ export default function SimpleCategoryManagement() {
 
       {/* Edit Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="w-[95vw] max-w-md">
           <DialogHeader>
             <DialogTitle>編輯分類</DialogTitle>
           </DialogHeader>
@@ -602,7 +602,7 @@ export default function SimpleCategoryManagement() {
 
       {/* 專案分類創建對話框 */}
       <Dialog open={isCreateProjectCategoryOpen} onOpenChange={setIsCreateProjectCategoryOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="w-[95vw] max-w-md">
           <DialogHeader>
             <DialogTitle>新增專案分類</DialogTitle>
           </DialogHeader>

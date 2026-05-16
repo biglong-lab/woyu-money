@@ -1,20 +1,20 @@
 // 分期付款詳細檢視對話框元件
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CreditCard, Calendar, TrendingUp } from "lucide-react";
-import type { PaymentItem } from "./installment-types";
-import { analyzeInstallmentItem, calculateProgress } from "./installment-utils";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Progress } from "@/components/ui/progress"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { CreditCard, Calendar, TrendingUp } from "lucide-react"
+import type { PaymentItem } from "./installment-types"
+import { analyzeInstallmentItem, calculateProgress } from "./installment-utils"
 
 export interface InstallmentDetailDialogProps {
-  item: PaymentItem | null;
-  onClose: () => void;
-  projects: Array<{ id: number; projectName: string }>;
-  categories: Array<{ id: number; categoryName: string }>;
-  fixedCategories: Array<{ id: number; categoryName: string }>;
+  item: PaymentItem | null
+  onClose: () => void
+  projects: Array<{ id: number; projectName: string }>
+  categories: Array<{ id: number; categoryName: string }>
+  fixedCategories: Array<{ id: number; categoryName: string }>
 }
 
 export default function InstallmentDetailDialog({
@@ -26,7 +26,7 @@ export default function InstallmentDetailDialog({
 }: InstallmentDetailDialogProps) {
   return (
     <Dialog open={!!item} onOpenChange={() => onClose()}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <CreditCard className="w-5 h-5 text-purple-600" />
@@ -65,17 +65,17 @@ export default function InstallmentDetailDialog({
         )}
       </DialogContent>
     </Dialog>
-  );
+  )
 }
 
 // 總覽頁籤
 function OverviewTab({ item }: { item: PaymentItem }) {
-  const progress = calculateProgress(item);
-  const monthlyAmount = parseFloat(item.installmentAmount || "0") || 0;
+  const progress = calculateProgress(item)
+  const monthlyAmount = parseFloat(item.installmentAmount || "0") || 0
   const paidPeriods =
-    monthlyAmount > 0 ? Math.floor(parseFloat(item.paidAmount) / monthlyAmount) : 0;
-  const totalPeriods = item.installmentCount || 0;
-  const remainingAmount = parseFloat(item.totalAmount) - parseFloat(item.paidAmount);
+    monthlyAmount > 0 ? Math.floor(parseFloat(item.paidAmount) / monthlyAmount) : 0
+  const totalPeriods = item.installmentCount || 0
+  const remainingAmount = parseFloat(item.totalAmount) - parseFloat(item.paidAmount)
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -111,9 +111,7 @@ function OverviewTab({ item }: { item: PaymentItem }) {
             </div>
             <div>
               <p className="text-sm text-gray-500">到期日</p>
-              <p className="font-medium">
-                {new Date(item.dueDate).toLocaleDateString()}
-              </p>
+              <p className="font-medium">{new Date(item.dueDate).toLocaleDateString()}</p>
             </div>
           </div>
           {item.notes && (
@@ -164,9 +162,7 @@ function OverviewTab({ item }: { item: PaymentItem }) {
             </div>
             <div className="text-center p-3 bg-purple-50 rounded-lg">
               <p className="text-sm text-gray-500">剩餘期數</p>
-              <p className="font-semibold text-purple-600">
-                {totalPeriods - paidPeriods} 期
-              </p>
+              <p className="font-semibold text-purple-600">{totalPeriods - paidPeriods} 期</p>
             </div>
           </div>
 
@@ -181,25 +177,25 @@ function OverviewTab({ item }: { item: PaymentItem }) {
         </CardContent>
       </Card>
     </div>
-  );
+  )
 }
 
 // 分期明細頁籤
 function ScheduleTab({ item }: { item: PaymentItem }) {
-  const analyzedData = analyzeInstallmentItem(item);
-  const monthlyAmount = parseFloat(item.totalAmount) || 0;
-  const totalPeriods = analyzedData.totalPeriods || 6;
-  const paidPeriods = analyzedData.paidPeriods || 0;
-  const startDate = item.startDate ? new Date(item.startDate) : new Date();
+  const analyzedData = analyzeInstallmentItem(item)
+  const monthlyAmount = parseFloat(item.totalAmount) || 0
+  const totalPeriods = analyzedData.totalPeriods || 6
+  const paidPeriods = analyzedData.paidPeriods || 0
+  const startDate = item.startDate ? new Date(item.startDate) : new Date()
 
   const scheduleItems = Array.from({ length: totalPeriods }, (_, index) => {
-    const periodDate = new Date(startDate);
-    periodDate.setMonth(periodDate.getMonth() + index);
+    const periodDate = new Date(startDate)
+    periodDate.setMonth(periodDate.getMonth() + index)
 
-    const isPaid = index + 1 <= paidPeriods;
-    const isCurrentPeriod = index + 1 === analyzedData.currentPeriod;
-    const isFuture = index + 1 > analyzedData.currentPeriod;
-    const isOverdue = !isPaid && !isFuture && periodDate < new Date();
+    const isPaid = index + 1 <= paidPeriods
+    const isCurrentPeriod = index + 1 === analyzedData.currentPeriod
+    const isFuture = index + 1 > analyzedData.currentPeriod
+    const isOverdue = !isPaid && !isFuture && periodDate < new Date()
 
     return {
       period: index + 1,
@@ -209,15 +205,9 @@ function ScheduleTab({ item }: { item: PaymentItem }) {
       isOverdue,
       isCurrentPeriod,
       isFuture,
-      status: isPaid
-        ? "paid"
-        : isOverdue
-          ? "overdue"
-          : isFuture
-            ? "future"
-            : "pending",
-    };
-  });
+      status: isPaid ? "paid" : isOverdue ? "overdue" : isFuture ? "future" : "pending",
+    }
+  })
 
   return (
     <Card>
@@ -259,9 +249,7 @@ function ScheduleTab({ item }: { item: PaymentItem }) {
                 </div>
                 <div>
                   <p className="font-medium">第 {scheduleItem.period} 期</p>
-                  <p className="text-sm text-gray-500">
-                    {scheduleItem.date.toLocaleDateString()}
-                  </p>
+                  <p className="text-sm text-gray-500">{scheduleItem.date.toLocaleDateString()}</p>
                   <p
                     className={`text-xs font-medium ${
                       scheduleItem.isPaid
@@ -289,9 +277,7 @@ function ScheduleTab({ item }: { item: PaymentItem }) {
               </div>
 
               <div className="text-right">
-                <p className="font-medium">
-                  NT$ {scheduleItem.amount.toLocaleString()}
-                </p>
+                <p className="font-medium">NT$ {scheduleItem.amount.toLocaleString()}</p>
                 <Badge
                   variant={
                     scheduleItem.isPaid
@@ -302,11 +288,7 @@ function ScheduleTab({ item }: { item: PaymentItem }) {
                   }
                   className="text-xs"
                 >
-                  {scheduleItem.isPaid
-                    ? "已付"
-                    : scheduleItem.isOverdue
-                      ? "逾期"
-                      : "待付"}
+                  {scheduleItem.isPaid ? "已付" : scheduleItem.isOverdue ? "逾期" : "待付"}
                 </Badge>
               </div>
             </div>
@@ -314,7 +296,7 @@ function ScheduleTab({ item }: { item: PaymentItem }) {
         </div>
       </CardContent>
     </Card>
-  );
+  )
 }
 
 // 分析統計頁籤
@@ -324,20 +306,18 @@ function AnalysisTab({
   categories,
   fixedCategories,
 }: {
-  item: PaymentItem;
-  projects: Array<{ id: number; projectName: string }>;
-  categories: Array<{ id: number; categoryName: string }>;
-  fixedCategories: Array<{ id: number; categoryName: string }>;
+  item: PaymentItem
+  projects: Array<{ id: number; projectName: string }>
+  categories: Array<{ id: number; categoryName: string }>
+  fixedCategories: Array<{ id: number; categoryName: string }>
 }) {
-  const monthlyAmount = parseFloat(item.amount) || 0;
-  const totalAmount = parseFloat(item.totalAmount);
-  const paidAmount = parseFloat(item.paidAmount);
-  const totalPeriods = item.installmentMonths || 0;
-  const paidPeriods =
-    monthlyAmount > 0 ? Math.floor(paidAmount / monthlyAmount) : 0;
-  const remainingPeriods = totalPeriods - paidPeriods;
-  const avgPaymentPerMonth =
-    paidPeriods > 0 ? paidAmount / paidPeriods : 0;
+  const monthlyAmount = parseFloat(item.amount) || 0
+  const totalAmount = parseFloat(item.totalAmount)
+  const paidAmount = parseFloat(item.paidAmount)
+  const totalPeriods = item.installmentMonths || 0
+  const paidPeriods = monthlyAmount > 0 ? Math.floor(paidAmount / monthlyAmount) : 0
+  const remainingPeriods = totalPeriods - paidPeriods
+  const avgPaymentPerMonth = paidPeriods > 0 ? paidAmount / paidPeriods : 0
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -349,9 +329,7 @@ function AnalysisTab({
           <div className="space-y-2">
             <div className="flex justify-between">
               <span className="text-sm text-gray-500">平均每期實付</span>
-              <span className="font-medium">
-                NT$ {avgPaymentPerMonth.toLocaleString()}
-              </span>
+              <span className="font-medium">NT$ {avgPaymentPerMonth.toLocaleString()}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-sm text-gray-500">完成率</span>
@@ -367,9 +345,9 @@ function AnalysisTab({
               <span className="text-sm text-gray-500">預計完成日期</span>
               <span className="font-medium">
                 {(() => {
-                  const endDate = new Date();
-                  endDate.setMonth(endDate.getMonth() + remainingPeriods);
-                  return endDate.toLocaleDateString();
+                  const endDate = new Date()
+                  endDate.setMonth(endDate.getMonth() + remainingPeriods)
+                  return endDate.toLocaleDateString()
                 })()}
               </span>
             </div>
@@ -397,8 +375,8 @@ function AnalysisTab({
           <div>
             <p className="text-sm text-gray-500">固定分類</p>
             <p className="font-medium">
-              {fixedCategories.find((fc) => fc.id === item.fixedCategoryId)
-                ?.categoryName || "未指定"}
+              {fixedCategories.find((fc) => fc.id === item.fixedCategoryId)?.categoryName ||
+                "未指定"}
             </p>
           </div>
           <div>
@@ -414,5 +392,5 @@ function AnalysisTab({
         </CardContent>
       </Card>
     </div>
-  );
+  )
 }
