@@ -36,15 +36,8 @@ function getValueByPath(obj: unknown, path: string): unknown {
 /**
  * 驗證 HMAC-SHA256 簽名
  */
-export function verifyHmacSignature(
-  payload: string,
-  signature: string,
-  secret: string
-): boolean {
-  const expected = crypto
-    .createHmac("sha256", secret)
-    .update(payload)
-    .digest("hex")
+export function verifyHmacSignature(payload: string, signature: string, secret: string): boolean {
+  const expected = crypto.createHmac("sha256", secret).update(payload).digest("hex")
   // 時間常數比較，防止 timing attack
   try {
     return crypto.timingSafeEqual(
@@ -61,10 +54,7 @@ export function verifyHmacSignature(
  */
 export function verifyBearerToken(token: string, expected: string): boolean {
   try {
-    return crypto.timingSafeEqual(
-      Buffer.from(token),
-      Buffer.from(expected)
-    )
+    return crypto.timingSafeEqual(Buffer.from(token), Buffer.from(expected))
   } catch {
     return false
   }
@@ -83,17 +73,11 @@ export function verifyIpAllowlist(ip: string, allowedIps: string[]): boolean {
 // ─────────────────────────────────────────────
 
 export async function getIncomeSources(): Promise<IncomeSource[]> {
-  return await db
-    .select()
-    .from(incomeSources)
-    .orderBy(desc(incomeSources.createdAt))
+  return await db.select().from(incomeSources).orderBy(desc(incomeSources.createdAt))
 }
 
 export async function getIncomeSourceById(id: number): Promise<IncomeSource | null> {
-  const [row] = await db
-    .select()
-    .from(incomeSources)
-    .where(eq(incomeSources.id, id))
+  const [row] = await db.select().from(incomeSources).where(eq(incomeSources.id, id))
   return row ?? null
 }
 
@@ -188,10 +172,7 @@ export async function getIncomeWebhooks(filters: WebhookFilters = {}): Promise<W
 }
 
 export async function getIncomeWebhookById(id: number): Promise<IncomeWebhook | null> {
-  const [row] = await db
-    .select()
-    .from(incomeWebhooks)
-    .where(eq(incomeWebhooks.id, id))
+  const [row] = await db.select().from(incomeWebhooks).where(eq(incomeWebhooks.id, id))
   return row ?? null
 }
 
@@ -276,9 +257,9 @@ export function parseWebhookPayload(
 export interface ReceiveWebhookInput {
   source: IncomeSource
   rawPayload: unknown
-  rawBody: string           // 用於 HMAC 驗證
-  signatureHeader?: string  // X-Signature 或 X-Hub-Signature-256
-  tokenHeader?: string      // Authorization Bearer
+  rawBody: string // 用於 HMAC 驗證
+  signatureHeader?: string // X-Signature 或 X-Hub-Signature-256
+  tokenHeader?: string // Authorization Bearer
   requestIp?: string
   requestHeaders?: Record<string, string>
 }
@@ -300,25 +281,33 @@ export async function receiveWebhook(input: ReceiveWebhookInput): Promise<Receiv
     return { success: false, error: "IP 不在白名單中" }
   }
 
-  // 2. 驗證簽名 / Token
+  // 2. 驗證簽名 / Token（SECURITY：設了驗證類型就嚴格檢查）
   let signatureValid = true
   const authType = source.authType ?? "token"
 
   if (authType === "token" || authType === "both") {
-    if (source.apiToken && tokenHeader) {
-      const token = tokenHeader.replace(/^Bearer\s+/i, "")
-      if (!verifyBearerToken(token, source.apiToken)) {
-        return { success: false, error: "Token 驗證失敗" }
-      }
+    if (!source.apiToken) {
+      return { success: false, error: "Token 驗證未設定（請聯絡管理員設定 api_token）" }
+    }
+    if (!tokenHeader) {
+      return { success: false, error: "缺少 Authorization header" }
+    }
+    const token = tokenHeader.replace(/^Bearer\s+/i, "")
+    if (!verifyBearerToken(token, source.apiToken)) {
+      return { success: false, error: "Token 驗證失敗" }
     }
   }
 
   if (authType === "hmac" || authType === "both") {
-    if (source.webhookSecret && signatureHeader) {
-      signatureValid = verifyHmacSignature(rawBody, signatureHeader, source.webhookSecret)
-      if (!signatureValid) {
-        return { success: false, error: "HMAC 簽名驗證失敗" }
-      }
+    if (!source.webhookSecret) {
+      return { success: false, error: "HMAC Secret 未設定（請聯絡管理員設定 webhook_secret）" }
+    }
+    if (!signatureHeader) {
+      return { success: false, error: "缺少 X-Signature header" }
+    }
+    signatureValid = verifyHmacSignature(rawBody, signatureHeader, source.webhookSecret)
+    if (!signatureValid) {
+      return { success: false, error: "HMAC 簽名驗證失敗" }
     }
   }
 
@@ -346,8 +335,7 @@ export async function receiveWebhook(input: ReceiveWebhookInput): Promise<Receiv
 
   // 5. 金額換算（目前記錄原始幣別，台幣直接等值）
   const currency = parsed.currency ?? source.defaultCurrency ?? "TWD"
-  const amountTwd =
-    currency === "TWD" ? (parsed.amount ?? null) : null // 外幣換算預留，目前為 null
+  const amountTwd = currency === "TWD" ? (parsed.amount ?? null) : null // 外幣換算預留，目前為 null
 
   // 6. 寫入資料庫
   const [webhook] = await db
@@ -416,8 +404,7 @@ export async function confirmWebhook(
   if (!webhook) return { success: false, webhookId, error: "找不到此進帳紀錄" }
   if (webhook.status !== "pending")
     return { success: false, webhookId, error: `此紀錄狀態為「${webhook.status}」，無法確認` }
-  if (!webhook.parsedAmount)
-    return { success: false, webhookId, error: "無法解析金額，請手動建立" }
+  if (!webhook.parsedAmount) return { success: false, webhookId, error: "無法解析金額，請手動建立" }
 
   const { paymentItemId, paymentRecordId } = await _createPaymentFromWebhook(webhook, input)
 
@@ -511,10 +498,7 @@ async function _createPaymentFromWebhook(
   const dateStr = paidAt.toISOString().split("T")[0]
 
   // 建立 paymentItem（itemType = 'income'）
-  const itemName =
-    input.itemName ??
-    webhook.parsedDescription ??
-    `進帳 ${dateStr}`
+  const itemName = input.itemName ?? webhook.parsedDescription ?? `進帳 ${dateStr}`
 
   const [item] = await db
     .insert(paymentItems)
@@ -542,13 +526,14 @@ async function _createPaymentFromWebhook(
       amountPaid: amount.toString(),
       paymentDate: dateStr,
       paymentMethod: "webhook",
-      notes: [
-        webhook.parsedPayerName ? `付款方：${webhook.parsedPayerName}` : null,
-        webhook.parsedOrderId ? `訂單號：${webhook.parsedOrderId}` : null,
-        webhook.externalTransactionId ? `交易ID：${webhook.externalTransactionId}` : null,
-      ]
-        .filter(Boolean)
-        .join(" | ") || null,
+      notes:
+        [
+          webhook.parsedPayerName ? `付款方：${webhook.parsedPayerName}` : null,
+          webhook.parsedOrderId ? `訂單號：${webhook.parsedOrderId}` : null,
+          webhook.externalTransactionId ? `交易ID：${webhook.externalTransactionId}` : null,
+        ]
+          .filter(Boolean)
+          .join(" | ") || null,
       isPartialPayment: false,
       createdAt: new Date(),
       updatedAt: new Date(),

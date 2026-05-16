@@ -172,21 +172,30 @@ export async function receiveExpenseWebhook(
   let signatureValid = true
   const authType = source.authType ?? "token"
 
+  // SECURITY：authType 設了就嚴格驗證。token/secret 為空時拒絕、不可 silently 放行
   if (authType === "token" || authType === "both") {
-    if (source.apiToken && tokenHeader) {
-      const token = tokenHeader.replace(/^Bearer\s+/i, "")
-      if (!verifyBearerToken(token, source.apiToken)) {
-        return { success: false, error: "Token 驗證失敗" }
-      }
+    if (!source.apiToken) {
+      return { success: false, error: "Token 驗證未設定（請聯絡管理員設定 api_token）" }
+    }
+    if (!tokenHeader) {
+      return { success: false, error: "缺少 Authorization header" }
+    }
+    const token = tokenHeader.replace(/^Bearer\s+/i, "")
+    if (!verifyBearerToken(token, source.apiToken)) {
+      return { success: false, error: "Token 驗證失敗" }
     }
   }
 
   if (authType === "hmac" || authType === "both") {
-    if (source.webhookSecret && signatureHeader) {
-      signatureValid = verifyHmacSignature(rawBody, signatureHeader, source.webhookSecret)
-      if (!signatureValid) {
-        return { success: false, error: "HMAC 簽名驗證失敗" }
-      }
+    if (!source.webhookSecret) {
+      return { success: false, error: "HMAC Secret 未設定（請聯絡管理員設定 webhook_secret）" }
+    }
+    if (!signatureHeader) {
+      return { success: false, error: "缺少 X-Signature header" }
+    }
+    signatureValid = verifyHmacSignature(rawBody, signatureHeader, source.webhookSecret)
+    if (!signatureValid) {
+      return { success: false, error: "HMAC 簽名驗證失敗" }
     }
   }
 
