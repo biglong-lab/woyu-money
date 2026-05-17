@@ -49,6 +49,27 @@ interface Snapshot {
   source: string
 }
 
+interface SeasonalForecast {
+  targetMonth: string
+  daysElapsed: number
+  currentAccumulated: number
+  history: Array<{ month: string; accAtSameDay: number; finalAcc: number; ratio: number }>
+  sampleSize: number
+  avgRatio: number
+  stdRatio: number
+  pointEstimate: number
+  ci80: { lower: number; upper: number }
+  ci95: { lower: number; upper: number }
+  confidence: "high" | "medium" | "low" | "insufficient"
+}
+
+const CONFIDENCE_LABEL: Record<SeasonalForecast["confidence"], { label: string; color: string }> = {
+  high: { label: "高（≥6 樣本 & 波動低）", color: "bg-green-100 text-green-800" },
+  medium: { label: "中（≥4 樣本）", color: "bg-blue-100 text-blue-800" },
+  low: { label: "低（≥2 樣本）", color: "bg-amber-100 text-amber-800" },
+  insufficient: { label: "資料不足（< 2 樣本，僅線性推估）", color: "bg-red-100 text-red-800" },
+}
+
 const PM_COMPANIES = [
   { id: 1, name: "浯島文旅" },
   { id: 2, name: "浯島輕旅" },
@@ -80,6 +101,11 @@ export default function RevenueForecastPage() {
   // 該月走勢
   const { data: trend = [], isLoading } = useQuery<Snapshot[]>({
     queryKey: [`/api/forecast/trend?targetMonth=${targetMonth}&companyId=${companyParam}`],
+  })
+
+  // 季節性預測
+  const { data: seasonal } = useQuery<SeasonalForecast>({
+    queryKey: [`/api/forecast/seasonal?targetMonth=${targetMonth}&companyId=${companyParam}`],
   })
 
   // 同期比較：拉過去 3 個月相同 targetMonth offset
@@ -306,6 +332,87 @@ export default function RevenueForecastPage() {
             </CardContent>
           </Card>
         </div>
+      )}
+
+      {/* 季節性預測（更精準）*/}
+      {seasonal && (
+        <Card className="border-2 border-indigo-200">
+          <CardContent className="py-4 px-3 sm:px-4">
+            <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+              <div className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                <TrendingUp className="h-4 w-4 text-indigo-600" />
+                季節性預測（用歷史同期累積比率）
+              </div>
+              <Badge className={CONFIDENCE_LABEL[seasonal.confidence].color}>
+                信心：{CONFIDENCE_LABEL[seasonal.confidence].label}
+              </Badge>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+              <div className="bg-indigo-50 rounded-lg p-3">
+                <div className="text-xs text-indigo-700">點估計（月底總額）</div>
+                <div className="text-2xl font-bold text-indigo-900">
+                  {formatMoney(seasonal.pointEstimate)}
+                </div>
+                <div className="text-xs text-indigo-600 mt-1">
+                  基於 {seasonal.sampleSize} 個歷史月
+                  {seasonal.sampleSize > 0 && (
+                    <>、平均比率 {(seasonal.avgRatio * 100).toFixed(1)}%</>
+                  )}
+                </div>
+              </div>
+              <div className="bg-blue-50 rounded-lg p-3">
+                <div className="text-xs text-blue-700">80% 信心區間</div>
+                <div className="text-sm font-bold text-blue-900">
+                  {formatMoney(seasonal.ci80.lower)} ~ {formatMoney(seasonal.ci80.upper)}
+                </div>
+                <div className="text-xs text-blue-600 mt-1">8 成機會落在此範圍</div>
+              </div>
+              <div className="bg-gray-50 rounded-lg p-3">
+                <div className="text-xs text-gray-700">95% 信心區間</div>
+                <div className="text-sm font-bold text-gray-900">
+                  {formatMoney(seasonal.ci95.lower)} ~ {formatMoney(seasonal.ci95.upper)}
+                </div>
+                <div className="text-xs text-gray-600 mt-1">幾乎都會落在此範圍</div>
+              </div>
+            </div>
+
+            {seasonal.history.length > 0 && (
+              <div className="mt-3 pt-3 border-t">
+                <div className="text-xs text-gray-500 mb-2">
+                  歷史同期比率（第 {seasonal.daysElapsed} 天累積 / 月底最終）
+                </div>
+                <div className="space-y-1.5 text-xs">
+                  {seasonal.history.map((h) => (
+                    <div key={h.month} className="flex items-center gap-3">
+                      <span className="font-mono text-gray-700 w-20">{h.month}</span>
+                      <span className="text-gray-500 flex-1 sm:flex-initial sm:w-32 text-right">
+                        {formatMoney(h.accAtSameDay)} / {formatMoney(h.finalAcc)}
+                      </span>
+                      <div className="flex-1">
+                        <div className="bg-gray-200 rounded-full h-2 relative overflow-hidden">
+                          <div
+                            className="bg-indigo-500 h-full"
+                            style={{ width: `${(h.ratio * 100).toFixed(1)}%` }}
+                          />
+                        </div>
+                      </div>
+                      <span className="font-semibold text-indigo-700 w-12 text-right">
+                        {(h.ratio * 100).toFixed(1)}%
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {seasonal.confidence === "insufficient" && (
+              <div className="mt-3 text-xs text-amber-700 bg-amber-50 p-2 rounded">
+                ⚠️ 目前歷史快照不足、退化為線性推估。建議：等資料累積 3+ 個月後此預測會大幅準確。
+              </div>
+            )}
+          </CardContent>
+        </Card>
       )}
 
       {/* 累積曲線圖 */}
