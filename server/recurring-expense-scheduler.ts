@@ -10,6 +10,7 @@
  */
 import { db } from "./db"
 import { sql } from "drizzle-orm"
+import { log } from "./vite"
 
 const RECURRING_CATEGORIES = [
   "洗滌費",
