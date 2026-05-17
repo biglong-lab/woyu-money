@@ -131,16 +131,21 @@ export default function ExpenseWebhooksInbox() {
   const [dueTo, setDueTo] = useState("")
   const [sortBy, setSortBy] = useState<SortKey>("createdDesc")
 
-  // 列表（按狀態篩選）
-  const queryStr = tab === "all" ? "" : `?status=${tab}`
-  const { data: list, isLoading } = useQuery<{
+  // 列表（按狀態篩選，pageSize 500 一次拿完，避免 PM 推大批時看不到）
+  const queryStr = tab === "all" ? "?pageSize=500" : `?status=${tab}&pageSize=500`
+  const {
+    data: list,
+    isLoading,
+    refetch,
+  } = useQuery<{
     data: ExpenseWebhook[]
     total: number
   }>({
     queryKey: [`/api/expense/webhooks${queryStr}`],
-    refetchInterval: 30000, // 30 秒重新整理一次（PM cron 進來時可及時看到）
+    refetchInterval: 30000, // 30 秒自動重新整理（PM cron 進來時可及時看到）
   })
   const allWebhooks = list?.data ?? []
+  const serverTotal = list?.total ?? 0
 
   // sources（顯示來源名稱）
   const { data: sourcesData } = useQuery<ExpenseSource[]>({
@@ -519,6 +524,15 @@ export default function ExpenseWebhooksInbox() {
                 清除
               </Button>
             )}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => refetch()}
+              title="立即重新整理"
+              disabled={isLoading}
+            >
+              <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
+            </Button>
           </div>
 
           {showFilters && (
@@ -589,7 +603,10 @@ export default function ExpenseWebhooksInbox() {
             筆
           </label>
           <span className="text-gray-400">
-            ・顯示 {webhooks.length} / 共 {allWebhooks.length} 筆
+            ・顯示 {webhooks.length} / 已載入 {allWebhooks.length}
+            {serverTotal > allWebhooks.length && (
+              <span className="text-orange-600 ml-1">（伺服器尚有 {serverTotal} 筆）</span>
+            )}
           </span>
         </div>
       )}
