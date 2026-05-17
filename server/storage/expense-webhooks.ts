@@ -136,6 +136,134 @@ export async function getExpenseSourceById(id: number): Promise<ExpenseSource | 
   return row ?? null
 }
 
+export async function getExpenseWebhookById(id: number) {
+  const [row] = await db.select().from(expenseWebhooks).where(eq(expenseWebhooks.id, id)).limit(1)
+  return row ?? null
+}
+
+// ─────────────────────────────────────────────
+// Webhook 確認 / 拒絕（將 pending 變 payment_item）
+// ─────────────────────────────────────────────
+export interface ConfirmExpenseInput {
+  projectId: number
+  categoryId?: number | null
+  itemName?: string | null
+  asPaid?: boolean
+  paymentMethod?: string | null
+  reviewNote?: string | null
+}
+
+export async function confirmExpenseWebhook(
+  webhookId: number,
+  userId: number | null,
+  input: ConfirmExpenseInput
+): Promise<{ success: boolean; paymentItemId?: number; paymentRecordId?: number; error?: string }> {
+  const webhook = await getExpenseWebhookById(webhookId)
+  if (!webhook) return { success: false, error: "找不到此帳單紀錄" }
+  if (webhook.status !== "pending") {
+    return { success: false, error: `此紀錄狀態為「${webhook.status}」、無法確認` }
+  }
+  if (!webhook.parsedAmount || parseFloat(webhook.parsedAmount) <= 0) {
+    return { success: false, error: "無法解析金額" }
+  }
+
+  const itemName =
+    input.itemName || webhook.parsedVendor || webhook.parsedDescription || `帳單 #${webhook.id}`
+
+  const today = new Date().toISOString().split("T")[0]
+  const startDate = webhook.parsedPaidAt
+    ? webhook.parsedPaidAt.toISOString().split("T")[0]
+    : webhook.parsedDueAt
+      ? webhook.parsedDueAt.toISOString().split("T")[0]
+      : today
+  const endDate = webhook.parsedDueAt ? webhook.parsedDueAt.toISOString().split("T")[0] : null
+
+  const amount = webhook.parsedAmount
+
+  return await db.transaction(async (tx) => {
+    // 1. 建 payment_item
+    const [newItem] = await tx
+      .insert(paymentItems)
+      .values({
+        projectId: input.projectId,
+        categoryId: input.categoryId ?? null,
+        itemName,
+        totalAmount: amount,
+        paidAmount: input.asPaid ? amount : "0",
+        status: input.asPaid ? "paid" : "unpaid",
+        startDate,
+        endDate,
+        notes:
+          (input.reviewNote ? input.reviewNote + "\n" : "") +
+          `來源：外部 webhook (id=${webhookId})\n${webhook.parsedDescription || ""}`,
+        source: "webhook",
+        paymentType: "single",
+        itemType: "project",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .returning()
+
+    let recordId: number | undefined
+    if (input.asPaid) {
+      const [newRecord] = await tx
+        .insert(paymentRecords)
+        .values({
+          itemId: newItem.id,
+          amountPaid: amount,
+          paymentDate: webhook.parsedPaidAt
+            ? webhook.parsedPaidAt.toISOString().split("T")[0]
+            : today,
+          paymentMethod: input.paymentMethod || "外部系統",
+          receiptImageUrl: null,
+          notes: `Webhook 確認自動建立`,
+        })
+        .returning()
+      recordId = newRecord.id
+    }
+
+    // 2. 更新 webhook
+    await tx
+      .update(expenseWebhooks)
+      .set({
+        status: "confirmed",
+        linkedItemId: newItem.id,
+        linkedRecordId: recordId ?? null,
+        reviewedByUserId: userId,
+        reviewedAt: new Date(),
+        reviewNote: input.reviewNote ?? null,
+        processedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(expenseWebhooks.id, webhookId))
+
+    return { success: true, paymentItemId: newItem.id, paymentRecordId: recordId }
+  })
+}
+
+export async function batchConfirmExpenseWebhooks(
+  ids: number[],
+  userId: number | null,
+  input: ConfirmExpenseInput
+): Promise<{
+  successCount: number
+  failCount: number
+  errors: Array<{ id: number; error: string }>
+}> {
+  let successCount = 0
+  let failCount = 0
+  const errors: Array<{ id: number; error: string }> = []
+  for (const id of ids) {
+    const r = await confirmExpenseWebhook(id, userId, input)
+    if (r.success) successCount++
+    else {
+      failCount++
+      errors.push({ id, error: r.error ?? "未知錯誤" })
+    }
+  }
+  return { successCount, failCount, errors }
+}
+
 // ─────────────────────────────────────────────
 // Webhook 接收主流程
 // ─────────────────────────────────────────────

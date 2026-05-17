@@ -68,6 +68,7 @@ import HouseholdBudget from "@/pages/household-budget"
 import HouseholdCategoryManagement from "@/pages/household-category-management"
 import IncomeSourcesManagement from "@/pages/income-sources-management"
 import IncomeWebhooksInbox from "@/pages/income-webhooks-inbox"
+import ExpenseWebhooksInbox from "@/pages/expense-webhooks-inbox"
 import CashAllocation from "@/pages/cash-allocation"
 import LaborInsuranceWatch from "@/pages/labor-insurance-watch"
 import RentalMatrix from "@/pages/rental-matrix"
@@ -191,6 +192,7 @@ function Router() {
                 {/* Income Webhook Gateway — 進帳多系統接入 */}
                 <ProtectedRoute path="/income/sources" component={IncomeSourcesManagement} />
                 <ProtectedRoute path="/income/inbox" component={IncomeWebhooksInbox} />
+                <ProtectedRoute path="/expense/inbox" component={ExpenseWebhooksInbox} />
 
                 {/* Cash Allocation — 現金分配助理（核心決策功能）*/}
                 <ProtectedRoute path="/cash-allocation" component={CashAllocation} />
