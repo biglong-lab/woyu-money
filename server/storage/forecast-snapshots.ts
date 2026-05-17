@@ -94,7 +94,7 @@ export async function captureFromPM(): Promise<CaptureResult> {
     let skipped = 0
 
     for (const targetMonth of months) {
-      // 從 PM 拉該月每家公司累積 total_revenue
+      // 從 PM 拉該月每家公司「截至今日」累積（含今日）
       const result = await pool.query<{
         company_id: number
         accumulated: string
@@ -102,8 +102,9 @@ export async function captureFromPM(): Promise<CaptureResult> {
         `SELECT company_id, COALESCE(SUM(total_revenue), 0)::text AS accumulated
          FROM daily_revenue_snapshots
          WHERE TO_CHAR(date, 'YYYY-MM') = $1
+           AND date <= $2::date
          GROUP BY company_id`,
-        [targetMonth]
+        [targetMonth, todayStr]
       )
 
       const daysAhead = Math.ceil(
@@ -130,12 +131,11 @@ export async function captureFromPM(): Promise<CaptureResult> {
           })
           inserted++
         } catch {
-          // unique constraint → skip
           skipped++
         }
       }
 
-      // 合計（companyId NULL）
+      // 合計：直接用各公司累積加總（已是「截至今日」、不會有跨日缺紀錄問題）
       try {
         await db.insert(revenueForecastSnapshots).values({
           snapshotDate: todayStr,
