@@ -43,6 +43,8 @@ import budgetAutoGenerateRoutes from "./budget-auto-generate"
 import propertyPlRoutes from "./property-pl"
 import varianceReportRoutes from "./variance-report"
 import dataQualityRoutes from "./data-quality"
+import recurringExpenseTemplatesRoutes from "./recurring-expense-templates"
+import forecastRoutes from "./forecast"
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // 設定認證系統
@@ -133,6 +135,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use(propertyPlRoutes)
   app.use(varianceReportRoutes)
   app.use(dataQualityRoutes)
+  app.use(recurringExpenseTemplatesRoutes)
+  app.use(forecastRoutes)
 
   const httpServer = createServer(app)
   return httpServer
