@@ -17,6 +17,10 @@ import {
   getSimpleForecast,
   getSeasonalForecast,
 } from "../storage/forecast-snapshots"
+import { getIncomeSourceByKey, verifyBearerToken } from "../storage/income"
+import { db } from "../db"
+import { revenueForecastSnapshots } from "@shared/schema"
+import { z } from "zod"
 
 const router = Router()
 
@@ -108,6 +112,112 @@ router.post(
     const result = await backfillFromPMHistory()
     if (!result.ok) throw new AppError(500, result.error ?? "backfill 失敗")
     res.json(result)
+  })
+)
+
+// ─────────────────────────────────────────────
+// PMS 對接：外部系統推送預訂快照（無 session 認證，走 Bearer token）
+// ─────────────────────────────────────────────
+
+const PmsForecastPayloadSchema = z.object({
+  snapshotDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "格式 YYYY-MM-DD"),
+  companyId: z.number().int().nullable().optional(),
+  targetMonth: z.string().regex(/^\d{4}-\d{2}$/, "格式 YYYY-MM"),
+  bookedRevenue: z.union([z.number(), z.string()]).transform((v) => Number(v)),
+  accumulatedRevenue: z
+    .union([z.number(), z.string()])
+    .optional()
+    .transform((v) => (v ? Number(v) : 0)),
+  notes: z.string().max(500).optional(),
+})
+
+/**
+ * POST /api/forecast/webhook/:sourceKey
+ *
+ * 給 PMS / OTA / 其他預訂系統推送「未來預訂快照」。
+ *
+ * 認證：走 income_sources 既有 sourceKey + Bearer token 機制（source_type = 'pms_forecast'）
+ * 行為：把 payload 寫進 revenue_forecast_snapshots，source = 'pms-booking'
+ *
+ * Payload 範例：
+ *   {
+ *     "snapshotDate": "2026-05-18",
+ *     "companyId": 1,
+ *     "targetMonth": "2026-06",
+ *     "bookedRevenue": 250000,
+ *     "accumulatedRevenue": 0
+ *   }
+ */
+router.post(
+  "/api/forecast/webhook/:sourceKey",
+  asyncHandler(async (req, res) => {
+    const { sourceKey } = req.params
+
+    // 1. 找 source
+    const source = await getIncomeSourceByKey(sourceKey)
+    if (!source) {
+      // 不洩漏 source 存在性、204 回應
+      return res.status(200).json({ received: true, note: "source not configured" })
+    }
+
+    // 2. token 驗證
+    if (!source.apiToken) {
+      throw new AppError(401, "Token 驗證未設定")
+    }
+    const tokenHeader = String(req.headers["authorization"] ?? "")
+    if (!tokenHeader) {
+      throw new AppError(401, "缺少 Authorization header")
+    }
+    const token = tokenHeader.replace(/^Bearer\s+/i, "")
+    if (!verifyBearerToken(token, source.apiToken)) {
+      throw new AppError(401, "Token 驗證失敗")
+    }
+
+    // 3. 解析 payload
+    try {
+      const data = PmsForecastPayloadSchema.parse(req.body)
+
+      const targetMonthEnd = new Date(data.targetMonth + "-01")
+      targetMonthEnd.setMonth(targetMonthEnd.getMonth() + 1)
+      const daysAhead = Math.ceil(
+        (targetMonthEnd.getTime() - new Date(data.snapshotDate).getTime()) / (1000 * 60 * 60 * 24)
+      )
+
+      // 4. INSERT 或 UPDATE（先 try insert，違反 unique 就 update）
+      let status: "inserted" | "updated" = "inserted"
+      try {
+        await db.insert(revenueForecastSnapshots).values({
+          snapshotDate: data.snapshotDate,
+          companyId: data.companyId ?? null,
+          targetMonth: data.targetMonth,
+          accumulatedRevenue: (data.accumulatedRevenue ?? 0).toString(),
+          bookedRevenue: data.bookedRevenue.toString(),
+          daysAheadOfTarget: daysAhead,
+          source: "pms-booking",
+          notes: data.notes ?? `via ${sourceKey}`,
+        })
+      } catch {
+        const { sql } = await import("drizzle-orm")
+        await db.execute(sql`
+          UPDATE revenue_forecast_snapshots
+          SET booked_revenue = ${data.bookedRevenue.toString()},
+              accumulated_revenue = ${(data.accumulatedRevenue ?? 0).toString()},
+              notes = ${data.notes ?? `via ${sourceKey}`},
+              days_ahead_of_target = ${daysAhead}
+          WHERE snapshot_date = ${data.snapshotDate}
+            AND company_id IS NOT DISTINCT FROM ${data.companyId ?? null}
+            AND target_month = ${data.targetMonth}
+            AND source = 'pms-booking'
+        `)
+        status = "updated"
+      }
+      return res.status(200).json({ received: true, status })
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        throw new AppError(400, "資料格式錯誤：" + err.errors.map((e) => e.message).join(", "))
+      }
+      throw err
+    }
   })
 )
 

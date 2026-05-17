@@ -86,7 +86,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // （改用 secret/token 驗證，在路由層處理）
     const isWebhookReceiver =
       req.method === "POST" &&
-      (req.path.startsWith("/income/webhook/") || req.path.startsWith("/expense/webhook/"))
+      (req.path.startsWith("/income/webhook/") ||
+        req.path.startsWith("/expense/webhook/") ||
+        req.path.startsWith("/forecast/webhook/"))
 
     const isPublic = publicPaths.some((p) => req.path === p) || isWebhookReceiver
     if (isPublic) return next()
