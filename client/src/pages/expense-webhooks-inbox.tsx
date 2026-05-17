@@ -6,11 +6,11 @@
  *
  * Pending → 點確認 → 寫入 payment_items（待付）或 payment_items+payment_records（已付）
  */
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { useQuery, useMutation } from "@tanstack/react-query"
 import { queryClient, apiRequest } from "@/lib/queryClient"
 import { useToast } from "@/hooks/use-toast"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -43,6 +43,10 @@ import {
   Building2,
   Receipt,
   RefreshCw,
+  Search,
+  SlidersHorizontal,
+  X,
+  ArrowUpDown,
 } from "lucide-react"
 import { useDocumentTitle } from "@/hooks/use-document-title"
 import { EmptyState } from "@/components/ui/empty-state"
@@ -104,6 +108,8 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.
   },
 }
 
+type SortKey = "createdDesc" | "createdAsc" | "amountDesc" | "amountAsc" | "dueAsc" | "dueDesc"
+
 export default function ExpenseWebhooksInbox() {
   useDocumentTitle("外部帳單收件箱")
   const { toast } = useToast()
@@ -113,6 +119,17 @@ export default function ExpenseWebhooksInbox() {
     mode: "single" | "batch"
     webhook?: ExpenseWebhook
   } | null>(null)
+  const [rejectDialog, setRejectDialog] = useState<{ ids: number[] } | null>(null)
+
+  // 搜尋與篩選
+  const [search, setSearch] = useState("")
+  const [showFilters, setShowFilters] = useState(false)
+  const [sourceFilter, setSourceFilter] = useState<string>("all")
+  const [minAmount, setMinAmount] = useState("")
+  const [maxAmount, setMaxAmount] = useState("")
+  const [dueFrom, setDueFrom] = useState("")
+  const [dueTo, setDueTo] = useState("")
+  const [sortBy, setSortBy] = useState<SortKey>("createdDesc")
 
   // 列表（按狀態篩選）
   const queryStr = tab === "all" ? "" : `?status=${tab}`
@@ -123,7 +140,7 @@ export default function ExpenseWebhooksInbox() {
     queryKey: [`/api/expense/webhooks${queryStr}`],
     refetchInterval: 30000, // 30 秒重新整理一次（PM cron 進來時可及時看到）
   })
-  const webhooks = list?.data ?? []
+  const allWebhooks = list?.data ?? []
 
   // sources（顯示來源名稱）
   const { data: sourcesData } = useQuery<ExpenseSource[]>({
@@ -137,6 +154,119 @@ export default function ExpenseWebhooksInbox() {
     queryKey: ["/api/payment/projects"],
   })
   const projects = projectsData ?? []
+
+  // 過濾 + 排序
+  const webhooks = useMemo(() => {
+    const kw = search.trim().toLowerCase()
+    const min = parseFloat(minAmount) || 0
+    const max = parseFloat(maxAmount) || Infinity
+    const from = dueFrom ? new Date(dueFrom).getTime() : null
+    const to = dueTo ? new Date(dueTo).getTime() + 86_400_000 : null // 含當日
+
+    const filtered = allWebhooks.filter((w) => {
+      // 來源
+      if (sourceFilter !== "all" && String(w.sourceId) !== sourceFilter) return false
+      // 金額
+      const amt = parseFloat(w.parsedAmountTwd || w.parsedAmount || "0")
+      if (amt < min || amt > max) return false
+      // 到期日
+      if (from || to) {
+        const dueMs = w.parsedDueAt ? new Date(w.parsedDueAt).getTime() : null
+        if (!dueMs) return false
+        if (from && dueMs < from) return false
+        if (to && dueMs >= to) return false
+      }
+      // 關鍵字（廠商 / 描述 / 發票 / 分類 / 交易 ID / PM company）
+      if (kw) {
+        const pmCompany = String(w.rawPayload?.pmCompanyId ?? "").toLowerCase()
+        const hay = [
+          w.parsedVendor,
+          w.parsedDescription,
+          w.parsedInvoiceNumber,
+          w.parsedCategoryHint,
+          w.externalTransactionId,
+          pmCompany,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase()
+        if (!hay.includes(kw)) return false
+      }
+      return true
+    })
+
+    const sorted = [...filtered]
+    sorted.sort((a, b) => {
+      switch (sortBy) {
+        case "createdAsc":
+          return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+        case "amountDesc":
+          return (
+            parseFloat(b.parsedAmountTwd || b.parsedAmount || "0") -
+            parseFloat(a.parsedAmountTwd || a.parsedAmount || "0")
+          )
+        case "amountAsc":
+          return (
+            parseFloat(a.parsedAmountTwd || a.parsedAmount || "0") -
+            parseFloat(b.parsedAmountTwd || b.parsedAmount || "0")
+          )
+        case "dueAsc":
+          return (
+            (a.parsedDueAt ? new Date(a.parsedDueAt).getTime() : Infinity) -
+            (b.parsedDueAt ? new Date(b.parsedDueAt).getTime() : Infinity)
+          )
+        case "dueDesc":
+          return (
+            (b.parsedDueAt ? new Date(b.parsedDueAt).getTime() : -Infinity) -
+            (a.parsedDueAt ? new Date(a.parsedDueAt).getTime() : -Infinity)
+          )
+        case "createdDesc":
+        default:
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      }
+    })
+    return sorted
+  }, [allWebhooks, search, sourceFilter, minAmount, maxAmount, dueFrom, dueTo, sortBy])
+
+  const visiblePendingIds = useMemo(
+    () => webhooks.filter((w) => w.status === "pending").map((w) => w.id),
+    [webhooks]
+  )
+  const allVisiblePendingSelected =
+    visiblePendingIds.length > 0 && visiblePendingIds.every((id) => selectedIds.has(id))
+  const someVisiblePendingSelected =
+    !allVisiblePendingSelected && visiblePendingIds.some((id) => selectedIds.has(id))
+
+  const toggleSelectAllVisible = () => {
+    if (allVisiblePendingSelected) {
+      const next = new Set(selectedIds)
+      visiblePendingIds.forEach((id) => next.delete(id))
+      setSelectedIds(next)
+    } else {
+      const next = new Set(selectedIds)
+      visiblePendingIds.forEach((id) => next.add(id))
+      setSelectedIds(next)
+    }
+  }
+
+  const clearFilters = () => {
+    setSearch("")
+    setSourceFilter("all")
+    setMinAmount("")
+    setMaxAmount("")
+    setDueFrom("")
+    setDueTo("")
+    setSortBy("createdDesc")
+  }
+
+  const activeFilterCount =
+    (search ? 1 : 0) +
+    (sourceFilter !== "all" ? 1 : 0) +
+    (minAmount ? 1 : 0) +
+    (maxAmount ? 1 : 0) +
+    (dueFrom ? 1 : 0) +
+    (dueTo ? 1 : 0) +
+    (sortBy !== "createdDesc" ? 1 : 0)
 
   // 確認 / 拒絕 mutations
   const confirmMutation = useMutation({
@@ -191,8 +321,10 @@ export default function ExpenseWebhooksInbox() {
   })
 
   const rejectMutation = useMutation({
-    mutationFn: async (id: number) =>
-      apiRequest("POST", `/api/expense/webhooks/${id}/reject`, { reviewNote: "" }),
+    mutationFn: async (vars: { id: number; reviewNote?: string }) =>
+      apiRequest("POST", `/api/expense/webhooks/${vars.id}/reject`, {
+        reviewNote: vars.reviewNote ?? "",
+      }),
     onSuccess: () => {
       toast({ title: "已拒絕" })
       queryClient.invalidateQueries({
@@ -203,11 +335,43 @@ export default function ExpenseWebhooksInbox() {
       toast({ title: "失敗", description: err.message, variant: "destructive" }),
   })
 
-  // 統計
-  const pendingCount = tab === "pending" ? webhooks.length : 0
-  const totalPendingAmount = webhooks
-    .filter((w) => w.status === "pending")
-    .reduce((sum, w) => sum + parseFloat(w.parsedAmount || "0"), 0)
+  const batchRejectMutation = useMutation({
+    mutationFn: async (vars: { ids: number[]; reviewNote: string }) => {
+      const results = await Promise.allSettled(
+        vars.ids.map((id) =>
+          apiRequest("POST", `/api/expense/webhooks/${id}/reject`, {
+            reviewNote: vars.reviewNote,
+          })
+        )
+      )
+      const successCount = results.filter((r) => r.status === "fulfilled").length
+      const failCount = results.length - successCount
+      return { successCount, failCount }
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "批次拒絕完成",
+        description: `成功 ${data.successCount} 筆${data.failCount > 0 ? `、失敗 ${data.failCount}` : ""}`,
+      })
+      queryClient.invalidateQueries({
+        predicate: (q) => String(q.queryKey[0]).startsWith("/api/expense"),
+      })
+      setRejectDialog(null)
+      setSelectedIds(new Set())
+    },
+    onError: (err: Error) =>
+      toast({ title: "失敗", description: err.message, variant: "destructive" }),
+  })
+
+  // 統計（基於過濾後 + 待確認的）
+  const pendingInView = webhooks.filter((w) => w.status === "pending")
+  const totalPendingAmount = pendingInView.reduce(
+    (sum, w) => sum + parseFloat(w.parsedAmountTwd || w.parsedAmount || "0"),
+    0
+  )
+  const selectedAmount = pendingInView
+    .filter((w) => selectedIds.has(w.id))
+    .reduce((sum, w) => sum + parseFloat(w.parsedAmountTwd || w.parsedAmount || "0"), 0)
 
   return (
     <div className="container mx-auto py-4 sm:py-6 space-y-4 sm:space-y-6">
@@ -221,13 +385,13 @@ export default function ExpenseWebhooksInbox() {
         </p>
       </div>
 
-      {/* 統計列 */}
-      {tab === "pending" && webhooks.length > 0 && (
+      {/* 統計列 — 待確認 tab 顯示 */}
+      {tab === "pending" && pendingInView.length > 0 && (
         <Card className="border-yellow-200 bg-yellow-50">
           <CardContent className="py-3 px-4 flex flex-wrap items-center gap-4">
             <div>
-              <div className="text-xs text-yellow-700">待確認筆數</div>
-              <div className="text-xl font-bold text-yellow-900">{pendingCount}</div>
+              <div className="text-xs text-yellow-700">符合條件待確認</div>
+              <div className="text-xl font-bold text-yellow-900">{pendingInView.length}</div>
             </div>
             <div>
               <div className="text-xs text-yellow-700">合計金額</div>
@@ -236,21 +400,52 @@ export default function ExpenseWebhooksInbox() {
               </div>
             </div>
             {selectedIds.size > 0 && (
-              <Button
-                size="sm"
-                className="ml-auto"
-                onClick={() => setConfirmDialog({ mode: "batch" })}
-              >
-                <CheckCircle2 className="h-4 w-4 mr-1" />
-                批次確認選取的 {selectedIds.size} 筆
-              </Button>
+              <>
+                <div className="border-l border-yellow-300 pl-4">
+                  <div className="text-xs text-yellow-700">已選</div>
+                  <div className="text-xl font-bold text-blue-900">
+                    {selectedIds.size}{" "}
+                    <span className="text-sm font-normal text-blue-600">
+                      ${Math.round(selectedAmount).toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+                <div className="ml-auto flex gap-2">
+                  <Button size="sm" onClick={() => setConfirmDialog({ mode: "batch" })}>
+                    <CheckCircle2 className="h-4 w-4 mr-1" />
+                    批次確認
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setRejectDialog({ ids: Array.from(selectedIds) })}
+                  >
+                    <XCircle className="h-4 w-4 mr-1 text-red-600" />
+                    批次拒絕
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setSelectedIds(new Set())}
+                    title="清除選取"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              </>
             )}
           </CardContent>
         </Card>
       )}
 
       {/* Tab 切換 */}
-      <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)}>
+      <Tabs
+        value={tab}
+        onValueChange={(v) => {
+          setTab(v as typeof tab)
+          setSelectedIds(new Set())
+        }}
+      >
         <TabsList>
           <TabsTrigger value="pending">
             <Clock className="h-4 w-4 mr-1" />
@@ -271,6 +466,134 @@ export default function ExpenseWebhooksInbox() {
         </TabsList>
       </Tabs>
 
+      {/* 搜尋與篩選工具列 */}
+      <Card>
+        <CardContent className="py-3 px-3 sm:px-4 space-y-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative flex-1 min-w-[180px]">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="搜尋廠商 / 描述 / 發票 / 分類..."
+                className="pl-8 pr-8"
+              />
+              {search && (
+                <button
+                  onClick={() => setSearch("")}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  aria-label="清除搜尋"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+            <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortKey)}>
+              <SelectTrigger className="w-auto min-w-[120px]">
+                <ArrowUpDown className="h-4 w-4 mr-1" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="createdDesc">最新優先</SelectItem>
+                <SelectItem value="createdAsc">最舊優先</SelectItem>
+                <SelectItem value="amountDesc">金額由大到小</SelectItem>
+                <SelectItem value="amountAsc">金額由小到大</SelectItem>
+                <SelectItem value="dueAsc">到期日近</SelectItem>
+                <SelectItem value="dueDesc">到期日遠</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button
+              variant={showFilters ? "default" : "outline"}
+              size="sm"
+              onClick={() => setShowFilters(!showFilters)}
+            >
+              <SlidersHorizontal className="h-4 w-4 mr-1" />
+              篩選
+              {activeFilterCount > 0 && (
+                <Badge className="ml-1 bg-blue-500 text-white">{activeFilterCount}</Badge>
+              )}
+            </Button>
+            {activeFilterCount > 0 && (
+              <Button variant="ghost" size="sm" onClick={clearFilters} title="清除所有條件">
+                <X className="h-4 w-4 mr-1" />
+                清除
+              </Button>
+            )}
+          </div>
+
+          {showFilters && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-2 border-t">
+              <div>
+                <Label className="text-xs">來源</Label>
+                <Select value={sourceFilter} onValueChange={setSourceFilter}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">全部來源</SelectItem>
+                    {sources.map((s) => (
+                      <SelectItem key={s.id} value={s.id.toString()}>
+                        {s.sourceName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs">金額範圍</Label>
+                <div className="flex gap-2 items-center">
+                  <Input
+                    type="number"
+                    placeholder="最小"
+                    value={minAmount}
+                    onChange={(e) => setMinAmount(e.target.value)}
+                  />
+                  <span className="text-gray-400">~</span>
+                  <Input
+                    type="number"
+                    placeholder="最大"
+                    value={maxAmount}
+                    onChange={(e) => setMaxAmount(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div>
+                <Label className="text-xs">到期日範圍</Label>
+                <div className="flex gap-2 items-center">
+                  <Input type="date" value={dueFrom} onChange={(e) => setDueFrom(e.target.value)} />
+                  <span className="text-gray-400">~</span>
+                  <Input type="date" value={dueTo} onChange={(e) => setDueTo(e.target.value)} />
+                </div>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* 全選列（只在 pending tab + 有 pending 顯示） */}
+      {tab === "pending" && visiblePendingIds.length > 0 && (
+        <div className="flex items-center gap-3 px-1 text-sm text-gray-600">
+          <Checkbox
+            checked={
+              allVisiblePendingSelected
+                ? true
+                : someVisiblePendingSelected
+                  ? "indeterminate"
+                  : false
+            }
+            onCheckedChange={toggleSelectAllVisible}
+            id="select-all-visible"
+          />
+          <label htmlFor="select-all-visible" className="cursor-pointer select-none">
+            {allVisiblePendingSelected ? "取消全選" : "全選目前顯示的"} {visiblePendingIds.length}{" "}
+            筆
+          </label>
+          <span className="text-gray-400">
+            ・顯示 {webhooks.length} / 共 {allWebhooks.length} 筆
+          </span>
+        </div>
+      )}
+
       {/* 列表 */}
       {isLoading ? (
         <Card>
@@ -284,11 +607,19 @@ export default function ExpenseWebhooksInbox() {
           <CardContent className="py-0">
             <EmptyState
               icon={Inbox}
-              title={tab === "pending" ? "目前沒有待確認的帳單" : "無資料"}
+              title={
+                allWebhooks.length === 0
+                  ? tab === "pending"
+                    ? "目前沒有待確認的帳單"
+                    : "無資料"
+                  : "沒有符合篩選條件的資料"
+              }
               description={
-                tab === "pending"
-                  ? "PM 系統推帳單進來時、會出現在這裡。也可請對接方手動觸發推送測試。"
-                  : "切換其他狀態查看"
+                allWebhooks.length === 0
+                  ? tab === "pending"
+                    ? "PM 系統推帳單進來時、會出現在這裡。也可請對接方手動觸發推送測試。"
+                    : "切換其他狀態查看"
+                  : "試試清除部分篩選條件，或關鍵字換個寫法。"
               }
             />
           </CardContent>
@@ -310,7 +641,7 @@ export default function ExpenseWebhooksInbox() {
               onConfirm={() => setConfirmDialog({ mode: "single", webhook: w })}
               onReject={() => {
                 if (confirm("確定拒絕這筆帳單？拒絕後不會建立付款項目。")) {
-                  rejectMutation.mutate(w.id)
+                  rejectMutation.mutate({ id: w.id })
                 }
               }}
             />
@@ -334,6 +665,18 @@ export default function ExpenseWebhooksInbox() {
               batchConfirmMutation.mutate({ ids: Array.from(selectedIds), ...data })
             }
           }}
+        />
+      )}
+
+      {/* 批次拒絕 Dialog */}
+      {rejectDialog && (
+        <BatchRejectDialog
+          count={rejectDialog.ids.length}
+          isPending={batchRejectMutation.isPending}
+          onClose={() => setRejectDialog(null)}
+          onConfirm={(reviewNote) =>
+            batchRejectMutation.mutate({ ids: rejectDialog.ids, reviewNote })
+          }
         />
       )}
     </div>
@@ -565,6 +908,59 @@ function ConfirmDialog({
           >
             {isPending && <RefreshCw className="h-4 w-4 animate-spin mr-1" />}
             確認
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function BatchRejectDialog({
+  count,
+  isPending,
+  onClose,
+  onConfirm,
+}: {
+  count: number
+  isPending: boolean
+  onClose: () => void
+  onConfirm: (reviewNote: string) => void
+}) {
+  const [reviewNote, setReviewNote] = useState("")
+
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent className="w-[95vw] max-w-md">
+        <DialogHeader>
+          <DialogTitle>批次拒絕 {count} 筆</DialogTitle>
+          <DialogDescription>
+            拒絕後不會建立付款項目，原始 webhook 紀錄仍保留可供查核。
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-3">
+          <div>
+            <Label>拒絕原因（選填）</Label>
+            <Textarea
+              value={reviewNote}
+              onChange={(e) => setReviewNote(e.target.value)}
+              rows={3}
+              placeholder="例：金額異常 / 已重複登錄 / PM 推測試資料..."
+            />
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            取消
+          </Button>
+          <Button
+            variant="destructive"
+            disabled={isPending}
+            onClick={() => onConfirm(reviewNote.trim())}
+          >
+            {isPending && <RefreshCw className="h-4 w-4 animate-spin mr-1" />}
+            確認拒絕
           </Button>
         </DialogFooter>
       </DialogContent>
