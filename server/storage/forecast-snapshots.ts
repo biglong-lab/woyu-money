@@ -296,6 +296,190 @@ export async function backfillFromPMHistory(): Promise<CaptureResult> {
 // ─────────────────────────────────────────────
 
 /**
+ * 季節性預測：用歷史「同 day 累積 / 最終」比率推估
+ *
+ * 公式：
+ *   predictedFinal = currentAccumulated / avgRatio(history)
+ *   其中 ratio[m] = accumulated_at_day_K[m] / final_accumulated[m]
+ *
+ * 信心區間：基於歷史比率標準差
+ *   95% CI = ratio ± 1.96 × std
+ *   80% CI = ratio ± 1.28 × std
+ *
+ * 對應的最終金額區間：currentAcc / [upperRatio, lowerRatio]
+ */
+export async function getSeasonalForecast(
+  targetMonth: string,
+  companyId: number | null = null,
+  historyMonths: number = 6
+): Promise<{
+  targetMonth: string
+  daysElapsed: number
+  currentAccumulated: number
+  history: Array<{
+    month: string
+    accAtSameDay: number
+    finalAcc: number
+    ratio: number // accAtSameDay / finalAcc
+  }>
+  sampleSize: number
+  avgRatio: number
+  stdRatio: number
+  pointEstimate: number
+  ci80: { lower: number; upper: number }
+  ci95: { lower: number; upper: number }
+  confidence: "high" | "medium" | "low" | "insufficient"
+}> {
+  // 1. 取本月最新快照
+  const conditions = [eq(revenueForecastSnapshots.targetMonth, targetMonth)]
+  if (companyId !== null) conditions.push(eq(revenueForecastSnapshots.companyId, companyId))
+
+  const currentSnapshots = await db
+    .select()
+    .from(revenueForecastSnapshots)
+    .where(and(...conditions))
+    .orderBy(revenueForecastSnapshots.snapshotDate)
+
+  if (currentSnapshots.length === 0) {
+    return {
+      targetMonth,
+      daysElapsed: 0,
+      currentAccumulated: 0,
+      history: [],
+      sampleSize: 0,
+      avgRatio: 0,
+      stdRatio: 0,
+      pointEstimate: 0,
+      ci80: { lower: 0, upper: 0 },
+      ci95: { lower: 0, upper: 0 },
+      confidence: "insufficient",
+    }
+  }
+
+  const latest = currentSnapshots[currentSnapshots.length - 1]
+  const daysElapsed = new Date(latest.snapshotDate).getDate()
+  const currentAccumulated = parseFloat(latest.accumulatedRevenue)
+
+  // 2. 對過去 N 月：找該月第 daysElapsed 天累積 + 該月最終累積
+  const [y, m] = targetMonth.split("-").map(Number)
+  const pastMonths: string[] = []
+  for (let i = 1; i <= historyMonths; i++) {
+    const d = new Date(y, m - 1 - i, 1)
+    pastMonths.push(d.toISOString().slice(0, 7))
+  }
+
+  const history: Array<{ month: string; accAtSameDay: number; finalAcc: number; ratio: number }> =
+    []
+
+  for (const hm of pastMonths) {
+    const hmConditions = [eq(revenueForecastSnapshots.targetMonth, hm)]
+    if (companyId !== null) hmConditions.push(eq(revenueForecastSnapshots.companyId, companyId))
+
+    const hmSnaps = await db
+      .select()
+      .from(revenueForecastSnapshots)
+      .where(and(...hmConditions))
+      .orderBy(revenueForecastSnapshots.snapshotDate)
+
+    if (hmSnaps.length === 0) continue
+
+    // 在同 day 累積：找 snapshotDate.day == daysElapsed 的 snapshot（取最接近的）
+    let sameDayAcc = 0
+    let minDiff = Infinity
+    for (const s of hmSnaps) {
+      const day = new Date(s.snapshotDate).getDate()
+      const diff = Math.abs(day - daysElapsed)
+      if (diff < minDiff) {
+        minDiff = diff
+        sameDayAcc = parseFloat(s.accumulatedRevenue)
+      }
+    }
+
+    // 最終累積：該月最後一筆 snapshot
+    const finalAcc = parseFloat(hmSnaps[hmSnaps.length - 1].accumulatedRevenue)
+
+    if (finalAcc > 0 && sameDayAcc > 0) {
+      history.push({
+        month: hm,
+        accAtSameDay: sameDayAcc,
+        finalAcc,
+        ratio: sameDayAcc / finalAcc, // 0~1 之間
+      })
+    }
+  }
+
+  const sampleSize = history.length
+
+  if (sampleSize === 0) {
+    // 沒任何歷史可比，退化為線性推估
+    const [y2, m2] = targetMonth.split("-").map(Number)
+    const monthEnd = new Date(y2, m2, 0).getDate()
+    const linearProj = (currentAccumulated / daysElapsed) * monthEnd
+    return {
+      targetMonth,
+      daysElapsed,
+      currentAccumulated,
+      history,
+      sampleSize: 0,
+      avgRatio: daysElapsed / monthEnd,
+      stdRatio: 0,
+      pointEstimate: Math.round(linearProj),
+      ci80: { lower: Math.round(linearProj * 0.85), upper: Math.round(linearProj * 1.15) },
+      ci95: { lower: Math.round(linearProj * 0.75), upper: Math.round(linearProj * 1.25) },
+      confidence: "insufficient",
+    }
+  }
+
+  // 3. 平均比率與標準差
+  const ratios = history.map((h) => h.ratio)
+  const avgRatio = ratios.reduce((sum, r) => sum + r, 0) / ratios.length
+  const variance = ratios.reduce((sum, r) => sum + (r - avgRatio) ** 2, 0) / ratios.length
+  const stdRatio = Math.sqrt(variance)
+
+  // 4. 點估計 + 信心區間
+  const pointEstimate = currentAccumulated / avgRatio
+
+  // 用 ratio 的不確定性反推 final 區間
+  // 若 ratio 高 → final 低；ratio 低 → final 高
+  const lowerRatio95 = avgRatio + 1.96 * stdRatio
+  const upperRatio95 = Math.max(0.01, avgRatio - 1.96 * stdRatio) // 防 0
+  const lowerRatio80 = avgRatio + 1.28 * stdRatio
+  const upperRatio80 = Math.max(0.01, avgRatio - 1.28 * stdRatio)
+
+  const ci95 = {
+    lower: Math.round(currentAccumulated / lowerRatio95),
+    upper: Math.round(currentAccumulated / upperRatio95),
+  }
+  const ci80 = {
+    lower: Math.round(currentAccumulated / lowerRatio80),
+    upper: Math.round(currentAccumulated / upperRatio80),
+  }
+
+  const confidence: "high" | "medium" | "low" | "insufficient" =
+    sampleSize >= 6 && stdRatio < 0.05
+      ? "high"
+      : sampleSize >= 4 && stdRatio < 0.1
+        ? "medium"
+        : sampleSize >= 2
+          ? "low"
+          : "insufficient"
+
+  return {
+    targetMonth,
+    daysElapsed,
+    currentAccumulated,
+    history,
+    sampleSize,
+    avgRatio,
+    stdRatio,
+    pointEstimate: Math.round(pointEstimate),
+    ci80,
+    ci95,
+    confidence,
+  }
+}
+
+/**
  * 給定 targetMonth、回傳：
  *  - 當下累積（最新快照）
  *  - 該月剩餘天數

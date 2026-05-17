@@ -15,6 +15,7 @@ import {
   captureFromPM,
   backfillFromPMHistory,
   getSimpleForecast,
+  getSeasonalForecast,
 } from "../storage/forecast-snapshots"
 
 const router = Router()
@@ -71,6 +72,24 @@ router.get(
       companyIdRaw === undefined || companyIdRaw === "null" ? null : parseInt(companyIdRaw, 10)
 
     res.json(await getSimpleForecast(targetMonth, companyId))
+  })
+)
+
+router.get(
+  "/api/forecast/seasonal",
+  asyncHandler(async (req, res) => {
+    const targetMonth = req.query.targetMonth as string
+    if (!targetMonth || !/^\d{4}-\d{2}$/.test(targetMonth)) {
+      throw new AppError(400, "targetMonth 必填，格式 YYYY-MM")
+    }
+    const companyIdRaw = req.query.companyId as string | undefined
+    const companyId =
+      companyIdRaw === undefined || companyIdRaw === "null" ? null : parseInt(companyIdRaw, 10)
+    const historyMonths = req.query.historyMonths
+      ? parseInt(req.query.historyMonths as string, 10)
+      : 6
+
+    res.json(await getSeasonalForecast(targetMonth, companyId, historyMonths))
   })
 )
 
