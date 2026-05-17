@@ -75,6 +75,7 @@ import RentalMatrix from "@/pages/rental-matrix"
 import CashflowDecisionCenter from "@/pages/cashflow-decision-center"
 import ReceiptMatchHelper from "@/pages/receipt-match-helper"
 import IntegrationsCenter from "@/pages/integrations-center"
+import RecurringExpensesPage from "@/pages/recurring-expenses"
 
 function Router() {
   const [quickPaymentOpen, setQuickPaymentOpen] = useState(false)
@@ -212,6 +213,7 @@ function Router() {
                 {/* Receipt Match Helper — 收據對應助手 */}
                 <ProtectedRoute path="/receipt-match-helper" component={ReceiptMatchHelper} />
                 <ProtectedRoute path="/integrations" component={IntegrationsCenter} />
+                <ProtectedRoute path="/recurring-expenses" component={RecurringExpensesPage} />
 
                 {/* Feature Showcase */}
                 <ProtectedRoute path="/features" component={FeatureShowcase} />

@@ -295,6 +295,12 @@ export const systemNavItems: NavItem[] = [
     description: "外部 API 嫁接（收入 / 支出 webhook、拋接紀錄、串接測試）",
   },
   {
+    title: "週期性支出模板",
+    href: "/recurring-expenses",
+    icon: Repeat,
+    description: "人事/洗滌/水電/保險等每月固定支出模板，自動產出待確認項目",
+  },
+  {
     title: "設定",
     href: "/settings",
     icon: Settings,
@@ -437,6 +443,11 @@ export const breadcrumbConfig: Record<string, BreadcrumbItem[]> = {
     { title: "資料品質中心" },
   ],
   "/integrations": [{ title: "首頁", href: "/" }, { title: "系統管理" }, { title: "整合中心" }],
+  "/recurring-expenses": [
+    { title: "首頁", href: "/" },
+    { title: "系統管理" },
+    { title: "週期性支出模板" },
+  ],
   "/expense/inbox": [
     { title: "首頁", href: "/" },
     { title: "系統管理" },
