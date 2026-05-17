@@ -420,23 +420,73 @@ function PaymentRecordCard({ record }: { record: PaymentRecordData }) {
   )
 }
 
+// 從 notes 抽出 PM 帳單照片 URL（confirm 時寫入：「📷 PM 帳單照片：<url>」）
+function extractPmInvoicePhoto(notes?: string | null): string | null {
+  if (!notes) return null
+  const match = notes.match(/📷 PM 帳單照片：(https?:\/\/\S+)/)
+  return match ? match[1] : null
+}
+
 // 來源追蹤區塊
 function SourceTrackingSection({ detailItem }: { detailItem: PaymentItem }) {
+  const isPm = detailItem.source === "pm"
+  const isWebhook = detailItem.source === "webhook" || isPm
+  const isAiScan = detailItem.source === "ai_scan"
+  const pmPhoto = isPm ? extractPmInvoicePhoto(detailItem.notes) : null
+  const tagList = (detailItem.tags ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean)
+
   return (
     <div className="border-t pt-4">
       <Label className="text-sm font-medium text-gray-500 block mb-2">項目來源</Label>
       <div className="p-3 bg-gray-50 rounded space-y-2">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <span className="text-sm font-medium">來源類型：</span>
-          {detailItem.source === "ai_scan" ? (
+          {isPm ? (
+            <Badge className="bg-purple-100 text-purple-800 border border-purple-300">
+              <span className="mr-1">🏨</span>PM 系統推送
+            </Badge>
+          ) : isWebhook ? (
+            <Badge className="bg-blue-100 text-blue-800 border border-blue-300">
+              外部系統 Webhook
+            </Badge>
+          ) : isAiScan ? (
             <Badge className="bg-purple-100 text-purple-800 border border-purple-300">
               <span className="mr-1">AI</span>掃描歸檔
             </Badge>
           ) : (
             <Badge className="bg-gray-100 text-gray-700">手動新增</Badge>
           )}
+          {tagList.map((t) => (
+            <Badge key={t} variant="outline" className="text-xs">
+              #{t}
+            </Badge>
+          ))}
         </div>
-        {detailItem.source === "ai_scan" && (
+
+        {pmPhoto && (
+          <div className="mt-2">
+            <div className="text-sm font-medium mb-1">PM 帳單照片：</div>
+            <a
+              href={pmPhoto}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-block border rounded-lg overflow-hidden hover:shadow-md transition-shadow"
+            >
+              <img
+                src={pmPhoto}
+                alt="PM 帳單"
+                className="max-w-full max-h-64 object-contain bg-gray-100"
+                loading="lazy"
+              />
+            </a>
+            <div className="text-xs text-gray-500 mt-1">點圖開新分頁檢視原始大小</div>
+          </div>
+        )}
+
+        {isAiScan && (
           <>
             {detailItem.documentUploadedByUsername && (
               <div className="text-sm">

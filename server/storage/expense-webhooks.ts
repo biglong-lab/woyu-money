@@ -167,6 +167,11 @@ export async function confirmExpenseWebhook(
     return { success: false, error: "無法解析金額" }
   }
 
+  // 取來源資訊（用於標籤、source 值）
+  const sourceObj = await getExpenseSourceById(webhook.sourceId)
+  const sourceName = sourceObj?.sourceName ?? "外部系統"
+  const sourceKey = sourceObj?.sourceKey ?? ""
+
   const itemName =
     input.itemName || webhook.parsedVendor || webhook.parsedDescription || `帳單 #${webhook.id}`
 
@@ -179,6 +184,30 @@ export async function confirmExpenseWebhook(
   const endDate = webhook.parsedDueAt ? webhook.parsedDueAt.toISOString().split("T")[0] : null
 
   const amount = webhook.parsedAmount
+
+  // PM 帳單照片（從 rawPayload 取）
+  const rawPhoto = (webhook.rawPayload as Record<string, unknown> | null)?.pmInvoicePhoto
+  const pmInvoicePhoto = typeof rawPhoto === "string" && rawPhoto ? rawPhoto : null
+
+  // 來源欄位：sourceKey 含 "pm" → 統一寫 "pm"，其他寫 "webhook"
+  const isPmSource =
+    sourceKey.toLowerCase().includes("pm") || sourceKey.toLowerCase().includes("wd")
+  const sourceValue = isPmSource ? "pm" : "webhook"
+
+  // 標籤：來源類型 + sourceKey 識別
+  const tagParts = [isPmSource ? "PM系統" : "外部系統"]
+  if (sourceKey) tagParts.push(sourceKey)
+  const tagsValue = tagParts.join(",")
+
+  // notes：包含原始描述、照片連結、原始 webhook id
+  const notesParts: string[] = []
+  if (input.reviewNote) notesParts.push(input.reviewNote)
+  notesParts.push(`來源：${sourceName} (webhook id=${webhookId})`)
+  if (webhook.parsedDescription) notesParts.push(webhook.parsedDescription)
+  if (webhook.externalTransactionId)
+    notesParts.push(`外部交易編號：${webhook.externalTransactionId}`)
+  if (pmInvoicePhoto) notesParts.push(`📷 PM 帳單照片：${pmInvoicePhoto}`)
+  const notesValue = notesParts.join("\n")
 
   return await db.transaction(async (tx) => {
     // 1. 建 payment_item
@@ -193,10 +222,9 @@ export async function confirmExpenseWebhook(
         status: input.asPaid ? "paid" : "unpaid",
         startDate,
         endDate,
-        notes:
-          (input.reviewNote ? input.reviewNote + "\n" : "") +
-          `來源：外部 webhook (id=${webhookId})\n${webhook.parsedDescription || ""}`,
-        source: "webhook",
+        notes: notesValue,
+        tags: tagsValue,
+        source: sourceValue,
         paymentType: "single",
         itemType: "project",
         createdAt: new Date(),
@@ -214,9 +242,9 @@ export async function confirmExpenseWebhook(
           paymentDate: webhook.parsedPaidAt
             ? webhook.parsedPaidAt.toISOString().split("T")[0]
             : today,
-          paymentMethod: input.paymentMethod || "外部系統",
-          receiptImageUrl: null,
-          notes: `Webhook 確認自動建立`,
+          paymentMethod: input.paymentMethod || (isPmSource ? "PM 系統" : "外部系統"),
+          receiptImageUrl: pmInvoicePhoto,
+          notes: `Webhook 確認自動建立${pmInvoicePhoto ? "（含 PM 帳單照片）" : ""}`,
         })
         .returning()
       recordId = newRecord.id
