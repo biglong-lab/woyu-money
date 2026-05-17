@@ -16,7 +16,11 @@ import {
   getExpenseSourceByKey,
   listExpenseSources,
   receiveExpenseWebhook,
+  getExpenseWebhookById,
+  confirmExpenseWebhook,
+  batchConfirmExpenseWebhooks,
 } from "../storage/expense-webhooks"
+import { confirmExpenseWebhookSchema, batchConfirmExpenseSchema } from "@shared/schema"
 import { logEvent } from "../storage/integration-events"
 import { ZodError } from "zod"
 
@@ -125,6 +129,62 @@ router.get(
     ])
 
     res.json({ data, total: count, page, pageSize })
+  })
+)
+
+/** GET /api/expense/webhooks/:id — 取得單筆詳情 */
+router.get(
+  "/api/expense/webhooks/:id",
+  asyncHandler(async (req, res) => {
+    const id = Number(req.params.id)
+    if (!Number.isInteger(id) || id < 1) throw new AppError(400, "無效的 ID")
+    const row = await getExpenseWebhookById(id)
+    if (!row) throw new AppError(404, "找不到")
+    res.json(row)
+  })
+)
+
+/** POST /api/expense/webhooks/:id/confirm — 確認單筆 → 寫入 payment_items */
+router.post(
+  "/api/expense/webhooks/:id/confirm",
+  asyncHandler(async (req, res) => {
+    const id = Number(req.params.id)
+    if (!Number.isInteger(id) || id < 1) throw new AppError(400, "無效的 ID")
+    try {
+      const input = confirmExpenseWebhookSchema.parse(req.body)
+      const userId = (req.user as { id?: number } | undefined)?.id ?? null
+      const result = await confirmExpenseWebhook(id, userId, input)
+      if (!result.success) throw new AppError(400, result.error ?? "確認失敗")
+      res.json(result)
+    } catch (err) {
+      if (err instanceof ZodError) {
+        throw new AppError(400, "資料格式錯誤：" + err.errors.map((e) => e.message).join(", "))
+      }
+      throw err
+    }
+  })
+)
+
+/** POST /api/expense/webhooks/batch-confirm — 批次確認 */
+router.post(
+  "/api/expense/webhooks/batch-confirm",
+  asyncHandler(async (req, res) => {
+    try {
+      const input = batchConfirmExpenseSchema.parse(req.body)
+      const userId = (req.user as { id?: number } | undefined)?.id ?? null
+      const result = await batchConfirmExpenseWebhooks(input.ids, userId, {
+        projectId: input.projectId,
+        categoryId: input.categoryId,
+        asPaid: input.asPaid,
+        reviewNote: input.reviewNote,
+      })
+      res.json(result)
+    } catch (err) {
+      if (err instanceof ZodError) {
+        throw new AppError(400, "資料格式錯誤：" + err.errors.map((e) => e.message).join(", "))
+      }
+      throw err
+    }
   })
 )
 
