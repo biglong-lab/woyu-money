@@ -105,7 +105,7 @@ router.get(
   "/api/expense/webhooks",
   asyncHandler(async (req, res) => {
     const page = Math.max(1, Number(req.query.page ?? 1))
-    const pageSize = Math.min(200, Math.max(1, Number(req.query.pageSize ?? 50)))
+    const pageSize = Math.min(500, Math.max(1, Number(req.query.pageSize ?? 50)))
     const status = req.query.status as string | undefined
     const sourceId = req.query.sourceId ? Number(req.query.sourceId) : undefined
 
