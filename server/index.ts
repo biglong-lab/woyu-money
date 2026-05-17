@@ -2,6 +2,7 @@ import express, { type Request, Response, NextFunction } from "express"
 import { registerRoutes } from "./routes"
 import { setupVite, serveStatic, log } from "./vite"
 import { notificationScheduler } from "./notification-scheduler"
+import { recurringExpenseScheduler } from "./recurring-expense-scheduler"
 import { securityHeaders, validateInput, rateLimits } from "./security"
 import { globalErrorHandler } from "./middleware/error-handler"
 
@@ -48,7 +49,6 @@ app.use((req, res, next) => {
 
   next()
 })
-
 ;(async () => {
   const server = await registerRoutes(app)
 
@@ -90,6 +90,13 @@ app.use((req, res, next) => {
       } catch (error) {
         console.error("通知排程器啟動失敗:", error)
         // Continue running even if notification scheduler fails
+      }
+
+      // 啟動週期性支出排程器（每月 1 號自動產出 unpaid 待確認）
+      try {
+        recurringExpenseScheduler.start()
+      } catch (error) {
+        console.error("週期性支出排程器啟動失敗:", error)
       }
     }
   )
