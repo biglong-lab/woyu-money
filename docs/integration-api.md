@@ -370,6 +370,69 @@ async function pushExpense(expense) {
 
 ---
 
+## 10.1 PM 系統 6 家館對接清單
+
+PM 端依 `pmCompanyId` 路由到對應的 sourceKey，每家館各有獨立 token：
+
+| pmCompanyId | 館別 | sourceKey | Money 專案 ID | webhook URL |
+|:-:|------|-----------|:-:|------|
+| 1 | 浯島文旅 | `wdhotelpay` | 3 | `/api/expense/webhook/wdhotelpay` |
+| 2 | 浯島輕旅 | `pm-wdql`    | 4 | `/api/expense/webhook/pm-wdql` |
+| 3 | 小六路厝 | `pm-xllc`    | 9 | `/api/expense/webhook/pm-xllc` |
+| 4 | 總兵招待所 | `pm-zbzds` | 10 | `/api/expense/webhook/pm-zbzds` |
+| 5 | 魁星背包棧 | `pm-kxbbz` | 20 | `/api/expense/webhook/pm-kxbbz` |
+| 6 | 大號文創 | `pm-dhwc`    | 26 | `/api/expense/webhook/pm-dhwc` |
+
+**Token**：每家館一把（32-byte hex）。Token 由管理員透過 `scripts/setup-pm-hotel-sources.mjs` 一次性產生並交付 PM 工程師；可在系統內 `/integrations` 重置。
+
+**PM SDK 端對接範例**：
+
+```ts
+// PM 系統依 companyId 路由到對應的 Money webhook
+const WOYU_MONEY_ROUTES: Record<number, { url: string; token: string }> = {
+  1: { url: 'https://money.homi.cc/api/expense/webhook/wdhotelpay', token: process.env.WOYU_TOKEN_1! },
+  2: { url: 'https://money.homi.cc/api/expense/webhook/pm-wdql',    token: process.env.WOYU_TOKEN_2! },
+  3: { url: 'https://money.homi.cc/api/expense/webhook/pm-xllc',    token: process.env.WOYU_TOKEN_3! },
+  4: { url: 'https://money.homi.cc/api/expense/webhook/pm-zbzds',   token: process.env.WOYU_TOKEN_4! },
+  5: { url: 'https://money.homi.cc/api/expense/webhook/pm-kxbbz',   token: process.env.WOYU_TOKEN_5! },
+  6: { url: 'https://money.homi.cc/api/expense/webhook/pm-dhwc',    token: process.env.WOYU_TOKEN_6! },
+}
+
+async function pushBillToMoney(bill: PMBill) {
+  const route = WOYU_MONEY_ROUTES[bill.companyId]
+  if (!route) throw new Error(`未配置 companyId=${bill.companyId} 的 Money route`)
+
+  const res = await fetch(route.url, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${route.token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      transactionId: bill.id,
+      amount: bill.amount,
+      currency: 'TWD',
+      description: bill.description,
+      vendor: bill.vendor,
+      dueAt: bill.dueAt,        // ISO 8601 date
+      paidAt: bill.paidAt,      // 若已付才填
+      categoryHint: bill.category,
+      orderId: bill.orderId,
+      pmCompanyId: bill.companyId,
+      pmInvoicePhoto: bill.photoUrl,  // 帳單照片 URL（會自動帶入 payment_item notes / record receipt_image_url）
+    }),
+  })
+  if (!res.ok) throw new Error(`Money webhook 失敗：${res.status}`)
+}
+```
+
+**新增館的流程**：
+1. PM 新增 company → 取得新 `companyId`
+2. Money 端：管理員在 `/integrations` 新增 `pm-{拼音縮寫}` source，產生 token
+3. PM 工程師：把 token 寫到 `WOYU_MONEY_ROUTES[新 companyId]`
+
+---
+
 ## 11. OpenAPI Spec
 
 完整 OpenAPI 3.0 spec 見：[`docs/openapi.yaml`](openapi.yaml)
