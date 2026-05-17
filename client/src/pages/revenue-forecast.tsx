@@ -1,0 +1,418 @@
+/**
+ * 收入預測（/revenue-forecast）
+ *
+ * Phase 1 - 累積走勢 + 簡單線性推估
+ *
+ * 顯示：
+ *  - 該月每日累積曲線（從 forecast_snapshots）
+ *  - 簡單線性推估月底總額
+ *  - 與最近 N 月同期比較（同 daysElapsed 累積值差異）
+ *  - 支援切換 targetMonth + 公司
+ */
+import { useMemo, useState } from "react"
+import { useQuery } from "@tanstack/react-query"
+import { Card, CardContent } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Legend,
+  ReferenceLine,
+} from "recharts"
+import { TrendingUp, RefreshCw, Calendar, AlertCircle } from "lucide-react"
+import { useDocumentTitle } from "@/hooks/use-document-title"
+import { apiRequest, queryClient } from "@/lib/queryClient"
+import { useMutation } from "@tanstack/react-query"
+import { useToast } from "@/hooks/use-toast"
+
+interface Snapshot {
+  id: number
+  snapshotDate: string
+  companyId: number | null
+  targetMonth: string
+  accumulatedRevenue: string
+  bookedRevenue: string
+  daysAheadOfTarget: number | null
+  source: string
+}
+
+const PM_COMPANIES = [
+  { id: 1, name: "浯島文旅" },
+  { id: 2, name: "浯島輕旅" },
+  { id: 3, name: "小六路厝" },
+  { id: 4, name: "總兵招待所" },
+  { id: 5, name: "魁星背包棧" },
+  { id: 6, name: "大號文創" },
+]
+
+function monthOptions(count: number): string[] {
+  const now = new Date()
+  const months: string[] = []
+  for (let i = -2; i < count; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() + i, 1)
+    months.push(d.toISOString().slice(0, 7))
+  }
+  return months.reverse()
+}
+
+export default function RevenueForecastPage() {
+  useDocumentTitle("收入預測")
+  const { toast } = useToast()
+
+  const [targetMonth, setTargetMonth] = useState(() => new Date().toISOString().slice(0, 7))
+  const [companyId, setCompanyId] = useState<string>("all") // 'all' = 合計
+
+  const companyParam = companyId === "all" ? "null" : companyId
+
+  // 該月走勢
+  const { data: trend = [], isLoading } = useQuery<Snapshot[]>({
+    queryKey: [`/api/forecast/trend?targetMonth=${targetMonth}&companyId=${companyParam}`],
+  })
+
+  // 同期比較：拉過去 3 個月相同 targetMonth offset
+  const compareMonths = useMemo(() => {
+    const [y, m] = targetMonth.split("-").map(Number)
+    return [-3, -2, -1].map((offset) => {
+      const d = new Date(y, m - 1 + offset, 1)
+      return d.toISOString().slice(0, 7)
+    })
+  }, [targetMonth])
+
+  const comparisonQueries = useQuery<{ month: string; data: Snapshot[] }[]>({
+    queryKey: [`/api/forecast/comparison`, targetMonth, companyParam],
+    queryFn: async () => {
+      const results = await Promise.all(
+        compareMonths.map(async (m) => {
+          const data = await apiRequest<Snapshot[]>(
+            "GET",
+            `/api/forecast/trend?targetMonth=${m}&companyId=${companyParam}`
+          )
+          return { month: m, data }
+        })
+      )
+      return results
+    },
+  })
+
+  const captureMutation = useMutation({
+    mutationFn: () =>
+      apiRequest<{ ok: boolean; inserted: number; skipped: number }>(
+        "POST",
+        "/api/forecast/capture",
+        {}
+      ),
+    onSuccess: (r) => {
+      toast({
+        title: r.ok ? "✅ 已拍快照" : "失敗",
+        description: r.ok
+          ? `新增 ${r.inserted} 筆、跳過 ${r.skipped} 筆`
+          : "請確認 PM_DATABASE_URL 設定",
+        variant: r.ok ? "default" : "destructive",
+      })
+      queryClient.invalidateQueries({
+        predicate: (q) => String(q.queryKey[0]).startsWith("/api/forecast"),
+      })
+    },
+  })
+
+  // 組合圖表資料：x 軸為「離月初第 N 天」
+  const chartData = useMemo(() => {
+    if (trend.length === 0) return []
+
+    // 取本月走勢（按 day）+ 同期比較
+    const byDay = new Map<number, Record<string, number | null>>()
+
+    const addSeries = (key: string, snaps: Snapshot[]) => {
+      for (const s of snaps) {
+        const day = new Date(s.snapshotDate).getDate()
+        if (!byDay.has(day)) byDay.set(day, { day })
+        byDay.get(day)![key] = parseFloat(s.accumulatedRevenue)
+      }
+    }
+
+    addSeries(targetMonth, trend)
+    if (comparisonQueries.data) {
+      for (const c of comparisonQueries.data) {
+        if (c.data.length > 0) addSeries(c.month, c.data)
+      }
+    }
+
+    return Array.from(byDay.values()).sort((a, b) => (a.day as number) - (b.day as number))
+  }, [trend, comparisonQueries.data, targetMonth])
+
+  // 簡單線性推估
+  const forecast = useMemo(() => {
+    if (trend.length === 0) return null
+    const latest = trend[trend.length - 1]
+    const latestDate = new Date(latest.snapshotDate)
+    const [y, m] = targetMonth.split("-").map(Number)
+    const monthEnd = new Date(y, m, 0).getDate()
+    const isCurrent = targetMonth === new Date().toISOString().slice(0, 7)
+    const daysElapsed = isCurrent ? Math.min(latestDate.getDate(), monthEnd) : monthEnd
+    const daysRemaining = monthEnd - daysElapsed
+    const accumulated = parseFloat(latest.accumulatedRevenue)
+    const linear = daysElapsed > 0 ? (accumulated / daysElapsed) * monthEnd : 0
+    return {
+      latestSnapshot: latest,
+      latestAmount: accumulated,
+      daysElapsed,
+      daysRemaining,
+      daysInMonth: monthEnd,
+      linearProjection: Math.round(linear),
+    }
+  }, [trend, targetMonth])
+
+  // 同期比較：相同 daysElapsed 時對方累積值
+  const comparison = useMemo(() => {
+    if (!comparisonQueries.data || !forecast) return []
+    return comparisonQueries.data.map((c) => {
+      // 找該月在 day == daysElapsed 時的累積（找最接近的）
+      const sorted = [...c.data].sort(
+        (a, b) =>
+          Math.abs(new Date(a.snapshotDate).getDate() - forecast.daysElapsed) -
+          Math.abs(new Date(b.snapshotDate).getDate() - forecast.daysElapsed)
+      )
+      const sameDayAcc = sorted[0] ? parseFloat(sorted[0].accumulatedRevenue) : 0
+      const finalAcc =
+        c.data.length > 0 ? Math.max(...c.data.map((s) => parseFloat(s.accumulatedRevenue))) : 0
+      return { month: c.month, sameDayAcc, finalAcc }
+    })
+  }, [comparisonQueries.data, forecast])
+
+  const formatMoney = (v: number) => "$" + Math.round(v).toLocaleString()
+
+  return (
+    <div className="container mx-auto py-4 sm:py-6 space-y-4 sm:space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            <TrendingUp className="h-6 w-6 text-blue-600" />
+            收入預測
+          </h1>
+          <p className="text-sm text-gray-500 mt-1">
+            每日從 PM 系統拉「截至今日累積」快照，提供月底推估與同期比較
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => captureMutation.mutate()}
+          disabled={captureMutation.isPending}
+        >
+          <RefreshCw
+            className={`h-4 w-4 mr-1 ${captureMutation.isPending ? "animate-spin" : ""}`}
+          />
+          立即拍快照
+        </Button>
+      </div>
+
+      {/* 切換器 */}
+      <Card>
+        <CardContent className="py-3 px-4 flex flex-wrap gap-3 items-end">
+          <div>
+            <div className="text-xs text-gray-500 mb-1">目標月</div>
+            <Select value={targetMonth} onValueChange={setTargetMonth}>
+              <SelectTrigger className="w-32">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {monthOptions(2).map((m) => (
+                  <SelectItem key={m} value={m}>
+                    {m}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <div className="text-xs text-gray-500 mb-1">公司</div>
+            <Select value={companyId} onValueChange={setCompanyId}>
+              <SelectTrigger className="w-36">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">全部（合計）</SelectItem>
+                {PM_COMPANIES.map((c) => (
+                  <SelectItem key={c.id} value={c.id.toString()}>
+                    {c.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* 推估卡片 */}
+      {forecast && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <Card className="border-blue-200 bg-blue-50">
+            <CardContent className="py-3 px-3">
+              <div className="text-xs text-blue-700">
+                截至 {forecast.latestSnapshot.snapshotDate.slice(5)}
+              </div>
+              <div className="text-lg font-bold text-blue-900">
+                {formatMoney(forecast.latestAmount)}
+              </div>
+              <div className="text-xs text-blue-600 mt-0.5">已累積</div>
+            </CardContent>
+          </Card>
+          <Card className="border-purple-200 bg-purple-50">
+            <CardContent className="py-3 px-3">
+              <div className="text-xs text-purple-700">
+                <Calendar className="h-3 w-3 inline mr-0.5" />第 {forecast.daysElapsed} /{" "}
+                {forecast.daysInMonth} 天
+              </div>
+              <div className="text-lg font-bold text-purple-900">
+                還 {forecast.daysRemaining} 天
+              </div>
+              <div className="text-xs text-purple-600 mt-0.5">月份進度</div>
+            </CardContent>
+          </Card>
+          <Card className="border-green-200 bg-green-50">
+            <CardContent className="py-3 px-3">
+              <div className="text-xs text-green-700">線性推估月底</div>
+              <div className="text-lg font-bold text-green-900">
+                {formatMoney(forecast.linearProjection)}
+              </div>
+              <div className="text-xs text-green-600 mt-0.5">
+                = 累積 / {forecast.daysElapsed}天 × {forecast.daysInMonth}天
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-amber-200 bg-amber-50">
+            <CardContent className="py-3 px-3">
+              <div className="text-xs text-amber-700">
+                <AlertCircle className="h-3 w-3 inline mr-0.5" />
+                精準度
+              </div>
+              <div className="text-sm font-medium text-amber-900">線性推估</div>
+              <div className="text-xs text-amber-600 mt-0.5">
+                {trend.length > 7 ? "資料 OK" : "資料 < 7 天、僅供參考"}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* 累積曲線圖 */}
+      <Card>
+        <CardContent className="py-4 px-3 sm:px-4">
+          <div className="text-sm font-medium text-gray-700 mb-3">
+            累積收入走勢（{targetMonth} vs 過去 3 月同期）
+          </div>
+          {isLoading ? (
+            <div className="h-72 flex items-center justify-center text-gray-400">
+              <RefreshCw className="h-5 w-5 animate-spin mr-2" />
+              載入中...
+            </div>
+          ) : trend.length === 0 ? (
+            <div className="h-72 flex flex-col items-center justify-center text-gray-400 gap-2">
+              <AlertCircle className="h-8 w-8" />
+              <div>該月份還沒有 forecast snapshot</div>
+              <div className="text-xs">點「立即拍快照」抓 PM 資料</div>
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height={320}>
+              <LineChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <XAxis
+                  dataKey="day"
+                  tick={{ fontSize: 11 }}
+                  label={{ value: "日", position: "insideBottom", offset: -2, fontSize: 11 }}
+                />
+                <YAxis
+                  tick={{ fontSize: 11 }}
+                  tickFormatter={(v) => (v >= 1000 ? `${Math.round(v / 1000)}K` : v)}
+                />
+                <Tooltip formatter={(v: number) => formatMoney(v)} />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                <Line
+                  type="monotone"
+                  dataKey={targetMonth}
+                  stroke="#2563eb"
+                  strokeWidth={3}
+                  dot={{ r: 3 }}
+                  name={`${targetMonth}（當前）`}
+                />
+                {compareMonths.map((m, i) => (
+                  <Line
+                    key={m}
+                    type="monotone"
+                    dataKey={m}
+                    stroke={["#94a3b8", "#cbd5e1", "#e2e8f0"][i]}
+                    strokeWidth={1.5}
+                    strokeDasharray="3 3"
+                    dot={false}
+                    name={m}
+                  />
+                ))}
+                {forecast && (
+                  <ReferenceLine
+                    x={forecast.daysElapsed}
+                    stroke="#dc2626"
+                    strokeDasharray="3 3"
+                    label={{ value: "今日", fontSize: 11, fill: "#dc2626" }}
+                  />
+                )}
+              </LineChart>
+            </ResponsiveContainer>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* 同期比較表 */}
+      {forecast && comparison.length > 0 && (
+        <Card>
+          <CardContent className="py-3 px-3 sm:px-4">
+            <div className="text-sm font-medium text-gray-700 mb-3">
+              同期比較（第 {forecast.daysElapsed} 天）
+            </div>
+            <div className="space-y-2">
+              {comparison.map((c) => {
+                const diff = forecast.latestAmount - c.sameDayAcc
+                const pct = c.sameDayAcc > 0 ? (diff / c.sameDayAcc) * 100 : 0
+                return (
+                  <div
+                    key={c.month}
+                    className="flex justify-between items-center py-2 border-b last:border-0 text-sm flex-wrap"
+                  >
+                    <span className="text-gray-600 w-20">{c.month}</span>
+                    <span className="text-gray-700">
+                      第 {forecast.daysElapsed} 天：
+                      <span className="font-semibold">{formatMoney(c.sameDayAcc)}</span>
+                    </span>
+                    <span className="text-gray-500 text-xs">
+                      最終：<span className="font-medium">{formatMoney(c.finalAcc)}</span>
+                    </span>
+                    <Badge
+                      className={
+                        diff > 0 ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+                      }
+                    >
+                      {diff > 0 ? "+" : ""}
+                      {pct.toFixed(1)}%
+                    </Badge>
+                  </div>
+                )
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  )
+}
