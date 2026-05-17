@@ -68,7 +68,15 @@ export const mainNavItems: NavItem[] = [
 ]
 
 // 財務助理分類（決策工具 — 解決記帳焦慮、拖延成本、現金缺口）
+export const forecastNavItem: NavItem = {
+  title: "收入預測",
+  href: "/revenue-forecast",
+  icon: TrendingUp,
+  description: "每日累積走勢 + 月底推估 + 同期比較",
+}
+
 export const decisionNavItems: NavItem[] = [
+  forecastNavItem,
   {
     title: "財務總覽",
     href: "/financial-overview-v2",
@@ -448,6 +456,7 @@ export const breadcrumbConfig: Record<string, BreadcrumbItem[]> = {
     { title: "系統管理" },
     { title: "週期性支出模板" },
   ],
+  "/revenue-forecast": [{ title: "首頁", href: "/" }, { title: "財務助理" }, { title: "收入預測" }],
   "/expense/inbox": [
     { title: "首頁", href: "/" },
     { title: "系統管理" },
