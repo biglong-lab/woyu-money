@@ -77,6 +77,7 @@ import ReceiptMatchHelper from "@/pages/receipt-match-helper"
 import IntegrationsCenter from "@/pages/integrations-center"
 import RecurringExpensesPage from "@/pages/recurring-expenses"
 import RevenueForecastPage from "@/pages/revenue-forecast"
+import ScenarioSimulatorPage from "@/pages/scenario-simulator"
 
 function Router() {
   const [quickPaymentOpen, setQuickPaymentOpen] = useState(false)
@@ -216,6 +217,7 @@ function Router() {
                 <ProtectedRoute path="/integrations" component={IntegrationsCenter} />
                 <ProtectedRoute path="/recurring-expenses" component={RecurringExpensesPage} />
                 <ProtectedRoute path="/revenue-forecast" component={RevenueForecastPage} />
+                <ProtectedRoute path="/scenario-simulator" component={ScenarioSimulatorPage} />
 
                 {/* Feature Showcase */}
                 <ProtectedRoute path="/features" component={FeatureShowcase} />

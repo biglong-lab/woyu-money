@@ -75,8 +75,16 @@ export const forecastNavItem: NavItem = {
   description: "每日累積走勢 + 月底推估 + 同期比較",
 }
 
+export const scenarioNavItem: NavItem = {
+  title: "沙盤推演",
+  href: "/scenario-simulator",
+  icon: Sparkles,
+  description: "調整行銷/訂價/固定支出，即時看下月收支影響",
+}
+
 export const decisionNavItems: NavItem[] = [
   forecastNavItem,
+  scenarioNavItem,
   {
     title: "財務總覽",
     href: "/financial-overview-v2",
@@ -457,6 +465,11 @@ export const breadcrumbConfig: Record<string, BreadcrumbItem[]> = {
     { title: "週期性支出模板" },
   ],
   "/revenue-forecast": [{ title: "首頁", href: "/" }, { title: "財務助理" }, { title: "收入預測" }],
+  "/scenario-simulator": [
+    { title: "首頁", href: "/" },
+    { title: "財務助理" },
+    { title: "沙盤推演" },
+  ],
   "/expense/inbox": [
     { title: "首頁", href: "/" },
     { title: "系統管理" },
