@@ -17,7 +17,7 @@ export type PaymentItem = {
   createdAt: string
   updatedAt: string
   // 項目來源追蹤
-  source?: "manual" | "ai_scan" | "webhook" | "pm"
+  source?: "manual" | "ai_scan" | "webhook" | "pm" | "hr"
   tags?: string
   sourceDocumentId?: number
   documentUploadedAt?: string

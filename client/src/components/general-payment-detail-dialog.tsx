@@ -432,6 +432,7 @@ function SourceTrackingSection({ detailItem }: { detailItem: PaymentItem }) {
   const isPm = detailItem.source === "pm"
   const isWebhook = detailItem.source === "webhook" || isPm
   const isAiScan = detailItem.source === "ai_scan"
+  const isHr = detailItem.source === "hr"
   const pmPhoto = isPm ? extractPmInvoicePhoto(detailItem.notes) : null
   const tagList = (detailItem.tags ?? "")
     .split(",")
@@ -447,6 +448,10 @@ function SourceTrackingSection({ detailItem }: { detailItem: PaymentItem }) {
           {isPm ? (
             <Badge className="bg-purple-100 text-purple-800 border border-purple-300">
               <span className="mr-1">🏨</span>PM 系統推送
+            </Badge>
+          ) : isHr ? (
+            <Badge className="bg-amber-100 text-amber-800 border border-amber-300">
+              <span className="mr-1">👤</span>人力成本（HR）
             </Badge>
           ) : isWebhook ? (
             <Badge className="bg-blue-100 text-blue-800 border border-blue-300">

@@ -193,6 +193,13 @@ function PaymentItemRow({
               >
                 <span className="mr-1">🏨</span>PM
               </Badge>
+            ) : item.source === "hr" ? (
+              <Badge
+                variant="secondary"
+                className="bg-amber-100 text-amber-800 border border-amber-300"
+              >
+                <span className="mr-1">👤</span>HR
+              </Badge>
             ) : item.source === "webhook" ? (
               <Badge
                 variant="secondary"
