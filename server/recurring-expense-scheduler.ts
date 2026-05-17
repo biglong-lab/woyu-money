@@ -63,9 +63,7 @@ class RecurringExpenseScheduler {
 
       const inserted = await this.generateForMonth(month)
       this.lastGeneratedMonth = month
-      console.log(
-        `[RecurringExpenseScheduler] ${month} 產出 ${inserted} 筆 auto_backfill payment_items`
-      )
+      log(`recurring-expense ${month} 產出 ${inserted} 筆 auto_backfill payment_items`)
     } catch (err) {
       console.error("[RecurringExpenseScheduler] 失敗:", err)
     }
