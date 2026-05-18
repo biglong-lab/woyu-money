@@ -21,6 +21,7 @@ import { getIncomeSourceByKey, verifyBearerToken } from "../storage/income"
 import { db } from "../db"
 import { revenueForecastSnapshots } from "@shared/schema"
 import { z } from "zod"
+import { getCalibrationCurve, predictWithCalibration } from "../storage/pms-calibration"
 
 const router = Router()
 
@@ -103,6 +104,31 @@ router.post(
     const result = await captureFromPM()
     if (!result.ok) throw new AppError(500, result.error ?? "拍快照失敗")
     res.json(result)
+  })
+)
+
+// PMS 預估校準模型
+router.get(
+  "/api/forecast/calibration",
+  asyncHandler(async (req, res) => {
+    const companyIdRaw = req.query.companyId as string | undefined
+    const companyId =
+      companyIdRaw === undefined || companyIdRaw === "null" ? null : parseInt(companyIdRaw, 10)
+    res.json(await getCalibrationCurve(companyId))
+  })
+)
+
+router.get(
+  "/api/forecast/pms-prediction",
+  asyncHandler(async (req, res) => {
+    const targetMonth = req.query.targetMonth as string
+    if (!targetMonth || !/^\d{4}-\d{2}$/.test(targetMonth)) {
+      throw new AppError(400, "targetMonth 必填，格式 YYYY-MM")
+    }
+    const companyIdRaw = req.query.companyId as string | undefined
+    const companyId =
+      companyIdRaw === undefined || companyIdRaw === "null" ? null : parseInt(companyIdRaw, 10)
+    res.json(await predictWithCalibration(targetMonth, companyId))
   })
 )
 
