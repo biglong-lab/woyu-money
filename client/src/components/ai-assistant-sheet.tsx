@@ -4,7 +4,13 @@
  */
 import { useRef, useEffect } from "react"
 import { Bot, Trash2, Zap } from "lucide-react"
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { AiMessageBubble } from "./ai-message-bubble"
@@ -104,6 +110,9 @@ export function AiAssistantSheet({ open, onOpenChange }: AiAssistantSheetProps) 
                 <SheetTitle className="text-base font-semibold text-gray-900 leading-tight">
                   AI 財務助手
                 </SheetTitle>
+                <SheetDescription className="sr-only">
+                  AI 財務助手對話視窗、可以詢問付款 / 收入 / 預測等財務問題
+                </SheetDescription>
                 <div className="flex items-center gap-1.5">
                   {isStreaming ? (
                     <>

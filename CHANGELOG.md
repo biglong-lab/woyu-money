@@ -8,7 +8,9 @@
 
 ## [1.0.5] - 2026-05-19
 
-### 改善 — UX 細部優化連續 loop（5 phase）
+### 改善 — UX 細部優化連續 loop（9 phase、12 commit）
+
+**Phase 1-5 (`c7a7a61` ~ `7ca2d46`) — 元件 / 功能**
 - **共用 BackToTop 按鈕**：滾動 400px+ 顯示、右下浮動、套用至 dashboard / forecast / scenario
 - **場景儲存（沙盤推演）**：localStorage、上限 20、可命名 / 套用 / 刪除 / 覆蓋
 - **useDocumentTitle 全頁覆蓋**：60/60 = 100%（24 頁批次補完、瀏覽器分頁可區分 + 緊急數量前綴）
@@ -17,15 +19,26 @@
 - **command-palette 擴增**：加「➕ 快速動作」6 項 + 「🕘 最近訪問」（localStorage 上限 6）
 - **scenario-simulator 匯出 CSV**：BOM + UTF-8、含參數 / 對比 / 模板覆寫
 
+**Phase 6 (`c6d2856`) — 跨裝置與多館**
+- **dashboard 單館切換**：合計 + 各館按鈕（影響未來 3 月 forecast、YTD 維持合計並標示）
+- **scenario JSON 匯出 / 匯入**：純前端跨裝置遷移、merge by name、檔案格式驗證
+
+**Phase 7-9 (`1af3323` ~ `e3b2fec`) — 無障礙系統補完**
+- **icon-only Button aria-label** × 9（ai-chat-input / ai-assistant / unified-search-filter）
+- **TopNavigation aria** × 4（主導航 / 使用者選單 / 完整選單 / hamburger）
+- **mobile-tab-bar aria 系統**：TabItem role + aria-label（含 badge）+ aria-current + 鍵盤支援、+ 按鈕 aria-expanded、X 關閉、底部 nav landmark
+- **DialogDescription** × 30（pages 6 個 + components 24 個、sr-only fallback、消除全站 Radix a11y warning）
+- **SheetDescription**：ai-assistant-sheet
+
 完整紀錄：[`docs/changes/2026-05-19-ux-detail-optimization-loop.md`](docs/changes/2026-05-19-ux-detail-optimization-loop.md)
 
-### 已研究 / 待做（follow-up）
-- `/financial-dashboard` 單館切換（forecast API 可、YTD 需新增 companyId 支援）
-- 全站 aria-label / title 無障礙補齊
-- 場景 / 最近訪問 export / import（跨裝置遷移）
+### 仍待做（follow-up）
+- dashboard YTD 加 project→company mapping（徹底支援單館切換）
+- /scenario-simulator 比較模式（對比 2 個場景）
+- /receipt-match-helper 細部優化
 
 ### Commit 範圍
-`c7a7a61` → `5646506` → `59e92f4` → `c204a6a` → `7ca2d46`
+`c7a7a61` → `5646506` → `59e92f4` → `c204a6a` → `7ca2d46` → `c6d2856` → `1af3323` → `95f376c` → `a3231a1` → `c9ec014` → `e3b2fec`
 
 ---
 
