@@ -6,6 +6,29 @@
 
 ---
 
+## [1.0.5] - 2026-05-19
+
+### 改善 — UX 細部優化連續 loop（5 phase）
+- **共用 BackToTop 按鈕**：滾動 400px+ 顯示、右下浮動、套用至 dashboard / forecast / scenario
+- **場景儲存（沙盤推演）**：localStorage、上限 20、可命名 / 套用 / 刪除 / 覆蓋
+- **useDocumentTitle 全頁覆蓋**：60/60 = 100%（24 頁批次補完、瀏覽器分頁可區分 + 緊急數量前綴）
+- **recurring-expenses 月份快速跳轉**：上月 / 本月 / 下月 三鍵組（單擊切換）
+- **late-fee 法規建議改 Dialog**：顯示「當前 → 建議值」對照（🟢 啟用 / ⚪ 停用 / 🟡 調整）
+- **command-palette 擴增**：加「➕ 快速動作」6 項 + 「🕘 最近訪問」（localStorage 上限 6）
+- **scenario-simulator 匯出 CSV**：BOM + UTF-8、含參數 / 對比 / 模板覆寫
+
+完整紀錄：[`docs/changes/2026-05-19-ux-detail-optimization-loop.md`](docs/changes/2026-05-19-ux-detail-optimization-loop.md)
+
+### 已研究 / 待做（follow-up）
+- `/financial-dashboard` 單館切換（forecast API 可、YTD 需新增 companyId 支援）
+- 全站 aria-label / title 無障礙補齊
+- 場景 / 最近訪問 export / import（跨裝置遷移）
+
+### Commit 範圍
+`c7a7a61` → `5646506` → `59e92f4` → `c204a6a` → `7ca2d46`
+
+---
+
 ## [1.0.4] - 2026-05-16
 
 ### 新功能 / 對外 API
