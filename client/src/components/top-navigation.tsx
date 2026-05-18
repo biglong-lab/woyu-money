@@ -250,6 +250,8 @@ export default function TopNavigation() {
                   <Button
                     variant={isActive ? "default" : "ghost"}
                     size="sm"
+                    aria-label={item.title}
+                    title={item.title}
                     className={`flex items-center space-x-1.5 px-3 py-2 rounded-lg transition-all duration-200 relative ${
                       isActive
                         ? "bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-sm"
@@ -277,6 +279,8 @@ export default function TopNavigation() {
                   <Button
                     variant="ghost"
                     size="sm"
+                    aria-label={`使用者選單（${getDisplayName(user)}）`}
+                    title="使用者選單"
                     className="flex items-center space-x-2 px-3 py-2 rounded-lg transition-all duration-200 text-gray-700 hover:text-gray-900 hover:bg-gray-100"
                   >
                     <Avatar className="w-6 h-6">
@@ -330,6 +334,8 @@ export default function TopNavigation() {
                 <Button
                   variant="ghost"
                   size="sm"
+                  aria-label="開啟完整選單"
+                  title="完整選單"
                   className="flex items-center space-x-1.5 px-3 py-2 rounded-lg transition-all duration-200 text-gray-700 hover:text-gray-900 hover:bg-gray-100"
                 >
                   <Menu className="w-4 h-4 flex-shrink-0" />
@@ -375,6 +381,8 @@ export default function TopNavigation() {
                 <Button
                   variant="ghost"
                   size="sm"
+                  aria-label="開啟導航選單"
+                  title="開啟選單"
                   className="p-2 rounded-lg transition-all duration-200 hover:bg-gray-100"
                 >
                   <Menu className="w-5 h-5" />
