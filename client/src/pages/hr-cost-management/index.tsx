@@ -27,6 +27,9 @@ interface EmployeeSubmitData {
   dependentsCount: number
   voluntaryPensionRate: string
   hasInsurance: boolean
+  employmentType: string
+  hourlyRate: string | undefined
+  monthlyHours: string | undefined
   notes: string
 }
 
@@ -141,6 +144,9 @@ export default function HRCostManagement() {
     dependentsCount: parseInt(formData.dependentsCount),
     voluntaryPensionRate: formData.voluntaryPensionRate,
     hasInsurance: formData.hasInsurance,
+    employmentType: formData.employmentType,
+    hourlyRate: formData.hourlyRate || undefined,
+    monthlyHours: formData.monthlyHours || undefined,
     notes: formData.notes,
   })
 
@@ -165,6 +171,9 @@ export default function HRCostManagement() {
       dependentsCount: String(emp.dependentsCount || 0),
       voluntaryPensionRate: emp.voluntaryPensionRate || "0",
       hasInsurance: emp.hasInsurance ?? true,
+      employmentType: emp.employmentType ?? "full_time",
+      hourlyRate: emp.hourlyRate || "",
+      monthlyHours: emp.monthlyHours || "",
       notes: emp.notes || "",
     })
     setShowAddDialog(true)

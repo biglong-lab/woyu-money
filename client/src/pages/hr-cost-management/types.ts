@@ -4,6 +4,17 @@
 
 import { localDateISO } from "@/lib/utils"
 
+/** 員工類型 */
+export type EmploymentType = "full_time" | "part_time" | "temporary" | "intern" | "contractor"
+
+export const EMPLOYMENT_TYPE_LABELS: Record<EmploymentType, string> = {
+  full_time: "正職",
+  part_time: "計時／兼職",
+  temporary: "臨時工",
+  intern: "工讀生",
+  contractor: "約聘／外包",
+}
+
 /** 員工資料介面 */
 export interface Employee {
   id: number
@@ -17,6 +28,9 @@ export interface Employee {
   voluntaryPensionRate: string
   isActive: boolean
   hasInsurance: boolean // 是否投保勞健保
+  employmentType: EmploymentType
+  hourlyRate?: string // 時薪（計時人員）
+  monthlyHours?: string // 每月平均工時（計時人員）
   notes?: string
 }
 
@@ -46,6 +60,9 @@ export interface EmployeeFormData {
   dependentsCount: string
   voluntaryPensionRate: string
   hasInsurance: boolean
+  employmentType: EmploymentType
+  hourlyRate: string
+  monthlyHours: string
   notes: string
 }
 
@@ -66,6 +83,9 @@ export const createEmptyFormData = (): EmployeeFormData => ({
   dependentsCount: "0",
   voluntaryPensionRate: "0",
   hasInsurance: true,
+  employmentType: "full_time",
+  hourlyRate: "",
+  monthlyHours: "",
   notes: "",
 })
 

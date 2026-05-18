@@ -12,7 +12,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Users, Plus, Loader2, Pencil, UserMinus } from "lucide-react"
-import { formatCurrency } from "./types"
+import { formatCurrency, EMPLOYMENT_TYPE_LABELS } from "./types"
 import type { Employee } from "./types"
 
 interface EmployeeTableProps {
@@ -82,15 +82,25 @@ function ActiveEmployeeTable({
           {employees.map((emp) => (
             <TableRow key={emp.id}>
               <TableCell className="font-medium">
-                {emp.employeeName}
-                {!emp.hasInsurance && (
-                  <span
-                    className="ml-2 text-xs px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-300"
-                    title="未投保勞健保"
-                  >
-                    無保
-                  </span>
-                )}
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span>{emp.employeeName}</span>
+                  {emp.employmentType && emp.employmentType !== "full_time" && (
+                    <span
+                      className="text-xs px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 border border-blue-300"
+                      title={`類型：${EMPLOYMENT_TYPE_LABELS[emp.employmentType] ?? emp.employmentType}`}
+                    >
+                      {EMPLOYMENT_TYPE_LABELS[emp.employmentType] ?? emp.employmentType}
+                    </span>
+                  )}
+                  {!emp.hasInsurance && (
+                    <span
+                      className="text-xs px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-300"
+                      title="未投保勞健保"
+                    >
+                      無保
+                    </span>
+                  )}
+                </div>
               </TableCell>
               <TableCell className="text-gray-500">{emp.position || "-"}</TableCell>
               <TableCell className="text-right">${formatCurrency(emp.monthlySalary)}</TableCell>
