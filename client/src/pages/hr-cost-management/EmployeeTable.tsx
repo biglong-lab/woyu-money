@@ -1,8 +1,8 @@
 /**
  * 人事費管理 - 員工清單表格（含在職與離職）
  */
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
 import {
   Table,
   TableBody,
@@ -10,24 +10,24 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
-import { Users, Plus, Loader2, Pencil, UserMinus } from "lucide-react";
-import { formatCurrency } from "./types";
-import type { Employee } from "./types";
+} from "@/components/ui/table"
+import { Users, Plus, Loader2, Pencil, UserMinus } from "lucide-react"
+import { formatCurrency } from "./types"
+import type { Employee } from "./types"
 
 interface EmployeeTableProps {
   /** 在職員工列表 */
-  activeEmployees: Employee[];
+  activeEmployees: Employee[]
   /** 離職員工列表 */
-  inactiveEmployees: Employee[];
+  inactiveEmployees: Employee[]
   /** 是否載入中 */
-  isLoading: boolean;
+  isLoading: boolean
   /** 編輯員工回呼 */
-  onEdit: (employee: Employee) => void;
+  onEdit: (employee: Employee) => void
   /** 設為離職回呼 */
-  onTerminate: (id: number) => void;
+  onTerminate: (id: number) => void
   /** 新增員工回呼 */
-  onAdd: () => void;
+  onAdd: () => void
 }
 
 /** 在職員工表格 */
@@ -38,18 +38,18 @@ function ActiveEmployeeTable({
   onTerminate,
   onAdd,
 }: {
-  employees: Employee[];
-  isLoading: boolean;
-  onEdit: (emp: Employee) => void;
-  onTerminate: (id: number) => void;
-  onAdd: () => void;
+  employees: Employee[]
+  isLoading: boolean
+  onEdit: (emp: Employee) => void
+  onTerminate: (id: number) => void
+  onAdd: () => void
 }) {
   if (isLoading) {
     return (
       <div className="text-center py-8">
         <Loader2 className="w-6 h-6 animate-spin mx-auto text-gray-400" />
       </div>
-    );
+    )
   }
 
   if (employees.length === 0) {
@@ -62,7 +62,7 @@ function ActiveEmployeeTable({
           新增第一位員工
         </Button>
       </div>
-    );
+    )
   }
 
   return (
@@ -81,23 +81,23 @@ function ActiveEmployeeTable({
         <TableBody>
           {employees.map((emp) => (
             <TableRow key={emp.id}>
-              <TableCell className="font-medium">{emp.employeeName}</TableCell>
-              <TableCell className="text-gray-500">
-                {emp.position || "-"}
+              <TableCell className="font-medium">
+                {emp.employeeName}
+                {!emp.hasInsurance && (
+                  <span
+                    className="ml-2 text-xs px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-300"
+                    title="未投保勞健保"
+                  >
+                    無保
+                  </span>
+                )}
               </TableCell>
-              <TableCell className="text-right">
-                ${formatCurrency(emp.monthlySalary)}
-              </TableCell>
+              <TableCell className="text-gray-500">{emp.position || "-"}</TableCell>
+              <TableCell className="text-right">${formatCurrency(emp.monthlySalary)}</TableCell>
               <TableCell>{emp.hireDate}</TableCell>
-              <TableCell className="text-center">
-                {emp.dependentsCount || 0}
-              </TableCell>
+              <TableCell className="text-center">{emp.dependentsCount || 0}</TableCell>
               <TableCell className="text-right space-x-1">
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => onEdit(emp)}
-                >
+                <Button size="sm" variant="ghost" onClick={() => onEdit(emp)}>
                   <Pencil className="w-3 h-3" />
                 </Button>
                 <Button
@@ -114,7 +114,7 @@ function ActiveEmployeeTable({
         </TableBody>
       </Table>
     </div>
-  );
+  )
 }
 
 /** 員工清單 Tab 內容 */
@@ -130,9 +130,7 @@ export function EmployeeTable({
     <div className="space-y-4">
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">
-            在職員工 ({activeEmployees.length})
-          </CardTitle>
+          <CardTitle className="text-base">在職員工 ({activeEmployees.length})</CardTitle>
         </CardHeader>
         <CardContent>
           <ActiveEmployeeTable
@@ -168,5 +166,5 @@ export function EmployeeTable({
         </Card>
       )}
     </div>
-  );
+  )
 }

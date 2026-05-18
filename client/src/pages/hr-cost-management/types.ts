@@ -16,6 +16,7 @@ export interface Employee {
   dependentsCount: number
   voluntaryPensionRate: string
   isActive: boolean
+  hasInsurance: boolean // 是否投保勞健保
   notes?: string
 }
 
@@ -44,6 +45,7 @@ export interface EmployeeFormData {
   hireDate: string
   dependentsCount: string
   voluntaryPensionRate: string
+  hasInsurance: boolean
   notes: string
 }
 
@@ -63,6 +65,7 @@ export const createEmptyFormData = (): EmployeeFormData => ({
   hireDate: localDateISO(),
   dependentsCount: "0",
   voluntaryPensionRate: "0",
+  hasInsurance: true,
   notes: "",
 })
 
