@@ -110,6 +110,7 @@ function createHistory(overrides: Partial<PaymentHistory> = {}): PaymentHistory 
     amountPaid: 100000,
     dueDate: "2026-03-25",
     paymentDate: "2026-04-05",
+    lateFeeRate: LABOR_INSURANCE_LATE_FEE_RATE,
     ...overrides,
   }
 }
