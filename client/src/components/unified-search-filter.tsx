@@ -395,6 +395,8 @@ export default function UnifiedSearchFilter({
               onClick={clearAllFilters}
               data-testid="btn-clear-all"
               className="min-h-[40px] min-w-[40px]"
+              aria-label="清除所有篩選"
+              title="清除所有篩選"
             >
               <X className="h-4 w-4" />
             </Button>
@@ -420,6 +422,8 @@ export default function UnifiedSearchFilter({
                   size="icon"
                   className="h-4 w-4 ml-1 hover:bg-transparent"
                   onClick={() => removeFilter("project", projectId)}
+                  aria-label={`移除「${project.projectName}」專案篩選`}
+                  title="移除此專案篩選"
                 >
                   <X className="h-3 w-3" />
                 </Button>
@@ -438,6 +442,8 @@ export default function UnifiedSearchFilter({
                   size="icon"
                   className="h-4 w-4 ml-1 hover:bg-transparent"
                   onClick={() => removeFilter("category", categoryId)}
+                  aria-label={`移除「${category.categoryName}」分類篩選`}
+                  title="移除此分類篩選"
                 >
                   <X className="h-3 w-3" />
                 </Button>
@@ -456,6 +462,8 @@ export default function UnifiedSearchFilter({
                   size="icon"
                   className="h-4 w-4 ml-1 hover:bg-transparent"
                   onClick={() => removeFilter("status", status)}
+                  aria-label={`移除「${statusInfo.label}」狀態篩選`}
+                  title="移除此狀態篩選"
                 >
                   <X className="h-3 w-3" />
                 </Button>
@@ -474,6 +482,8 @@ export default function UnifiedSearchFilter({
                   size="icon"
                   className="h-4 w-4 ml-1 hover:bg-transparent"
                   onClick={() => removeFilter("priority", priority)}
+                  aria-label={`移除「${priorityInfo.label}」優先級篩選`}
+                  title="移除此優先級篩選"
                 >
                   <X className="h-3 w-3" />
                 </Button>
@@ -501,6 +511,8 @@ export default function UnifiedSearchFilter({
                 size="icon"
                 className="h-4 w-4 ml-1 hover:bg-transparent"
                 onClick={() => removeFilter("dueDate")}
+                aria-label="移除到期日篩選"
+                title="移除到期日篩選"
               >
                 <X className="h-3 w-3" />
               </Button>

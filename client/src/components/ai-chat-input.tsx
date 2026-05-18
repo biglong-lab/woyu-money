@@ -52,7 +52,10 @@ export function AiChatInput({ onSend, isStreaming, onStop, disabled }: AiChatInp
 
   /** 送出訊息 */
   const handleSend = useCallback(() => {
-    if (isStreaming) { onStop(); return }
+    if (isStreaming) {
+      onStop()
+      return
+    }
     if (!text.trim() && !imageBase64) return
 
     onSend(text.trim(), imageBase64 ?? undefined, imageMimeType)
@@ -111,6 +114,7 @@ export function AiChatInput({ onSend, isStreaming, onStop, disabled }: AiChatInp
           onClick={() => fileInputRef.current?.click()}
           disabled={disabled || isStreaming}
           title="上傳圖片（帳單/單據）"
+          aria-label="上傳圖片（帳單/單據）"
         >
           <Camera className="w-4.5 h-4.5" />
         </Button>
@@ -132,13 +136,12 @@ export function AiChatInput({ onSend, isStreaming, onStop, disabled }: AiChatInp
           type="button"
           size="icon"
           className={`flex-shrink-0 h-9 w-9 ${
-            isStreaming
-              ? "bg-red-500 hover:bg-red-600"
-              : "bg-blue-600 hover:bg-blue-700"
+            isStreaming ? "bg-red-500 hover:bg-red-600" : "bg-blue-600 hover:bg-blue-700"
           }`}
           onClick={handleSend}
           disabled={disabled || (!isStreaming && !text.trim() && !imageBase64)}
           title={isStreaming ? "停止" : "送出"}
+          aria-label={isStreaming ? "停止 AI 回覆" : "送出訊息"}
         >
           {isStreaming ? (
             <Square className="w-3.5 h-3.5 text-white fill-white" />
