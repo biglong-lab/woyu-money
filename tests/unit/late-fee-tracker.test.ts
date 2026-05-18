@@ -63,6 +63,7 @@ function createItem(overrides: Partial<LateFeeItem> = {}): LateFeeItem {
     totalAmount: 100000,
     paidAmount: 0,
     dueDate: "2026-04-15",
+    lateFeeRate: LABOR_INSURANCE_LATE_FEE_RATE, // 預設用勞健保費率（呼叫端應主動傳）
     ...overrides,
   }
 }
