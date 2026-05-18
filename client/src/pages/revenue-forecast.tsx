@@ -548,6 +548,77 @@ export default function RevenueForecastPage() {
         </Card>
       )}
 
+      {/* 歷史準確度報表 */}
+      {calibrationCurve && calibrationCurve.totalSamples > 0 && (
+        <Card className="border-emerald-200">
+          <CardContent className="py-4 px-3 sm:px-4">
+            <div className="text-sm font-semibold text-gray-700 mb-3 flex items-center justify-between flex-wrap gap-2">
+              <span>📈 歷史準確度（PMS 校準模型可信度）</span>
+              <Badge className="bg-emerald-100 text-emerald-800">
+                共 {calibrationCurve.totalSamples} 筆訓練樣本
+              </Badge>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {(() => {
+                const close = calibrationCurve.buckets.find(
+                  (b) => b.bucket === "0-7天" || b.bucket === "8-15天"
+                )
+                const mid = calibrationCurve.buckets.find((b) => b.bucket === "16-30天")
+                const far = calibrationCurve.buckets.find(
+                  (b) => b.bucket === "31-60天" || b.bucket === "60+天"
+                )
+
+                // 「精準度」分數 = 1 / (1 + std)
+                // 越接近 1 越準
+                const score = (b: typeof close) => {
+                  if (!b) return 0
+                  const spread = (b.p75Ratio - b.p25Ratio) / b.medianRatio
+                  return Math.max(0, Math.min(1, 1 - spread / 2))
+                }
+
+                return (
+                  <>
+                    <div className="bg-green-50 rounded-lg p-3">
+                      <div className="text-xs text-green-700">近月底（0-15 天）</div>
+                      <div className="text-xl font-bold text-green-900">
+                        {close ? `${(score(close) * 100).toFixed(0)}%` : "—"}
+                      </div>
+                      <div className="text-xs text-green-600 mt-1">
+                        {close
+                          ? `${close.samples} 筆 / 中位 ${close.medianRatio.toFixed(2)}×`
+                          : "無樣本"}
+                      </div>
+                    </div>
+                    <div className="bg-amber-50 rounded-lg p-3">
+                      <div className="text-xs text-amber-700">中期（16-30 天）</div>
+                      <div className="text-xl font-bold text-amber-900">
+                        {mid ? `${(score(mid) * 100).toFixed(0)}%` : "—"}
+                      </div>
+                      <div className="text-xs text-amber-600 mt-1">
+                        {mid ? `${mid.samples} 筆 / 中位 ${mid.medianRatio.toFixed(2)}×` : "無樣本"}
+                      </div>
+                    </div>
+                    <div className="bg-red-50 rounded-lg p-3">
+                      <div className="text-xs text-red-700">早期（31+ 天）</div>
+                      <div className="text-xl font-bold text-red-900">
+                        {far ? `${(score(far) * 100).toFixed(0)}%` : "—"}
+                      </div>
+                      <div className="text-xs text-red-600 mt-1">
+                        {far ? `${far.samples} 筆 / 中位 ${far.medianRatio.toFixed(2)}×` : "無樣本"}
+                      </div>
+                    </div>
+                  </>
+                )
+              })()}
+            </div>
+            <div className="text-xs text-gray-500 mt-3 leading-relaxed">
+              💡 <strong>解讀</strong>：% 越高代表預估離散度小（同樣 N 天前填的、最終差距小）。
+              近月底通常 80%+ 精準、早期 30+ 天 % 偏低代表使用者早期填的較保守、無法精準推算。
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* 校準曲線表 */}
       {calibrationCurve && calibrationCurve.buckets.length > 0 && (
         <Card>

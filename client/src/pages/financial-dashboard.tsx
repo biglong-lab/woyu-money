@@ -33,6 +33,8 @@ import {
   Legend,
   Line,
   ComposedChart,
+  Cell,
+  ReferenceLine,
 } from "recharts"
 
 interface SeasonalForecast {
@@ -247,17 +249,56 @@ export default function FinancialDashboardPage() {
                   tick={{ fontSize: 11 }}
                   tickFormatter={(v) => (Math.abs(v) >= 1000 ? `${Math.round(v / 1000)}K` : v)}
                 />
-                <Tooltip formatter={(v: number) => formatMoney(v)} />
+                <Tooltip
+                  formatter={(v: number) => formatMoney(v)}
+                  labelFormatter={(label) => {
+                    const row = chartData.find((d) => d.month === label)
+                    return `${label}${row?.isForecast ? " (預估)" : ""}`
+                  }}
+                />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
-                <Bar dataKey="income" name="收入" fill="#3b82f6" />
-                <Bar dataKey="expense" name="支出" fill="#ef4444" />
+                {/* 今日分界線（最後一個歷史 vs 第一個預測之間）*/}
+                {chartData.find((d) => d.isForecast) && (
+                  <ReferenceLine
+                    x={chartData.find((d) => d.isForecast)?.month}
+                    stroke="#9ca3af"
+                    strokeDasharray="3 3"
+                    label={{ value: "預估", position: "top", fontSize: 10, fill: "#6b7280" }}
+                  />
+                )}
+                <Bar dataKey="income" name="收入" fill="#3b82f6">
+                  {chartData.map((d, i) => (
+                    <Cell key={i} fill="#3b82f6" fillOpacity={d.isForecast ? 0.4 : 1} />
+                  ))}
+                </Bar>
+                <Bar dataKey="expense" name="支出" fill="#ef4444">
+                  {chartData.map((d, i) => (
+                    <Cell key={i} fill="#ef4444" fillOpacity={d.isForecast ? 0.4 : 1} />
+                  ))}
+                </Bar>
                 <Line
                   type="monotone"
                   dataKey="profit"
                   name="淨利"
                   stroke="#10b981"
                   strokeWidth={2}
-                  dot={{ r: 4 }}
+                  dot={(props) => {
+                    const { cx, cy, payload } = props as {
+                      cx: number
+                      cy: number
+                      payload: { isForecast: boolean }
+                    }
+                    return (
+                      <circle
+                        cx={cx}
+                        cy={cy}
+                        r={4}
+                        fill={payload.isForecast ? "transparent" : "#10b981"}
+                        stroke="#10b981"
+                        strokeWidth={payload.isForecast ? 2 : 0}
+                      />
+                    )
+                  }}
                 />
               </ComposedChart>
             </ResponsiveContainer>
