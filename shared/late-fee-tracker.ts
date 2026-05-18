@@ -100,7 +100,9 @@ function getYearFromDueDate(dueDate: string): number {
 }
 
 function effectiveRate(override?: number): number {
-  return override ?? LABOR_INSURANCE_LATE_FEE_RATE
+  // 預設 0（不算滯納金），呼叫端應主動傳入該類別 rate
+  // 過去 fallback 為勞健保 0.3% 導致誤推估
+  return override ?? 0
 }
 
 // ─────────────────────────────────────────────
