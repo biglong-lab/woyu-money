@@ -109,11 +109,13 @@ router.post(
       throw new AppError(400, "請輸入有效的月薪")
     }
 
+    const { hasInsurance } = req.body
     const result = calculateInsurance({
       monthlySalary: parseFloat(monthlySalary),
       insuredSalary: insuredSalary ? parseFloat(insuredSalary) : undefined,
       dependentsCount: parseInt(dependentsCount) || 0,
       voluntaryPensionRate: parseFloat(voluntaryPensionRate) || 0,
+      hasInsurance: hasInsurance !== false, // 預設投保
     })
 
     res.json(result)
@@ -184,6 +186,7 @@ router.post(
           insuredSalary: insuredSalaryVal,
           dependentsCount: dependents,
           voluntaryPensionRate: voluntaryRate,
+          hasInsurance: emp.hasInsurance,
         })
 
         return {
