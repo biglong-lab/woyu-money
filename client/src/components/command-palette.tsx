@@ -9,7 +9,7 @@
  * - 在 input/textarea/contentEditable 中不攔截，避免干擾打字
  * - 手機端：保留 hotkey 給外接鍵盤使用者；TopNavigation 可加按鈕觸發
  */
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState, useCallback, useMemo } from "react"
 import { useLocation } from "wouter"
 import {
   Home,
@@ -21,6 +21,7 @@ import {
   Repeat,
   Sparkles,
   Wallet,
+  History,
 } from "lucide-react"
 import {
   CommandDialog,
@@ -33,9 +34,65 @@ import {
 } from "@/components/ui/command"
 import { navigationCategories } from "@/config/navigation"
 
+const RECENT_STORAGE_KEY = "command-palette:recent"
+const RECENT_MAX = 6
+
+/** 把路徑寫進「最近訪問」清單（純前端、localStorage、去重、上限 6） */
+function pushRecent(href: string) {
+  try {
+    if (!href || href === "/") return
+    const raw = localStorage.getItem(RECENT_STORAGE_KEY)
+    const list: string[] = raw ? JSON.parse(raw) : []
+    const next = [href, ...list.filter((h) => h !== href)].slice(0, RECENT_MAX)
+    localStorage.setItem(RECENT_STORAGE_KEY, JSON.stringify(next))
+  } catch {
+    // localStorage 滿 / 隱私模式 — 靜默失敗
+  }
+}
+
+function loadRecent(): string[] {
+  try {
+    const raw = localStorage.getItem(RECENT_STORAGE_KEY)
+    if (!raw) return []
+    const parsed = JSON.parse(raw)
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
 export function CommandPalette() {
   const [open, setOpen] = useState(false)
-  const [, setLocation] = useLocation()
+  const [location, setLocation] = useLocation()
+  // 用 state 強制 re-render（讓 open=true 時讀到最新清單）
+  const [recentHrefs, setRecentHrefs] = useState<string[]>(() => loadRecent())
+
+  // 每次 location 改了、若該路徑在 nav 內就記下來
+  useEffect(() => {
+    pushRecent(location)
+    setRecentHrefs(loadRecent())
+  }, [location])
+
+  // 從 navigationCategories 對應 href → { title, icon, description }
+  const navIndex = useMemo(() => {
+    const m = new Map<string, { title: string; icon: typeof Home; description?: string }>()
+    for (const c of navigationCategories) {
+      for (const it of c.items) {
+        m.set(it.href, { title: it.title, icon: it.icon, description: it.description })
+      }
+    }
+    return m
+  }, [])
+
+  // 過濾掉不在 nav 內的（避免顯示 /auth、/not-found 等）+ 排除當前頁
+  const recentItems = useMemo(
+    () =>
+      recentHrefs
+        .filter((h) => navIndex.has(h) && h !== location)
+        .map((h) => ({ href: h, ...navIndex.get(h)! }))
+        .slice(0, 5),
+    [recentHrefs, navIndex, location]
+  )
 
   // 全域 hotkey
   useEffect(() => {
@@ -102,6 +159,29 @@ export function CommandPalette() {
         </CommandGroup>
 
         <CommandSeparator />
+
+        {/* 最近訪問 — 限有在 navigation 內的頁面 */}
+        {recentItems.length > 0 && (
+          <>
+            <CommandGroup heading="🕘 最近訪問">
+              {recentItems.map((it) => {
+                const Icon = it.icon
+                return (
+                  <CommandItem
+                    key={`recent-${it.href}`}
+                    onSelect={() => runCommand(() => setLocation(it.href))}
+                    keywords={[it.title, it.href, it.description ?? ""]}
+                  >
+                    <Icon className="mr-2 h-4 w-4 text-blue-500" />
+                    <span>{it.title}</span>
+                    <History className="ml-auto h-3 w-3 text-gray-300" />
+                  </CommandItem>
+                )
+              })}
+            </CommandGroup>
+            <CommandSeparator />
+          </>
+        )}
 
         {/* 快速動作：建立 / 跳轉到常見操作頁 */}
         <CommandGroup heading="➕ 快速動作">

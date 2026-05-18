@@ -39,6 +39,7 @@ import {
   BookmarkPlus,
   Trash2,
   FolderOpen,
+  Download,
 } from "lucide-react"
 import { useDocumentTitle } from "@/hooks/use-document-title"
 import { useToast } from "@/hooks/use-toast"
@@ -289,6 +290,98 @@ export default function ScenarioSimulatorPage() {
     saveScenarios(list)
   }
 
+  const handleExportCSV = () => {
+    if (!simulated) {
+      toast({ title: "尚無資料可匯出", variant: "destructive" })
+      return
+    }
+    // CSV 內含：基本資料 + 三大指標對比 + 個別模板覆寫
+    const csvEscape = (v: string | number) => {
+      const s = String(v)
+      return /[,"\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+    }
+    const rows: (string | number)[][] = [
+      ["沙盤推演結果"],
+      ["匯出時間", new Date().toISOString()],
+      ["目標月份", targetMonth],
+      ["信心等級", seasonal?.confidence ?? "—"],
+      ["樣本數", seasonal?.sampleSize ?? 0],
+      [],
+      ["[參數]"],
+      ["行銷預算調整(%)", marketingDelta],
+      ["行銷彈性係數", marketingElasticity],
+      ["訂價調整(%)", priceDelta],
+      ["OTA 佔比變化(%)", otaShiftDelta],
+      ["收入直接調整(%)", revenueAdjust],
+      [],
+      ["[結果對比]", "基準", "模擬後", "差異", "差異%"],
+      [
+        "收入",
+        Math.round(baseline.revenue),
+        Math.round(simulated.revenue),
+        Math.round(simulated.revenue - baseline.revenue),
+        baseline.revenue > 0
+          ? (((simulated.revenue - baseline.revenue) / baseline.revenue) * 100).toFixed(2) + "%"
+          : "—",
+      ],
+      [
+        "支出",
+        Math.round(baseline.expense),
+        Math.round(simulated.expense),
+        Math.round(simulated.expense - baseline.expense),
+        baseline.expense > 0
+          ? (((simulated.expense - baseline.expense) / baseline.expense) * 100).toFixed(2) + "%"
+          : "—",
+      ],
+      [
+        "淨利",
+        Math.round(baseline.profit),
+        Math.round(simulated.profit),
+        Math.round(simulated.profit - baseline.profit),
+        baseline.profit !== 0
+          ? (((simulated.profit - baseline.profit) / Math.abs(baseline.profit)) * 100).toFixed(2) +
+            "%"
+          : "—",
+      ],
+      [
+        "利潤率(%)",
+        baseline.marginPct.toFixed(2),
+        simulated.marginPct.toFixed(2),
+        (simulated.marginPct - baseline.marginPct).toFixed(2) + " pp",
+        "",
+      ],
+      [],
+      ["[支出模板覆寫]"],
+      ["名稱", "原金額", "模擬金額", "啟用狀態"],
+    ]
+    for (const t of templates) {
+      const o = tplOverrides[t.id]
+      if (!o) continue
+      const orig = parseFloat(t.estimatedAmount)
+      const changed = !o.active || o.amount !== orig
+      if (!changed) continue
+      rows.push([
+        t.templateName,
+        Math.round(orig),
+        Math.round(o.amount),
+        o.active ? "啟用" : "停用",
+      ])
+    }
+
+    const csv = rows.map((r) => r.map(csvEscape).join(",")).join("\n")
+    const BOM = "﻿" // Excel 開 UTF-8 用
+    const blob = new Blob([BOM + csv], { type: "text/csv;charset=utf-8" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `沙盤推演_${targetMonth}_${new Date().toISOString().slice(0, 10)}.csv`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+    toast({ title: "✅ 已匯出 CSV", description: a.download })
+  }
+
   const diff = simulated
     ? {
         revenue: simulated.revenue - baseline.revenue,
@@ -310,6 +403,10 @@ export default function ScenarioSimulatorPage() {
           </p>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={handleExportCSV} disabled={!simulated}>
+            <Download className="h-4 w-4 mr-1" />
+            匯出 CSV
+          </Button>
           <Button variant="outline" size="sm" onClick={reset}>
             <RotateCcw className="h-4 w-4 mr-1" />
             重置
