@@ -22,6 +22,7 @@ import {
   projectSchema,
 } from "@/components/integrated-payment-analysis"
 import type { PaymentItem, PaymentProject } from "@/components/integrated-payment-analysis"
+import { useDocumentTitle } from "@/hooks/use-document-title"
 
 // ========================================
 // 付款分析與專案管理 - 主頁面
@@ -32,6 +33,7 @@ import type { PaymentItem, PaymentProject } from "@/components/integrated-paymen
 type PaymentItemFormData = z.infer<typeof paymentItemSchema>
 
 export default function IntegratedPaymentAnalysisOptimized() {
+  useDocumentTitle("整合付款分析")
   // 頁面狀態
   const [activeTab, setActiveTab] = useState("dashboard")
   const [selectedProject, setSelectedProject] = useState<string>("all")

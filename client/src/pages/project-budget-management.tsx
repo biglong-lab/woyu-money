@@ -34,6 +34,7 @@ import {
 
 // 型別
 import type { BudgetPlan, BudgetItem, Project, Category } from "@/components/project-budget-types"
+import { useDocumentTitle } from "@/hooks/use-document-title"
 
 // 預算計劃摘要 API 回傳型別
 interface PaymentTypeStat {
@@ -104,6 +105,7 @@ type BudgetPlanFormData = z.infer<typeof budgetPlanSchema>
 type BudgetItemFormData = z.infer<typeof budgetItemSchema>
 
 export default function ProjectBudgetManagement() {
+  useDocumentTitle("專案預算管理")
   // 頁面狀態
   const [activeTab, setActiveTab] = useState("plans")
   const [selectedPlanId, setSelectedPlanId] = useState<number | null>(null)

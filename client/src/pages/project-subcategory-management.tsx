@@ -48,6 +48,7 @@ import { apiRequest } from "@/lib/queryClient"
 import { queryClient } from "@/lib/queryClient"
 import { useToast } from "@/hooks/use-toast"
 import type { PaymentProject, DebtCategory } from "@shared/schema"
+import { useDocumentTitle } from "@/hooks/use-document-title"
 
 // 類型定義
 type SubcategoryStatus = {
@@ -86,6 +87,7 @@ interface ProcessPaymentResult {
 }
 
 export default function ProjectSubcategoryManagement() {
+  useDocumentTitle("專案子分類")
   const [selectedProject, setSelectedProject] = useState<number | null>(null)
   const [selectedParentCategory, setSelectedParentCategory] = useState<number | null>(null)
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false)

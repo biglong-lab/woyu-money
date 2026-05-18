@@ -153,6 +153,43 @@ export default function RecurringExpensesPage() {
           </p>
         </div>
         <div className="flex gap-2 items-center flex-wrap">
+          {/* 月份快速跳轉 */}
+          {(() => {
+            const now = new Date()
+            const offsetMonth = (offset: number) => {
+              const d = new Date(now.getFullYear(), now.getMonth() + offset, 1)
+              return d.toISOString().slice(0, 7)
+            }
+            const thisMonth = offsetMonth(0)
+            const lastMonth = offsetMonth(-1)
+            const nextMonth = offsetMonth(1)
+            const presets = [
+              { value: lastMonth, label: "上月" },
+              { value: thisMonth, label: "本月" },
+              { value: nextMonth, label: "下月" },
+            ]
+            return (
+              <div className="inline-flex rounded-md border border-gray-300 overflow-hidden">
+                {presets.map((p, idx) => {
+                  const active = selectedMonth === p.value
+                  return (
+                    <button
+                      key={p.value}
+                      type="button"
+                      onClick={() => setSelectedMonth(p.value)}
+                      className={`px-2.5 h-9 text-xs sm:text-sm transition-colors ${
+                        active
+                          ? "bg-blue-600 text-white"
+                          : "bg-white text-gray-700 hover:bg-gray-50"
+                      } ${idx > 0 ? "border-l border-gray-300" : ""}`}
+                    >
+                      {p.label}
+                    </button>
+                  )
+                })}
+              </div>
+            )
+          })()}
           <select
             value={selectedMonth}
             onChange={(e) => setSelectedMonth(e.target.value)}

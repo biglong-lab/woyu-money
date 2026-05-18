@@ -1,24 +1,25 @@
-import { useState } from "react";
-import { Link } from "wouter";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import { 
-  Sparkles, 
-  Search, 
-  Package, 
-  Bell, 
-  Palette, 
-  BarChart3, 
+import { useState } from "react"
+import { Link } from "wouter"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Badge } from "@/components/ui/badge"
+import { Progress } from "@/components/ui/progress"
+import {
+  Sparkles,
+  Search,
+  Package,
+  Bell,
+  Palette,
+  BarChart3,
   Zap,
   Shield,
   Database,
   Smartphone,
   FileText,
-  Settings
-} from "lucide-react";
+  Settings,
+} from "lucide-react"
+import { useDocumentTitle } from "@/hooks/use-document-title"
 
 // Simple demo components for showcase
 const DemoIntelligentReports = () => (
@@ -39,7 +40,7 @@ const DemoIntelligentReports = () => (
       </div>
     </div>
   </div>
-);
+)
 
 const DemoAdvancedSearch = () => (
   <div className="space-y-4 p-4 bg-slate-50 dark:bg-slate-800 rounded-lg">
@@ -51,7 +52,7 @@ const DemoAdvancedSearch = () => (
       <div>✓ 搜尋歷史記錄</div>
     </div>
   </div>
-);
+)
 
 const DemoBatchOperations = () => (
   <div className="space-y-4 p-4 bg-slate-50 dark:bg-slate-800 rounded-lg">
@@ -63,7 +64,7 @@ const DemoBatchOperations = () => (
       <div>✓ 批量報表產出</div>
     </div>
   </div>
-);
+)
 
 const DemoNotificationSystem = () => (
   <div className="space-y-4 p-4 bg-slate-50 dark:bg-slate-800 rounded-lg">
@@ -75,10 +76,11 @@ const DemoNotificationSystem = () => (
       <div>✓ 系統狀態更新</div>
     </div>
   </div>
-);
+)
 
 export default function FeatureShowcase() {
-  const [activeDemo, setActiveDemo] = useState<string | null>(null);
+  useDocumentTitle("功能展示")
+  const [activeDemo, setActiveDemo] = useState<string | null>(null)
 
   const features = [
     {
@@ -87,7 +89,7 @@ export default function FeatureShowcase() {
       description: "AI驅動的數據分析與視覺化報表",
       icon: BarChart3,
       color: "bg-blue-500",
-      component: <DemoIntelligentReports />
+      component: <DemoIntelligentReports />,
     },
     {
       id: "advanced-search",
@@ -95,7 +97,7 @@ export default function FeatureShowcase() {
       description: "多維度篩選與智能搜尋建議",
       icon: Search,
       color: "bg-green-500",
-      component: <DemoAdvancedSearch />
+      component: <DemoAdvancedSearch />,
     },
     {
       id: "batch-operations",
@@ -103,7 +105,7 @@ export default function FeatureShowcase() {
       description: "高效處理大量數據的批量操作",
       icon: Package,
       color: "bg-purple-500",
-      component: <DemoBatchOperations />
+      component: <DemoBatchOperations />,
     },
     {
       id: "notification-system",
@@ -111,9 +113,9 @@ export default function FeatureShowcase() {
       description: "個人化通知與即時提醒",
       icon: Bell,
       color: "bg-orange-500",
-      component: <DemoNotificationSystem />
-    }
-  ];
+      component: <DemoNotificationSystem />,
+    },
+  ]
 
   const systemImprovements = [
     {
@@ -121,30 +123,30 @@ export default function FeatureShowcase() {
       description: "查詢速度提升 99%，從秒級降至毫秒級",
       icon: Zap,
       progress: 99,
-      color: "text-green-600"
+      color: "text-green-600",
     },
     {
       title: "安全強化",
       description: "新增多層安全防護與資料加密",
       icon: Shield,
       progress: 100,
-      color: "text-blue-600"
+      color: "text-blue-600",
     },
     {
       title: "資料庫優化",
       description: "44個資料庫索引，提升查詢效率",
       icon: Database,
       progress: 95,
-      color: "text-purple-600"
+      color: "text-purple-600",
     },
     {
       title: "響應式設計",
       description: "完美支援手機、平板與桌面裝置",
       icon: Smartphone,
       progress: 100,
-      color: "text-orange-600"
-    }
-  ];
+      color: "text-orange-600",
+    },
+  ]
 
   const technicalFeatures = [
     "44個最佳化資料庫索引",
@@ -158,8 +160,8 @@ export default function FeatureShowcase() {
     "主題個人化系統",
     "資料完整性驗證",
     "效能監控儀表板",
-    "自動備份機制"
-  ];
+    "自動備份機制",
+  ]
 
   return (
     <div className="container-responsive min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
@@ -201,7 +203,10 @@ export default function FeatureShowcase() {
           <TabsContent value="features" className="space-y-8">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               {features.map((feature) => (
-                <Card key={feature.id} className="hover:shadow-xl transition-all duration-300 border-2 hover:border-blue-200 dark:hover:border-blue-800">
+                <Card
+                  key={feature.id}
+                  className="hover:shadow-xl transition-all duration-300 border-2 hover:border-blue-200 dark:hover:border-blue-800"
+                >
                   <CardHeader className="pb-4">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-3">
@@ -226,9 +231,7 @@ export default function FeatureShowcase() {
                   </CardHeader>
                   {activeDemo === feature.id && (
                     <CardContent className="pt-0">
-                      <div className="border-t pt-6">
-                        {feature.component}
-                      </div>
+                      <div className="border-t pt-6">{feature.component}</div>
                     </CardContent>
                   )}
                 </Card>
@@ -272,9 +275,7 @@ export default function FeatureShowcase() {
                   <FileText className="h-6 w-6" />
                   <span>技術實現清單</span>
                 </CardTitle>
-                <CardDescription>
-                  第五階段功能擴展的完整技術規格與實現項目
-                </CardDescription>
+                <CardDescription>第五階段功能擴展的完整技術規格與實現項目</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -294,9 +295,7 @@ export default function FeatureShowcase() {
             <Card>
               <CardHeader>
                 <CardTitle>效能指標</CardTitle>
-                <CardDescription>
-                  系統優化前後的關鍵效能指標對比
-                </CardDescription>
+                <CardDescription>系統優化前後的關鍵效能指標對比</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -346,5 +345,5 @@ export default function FeatureShowcase() {
         </div>
       </div>
     </div>
-  );
+  )
 }

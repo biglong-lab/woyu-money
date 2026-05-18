@@ -23,12 +23,14 @@ import type {
   LoanInvestmentRecord,
   LoanInvestmentStats,
 } from "@/components/loan-investment-mgmt"
+import { useDocumentTitle } from "@/hooks/use-document-title"
 
 /**
  * 借貸投資管理頁面
  * 負責狀態管理、API 互動與子元件組合
  */
 export default function LoanInvestmentManagement() {
+  useDocumentTitle("借貸投資管理")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingRecord, setEditingRecord] = useState<LoanInvestmentRecord | null>(null)
   const [selectedTab, setSelectedTab] = useState("all")

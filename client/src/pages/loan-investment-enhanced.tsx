@@ -29,6 +29,7 @@ import {
 import { LoanEnhancedDetailDialog } from "@/components/loan-enhanced-detail-dialog"
 import { LoanEnhancedDeleteDialog } from "@/components/loan-enhanced-delete-dialog"
 import { LoanEnhancedQuickPaymentDialog } from "@/components/loan-enhanced-quick-payment-dialog"
+import { useDocumentTitle } from "@/hooks/use-document-title"
 
 // ==========================================
 // 借貸投資管理 - 主頁面
@@ -43,6 +44,7 @@ const INITIAL_QUICK_PAYMENT: QuickPaymentFormData = {
 }
 
 export default function LoanInvestmentEnhanced() {
+  useDocumentTitle("借貸投資（進階）")
   const { toast } = useToast()
   const queryClient = useQueryClient()
 
