@@ -119,22 +119,22 @@ export async function captureFromPM(): Promise<CaptureResult> {
           (1000 * 60 * 60 * 24)
       )
 
-      // 每家公司
+      // 每家公司（UPSERT：PM 後續若補日紀錄、累積值要更新）
       let monthTotal = 0
       for (const row of result.rows) {
         const accumulated = parseFloat(row.accumulated)
         monthTotal += accumulated
 
         try {
-          await db.insert(revenueForecastSnapshots).values({
-            snapshotDate: todayStr,
-            companyId: row.company_id,
-            targetMonth,
-            accumulatedRevenue: accumulated.toString(),
-            bookedRevenue: "0",
-            daysAheadOfTarget: daysAhead,
-            source: "pm-daily-snapshot",
-          })
+          await db.execute(sql`
+            INSERT INTO revenue_forecast_snapshots
+              (snapshot_date, company_id, target_month, accumulated_revenue, booked_revenue, days_ahead_of_target, source)
+            VALUES
+              (${todayStr}, ${row.company_id}, ${targetMonth}, ${accumulated.toString()}, '0', ${daysAhead}, 'pm-daily-snapshot')
+            ON CONFLICT (snapshot_date, company_id, target_month, source)
+            DO UPDATE SET accumulated_revenue = EXCLUDED.accumulated_revenue,
+                          days_ahead_of_target = EXCLUDED.days_ahead_of_target
+          `)
           inserted++
         } catch {
           skipped++
@@ -415,8 +415,22 @@ export async function getSeasonalForecast(
       }
     }
 
-    // 最終累積：該月最後一筆 snapshot
-    const finalAcc = parseFloat(hmSnaps[hmSnaps.length - 1].accumulatedRevenue)
+    // 最終累積：改用 payment_items income 加總（精準、含完整月）
+    // forecast_snapshots PM daily 部分月份不完整、不可信賴
+    const finalQuery = await db.execute(sql`
+      SELECT COALESCE(SUM(total_amount::numeric), 0)::text AS final_acc
+      FROM payment_items
+      WHERE item_type = 'income' AND NOT is_deleted AND source = 'webhook'
+        AND TO_CHAR(start_date, 'YYYY-MM') = ${hm}
+        ${
+          companyId === null
+            ? sql`AND project_id IN (3, 4, 9, 10, 20, 26)`
+            : sql`AND project_id = ${companyId === 1 ? 3 : companyId === 2 ? 4 : companyId === 3 ? 9 : companyId === 4 ? 10 : companyId === 5 ? 20 : companyId === 6 ? 26 : 0}`
+        }
+    `)
+    const finalAcc = parseFloat(
+      (finalQuery as unknown as { rows: Array<{ final_acc: string }> }).rows[0]?.final_acc ?? "0"
+    )
 
     if (finalAcc > 0 && sameDayAcc > 0) {
       history.push({
