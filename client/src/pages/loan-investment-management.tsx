@@ -3,7 +3,13 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog"
 import { Plus } from "lucide-react"
 import LoanPaymentHistory from "@/components/loan-payment-history"
 import { useForm } from "react-hook-form"
@@ -263,6 +269,7 @@ export default function LoanInvestmentManagement() {
         <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>還款記錄管理</DialogTitle>
+            <DialogDescription>檢視與管理此筆借貸 / 投資的還款明細</DialogDescription>
           </DialogHeader>
           {selectedRecordForPayments && (
             <LoanPaymentHistory

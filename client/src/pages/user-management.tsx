@@ -17,6 +17,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -386,6 +387,7 @@ export default function UserManagement() {
               <DialogContent>
                 <DialogHeader>
                   <DialogTitle>新增用戶</DialogTitle>
+                  <DialogDescription>建立系統使用者帳號並指定角色與選單權限</DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4">
                   <div className="space-y-2">
@@ -499,6 +501,7 @@ export default function UserManagement() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>編輯用戶</DialogTitle>
+            <DialogDescription>修改帳號資訊、角色或啟用狀態</DialogDescription>
           </DialogHeader>
           {selectedUser && (
             <div className="space-y-4">
@@ -571,6 +574,7 @@ export default function UserManagement() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>重置密碼</DialogTitle>
+            <DialogDescription>為此使用者設定新密碼（不需舊密碼驗證）</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
@@ -599,6 +603,7 @@ export default function UserManagement() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>權限設定</DialogTitle>
+            <DialogDescription>勾選此使用者可看見的選單模組</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
