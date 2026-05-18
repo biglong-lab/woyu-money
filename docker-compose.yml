@@ -26,6 +26,7 @@ services:
     networks:
       - default
       - pm_pm-network
+      - pms_default
     volumes:
       - uploads:/app/uploads
     depends_on:
@@ -53,6 +54,9 @@ networks:
     name: woyu_default
   # PM 系統的 docker network — 透過 external 引用、woyu-money 加入後可解析 pm-postgres-prod
   pm_pm-network:
+    external: true
+  # PMS 系統的 docker network — woyu-money 加入後可解析 pms-postgres
+  pms_default:
     external: true
 
 volumes:
