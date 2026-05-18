@@ -3,7 +3,7 @@
  * 輸入收據資訊 → 系統回傳匹配建議 → 一鍵標記已付
  */
 
-import { useState } from "react"
+import { useRef, useState } from "react"
 import { useMutation } from "@tanstack/react-query"
 import { Link } from "wouter"
 import { Receipt, CheckCircle2, ArrowRight, Plus, RotateCcw } from "lucide-react"
@@ -116,6 +116,7 @@ export default function ReceiptMatchHelperPage() {
   const [ocrText, setOcrText] = useState("")
   const [result, setResult] = useState<MatchResult | null>(null)
   const [receiptUrl, setReceiptUrl] = useState<string | null>(null)
+  const amountInputRef = useRef<HTMLInputElement>(null)
   const { toast } = useToast()
 
   const suggestMutation = useMutation<MatchResult, Error, SuggestPayload>({
@@ -140,6 +141,8 @@ export default function ReceiptMatchHelperPage() {
       setVendor("")
       setOcrText("")
       setReceiptUrl(null)
+      // 標記後自動 focus 回 amount input、加速連續處理
+      setTimeout(() => amountInputRef.current?.focus(), 0)
       queryClient.invalidateQueries({ queryKey: ["/api/payment/priority-report?includeLow=true"] })
       queryClient.invalidateQueries({ queryKey: ["/api/payment/items"] })
     },
@@ -154,6 +157,8 @@ export default function ReceiptMatchHelperPage() {
     setOcrText("")
     setReceiptUrl(null)
     setResult(null)
+    // 連續處理體驗：清完自動回 amount input
+    setTimeout(() => amountInputRef.current?.focus(), 0)
   }
 
   const hasAnyInput = !!(amount || receiptDate || vendor || ocrText || receiptUrl || result)
@@ -203,6 +208,7 @@ export default function ReceiptMatchHelperPage() {
                 金額 <span className="text-xs text-gray-400 font-normal">（任一即可）</span>
               </Label>
               <Input
+                ref={amountInputRef}
                 id="amount"
                 inputMode="numeric"
                 placeholder="例如：12,000"
