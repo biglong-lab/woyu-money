@@ -90,12 +90,17 @@ describe("classifyItem 分類邏輯", () => {
     expect(classifyItem(input)).toBe("labor_insurance")
   })
 
-  it("項目名稱含「健保」應分類為 labor_insurance", () => {
+  it("項目名稱含「健保」應分類為 health_insurance", () => {
     const input = createInput({ itemName: "全民健保費" })
-    expect(classifyItem(input)).toBe("labor_insurance")
+    expect(classifyItem(input)).toBe("health_insurance")
   })
 
-  it("項目名稱含「勞健保」應分類為 labor_insurance", () => {
+  it("項目名稱含「勞退」應分類為 pension", () => {
+    const input = createInput({ itemName: "勞退提繳 4 月" })
+    expect(classifyItem(input)).toBe("pension")
+  })
+
+  it("項目名稱含「勞健保」（合稱）應分類為 labor_insurance（最重）", () => {
     const input = createInput({ itemName: "勞健保 3 月" })
     expect(classifyItem(input)).toBe("labor_insurance")
   })

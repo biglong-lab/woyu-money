@@ -109,6 +109,10 @@ function effectiveRate(override?: number): number {
 // 分類辨識
 // ─────────────────────────────────────────────
 
+/**
+ * 識別「勞保 / 健保 / 勞退」三類強制保險（共同特性：政府強制、有滯納金）
+ * 用於勞健保監控頁面、提醒推送等場合
+ */
 export function isLaborInsurance(itemName: string, categoryName?: string | null): boolean {
   if (!itemName && !categoryName) return false
   const category = classifyItem({
@@ -120,7 +124,7 @@ export function isLaborInsurance(itemName: string, categoryName?: string | null)
     debtCategoryName: categoryName,
     fixedCategoryName: categoryName,
   })
-  return category === "labor_insurance"
+  return category === "labor_insurance" || category === "health_insurance" || category === "pension"
 }
 
 // ─────────────────────────────────────────────

@@ -19,7 +19,9 @@
 // ─────────────────────────────────────────────
 
 export type CategoryKey =
-  | "labor_insurance" // 勞健保
+  | "labor_insurance" // 勞保（勞工保險、勞保局開繳）
+  | "health_insurance" // 健保（全民健康保險、健保署開繳）
+  | "pension" // 勞退（雇主提繳 6%、勞保局）
   | "tax" // 稅務
   | "bank_loan" // 銀行貸款
   | "credit_card" // 信用卡
@@ -85,12 +87,31 @@ export interface PriorityResult {
 export const CATEGORY_RULES: Record<CategoryKey, CategoryRule> = {
   labor_insurance: {
     key: "labor_insurance",
-    label: "勞健保",
-    keywords: ["勞健保", "勞保", "健保", "勞工保險", "全民健康保險", "健康保險", "二代健保"],
+    label: "勞保",
+    // 注意：「勞健保」也歸這（一般稱呼合併），但與健保/勞退規則不同
+    keywords: ["勞保", "勞工保險", "勞健保"],
     lateFeeRate: 0.003,
     consequenceWeight: 100,
     flexibility: 0,
-    description: "政府強制執行，信用影響，企業違法風險",
+    description: "勞保局，每月寄繳款單，逾期立即計息（每日 0.3%）",
+  },
+  health_insurance: {
+    key: "health_insurance",
+    label: "健保",
+    keywords: ["健保", "全民健康保險", "健康保險", "二代健保", "補充保費"],
+    lateFeeRate: 0.001, // 全民健保法第 35 條：每日 0.1%（最高 15%）
+    consequenceWeight: 100,
+    flexibility: 0,
+    description: "健保署，每月寄繳款單，每日滯納 0.1%（最高 15%）",
+  },
+  pension: {
+    key: "pension",
+    label: "勞退（雇主提繳）",
+    keywords: ["勞退", "勞工退休金", "退休金提繳", "雇主提繳", "勞退金"],
+    lateFeeRate: 0.001, // 勞工退休金條例第 53 條：每日 0.1%（最高 100%）
+    consequenceWeight: 100,
+    flexibility: 0,
+    description: "勞保局，每月 25 日截止，每日滯納 0.1%（最高 100%）",
   },
   tax: {
     key: "tax",
@@ -166,9 +187,15 @@ export const CATEGORY_RULES: Record<CategoryKey, CategoryRule> = {
   },
 }
 
-// 分類檢查順序（labor_insurance 優先於 insurance，避免「健保」被歸入 insurance）
+// 分類檢查順序
+// 注意：
+// - pension 優先（勞退關鍵字最具體）
+// - labor_insurance 在 health_insurance 之前（「勞健保」3 字會被勞保關鍵字先吃到）
+// - 三者都優先於 insurance（避免「健保」被誤歸商業保險）
 const CLASSIFICATION_ORDER: CategoryKey[] = [
+  "pension",
   "labor_insurance",
+  "health_insurance",
   "tax",
   "bank_loan",
   "credit_card",
