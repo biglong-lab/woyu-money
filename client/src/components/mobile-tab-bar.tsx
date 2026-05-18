@@ -28,8 +28,23 @@ interface TabItemProps {
 }
 
 function TabItem({ title, href, icon: Icon, isActive, badge, onClick }: TabItemProps) {
+  const ariaLabel = badge && badge > 0 ? `${title}（${badge} 項待處理）` : title
   const content = (
     <div
+      role={href ? undefined : "button"}
+      tabIndex={href ? undefined : 0}
+      aria-label={ariaLabel}
+      aria-current={isActive ? "page" : undefined}
+      onKeyDown={
+        onClick
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault()
+                onClick()
+              }
+            }
+          : undefined
+      }
       className={cn(
         "flex flex-col items-center justify-center gap-0.5 py-2 px-2 min-w-[56px] touch-target",
         "transition-colors duration-200 cursor-pointer select-none",
@@ -125,6 +140,8 @@ function PopupMenu({ items, sections, isOpen, onClose, title, color = "blue" }: 
           <h3 className={cn("text-sm font-semibold", colorClasses[color].header)}>{title}</h3>
           <button
             onClick={onClose}
+            aria-label="關閉選單"
+            title="關閉"
             className="p-1 rounded-full hover:bg-gray-100 transition-colors"
           >
             <X className="w-4 h-4 text-gray-500" />
@@ -439,6 +456,7 @@ export function MobileTabBar() {
 
       {/* 底部 Tab Bar */}
       <nav
+        aria-label="主要導航"
         className={cn(
           "fixed bottom-0 left-0 right-0 z-50",
           "bg-white/95 backdrop-blur-sm border-t border-gray-200",
@@ -475,6 +493,9 @@ export function MobileTabBar() {
             )}
             <button
               onClick={() => toggleMenu("quick")}
+              aria-label={openMenu === "quick" ? "關閉快速記帳選單" : "開啟快速記帳選單"}
+              aria-expanded={openMenu === "quick"}
+              title="快速記帳"
               className={cn(
                 "relative w-14 h-14 rounded-full flex items-center justify-center shadow-lg transition-all duration-200",
                 "active:scale-90",
