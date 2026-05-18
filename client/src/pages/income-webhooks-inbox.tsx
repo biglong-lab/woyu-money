@@ -14,6 +14,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { BackToTop } from "@/components/back-to-top"
 import {
   Select,
   SelectContent,
@@ -919,6 +920,7 @@ export default function IncomeWebhooksInboxPage() {
       {showPmSync && (
         <PmSyncDialog onClose={() => setShowPmSync(false)} onDone={() => setShowPmSync(false)} />
       )}
+      <BackToTop />
     </div>
   )
 }

@@ -11,6 +11,7 @@
 
 import { useState, useEffect } from "react"
 import { useMutation, useQuery } from "@tanstack/react-query"
+import { BackToTop } from "@/components/back-to-top"
 import {
   AlertCircle,
   CheckCircle2,
@@ -755,6 +756,7 @@ export default function CashAllocationPage() {
           })
         }}
       />
+      <BackToTop />
     </div>
   )
 }
