@@ -14,7 +14,7 @@
  *
  * 純前端計算、不需新 API
  */
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -36,8 +36,48 @@ import {
   TrendingDown,
   AlertTriangle,
   Sparkles,
+  BookmarkPlus,
+  Trash2,
+  FolderOpen,
 } from "lucide-react"
 import { useDocumentTitle } from "@/hooks/use-document-title"
+import { useToast } from "@/hooks/use-toast"
+import { BackToTop } from "@/components/back-to-top"
+
+interface SavedScenario {
+  id: string
+  name: string
+  createdAt: string
+  params: {
+    marketingDelta: number
+    priceDelta: number
+    otaShiftDelta: number
+    revenueAdjust: number
+    marketingElasticity: number
+    tplOverrides: Record<number, { active: boolean; amount: number }>
+  }
+}
+
+const STORAGE_KEY = "scenario-simulator:saved-scenarios"
+
+function loadScenarios(): SavedScenario[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (!raw) return []
+    const parsed = JSON.parse(raw)
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
+function saveScenarios(list: SavedScenario[]) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(list))
+  } catch {
+    // localStorage 滿了 / 隱私模式 — 靜默失敗
+  }
+}
 
 interface SeasonalForecast {
   targetMonth: string
@@ -69,12 +109,17 @@ const formatMoney = (v: number) =>
 
 export default function ScenarioSimulatorPage() {
   useDocumentTitle("沙盤推演")
+  const { toast } = useToast()
 
   const [targetMonth, setTargetMonth] = useState(() => {
     const d = new Date()
     d.setMonth(d.getMonth() + 1) // 預設下個月
     return d.toISOString().slice(0, 7)
   })
+
+  // 場景儲存（localStorage）
+  const [savedScenarios, setSavedScenarios] = useState<SavedScenario[]>(() => loadScenarios())
+  const [newScenarioName, setNewScenarioName] = useState("")
 
   // 模擬參數
   const [marketingDelta, setMarketingDelta] = useState(0) // -50 ~ +100 %
@@ -186,6 +231,64 @@ export default function ScenarioSimulatorPage() {
     setTplOverrides(init)
   }
 
+  const handleSaveScenario = () => {
+    const name = newScenarioName.trim()
+    if (!name) {
+      toast({ title: "請先輸入場景名稱", variant: "destructive" })
+      return
+    }
+    if (savedScenarios.length >= 20) {
+      toast({
+        title: "已達上限",
+        description: "最多儲存 20 個場景、請先刪除不用的",
+        variant: "destructive",
+      })
+      return
+    }
+    const dup = savedScenarios.find((s) => s.name === name)
+    if (dup && !confirm(`已存在同名場景「${name}」、要覆蓋嗎？`)) return
+
+    const next: SavedScenario = {
+      id: dup?.id ?? `s_${Date.now()}`,
+      name,
+      createdAt: new Date().toISOString(),
+      params: {
+        marketingDelta,
+        priceDelta,
+        otaShiftDelta,
+        revenueAdjust,
+        marketingElasticity,
+        tplOverrides,
+      },
+    }
+    const list = dup
+      ? savedScenarios.map((s) => (s.id === dup.id ? next : s))
+      : [...savedScenarios, next]
+    setSavedScenarios(list)
+    saveScenarios(list)
+    setNewScenarioName("")
+    toast({ title: "✅ 已儲存場景", description: name })
+  }
+
+  const handleLoadScenario = (s: SavedScenario) => {
+    setMarketingDelta(s.params.marketingDelta)
+    setPriceDelta(s.params.priceDelta)
+    setOtaShiftDelta(s.params.otaShiftDelta)
+    setRevenueAdjust(s.params.revenueAdjust)
+    setMarketingElasticity(s.params.marketingElasticity)
+    setTplOverrides(s.params.tplOverrides)
+    toast({ title: "已套用場景", description: s.name })
+  }
+
+  const handleDeleteScenario = (id: string) => {
+    const target = savedScenarios.find((s) => s.id === id)
+    if (!target) return
+    if (!confirm(`確定刪除「${target.name}」？`)) return
+    const list = savedScenarios.filter((s) => s.id !== id)
+    setSavedScenarios(list)
+    saveScenarios(list)
+  }
+
   const diff = simulated
     ? {
         revenue: simulated.revenue - baseline.revenue,
@@ -243,6 +346,69 @@ export default function ScenarioSimulatorPage() {
               </span>
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      {/* 常用場景儲存區 */}
+      <Card>
+        <CardContent className="py-3 px-4 space-y-3">
+          <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+            <FolderOpen className="h-4 w-4 text-violet-600" />
+            常用場景
+            <Badge variant="outline" className="ml-1 text-xs">
+              {savedScenarios.length} / 20
+            </Badge>
+          </div>
+
+          {/* 已存場景列表 */}
+          {savedScenarios.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {savedScenarios.map((s) => (
+                <div
+                  key={s.id}
+                  className="flex items-center gap-1 bg-violet-50 border border-violet-200 rounded-md px-2 py-1"
+                >
+                  <button
+                    type="button"
+                    onClick={() => handleLoadScenario(s)}
+                    title={`套用：${s.name}\n建立於 ${s.createdAt.slice(0, 10)}`}
+                    className="text-sm text-violet-900 hover:text-violet-700 font-medium"
+                  >
+                    {s.name}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteScenario(s.id)}
+                    title="刪除"
+                    className="text-violet-400 hover:text-red-600 transition"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-xs text-gray-400">尚無儲存的場景。調好參數後在下方命名儲存</div>
+          )}
+
+          {/* 新增 */}
+          <div className="flex gap-2 items-center flex-wrap">
+            <Input
+              type="text"
+              placeholder="場景名稱（例：下月行銷+20%）"
+              value={newScenarioName}
+              onChange={(e) => setNewScenarioName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleSaveScenario()
+              }}
+              maxLength={30}
+              className="h-8 text-sm flex-1 min-w-[180px]"
+            />
+            <Button size="sm" onClick={handleSaveScenario}>
+              <BookmarkPlus className="h-4 w-4 mr-1" />
+              儲存當前
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
@@ -454,6 +620,8 @@ export default function ScenarioSimulatorPage() {
           )}
         </CardContent>
       </Card>
+
+      <BackToTop />
 
       {/* 警示 */}
       {simulated && simulated.profit < 0 && (

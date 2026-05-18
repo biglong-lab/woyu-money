@@ -22,6 +22,7 @@ import {
   Calendar,
 } from "lucide-react"
 import { useDocumentTitle } from "@/hooks/use-document-title"
+import { BackToTop } from "@/components/back-to-top"
 import {
   BarChart,
   Bar,
@@ -452,6 +453,8 @@ export default function FinancialDashboardPage() {
           </ul>
         </CardContent>
       </Card>
+
+      <BackToTop />
     </div>
   )
 }
