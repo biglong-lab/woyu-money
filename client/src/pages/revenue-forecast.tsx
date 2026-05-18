@@ -287,6 +287,34 @@ export default function RevenueForecastPage() {
           <p className="text-sm text-gray-500 mt-1">
             每日從 PM 系統拉「截至今日累積」快照，提供月底推估與同期比較
           </p>
+          {(() => {
+            // 顯示資料新鮮度：取 trend 中最新的 snapshot_date
+            const latestPm = trend
+              .filter((s) => s.source === "pm-daily-snapshot")
+              .reduce<
+                string | null
+              >((max, s) => (max === null || s.snapshotDate > max ? s.snapshotDate : max), null)
+            const latestPms = trend
+              .filter((s) => s.source === "pms-bridge")
+              .reduce<
+                string | null
+              >((max, s) => (max === null || s.snapshotDate > max ? s.snapshotDate : max), null)
+            if (!latestPm && !latestPms) return null
+            return (
+              <div className="text-xs text-gray-400 mt-1 flex gap-3 flex-wrap">
+                {latestPm && (
+                  <span>
+                    📊 PM 累積：<span className="font-mono">{latestPm.slice(0, 10)}</span>
+                  </span>
+                )}
+                {latestPms && (
+                  <span>
+                    🎯 PMS 預估：<span className="font-mono">{latestPms.slice(0, 10)}</span>
+                  </span>
+                )}
+              </div>
+            )
+          })()}
         </div>
         <Button
           variant="outline"
@@ -404,7 +432,7 @@ export default function RevenueForecastPage() {
               </Badge>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
               <div className="bg-indigo-50 rounded-lg p-3">
                 <div className="text-xs text-indigo-700">點估計（月底總額）</div>
                 <div className="text-2xl font-bold text-indigo-900">
@@ -468,12 +496,15 @@ export default function RevenueForecastPage() {
                 </div>
                 <div className="space-y-1.5 text-xs">
                   {seasonal.history.map((h) => (
-                    <div key={h.month} className="flex items-center gap-3">
-                      <span className="font-mono text-gray-700 w-20">{h.month}</span>
-                      <span className="text-gray-500 flex-1 sm:flex-initial sm:w-32 text-right">
+                    <div
+                      key={h.month}
+                      className="grid grid-cols-[5rem_1fr_3rem] sm:grid-cols-[5rem_8rem_1fr_3rem] gap-2 items-center"
+                    >
+                      <span className="font-mono text-gray-700">{h.month}</span>
+                      <span className="text-gray-500 text-right text-[10px] sm:text-xs truncate hidden sm:inline">
                         {formatMoney(h.accAtSameDay)} / {formatMoney(h.finalAcc)}
                       </span>
-                      <div className="flex-1">
+                      <div>
                         <div className="bg-gray-200 rounded-full h-2 relative overflow-hidden">
                           <div
                             className="bg-indigo-500 h-full"
@@ -481,7 +512,7 @@ export default function RevenueForecastPage() {
                           />
                         </div>
                       </div>
-                      <span className="font-semibold text-indigo-700 w-12 text-right">
+                      <span className="font-semibold text-indigo-700 text-right">
                         {(h.ratio * 100).toFixed(1)}%
                       </span>
                     </div>
@@ -513,7 +544,7 @@ export default function RevenueForecastPage() {
               </Badge>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
               <div className="bg-orange-50 rounded-lg p-3">
                 <div className="text-xs text-orange-700">PMS 當前預估</div>
                 <div className="text-lg font-semibold text-orange-900">
@@ -631,10 +662,13 @@ export default function RevenueForecastPage() {
             </div>
             <div className="space-y-2">
               {calibrationCurve.buckets.map((b) => (
-                <div key={b.bucket} className="flex items-center gap-3 text-xs flex-wrap">
-                  <span className="w-16 font-mono">{b.bucket}</span>
-                  <span className="w-12 text-gray-500">{b.samples} 筆</span>
-                  <div className="flex-1 min-w-[200px]">
+                <div
+                  key={b.bucket}
+                  className="text-xs grid grid-cols-[5rem_3.5rem_1fr_4rem] sm:grid-cols-[5rem_3.5rem_1fr_4rem_6.5rem] gap-2 items-center"
+                >
+                  <span className="font-mono">{b.bucket}</span>
+                  <span className="text-gray-500">{b.samples} 筆</span>
+                  <div>
                     <div className="bg-gray-100 rounded h-5 relative overflow-hidden">
                       <div
                         className="bg-blue-300 h-full absolute"
@@ -649,10 +683,10 @@ export default function RevenueForecastPage() {
                       />
                     </div>
                   </div>
-                  <span className="font-semibold text-indigo-700 w-20 text-right">
+                  <span className="font-semibold text-indigo-700 text-right">
                     {b.medianRatio.toFixed(2)}x
                   </span>
-                  <span className="text-gray-400 w-32 text-right">
+                  <span className="text-gray-400 text-right hidden sm:inline">
                     [{b.p25Ratio.toFixed(2)} ~ {b.p75Ratio.toFixed(2)}]
                   </span>
                 </div>
