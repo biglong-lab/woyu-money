@@ -11,7 +11,17 @@
  */
 import { useEffect, useState, useCallback } from "react"
 import { useLocation } from "wouter"
-import { Home, Inbox, Search } from "lucide-react"
+import {
+  Home,
+  Inbox,
+  Search,
+  PlusCircle,
+  Receipt,
+  Building2,
+  Repeat,
+  Sparkles,
+  Wallet,
+} from "lucide-react"
 import {
   CommandDialog,
   CommandEmpty,
@@ -88,6 +98,56 @@ export function CommandPalette() {
           >
             <Inbox className="mr-2 h-4 w-4 text-purple-600" />
             <span>單據收件箱（拍 / 上傳單據）</span>
+          </CommandItem>
+        </CommandGroup>
+
+        <CommandSeparator />
+
+        {/* 快速動作：建立 / 跳轉到常見操作頁 */}
+        <CommandGroup heading="➕ 快速動作">
+          <CommandItem
+            onSelect={() => runCommand(() => setLocation("/payment-projects"))}
+            keywords={["new", "新增", "付款", "項目", "payment", "建立"]}
+          >
+            <PlusCircle className="mr-2 h-4 w-4 text-blue-600" />
+            <span>新增付款項目</span>
+            <span className="ml-auto text-xs text-gray-400">付款專案頁</span>
+          </CommandItem>
+          <CommandItem
+            onSelect={() => runCommand(() => setLocation("/revenue-reports"))}
+            keywords={["new", "新增", "收入", "revenue", "income", "記帳"]}
+          >
+            <Wallet className="mr-2 h-4 w-4 text-green-600" />
+            <span>新增收入紀錄</span>
+            <span className="ml-auto text-xs text-gray-400">收入報表頁</span>
+          </CommandItem>
+          <CommandItem
+            onSelect={() => runCommand(() => setLocation("/recurring-expenses"))}
+            keywords={["new", "新增", "週期", "模板", "recurring", "template"]}
+          >
+            <Repeat className="mr-2 h-4 w-4 text-cyan-600" />
+            <span>新增週期性支出模板</span>
+          </CommandItem>
+          <CommandItem
+            onSelect={() => runCommand(() => setLocation("/rental-management-enhanced"))}
+            keywords={["new", "新增", "租約", "rental", "contract"]}
+          >
+            <Building2 className="mr-2 h-4 w-4 text-orange-600" />
+            <span>新增租約 / 房東付款</span>
+          </CommandItem>
+          <CommandItem
+            onSelect={() => runCommand(() => setLocation("/receipt-match-helper"))}
+            keywords={["receipt", "收據", "對應", "match", "比對"]}
+          >
+            <Receipt className="mr-2 h-4 w-4 text-amber-600" />
+            <span>收據對應助手</span>
+          </CommandItem>
+          <CommandItem
+            onSelect={() => runCommand(() => setLocation("/scenario-simulator"))}
+            keywords={["scenario", "沙盤", "simulator", "推演", "模擬"]}
+          >
+            <Sparkles className="mr-2 h-4 w-4 text-violet-600" />
+            <span>沙盤推演（場景模擬）</span>
           </CommandItem>
         </CommandGroup>
 
