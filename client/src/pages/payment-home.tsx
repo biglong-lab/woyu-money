@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { BackToTop } from "@/components/back-to-top"
 import {
   DollarSign,
   CheckCircle2,
@@ -753,6 +754,7 @@ export default function PaymentHome() {
       {/* ===== 對話框/抽屜 ===== */}
       <QuickAddDrawer open={showQuickAdd} onOpenChange={setShowQuickAdd} />
       <QuickPaymentDialog open={showQuickPay} onOpenChange={setShowQuickPay} />
+      <BackToTop />
     </div>
   )
 }

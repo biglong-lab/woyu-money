@@ -22,6 +22,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { useToast } from "@/hooks/use-toast"
 import { useDocumentTitle } from "@/hooks/use-document-title"
 import { apiRequest } from "@/lib/queryClient"
+import { BackToTop } from "@/components/back-to-top"
 import {
   Activity,
   AlertTriangle,
@@ -1025,6 +1026,8 @@ function CreateApiKeyDialog({
           </Button>
         </div>
       </Card>
+
+      <BackToTop />
     </div>
   )
 }
