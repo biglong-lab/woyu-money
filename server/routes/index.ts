@@ -45,6 +45,7 @@ import varianceReportRoutes from "./variance-report"
 import dataQualityRoutes from "./data-quality"
 import recurringExpenseTemplatesRoutes from "./recurring-expense-templates"
 import forecastRoutes from "./forecast"
+import lateFeePoliciesRoutes from "./late-fee-policies"
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // 設定認證系統
@@ -139,6 +140,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use(dataQualityRoutes)
   app.use(recurringExpenseTemplatesRoutes)
   app.use(forecastRoutes)
+  app.use(lateFeePoliciesRoutes)
 
   const httpServer = createServer(app)
   return httpServer

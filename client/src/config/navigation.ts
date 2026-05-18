@@ -317,6 +317,12 @@ export const systemNavItems: NavItem[] = [
     description: "人事/洗滌/水電/保險等每月固定支出模板，自動產出待確認項目",
   },
   {
+    title: "滯納金規則",
+    href: "/late-fee-settings",
+    icon: AlertTriangle,
+    description: "設定各類別費率與寬限期（勞健保/稅務有滯納金、其他預設關閉）",
+  },
+  {
     title: "設定",
     href: "/settings",
     icon: Settings,
