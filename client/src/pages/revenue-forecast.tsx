@@ -37,6 +37,7 @@ import { useDocumentTitle } from "@/hooks/use-document-title"
 import { apiRequest, queryClient } from "@/lib/queryClient"
 import { useMutation } from "@tanstack/react-query"
 import { useToast } from "@/hooks/use-toast"
+import { BackToTop } from "@/components/back-to-top"
 
 interface Snapshot {
   id: number
@@ -818,6 +819,8 @@ export default function RevenueForecastPage() {
           </CardContent>
         </Card>
       )}
+
+      <BackToTop />
     </div>
   )
 }
