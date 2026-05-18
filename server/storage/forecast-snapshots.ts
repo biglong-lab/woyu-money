@@ -135,17 +135,17 @@ export async function captureFromPM(): Promise<CaptureResult> {
         }
       }
 
-      // 合計：直接用各公司累積加總（已是「截至今日」、不會有跨日缺紀錄問題）
+      // 合計：用 UPSERT（NULL company_id 同日同月同 source 唯一、由 partial unique index 保證）
       try {
-        await db.insert(revenueForecastSnapshots).values({
-          snapshotDate: todayStr,
-          companyId: null,
-          targetMonth,
-          accumulatedRevenue: monthTotal.toString(),
-          bookedRevenue: "0",
-          daysAheadOfTarget: daysAhead,
-          source: "pm-daily-snapshot",
-        })
+        await db.execute(sql`
+          INSERT INTO revenue_forecast_snapshots
+            (snapshot_date, company_id, target_month, accumulated_revenue, booked_revenue, days_ahead_of_target, source)
+          VALUES
+            (${todayStr}, NULL, ${targetMonth}, ${monthTotal.toString()}, '0', ${daysAhead}, 'pm-daily-snapshot')
+          ON CONFLICT (snapshot_date, target_month, source) WHERE company_id IS NULL
+          DO UPDATE SET accumulated_revenue = EXCLUDED.accumulated_revenue,
+                        days_ahead_of_target = EXCLUDED.days_ahead_of_target
+        `)
         inserted++
       } catch {
         skipped++
