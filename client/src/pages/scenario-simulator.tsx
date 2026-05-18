@@ -40,6 +40,8 @@ import {
   Trash2,
   FolderOpen,
   Download,
+  Upload,
+  FileJson,
 } from "lucide-react"
 import { useDocumentTitle } from "@/hooks/use-document-title"
 import { useToast } from "@/hooks/use-toast"
@@ -290,6 +292,75 @@ export default function ScenarioSimulatorPage() {
     saveScenarios(list)
   }
 
+  /** 匯出所有儲存場景為 JSON（跨裝置遷移用） */
+  const handleExportScenariosJSON = () => {
+    if (savedScenarios.length === 0) {
+      toast({ title: "尚無場景可匯出", variant: "destructive" })
+      return
+    }
+    const payload = {
+      app: "woyu-money/scenario-simulator",
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      scenarios: savedScenarios,
+    }
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {
+      type: "application/json;charset=utf-8",
+    })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `沙盤場景_${new Date().toISOString().slice(0, 10)}.json`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+    toast({ title: "✅ 已匯出場景", description: `${savedScenarios.length} 個` })
+  }
+
+  /** 從 JSON 匯入場景（merge by name；同名覆蓋）*/
+  const handleImportScenariosJSON = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => {
+      try {
+        const data = JSON.parse(reader.result as string)
+        if (data.app !== "woyu-money/scenario-simulator" || !Array.isArray(data.scenarios)) {
+          throw new Error("檔案格式不符（不是沙盤場景匯出檔）")
+        }
+        const incoming: SavedScenario[] = data.scenarios.filter(
+          (s: SavedScenario) => s && typeof s.name === "string" && s.params
+        )
+        if (incoming.length === 0) {
+          toast({ title: "檔案內沒有可匯入的場景", variant: "destructive" })
+          return
+        }
+        // merge：同名覆蓋、不同名 append、上限 20
+        const byName = new Map<string, SavedScenario>()
+        for (const s of savedScenarios) byName.set(s.name, s)
+        for (const s of incoming) byName.set(s.name, s)
+        const merged = Array.from(byName.values()).slice(0, 20)
+        setSavedScenarios(merged)
+        saveScenarios(merged)
+        toast({
+          title: "✅ 匯入完成",
+          description: `匯入 ${incoming.length} 個、合計 ${merged.length} 個（上限 20）`,
+        })
+      } catch (err) {
+        toast({
+          title: "匯入失敗",
+          description: err instanceof Error ? err.message : "未知錯誤",
+          variant: "destructive",
+        })
+      } finally {
+        // 重置 input、讓同一檔可重選
+        e.target.value = ""
+      }
+    }
+    reader.readAsText(file)
+  }
+
   const handleExportCSV = () => {
     if (!simulated) {
       toast({ title: "尚無資料可匯出", variant: "destructive" })
@@ -449,12 +520,35 @@ export default function ScenarioSimulatorPage() {
       {/* 常用場景儲存區 */}
       <Card>
         <CardContent className="py-3 px-4 space-y-3">
-          <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+          <div className="flex items-center gap-2 text-sm font-semibold text-gray-700 flex-wrap">
             <FolderOpen className="h-4 w-4 text-violet-600" />
             常用場景
             <Badge variant="outline" className="ml-1 text-xs">
               {savedScenarios.length} / 20
             </Badge>
+            <div className="ml-auto flex gap-1.5">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleExportScenariosJSON}
+                disabled={savedScenarios.length === 0}
+                className="h-7 px-2 text-xs"
+                title="匯出為 JSON 檔（跨裝置遷移用）"
+              >
+                <FileJson className="h-3.5 w-3.5 mr-1" />
+                匯出
+              </Button>
+              <label className="inline-flex items-center h-7 px-2 text-xs border border-input bg-background rounded-md cursor-pointer hover:bg-accent hover:text-accent-foreground transition-colors">
+                <Upload className="h-3.5 w-3.5 mr-1" />
+                匯入
+                <input
+                  type="file"
+                  accept=".json,application/json"
+                  className="hidden"
+                  onChange={handleImportScenariosJSON}
+                />
+              </label>
+            </div>
           </div>
 
           {/* 已存場景列表 */}

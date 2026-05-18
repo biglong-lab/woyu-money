@@ -8,7 +8,7 @@
  *  - PMS 預訂 vs PM 已實現對照
  *  - 缺口警示
  */
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { apiRequest } from "@/lib/queryClient"
 import { Card, CardContent } from "@/components/ui/card"
@@ -20,6 +20,8 @@ import {
   AlertTriangle,
   CheckCircle2,
   Calendar,
+  Building2,
+  Info,
 } from "lucide-react"
 import { useDocumentTitle } from "@/hooks/use-document-title"
 import { BackToTop } from "@/components/back-to-top"
@@ -72,20 +74,36 @@ function nextMonths(count: number): string[] {
   })
 }
 
+interface Company {
+  id: number
+  name: string
+}
+
 export default function FinancialDashboardPage() {
   useDocumentTitle("財務綜合儀表板")
 
+  // 單館篩選器（"all" = 合計、否則 PM company_id）
+  // 注意：目前僅 forecast 區塊吃此參數、YTD 維持合計（payment_items 無 company_id）
+  const [companyFilter, setCompanyFilter] = useState<"all" | number>("all")
+
+  const { data: companies = [] } = useQuery<Company[]>({
+    queryKey: ["/api/pm-bridge/companies"],
+    staleTime: 5 * 60_000, // 5 分鐘 cache（不太會變）
+    retry: false,
+  })
+
   // 過去 + 未來 3 月的預測
   const months = nextMonths(3)
+  const companyIdParam = companyFilter === "all" ? "null" : String(companyFilter)
 
   const forecastQueries = useQuery<SeasonalForecast[]>({
-    queryKey: [`/api/forecast/seasonal-batch`, months],
+    queryKey: [`/api/forecast/seasonal-batch`, months, companyIdParam],
     queryFn: async () => {
       const results = await Promise.all(
         months.map((m) =>
           apiRequest<SeasonalForecast>(
             "GET",
-            `/api/forecast/seasonal?targetMonth=${m}&companyId=null`
+            `/api/forecast/seasonal?targetMonth=${m}&companyId=${companyIdParam}`
           )
         )
       )
@@ -184,6 +202,52 @@ export default function FinancialDashboardPage() {
           一頁看完今年到今 + 未來 3 月預估 + 各館明細 + 缺口警示
         </p>
       </div>
+
+      {/* 單館切換器（限 forecast 區塊、YTD 維持合計）*/}
+      {companies.length > 0 && (
+        <Card>
+          <CardContent className="py-3 px-4 flex items-center gap-3 flex-wrap">
+            <Building2 className="h-4 w-4 text-indigo-600 shrink-0" />
+            <span className="text-sm text-gray-600 shrink-0">未來預估範圍：</span>
+            <div className="inline-flex flex-wrap rounded-md border border-gray-300 overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setCompanyFilter("all")}
+                className={`px-3 h-8 text-xs sm:text-sm transition-colors ${
+                  companyFilter === "all"
+                    ? "bg-indigo-600 text-white"
+                    : "bg-white text-gray-700 hover:bg-gray-50"
+                }`}
+              >
+                合計
+              </button>
+              {companies.map((c) => {
+                const active = companyFilter === c.id
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => setCompanyFilter(c.id)}
+                    className={`px-3 h-8 text-xs sm:text-sm border-l border-gray-300 transition-colors ${
+                      active
+                        ? "bg-indigo-600 text-white"
+                        : "bg-white text-gray-700 hover:bg-gray-50"
+                    }`}
+                  >
+                    {c.name}
+                  </button>
+                )
+              })}
+            </div>
+            {companyFilter !== "all" && (
+              <Badge variant="outline" className="text-xs text-amber-700 border-amber-300">
+                <Info className="h-3 w-3 mr-1" />
+                YTD 暫維持合計
+              </Badge>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* 累積現金缺口警示（更嚴重、YTD 結餘 + 未來累積會轉負）*/}
       {cumulativeWarning?.firstNegativeMonth && (
