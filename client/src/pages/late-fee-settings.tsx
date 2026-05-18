@@ -15,7 +15,23 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
-import { AlertTriangle, Save, Info, ShieldCheck, Wand2 } from "lucide-react"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog"
+import {
+  AlertTriangle,
+  Save,
+  Info,
+  ShieldCheck,
+  Wand2,
+  ArrowRight,
+  CheckCircle2,
+} from "lucide-react"
 import { useDocumentTitle } from "@/hooks/use-document-title"
 
 interface Policy {
@@ -77,6 +93,23 @@ export default function LateFeeSettingsPage() {
   // 本地編輯狀態（暫存改動）
   const [edits, setEdits] = useState<Record<string, Partial<Policy>>>({})
 
+  // 法規建議 dialog
+  interface DiffRow {
+    categoryKey: string
+    label: string
+    fromRate: number
+    toRate: number
+    fromGrace: number
+    toGrace: number
+    fromEnabled: boolean
+    toEnabled: boolean
+    changeType: "enable" | "disable" | "tune" // 啟用 / 停用 / 調整
+  }
+  const [legalDialog, setLegalDialog] = useState<{ open: boolean; rows: DiffRow[] }>({
+    open: false,
+    rows: [],
+  })
+
   // 法規推薦值（依台灣現行勞保條例 / 健保法 / 勞退條例 / 稅捐稽徵法）
   const LEGAL_DEFAULTS: Record<
     string,
@@ -95,8 +128,8 @@ export default function LateFeeSettingsPage() {
     other: { dailyRate: 0, gracePeriodDays: 0, isEnabled: false },
   }
 
-  const applyLegalDefaults = () => {
-    const newEdits: Record<string, Partial<Policy>> = {}
+  const openLegalDialog = () => {
+    const rows: DiffRow[] = []
     for (const p of policies) {
       const legal = LEGAL_DEFAULTS[p.categoryKey]
       if (!legal) continue
@@ -104,18 +137,46 @@ export default function LateFeeSettingsPage() {
       const sameRate = Math.abs(currentRate - legal.dailyRate) < 1e-6
       const sameGrace = p.gracePeriodDays === legal.gracePeriodDays
       const sameEnabled = p.isEnabled === legal.isEnabled
-      // 跟現值不同的才放進 edits
       if (sameRate && sameGrace && sameEnabled) continue
-      newEdits[p.categoryKey] = {
-        dailyRate: legal.dailyRate.toString() as unknown as string,
-        gracePeriodDays: legal.gracePeriodDays,
-        isEnabled: legal.isEnabled,
+      let changeType: DiffRow["changeType"] = "tune"
+      if (!p.isEnabled && legal.isEnabled) changeType = "enable"
+      else if (p.isEnabled && !legal.isEnabled) changeType = "disable"
+      rows.push({
+        categoryKey: p.categoryKey,
+        label: p.label,
+        fromRate: currentRate,
+        toRate: legal.dailyRate,
+        fromGrace: p.gracePeriodDays,
+        toGrace: legal.gracePeriodDays,
+        fromEnabled: p.isEnabled,
+        toEnabled: legal.isEnabled,
+        changeType,
+      })
+    }
+    if (rows.length === 0) {
+      toast({
+        title: "✅ 已完全符合法規",
+        description: "所有規則都已與台灣現行法規一致、無需調整",
+      })
+      return
+    }
+    setLegalDialog({ open: true, rows })
+  }
+
+  const confirmLegalApply = () => {
+    const newEdits: Record<string, Partial<Policy>> = {}
+    for (const row of legalDialog.rows) {
+      newEdits[row.categoryKey] = {
+        dailyRate: row.toRate.toString() as unknown as string,
+        gracePeriodDays: row.toGrace,
+        isEnabled: row.toEnabled,
       }
     }
     setEdits(newEdits)
+    setLegalDialog({ open: false, rows: [] })
     toast({
-      title: "✅ 已套用法規建議",
-      description: `${Object.keys(newEdits).length} 項類別將被調整、請按各卡「儲存此項」確認`,
+      title: "✅ 已預載法規建議",
+      description: `${Object.keys(newEdits).length} 項待儲存、請逐項按「儲存此項」確認`,
     })
   }
 
@@ -169,7 +230,7 @@ export default function LateFeeSettingsPage() {
             設定各類別的每日費率與寬限期。**只有勞健保與稅務有法律強制滯納金**、其他類別預設關閉。
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={applyLegalDefaults}>
+        <Button variant="outline" size="sm" onClick={openLegalDialog}>
           <Wand2 className="h-4 w-4 mr-1" />
           套用法規建議
         </Button>
@@ -314,6 +375,102 @@ export default function LateFeeSettingsPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* 法規建議套用對照 Dialog */}
+      <Dialog
+        open={legalDialog.open}
+        onOpenChange={(open) => !open && setLegalDialog({ open: false, rows: [] })}
+      >
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Wand2 className="h-5 w-5 text-amber-600" />
+              套用法規建議
+              <Badge className="bg-amber-100 text-amber-800">
+                {legalDialog.rows.length} 項變更
+              </Badge>
+            </DialogTitle>
+            <DialogDescription>
+              依台灣現行法規（勞保條例、健保法、勞退條例、稅捐稽徵法）建議值。請確認下列變更：
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-2 my-3">
+            {legalDialog.rows.map((row) => {
+              const accent =
+                row.changeType === "enable"
+                  ? "border-green-300 bg-green-50"
+                  : row.changeType === "disable"
+                    ? "border-gray-300 bg-gray-50"
+                    : "border-amber-300 bg-amber-50"
+              const badgeText =
+                row.changeType === "enable"
+                  ? "🟢 啟用"
+                  : row.changeType === "disable"
+                    ? "⚪ 停用"
+                    : "🟡 調整"
+              return (
+                <div key={row.categoryKey} className={`border rounded p-3 text-sm ${accent}`}>
+                  <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+                    <span className="font-semibold">{row.label}</span>
+                    <Badge variant="outline" className="text-xs">
+                      {badgeText}
+                    </Badge>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+                    <div>
+                      <div className="text-gray-500">啟用狀態</div>
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <span className={row.fromEnabled ? "text-green-700" : "text-gray-400"}>
+                          {row.fromEnabled ? "啟用" : "停用"}
+                        </span>
+                        <ArrowRight className="h-3 w-3 text-gray-400" />
+                        <span
+                          className={`font-semibold ${row.toEnabled ? "text-green-700" : "text-gray-600"}`}
+                        >
+                          {row.toEnabled ? "啟用" : "停用"}
+                        </span>
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-gray-500">每日費率</div>
+                      <div className="flex items-center gap-1 mt-0.5 font-mono">
+                        <span className="text-gray-600">{(row.fromRate * 100).toFixed(3)}%</span>
+                        <ArrowRight className="h-3 w-3 text-gray-400" />
+                        <span className="font-semibold text-blue-700">
+                          {(row.toRate * 100).toFixed(3)}%
+                        </span>
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-gray-500">寬限期</div>
+                      <div className="flex items-center gap-1 mt-0.5 font-mono">
+                        <span className="text-gray-600">{row.fromGrace} 天</span>
+                        <ArrowRight className="h-3 w-3 text-gray-400" />
+                        <span className="font-semibold text-blue-700">{row.toGrace} 天</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          <div className="text-xs text-gray-500 bg-blue-50 p-2 rounded border border-blue-200">
+            ℹ️ 按下「確認套用」後、變更會「預載」到設定區、仍需逐項按「儲存此項」才正式生效
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button variant="outline" onClick={() => setLegalDialog({ open: false, rows: [] })}>
+              取消
+            </Button>
+            <Button onClick={confirmLegalApply}>
+              <CheckCircle2 className="h-4 w-4 mr-1" />
+              確認套用 {legalDialog.rows.length} 項
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
