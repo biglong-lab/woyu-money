@@ -336,22 +336,54 @@ export async function getSeasonalForecast(
   ci95: { lower: number; upper: number }
   confidence: "high" | "medium" | "low" | "insufficient"
 }> {
-  // 1. 取本月最新快照（只看 PM 已實現累積、不混 PMS 預估）
-  const conditions = [
-    eq(revenueForecastSnapshots.targetMonth, targetMonth),
-    eq(revenueForecastSnapshots.source, "pm-daily-snapshot"),
-  ]
-  if (companyId === null) {
-    conditions.push(sql`${revenueForecastSnapshots.companyId} IS NULL`)
-  } else {
-    conditions.push(eq(revenueForecastSnapshots.companyId, companyId))
+  // 1. 取本月截至今日累積（改用 payment_items income、跟 history 同口徑）
+  const projectIdMapPrefetch: Record<number, number> = {
+    1: 3,
+    2: 4,
+    3: 9,
+    4: 10,
+    5: 20,
+    6: 26,
   }
+  const today = new Date()
+  const todayStr = today.toISOString().slice(0, 10)
+  const projectFilterPrefetch =
+    companyId === null
+      ? sql`AND project_id IN (3, 4, 9, 10, 20, 26)`
+      : sql`AND project_id = ${projectIdMapPrefetch[companyId] ?? 0}`
 
-  const currentSnapshots = await db
-    .select()
-    .from(revenueForecastSnapshots)
-    .where(and(...conditions))
-    .orderBy(revenueForecastSnapshots.snapshotDate)
+  const currentResult = await db.execute(sql`
+    SELECT COALESCE(SUM(total_amount::numeric), 0)::text AS current_acc
+    FROM payment_items
+    WHERE item_type = 'income' AND NOT is_deleted AND source = 'webhook'
+      AND TO_CHAR(start_date, 'YYYY-MM') = ${targetMonth}
+      AND start_date <= ${todayStr}::date
+      ${projectFilterPrefetch}
+  `)
+  const currentAccFromPayments = parseFloat(
+    (currentResult as unknown as { rows: Array<{ current_acc: string }> }).rows[0]?.current_acc ??
+      "0"
+  )
+
+  // 為了避免後續 logic 大改、做個 mock currentSnapshots
+  // （後面只用 latest.accumulatedRevenue 和 latest.snapshotDate）
+  const currentSnapshots: RevenueForecastSnapshot[] =
+    currentAccFromPayments > 0
+      ? [
+          {
+            id: 0,
+            snapshotDate: todayStr,
+            companyId,
+            targetMonth,
+            accumulatedRevenue: currentAccFromPayments.toString(),
+            bookedRevenue: "0",
+            daysAheadOfTarget: 0,
+            source: "payment-items",
+            notes: null,
+            createdAt: new Date(),
+          },
+        ]
+      : []
 
   if (currentSnapshots.length === 0) {
     return {
@@ -384,53 +416,29 @@ export async function getSeasonalForecast(
   const history: Array<{ month: string; accAtSameDay: number; finalAcc: number; ratio: number }> =
     []
 
+  // companyId → project_id mapping（payment_items income 用 project_id）
+  const projectIdMap: Record<number, number> = { 1: 3, 2: 4, 3: 9, 4: 10, 5: 20, 6: 26 }
+  const projectFilter =
+    companyId === null
+      ? sql`AND project_id IN (3, 4, 9, 10, 20, 26)`
+      : sql`AND project_id = ${projectIdMap[companyId] ?? 0}`
+
   for (const hm of pastMonths) {
-    const hmConditions = [
-      eq(revenueForecastSnapshots.targetMonth, hm),
-      eq(revenueForecastSnapshots.source, "pm-daily-snapshot"),
-    ]
-    if (companyId === null) {
-      hmConditions.push(sql`${revenueForecastSnapshots.companyId} IS NULL`)
-    } else {
-      hmConditions.push(eq(revenueForecastSnapshots.companyId, companyId))
-    }
-
-    const hmSnaps = await db
-      .select()
-      .from(revenueForecastSnapshots)
-      .where(and(...hmConditions))
-      .orderBy(revenueForecastSnapshots.snapshotDate)
-
-    if (hmSnaps.length === 0) continue
-
-    // 在同 day 累積：找 snapshotDate.day == daysElapsed 的 snapshot（取最接近的）
-    let sameDayAcc = 0
-    let minDiff = Infinity
-    for (const s of hmSnaps) {
-      const day = new Date(s.snapshotDate).getDate()
-      const diff = Math.abs(day - daysElapsed)
-      if (diff < minDiff) {
-        minDiff = diff
-        sameDayAcc = parseFloat(s.accumulatedRevenue)
-      }
-    }
-
-    // 最終累積：改用 payment_items income 加總（精準、含完整月）
-    // forecast_snapshots PM daily 部分月份不完整、不可信賴
-    const finalQuery = await db.execute(sql`
-      SELECT COALESCE(SUM(total_amount::numeric), 0)::text AS final_acc
+    // sameDayAcc：該月 1 日 ~ daysElapsed 日的 payment_items income SUM
+    // finalAcc：該月全月 payment_items income SUM
+    const result = await db.execute(sql`
+      SELECT
+        COALESCE(SUM(total_amount::numeric) FILTER (WHERE EXTRACT(DAY FROM start_date) <= ${daysElapsed}), 0)::text AS same_day_acc,
+        COALESCE(SUM(total_amount::numeric), 0)::text AS final_acc
       FROM payment_items
       WHERE item_type = 'income' AND NOT is_deleted AND source = 'webhook'
         AND TO_CHAR(start_date, 'YYYY-MM') = ${hm}
-        ${
-          companyId === null
-            ? sql`AND project_id IN (3, 4, 9, 10, 20, 26)`
-            : sql`AND project_id = ${companyId === 1 ? 3 : companyId === 2 ? 4 : companyId === 3 ? 9 : companyId === 4 ? 10 : companyId === 5 ? 20 : companyId === 6 ? 26 : 0}`
-        }
+        ${projectFilter}
     `)
-    const finalAcc = parseFloat(
-      (finalQuery as unknown as { rows: Array<{ final_acc: string }> }).rows[0]?.final_acc ?? "0"
-    )
+    const row = (result as unknown as { rows: Array<{ same_day_acc: string; final_acc: string }> })
+      .rows[0]
+    const sameDayAcc = parseFloat(row?.same_day_acc ?? "0")
+    const finalAcc = parseFloat(row?.final_acc ?? "0")
 
     if (finalAcc > 0 && sameDayAcc > 0) {
       history.push({
