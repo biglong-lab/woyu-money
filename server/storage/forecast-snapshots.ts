@@ -58,16 +58,20 @@ export async function getMonthlyTrend(
   //   - PMS 資料只有各館 company_id（無合計列）→ 取各館、前端加總
   // companyId = number：兩種 source 都取該館
   if (companyId === null) {
-    const result = await db.execute(sql`
-      SELECT * FROM revenue_forecast_snapshots
-      WHERE target_month = ${targetMonth}
-        AND (
-          (source = 'pm-daily-snapshot' AND company_id IS NULL)
-          OR (source = 'pms-bridge' AND company_id IS NOT NULL)
+    // 用 drizzle ORM 而非 raw SQL，確保欄位 camelCase 化
+    return db
+      .select()
+      .from(revenueForecastSnapshots)
+      .where(
+        and(
+          eq(revenueForecastSnapshots.targetMonth, targetMonth),
+          sql`(
+            (${revenueForecastSnapshots.source} = 'pm-daily-snapshot' AND ${revenueForecastSnapshots.companyId} IS NULL)
+            OR (${revenueForecastSnapshots.source} = 'pms-bridge' AND ${revenueForecastSnapshots.companyId} IS NOT NULL)
+          )`
         )
-      ORDER BY snapshot_date
-    `)
-    return (result as unknown as { rows: RevenueForecastSnapshot[] }).rows
+      )
+      .orderBy(revenueForecastSnapshots.snapshotDate)
   }
 
   return db
