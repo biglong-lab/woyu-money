@@ -79,6 +79,8 @@ import RecurringExpensesPage from "@/pages/recurring-expenses"
 import RevenueForecastPage from "@/pages/revenue-forecast"
 import ScenarioSimulatorPage from "@/pages/scenario-simulator"
 import LateFeeSettingsPage from "@/pages/late-fee-settings"
+import FinancialDashboardPage from "@/pages/financial-dashboard"
+import ForecastInputPage from "@/pages/forecast-input"
 
 function Router() {
   const [quickPaymentOpen, setQuickPaymentOpen] = useState(false)
@@ -220,6 +222,8 @@ function Router() {
                 <ProtectedRoute path="/revenue-forecast" component={RevenueForecastPage} />
                 <ProtectedRoute path="/scenario-simulator" component={ScenarioSimulatorPage} />
                 <ProtectedRoute path="/late-fee-settings" component={LateFeeSettingsPage} />
+                <ProtectedRoute path="/financial-dashboard" component={FinancialDashboardPage} />
+                <ProtectedRoute path="/forecast-input" component={ForecastInputPage} />
 
                 {/* Feature Showcase */}
                 <ProtectedRoute path="/features" component={FeatureShowcase} />

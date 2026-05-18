@@ -116,6 +116,63 @@ router.post(
 )
 
 // ─────────────────────────────────────────────
+// 內部 UI 用：使用者直接在 Money 內輸入預訂快照
+// ─────────────────────────────────────────────
+const QuickInputSchema = z.object({
+  snapshotDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  companyId: z.number().int(),
+  targetMonth: z.string().regex(/^\d{4}-\d{2}$/),
+  bookedRevenue: z.union([z.number(), z.string()]).transform((v) => Number(v)),
+})
+
+router.post(
+  "/api/forecast/quick-input",
+  asyncHandler(async (req, res) => {
+    try {
+      const data = QuickInputSchema.parse(req.body)
+
+      const targetMonthEnd = new Date(data.targetMonth + "-01")
+      targetMonthEnd.setMonth(targetMonthEnd.getMonth() + 1)
+      const daysAhead = Math.ceil(
+        (targetMonthEnd.getTime() - new Date(data.snapshotDate).getTime()) / (1000 * 60 * 60 * 24)
+      )
+
+      try {
+        await db.insert(revenueForecastSnapshots).values({
+          snapshotDate: data.snapshotDate,
+          companyId: data.companyId,
+          targetMonth: data.targetMonth,
+          accumulatedRevenue: "0",
+          bookedRevenue: data.bookedRevenue.toString(),
+          daysAheadOfTarget: daysAhead,
+          source: "pms-booking",
+          notes: "manual input",
+        })
+        return res.json({ status: "inserted" })
+      } catch {
+        const { sql } = await import("drizzle-orm")
+        await db.execute(sql`
+          UPDATE revenue_forecast_snapshots
+          SET booked_revenue = ${data.bookedRevenue.toString()},
+              notes = 'manual input',
+              days_ahead_of_target = ${daysAhead}
+          WHERE snapshot_date = ${data.snapshotDate}
+            AND company_id = ${data.companyId}
+            AND target_month = ${data.targetMonth}
+            AND source = 'pms-booking'
+        `)
+        return res.json({ status: "updated" })
+      }
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        throw new AppError(400, "格式錯誤：" + err.errors.map((e) => e.message).join(", "))
+      }
+      throw err
+    }
+  })
+)
+
+// ─────────────────────────────────────────────
 // PMS 對接：外部系統推送預訂快照（無 session 認證，走 Bearer token）
 // ─────────────────────────────────────────────
 
