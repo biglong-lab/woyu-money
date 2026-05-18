@@ -1,15 +1,21 @@
-import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Progress } from "@/components/ui/progress";
-import { 
-  TrendingUp, 
-  TrendingDown, 
-  BarChart3, 
+import { useState, useMemo } from "react"
+import { useQuery } from "@tanstack/react-query"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Progress } from "@/components/ui/progress"
+import {
+  TrendingUp,
+  TrendingDown,
+  BarChart3,
   PieChart as PieChartIcon,
   Target,
   DollarSign,
@@ -18,160 +24,171 @@ import {
   Activity,
   ArrowUpRight,
   ArrowDownRight,
-  Minus
-} from "lucide-react";
-import { 
-  ResponsiveContainer, 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  Tooltip, 
-  PieChart, 
-  Pie, 
+  Minus,
+} from "lucide-react"
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  PieChart,
+  Pie,
   Cell,
   LineChart,
   Line,
   Area,
-  AreaChart
-} from "recharts";
+  AreaChart,
+} from "recharts"
+import { useDocumentTitle } from "@/hooks/use-document-title"
 
 interface PaymentItem {
-  id: number;
-  itemName: string;
-  totalAmount: string;
-  paidAmount: string;
-  status: string;
-  paymentType: string;
-  startDate: string;
-  endDate?: string;
-  priority: number;
-  categoryName?: string;
-  projectName?: string;
-  projectId?: number;
-  categoryId?: number;
-  notes?: string;
-  isDeleted?: boolean;
-  createdAt?: string;
-  updatedAt?: string;
+  id: number
+  itemName: string
+  totalAmount: string
+  paidAmount: string
+  status: string
+  paymentType: string
+  startDate: string
+  endDate?: string
+  priority: number
+  categoryName?: string
+  projectName?: string
+  projectId?: number
+  categoryId?: number
+  notes?: string
+  isDeleted?: boolean
+  createdAt?: string
+  updatedAt?: string
 }
 
 interface PaymentProject {
-  id: number;
-  projectName: string;
-  projectType: string;
-  description?: string;
-  isActive: boolean;
+  id: number
+  projectName: string
+  projectType: string
+  description?: string
+  isActive: boolean
 }
-
 
 interface ProjectStat {
-  id: number;
-  name: string;
-  totalPlanned: number;
-  totalPaid: number;
-  itemCount: number;
-  pendingItems: number;
-  completedItems: number;
-  overdueItems: number;
-  completionRate?: number;
-  pendingAmount?: number;
+  id: number
+  name: string
+  totalPlanned: number
+  totalPaid: number
+  itemCount: number
+  pendingItems: number
+  completedItems: number
+  overdueItems: number
+  completionRate?: number
+  pendingAmount?: number
 }
 
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82ca9d'];
+const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#8884D8", "#82ca9d"]
 
 export default function PaymentProjectStatsOptimized() {
-  const [selectedProject, setSelectedProject] = useState<string>("all");
-  const [selectedPeriod, setSelectedPeriod] = useState<string>("current_month");
-  const [activeTab, setActiveTab] = useState("overview");
+  useDocumentTitle("專案付款統計")
+  const [selectedProject, setSelectedProject] = useState<string>("all")
+  const [selectedPeriod, setSelectedPeriod] = useState<string>("current_month")
+  const [activeTab, setActiveTab] = useState("overview")
 
   // 資料查詢
   const { data: paymentItems = [] } = useQuery<PaymentItem[]>({
     queryKey: [`/api/payment/items?includeDeleted=false`],
-  });
+  })
 
   const { data: projects = [] } = useQuery<PaymentProject[]>({
     queryKey: ["/api/payment/projects"],
-  });
+  })
 
   // 篩選數據
   const filteredItems = useMemo(() => {
-    return paymentItems.filter(item => {
+    return paymentItems.filter((item) => {
       if (selectedProject !== "all" && item.projectId !== parseInt(selectedProject)) {
-        return false;
+        return false
       }
-      return !item.isDeleted;
-    });
-  }, [paymentItems, selectedProject]);
+      return !item.isDeleted
+    })
+  }, [paymentItems, selectedProject])
 
   // 專案統計概覽
   const projectStats = useMemo(() => {
-    const stats = filteredItems.reduce((acc, item) => {
-      const projectName = item.projectName || "未分類";
-      const projectId = item.projectId || 0;
-      
-      if (!acc[projectId]) {
-        acc[projectId] = {
-          id: projectId,
-          name: projectName,
-          totalPlanned: 0,
-          totalPaid: 0,
-          itemCount: 0,
-          pendingItems: 0,
-          completedItems: 0,
-          overdueItems: 0
-        };
-      }
+    const stats = filteredItems.reduce(
+      (acc, item) => {
+        const projectName = item.projectName || "未分類"
+        const projectId = item.projectId || 0
 
-      const planned = parseFloat(item.totalAmount || "0");
-      const paid = parseFloat(item.paidAmount || "0");
-      
-      acc[projectId].totalPlanned += planned;
-      acc[projectId].totalPaid += paid;
-      acc[projectId].itemCount += 1;
+        if (!acc[projectId]) {
+          acc[projectId] = {
+            id: projectId,
+            name: projectName,
+            totalPlanned: 0,
+            totalPaid: 0,
+            itemCount: 0,
+            pendingItems: 0,
+            completedItems: 0,
+            overdueItems: 0,
+          }
+        }
 
-      if (item.status === "pending") acc[projectId].pendingItems += 1;
-      else if (item.status === "paid") acc[projectId].completedItems += 1;
-      else if (item.status === "overdue") acc[projectId].overdueItems += 1;
+        const planned = parseFloat(item.totalAmount || "0")
+        const paid = parseFloat(item.paidAmount || "0")
 
-      return acc;
-    }, {} as Record<number, ProjectStat>);
+        acc[projectId].totalPlanned += planned
+        acc[projectId].totalPaid += paid
+        acc[projectId].itemCount += 1
+
+        if (item.status === "pending") acc[projectId].pendingItems += 1
+        else if (item.status === "paid") acc[projectId].completedItems += 1
+        else if (item.status === "overdue") acc[projectId].overdueItems += 1
+
+        return acc
+      },
+      {} as Record<number, ProjectStat>
+    )
 
     return Object.values(stats).map((stat: ProjectStat) => ({
       ...stat,
-      completionRate: stat.totalPlanned > 0 ? (stat.totalPaid / stat.totalPlanned * 100) : 0,
-      pendingAmount: stat.totalPlanned - stat.totalPaid
-    }));
-  }, [filteredItems]);
+      completionRate: stat.totalPlanned > 0 ? (stat.totalPaid / stat.totalPlanned) * 100 : 0,
+      pendingAmount: stat.totalPlanned - stat.totalPaid,
+    }))
+  }, [filteredItems])
 
   // 整體統計
   const overallStats = useMemo(() => {
-    const totalPlanned = filteredItems.reduce((sum, item) => sum + parseFloat(item.totalAmount || "0"), 0);
-    const totalPaid = filteredItems.reduce((sum, item) => sum + parseFloat(item.paidAmount || "0"), 0);
-    const totalProjects = new Set(filteredItems.map(item => item.projectId)).size;
-    
-    const statusCounts = filteredItems.reduce((acc, item) => {
-      acc[item.status] = (acc[item.status] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
+    const totalPlanned = filteredItems.reduce(
+      (sum, item) => sum + parseFloat(item.totalAmount || "0"),
+      0
+    )
+    const totalPaid = filteredItems.reduce(
+      (sum, item) => sum + parseFloat(item.paidAmount || "0"),
+      0
+    )
+    const totalProjects = new Set(filteredItems.map((item) => item.projectId)).size
+
+    const statusCounts = filteredItems.reduce(
+      (acc, item) => {
+        acc[item.status] = (acc[item.status] || 0) + 1
+        return acc
+      },
+      {} as Record<string, number>
+    )
 
     return {
       totalPlanned,
       totalPaid,
       totalPending: totalPlanned - totalPaid,
-      completionRate: totalPlanned > 0 ? (totalPaid / totalPlanned * 100) : 0,
+      completionRate: totalPlanned > 0 ? (totalPaid / totalPlanned) * 100 : 0,
       totalItems: filteredItems.length,
       totalProjects,
-      statusCounts
-    };
-  }, [filteredItems]);
+      statusCounts,
+    }
+  }, [filteredItems])
 
   // 專案表現排名
   const projectRanking = useMemo(() => {
-    return [...projectStats]
-      .sort((a, b) => b.completionRate - a.completionRate)
-      .slice(0, 10);
-  }, [projectStats]);
+    return [...projectStats].sort((a, b) => b.completionRate - a.completionRate).slice(0, 10)
+  }, [projectStats])
 
   // 金額分布數據
   const amountDistribution = useMemo(() => {
@@ -180,23 +197,25 @@ export default function PaymentProjectStatsOptimized() {
       { name: "1-5萬", min: 10000, max: 50000 },
       { name: "5-10萬", min: 50000, max: 100000 },
       { name: "10-50萬", min: 100000, max: 500000 },
-      { name: "> 50萬", min: 500000, max: Infinity }
-    ];
+      { name: "> 50萬", min: 500000, max: Infinity },
+    ]
 
-    return ranges.map(range => {
-      const items = filteredItems.filter(item => {
-        const amount = parseFloat(item.totalAmount || "0");
-        return amount >= range.min && amount < range.max;
-      });
-      
-      return {
-        name: range.name,
-        count: items.length,
-        totalAmount: items.reduce((sum, item) => sum + parseFloat(item.totalAmount || "0"), 0),
-        paidAmount: items.reduce((sum, item) => sum + parseFloat(item.paidAmount || "0"), 0)
-      };
-    }).filter(range => range.count > 0);
-  }, [filteredItems]);
+    return ranges
+      .map((range) => {
+        const items = filteredItems.filter((item) => {
+          const amount = parseFloat(item.totalAmount || "0")
+          return amount >= range.min && amount < range.max
+        })
+
+        return {
+          name: range.name,
+          count: items.length,
+          totalAmount: items.reduce((sum, item) => sum + parseFloat(item.totalAmount || "0"), 0),
+          paidAmount: items.reduce((sum, item) => sum + parseFloat(item.paidAmount || "0"), 0),
+        }
+      })
+      .filter((range) => range.count > 0)
+  }, [filteredItems])
 
   // 狀態分布數據
   const statusDistribution = useMemo(() => {
@@ -204,22 +223,22 @@ export default function PaymentProjectStatsOptimized() {
       pending: { name: "待付款", color: "#fbbf24" },
       partial: { name: "部分付款", color: "#60a5fa" },
       paid: { name: "已付款", color: "#10b981" },
-      overdue: { name: "逾期", color: "#ef4444" }
-    };
+      overdue: { name: "逾期", color: "#ef4444" },
+    }
 
     return Object.entries(overallStats.statusCounts).map(([status, count]) => ({
       name: statusMap[status as keyof typeof statusMap]?.name || status,
       value: count,
-      color: statusMap[status as keyof typeof statusMap]?.color || "#6b7280"
-    }));
-  }, [overallStats.statusCounts]);
+      color: statusMap[status as keyof typeof statusMap]?.color || "#6b7280",
+    }))
+  }, [overallStats.statusCounts])
 
   // 趨勢指標
   const getTrendIcon = (current: number, previous: number) => {
-    if (current > previous) return <ArrowUpRight className="h-4 w-4 text-green-600" />;
-    if (current < previous) return <ArrowDownRight className="h-4 w-4 text-red-600" />;
-    return <Minus className="h-4 w-4 text-gray-600" />;
-  };
+    if (current > previous) return <ArrowUpRight className="h-4 w-4 text-green-600" />
+    if (current < previous) return <ArrowDownRight className="h-4 w-4 text-red-600" />
+    return <Minus className="h-4 w-4 text-gray-600" />
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -228,11 +247,9 @@ export default function PaymentProjectStatsOptimized() {
         <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4">
           <div>
             <h1 className="text-2xl lg:text-3xl font-bold tracking-tight">專案付款統計報表</h1>
-            <p className="text-muted-foreground">
-              詳細的專案付款分析與統計數據
-            </p>
+            <p className="text-muted-foreground">詳細的專案付款分析與統計數據</p>
           </div>
-          
+
           <div className="flex flex-col sm:flex-row gap-2">
             <Select value={selectedProject} onValueChange={setSelectedProject}>
               <SelectTrigger className="w-48">
@@ -247,7 +264,7 @@ export default function PaymentProjectStatsOptimized() {
                 ))}
               </SelectContent>
             </Select>
-            
+
             <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
               <SelectTrigger className="w-40">
                 <SelectValue placeholder="選擇期間" />
@@ -274,12 +291,10 @@ export default function PaymentProjectStatsOptimized() {
               <div className="text-2xl font-bold">
                 NT$ {overallStats.totalPlanned.toLocaleString()}
               </div>
-              <p className="text-xs text-muted-foreground">
-                共 {overallStats.totalItems} 項目
-              </p>
+              <p className="text-xs text-muted-foreground">共 {overallStats.totalItems} 項目</p>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">已付金額</CardTitle>
@@ -294,7 +309,7 @@ export default function PaymentProjectStatsOptimized() {
               </p>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">待付金額</CardTitle>
@@ -309,19 +324,15 @@ export default function PaymentProjectStatsOptimized() {
               </p>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">活躍專案</CardTitle>
               <Building2 className="h-4 w-4 text-blue-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-blue-600">
-                {overallStats.totalProjects}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                專案類別
-              </p>
+              <div className="text-2xl font-bold text-blue-600">{overallStats.totalProjects}</div>
+              <p className="text-xs text-muted-foreground">專案類別</p>
             </CardContent>
           </Card>
         </div>
@@ -348,18 +359,18 @@ export default function PaymentProjectStatsOptimized() {
                 <CardContent>
                   <ResponsiveContainer width="100%" height={300}>
                     <BarChart data={projectStats.slice(0, 8)}>
-                      <XAxis 
-                        dataKey="name" 
+                      <XAxis
+                        dataKey="name"
                         angle={-45}
                         textAnchor="end"
                         height={80}
                         fontSize={12}
                       />
                       <YAxis />
-                      <Tooltip 
+                      <Tooltip
                         formatter={(value, name) => [
                           `NT$ ${Number(value).toLocaleString()}`,
-                          name === 'totalPaid' ? '已付' : '計劃'
+                          name === "totalPaid" ? "已付" : "計劃",
                         ]}
                       />
                       <Bar dataKey="totalPlanned" fill="#e5e7eb" name="totalPlanned" />
@@ -413,8 +424,20 @@ export default function PaymentProjectStatsOptimized() {
                           {project.itemCount} 項目 • 完成率 {project.completionRate.toFixed(1)}%
                         </CardDescription>
                       </div>
-                      <Badge variant={project.completionRate >= 80 ? "default" : project.completionRate >= 50 ? "secondary" : "destructive"}>
-                        {project.completionRate >= 80 ? "優秀" : project.completionRate >= 50 ? "良好" : "需關注"}
+                      <Badge
+                        variant={
+                          project.completionRate >= 80
+                            ? "default"
+                            : project.completionRate >= 50
+                              ? "secondary"
+                              : "destructive"
+                        }
+                      >
+                        {project.completionRate >= 80
+                          ? "優秀"
+                          : project.completionRate >= 50
+                            ? "良好"
+                            : "需關注"}
                       </Badge>
                     </div>
                   </CardHeader>
@@ -423,22 +446,30 @@ export default function PaymentProjectStatsOptimized() {
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                         <div>
                           <p className="text-muted-foreground">計劃金額</p>
-                          <p className="font-semibold">NT$ {project.totalPlanned.toLocaleString()}</p>
+                          <p className="font-semibold">
+                            NT$ {project.totalPlanned.toLocaleString()}
+                          </p>
                         </div>
                         <div>
                           <p className="text-muted-foreground">已付金額</p>
-                          <p className="font-semibold text-green-600">NT$ {project.totalPaid.toLocaleString()}</p>
+                          <p className="font-semibold text-green-600">
+                            NT$ {project.totalPaid.toLocaleString()}
+                          </p>
                         </div>
                         <div>
                           <p className="text-muted-foreground">待付金額</p>
-                          <p className="font-semibold text-yellow-600">NT$ {project.pendingAmount.toLocaleString()}</p>
+                          <p className="font-semibold text-yellow-600">
+                            NT$ {project.pendingAmount.toLocaleString()}
+                          </p>
                         </div>
                         <div>
                           <p className="text-muted-foreground">完成項目</p>
-                          <p className="font-semibold">{project.completedItems} / {project.itemCount}</p>
+                          <p className="font-semibold">
+                            {project.completedItems} / {project.itemCount}
+                          </p>
                         </div>
                       </div>
-                      
+
                       <div className="space-y-2">
                         <div className="flex justify-between text-sm">
                           <span>完成進度</span>
@@ -455,9 +486,7 @@ export default function PaymentProjectStatsOptimized() {
                             </Badge>
                           )}
                           {project.overdueItems > 0 && (
-                            <Badge variant="destructive">
-                              {project.overdueItems} 項逾期
-                            </Badge>
+                            <Badge variant="destructive">{project.overdueItems} 項逾期</Badge>
                           )}
                         </div>
                       )}
@@ -481,10 +510,16 @@ export default function PaymentProjectStatsOptimized() {
                     <BarChart data={amountDistribution}>
                       <XAxis dataKey="name" />
                       <YAxis />
-                      <Tooltip 
+                      <Tooltip
                         formatter={(value, name) => [
-                          name === 'count' ? `${value} 項` : `NT$ ${Number(value).toLocaleString()}`,
-                          name === 'count' ? '項目數' : name === 'totalAmount' ? '總金額' : '已付金額'
+                          name === "count"
+                            ? `${value} 項`
+                            : `NT$ ${Number(value).toLocaleString()}`,
+                          name === "count"
+                            ? "項目數"
+                            : name === "totalAmount"
+                              ? "總金額"
+                              : "已付金額",
                         ]}
                       />
                       <Bar dataKey="count" fill="#8884d8" name="count" />
@@ -502,7 +537,10 @@ export default function PaymentProjectStatsOptimized() {
                 <CardContent>
                   <div className="space-y-3">
                     {amountDistribution.map((range, index) => (
-                      <div key={index} className="flex justify-between items-center p-3 border rounded-lg">
+                      <div
+                        key={index}
+                        className="flex justify-between items-center p-3 border rounded-lg"
+                      >
                         <div>
                           <p className="font-medium">{range.name}</p>
                           <p className="text-sm text-muted-foreground">{range.count} 項目</p>
@@ -530,7 +568,10 @@ export default function PaymentProjectStatsOptimized() {
               <CardContent>
                 <div className="space-y-4">
                   {projectRanking.map((project, index) => (
-                    <div key={project.id} className="flex items-center justify-between p-4 border rounded-lg">
+                    <div
+                      key={project.id}
+                      className="flex items-center justify-between p-4 border rounded-lg"
+                    >
                       <div className="flex items-center gap-4">
                         <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary text-primary-foreground text-sm font-semibold">
                           {index + 1}
@@ -542,7 +583,7 @@ export default function PaymentProjectStatsOptimized() {
                           </p>
                         </div>
                       </div>
-                      
+
                       <div className="text-right">
                         <div className="flex items-center gap-2">
                           <span className="text-lg font-semibold">
@@ -561,5 +602,5 @@ export default function PaymentProjectStatsOptimized() {
         </Tabs>
       </div>
     </div>
-  );
+  )
 }

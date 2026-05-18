@@ -34,6 +34,7 @@ import { z } from "zod"
 import { useToast } from "@/hooks/use-toast"
 import { Plus, Edit2, Trash2, Phone, Zap, Droplets, Wifi, Building } from "lucide-react"
 import type { ProjectCategoryTemplate, DebtCategory, PaymentProject } from "@shared/schema"
+import { useDocumentTitle } from "@/hooks/use-document-title"
 
 const templateFormSchema = z.object({
   projectId: z.number(),
@@ -46,6 +47,7 @@ const templateFormSchema = z.object({
 type TemplateFormData = z.infer<typeof templateFormSchema>
 
 export default function ProjectTemplateManagement() {
+  useDocumentTitle("專案範本")
   const { toast } = useToast()
   const queryClient = useQueryClient()
   const [selectedProject, setSelectedProject] = useState<number | null>(null)

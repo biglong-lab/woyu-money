@@ -7,27 +7,50 @@
 
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import {
-  Card, CardContent, CardDescription, CardHeader, CardTitle,
-} from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select"
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table"
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, Legend, ReferenceLine,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Legend,
+  ReferenceLine,
 } from "recharts"
 import {
-  RefreshCw, TrendingUp, TrendingDown, CheckCircle2,
-  AlertTriangle, BarChart3, Info, ChevronDown, ChevronRight, Minus,
+  RefreshCw,
+  TrendingUp,
+  TrendingDown,
+  CheckCircle2,
+  AlertTriangle,
+  BarChart3,
+  Info,
+  ChevronDown,
+  ChevronRight,
+  Minus,
 } from "lucide-react"
 import { apiRequest } from "@/lib/queryClient"
 import { useToast } from "@/hooks/use-toast"
+import { useDocumentTitle } from "@/hooks/use-document-title"
 
 // ─────────────────────────────────────────────
 // 型別
@@ -81,24 +104,28 @@ function statusBadge(status: CompareRow["status"], diff: number) {
   if (status === "insufficient_pm")
     return (
       <Badge variant="outline" className="border-gray-300 text-gray-500 text-xs">
-        <Minus className="h-3 w-3 mr-1" />PM 資料不足
+        <Minus className="h-3 w-3 mr-1" />
+        PM 資料不足
       </Badge>
     )
   if (status === "match")
     return (
       <Badge variant="outline" className="border-green-500 text-green-600 text-xs">
-        <CheckCircle2 className="h-3 w-3 mr-1" />吻合
+        <CheckCircle2 className="h-3 w-3 mr-1" />
+        吻合
       </Badge>
     )
   if (status === "pms_higher")
     return (
       <Badge variant="outline" className="border-orange-400 text-orange-600 text-xs">
-        <TrendingUp className="h-3 w-3 mr-1" />PMS 高 {fmtDiff(diff)}
+        <TrendingUp className="h-3 w-3 mr-1" />
+        PMS 高 {fmtDiff(diff)}
       </Badge>
     )
   return (
     <Badge variant="outline" className="border-red-400 text-red-600 text-xs">
-      <TrendingDown className="h-3 w-3 mr-1" />PM 高 {fmtDiff(Math.abs(diff))}
+      <TrendingDown className="h-3 w-3 mr-1" />
+      PM 高 {fmtDiff(Math.abs(diff))}
     </Badge>
   )
 }
@@ -121,7 +148,11 @@ function CustomTooltip({ active, payload, label }: any) {
       {payload.length === 2 && (
         <div className="border-t mt-2 pt-2 flex justify-between gap-6 text-muted-foreground">
           <span>差距</span>
-          <span className={payload[0].value - payload[1].value >= 0 ? "text-orange-500" : "text-red-500"}>
+          <span
+            className={
+              payload[0].value - payload[1].value >= 0 ? "text-orange-500" : "text-red-500"
+            }
+          >
             {fmtDiff(payload[0].value - payload[1].value)}
           </span>
         </div>
@@ -135,19 +166,22 @@ function CustomTooltip({ active, payload, label }: any) {
 // ─────────────────────────────────────────────
 
 export default function RevenueCompare() {
+  useDocumentTitle("收入比較")
   const { toast } = useToast()
   const queryClient = useQueryClient()
 
   const currentMonth = new Date().toISOString().slice(0, 7)
   const [startMonth, setStartMonth] = useState("2025-08")
-  const [endMonth, setEndMonth]     = useState(currentMonth)
+  const [endMonth, setEndMonth] = useState(currentMonth)
   const [expandedMonth, setExpandedMonth] = useState<string | null>(null)
 
   // ── 資料查詢 ──
   const { data, isLoading, refetch } = useQuery<CompareData>({
     queryKey: ["/api/pms-bridge/compare", startMonth, endMonth],
     queryFn: async () => {
-      const res = await fetch(`/api/pms-bridge/compare?startMonth=${startMonth}&endMonth=${endMonth}`)
+      const res = await fetch(
+        `/api/pms-bridge/compare?startMonth=${startMonth}&endMonth=${endMonth}`
+      )
       if (!res.ok) throw new Error("載入失敗")
       return res.json()
     },
@@ -169,7 +203,7 @@ export default function RevenueCompare() {
     mutationFn: () =>
       apiRequest("POST", "/api/pm-bridge/sync", {
         startDate: `${startMonth}-01`,
-        endDate:   `${endMonth}-31`,
+        endDate: `${endMonth}-31`,
       }),
     onSuccess: (res: any) => {
       toast({ title: "PM 同步完成", description: `新增 ${res.synced} 筆，略過 ${res.skipped} 筆` })
@@ -185,7 +219,7 @@ export default function RevenueCompare() {
       await apiRequest("POST", "/api/pms-bridge/sync", { startMonth, endMonth })
       return apiRequest("POST", "/api/pm-bridge/sync", {
         startDate: `${startMonth}-01`,
-        endDate:   `${endMonth}-31`,
+        endDate: `${endMonth}-31`,
       })
     },
     onSuccess: () => {
@@ -202,9 +236,9 @@ export default function RevenueCompare() {
   const validComparison = comparison.filter((r) => r.status !== "insufficient_pm")
 
   // 統計
-  const totalPms   = validComparison.reduce((s, r) => s + r.pms.total, 0)
-  const totalPm    = validComparison.reduce((s, r) => s + r.pm.total,  0)
-  const totalDiff  = totalPms - totalPm
+  const totalPms = validComparison.reduce((s, r) => s + r.pms.total, 0)
+  const totalPm = validComparison.reduce((s, r) => s + r.pm.total, 0)
+  const totalDiff = totalPms - totalPm
   const matchCount = validComparison.filter((r) => r.status === "match").length
   const avgAbsDiffPct =
     validComparison.length > 0
@@ -213,10 +247,10 @@ export default function RevenueCompare() {
 
   // 圖表資料
   const chartData = comparison.map((r) => ({
-    month:  r.month.slice(2),   // 短月份 "25-08"
-    PMS:    r.pms.total,
-    PM:     r.pm.total,
-    差距:   Math.abs(r.diff),
+    month: r.month.slice(2), // 短月份 "25-08"
+    PMS: r.pms.total,
+    PM: r.pm.total,
+    差距: Math.abs(r.diff),
     status: r.status,
   }))
 
@@ -224,7 +258,6 @@ export default function RevenueCompare() {
 
   return (
     <div className="p-4 md:p-6 space-y-5 max-w-6xl mx-auto">
-
       {/* ── 標題列 ── */}
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
@@ -233,17 +266,15 @@ export default function RevenueCompare() {
             PMS vs PM 收入比對
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            PMS 為基準（最準）·  目標：兩系統每月數字一致
+            PMS 為基準（最準）· 目標：兩系統每月數字一致
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
-          <Button variant="outline" size="sm" onClick={() => syncPm.mutate()}
-            disabled={isSyncing}>
+          <Button variant="outline" size="sm" onClick={() => syncPm.mutate()} disabled={isSyncing}>
             <RefreshCw className={`h-3.5 w-3.5 mr-1 ${syncPm.isPending ? "animate-spin" : ""}`} />
             更新 PM
           </Button>
-          <Button variant="outline" size="sm" onClick={() => syncPms.mutate()}
-            disabled={isSyncing}>
+          <Button variant="outline" size="sm" onClick={() => syncPms.mutate()} disabled={isSyncing}>
             <RefreshCw className={`h-3.5 w-3.5 mr-1 ${syncPms.isPending ? "animate-spin" : ""}`} />
             更新 PMS
           </Button>
@@ -273,7 +304,9 @@ export default function RevenueCompare() {
           </SelectTrigger>
           <SelectContent>
             {monthOptions().map((m) => (
-              <SelectItem key={m} value={m}>{m}</SelectItem>
+              <SelectItem key={m} value={m}>
+                {m}
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -284,7 +317,9 @@ export default function RevenueCompare() {
           </SelectTrigger>
           <SelectContent>
             {monthOptions().map((m) => (
-              <SelectItem key={m} value={m}>{m}</SelectItem>
+              <SelectItem key={m} value={m}>
+                {m}
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -297,20 +332,31 @@ export default function RevenueCompare() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
           {
-            label: "PMS 合計", sub: "發票/正式收款",
-            value: fmtM(totalPms), color: "text-blue-600",
+            label: "PMS 合計",
+            sub: "發票/正式收款",
+            value: fmtM(totalPms),
+            color: "text-blue-600",
           },
           {
-            label: "PM 合計", sub: "每日逐筆",
-            value: fmtM(totalPm), color: "text-emerald-600",
+            label: "PM 合計",
+            sub: "每日逐筆",
+            value: fmtM(totalPm),
+            color: "text-emerald-600",
           },
           {
-            label: "總差距", sub: totalDiff > 0 ? "PMS 較高" : totalDiff < 0 ? "PM 較高" : "完全吻合",
+            label: "總差距",
+            sub: totalDiff > 0 ? "PMS 較高" : totalDiff < 0 ? "PM 較高" : "完全吻合",
             value: `${fmtDiff(totalDiff)}`,
-            color: Math.abs(totalDiff) < 5000 ? "text-green-600" : totalDiff > 0 ? "text-orange-500" : "text-red-500",
+            color:
+              Math.abs(totalDiff) < 5000
+                ? "text-green-600"
+                : totalDiff > 0
+                  ? "text-orange-500"
+                  : "text-red-500",
           },
           {
-            label: "月份吻合", sub: `平均差距 ${avgAbsDiffPct.toFixed(1)}%`,
+            label: "月份吻合",
+            sub: `平均差距 ${avgAbsDiffPct.toFixed(1)}%`,
             value: `${matchCount} / ${validComparison.length}`,
             color: matchCount === validComparison.length ? "text-green-600" : "text-orange-500",
           },
@@ -331,11 +377,15 @@ export default function RevenueCompare() {
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-base">月度收入對比圖</CardTitle>
-          <CardDescription className="text-xs">藍色 = PMS，綠色 = PM（差距越小越好）</CardDescription>
+          <CardDescription className="text-xs">
+            藍色 = PMS，綠色 = PM（差距越小越好）
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <div className="h-64 flex items-center justify-center text-muted-foreground text-sm">載入中…</div>
+            <div className="h-64 flex items-center justify-center text-muted-foreground text-sm">
+              載入中…
+            </div>
           ) : (
             <ResponsiveContainer width="100%" height={280}>
               <BarChart data={chartData} margin={{ left: 10, right: 10, top: 5, bottom: 5 }}>
@@ -348,7 +398,7 @@ export default function RevenueCompare() {
                 <Tooltip content={<CustomTooltip />} />
                 <Legend />
                 <Bar dataKey="PMS" fill="#3b82f6" radius={[3, 3, 0, 0]} maxBarSize={48} />
-                <Bar dataKey="PM"  fill="#10b981" radius={[3, 3, 0, 0]} maxBarSize={48} />
+                <Bar dataKey="PM" fill="#10b981" radius={[3, 3, 0, 0]} maxBarSize={48} />
               </BarChart>
             </ResponsiveContainer>
           )}
@@ -384,9 +434,13 @@ export default function RevenueCompare() {
                 {comparison.map((row) => {
                   const isExpanded = expandedMonth === row.month
                   const diffColor =
-                    row.status === "insufficient_pm" ? "text-gray-400" :
-                    row.status === "match"            ? "text-green-600" :
-                    row.diff > 0                      ? "text-orange-500" : "text-red-500"
+                    row.status === "insufficient_pm"
+                      ? "text-gray-400"
+                      : row.status === "match"
+                        ? "text-green-600"
+                        : row.diff > 0
+                          ? "text-orange-500"
+                          : "text-red-500"
                   const hasBranches = row.pms.branchDetail.length > 0
 
                   return (
@@ -398,27 +452,39 @@ export default function RevenueCompare() {
                         onClick={() => setExpandedMonth(isExpanded ? null : row.month)}
                       >
                         <TableCell className="w-8 py-2 pl-4">
-                          {hasBranches
-                            ? isExpanded
-                              ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-                              : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
-                            : null}
+                          {hasBranches ? (
+                            isExpanded ? (
+                              <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                            ) : (
+                              <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                            )
+                          ) : null}
                         </TableCell>
 
                         <TableCell className="py-2 font-medium text-sm">{row.month}</TableCell>
 
                         <TableCell className="text-right py-2">
-                          <div className="font-semibold text-blue-600 text-sm">{fmtM(row.pms.total)}</div>
-                          <div className="text-xs text-muted-foreground">{row.pms.branches} 分店</div>
+                          <div className="font-semibold text-blue-600 text-sm">
+                            {fmtM(row.pms.total)}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {row.pms.branches} 分店
+                          </div>
                         </TableCell>
 
                         <TableCell className="text-right py-2">
                           {row.status === "insufficient_pm" ? (
-                            <span className="text-xs text-muted-foreground">({row.pm.records} 筆，資料不足)</span>
+                            <span className="text-xs text-muted-foreground">
+                              ({row.pm.records} 筆，資料不足)
+                            </span>
                           ) : (
                             <>
-                              <div className="font-semibold text-emerald-600 text-sm">{fmtM(row.pm.total)}</div>
-                              <div className="text-xs text-muted-foreground">{row.pm.records.toLocaleString()} 筆</div>
+                              <div className="font-semibold text-emerald-600 text-sm">
+                                {fmtM(row.pm.total)}
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                {row.pm.records.toLocaleString()} 筆
+                              </div>
                             </>
                           )}
                         </TableCell>
@@ -428,10 +494,13 @@ export default function RevenueCompare() {
                             <span className="text-xs text-muted-foreground">–</span>
                           ) : (
                             <>
-                              <span className={`font-semibold text-sm ${diffColor}`}>{fmtDiff(row.diff)}</span>
+                              <span className={`font-semibold text-sm ${diffColor}`}>
+                                {fmtDiff(row.diff)}
+                              </span>
                               {row.diffPct !== null && (
                                 <div className={`text-xs ${diffColor}`}>
-                                  {row.diff >= 0 ? "+" : ""}{row.diffPct?.toFixed(1)}%
+                                  {row.diff >= 0 ? "+" : ""}
+                                  {row.diffPct?.toFixed(1)}%
                                 </div>
                               )}
                             </>
@@ -444,25 +513,26 @@ export default function RevenueCompare() {
                       </TableRow>
 
                       {/* 分店明細展開列 */}
-                      {isExpanded && row.pms.branchDetail.map((b) => (
-                        <TableRow
-                          key={`${row.month}-${b.branchId}`}
-                          className="bg-blue-50/40 dark:bg-blue-950/10"
-                        >
-                          <TableCell />
-                          <TableCell className="py-1.5 pl-8 text-xs text-muted-foreground">
-                            <span className="font-mono bg-blue-100 dark:bg-blue-900/50 px-1.5 py-0.5 rounded text-blue-700 dark:text-blue-300 mr-2">
-                              {b.branchCode}
-                            </span>
-                            {b.branchName}
-                            <span className="ml-2 text-gray-400 text-[11px]">({b.lastDate})</span>
-                          </TableCell>
-                          <TableCell className="text-right py-1.5 text-sm text-blue-600 font-medium">
-                            {fmtM(b.revenue)}
-                          </TableCell>
-                          <TableCell colSpan={3} />
-                        </TableRow>
-                      ))}
+                      {isExpanded &&
+                        row.pms.branchDetail.map((b) => (
+                          <TableRow
+                            key={`${row.month}-${b.branchId}`}
+                            className="bg-blue-50/40 dark:bg-blue-950/10"
+                          >
+                            <TableCell />
+                            <TableCell className="py-1.5 pl-8 text-xs text-muted-foreground">
+                              <span className="font-mono bg-blue-100 dark:bg-blue-900/50 px-1.5 py-0.5 rounded text-blue-700 dark:text-blue-300 mr-2">
+                                {b.branchCode}
+                              </span>
+                              {b.branchName}
+                              <span className="ml-2 text-gray-400 text-[11px]">({b.lastDate})</span>
+                            </TableCell>
+                            <TableCell className="text-right py-1.5 text-sm text-blue-600 font-medium">
+                              {fmtM(b.revenue)}
+                            </TableCell>
+                            <TableCell colSpan={3} />
+                          </TableRow>
+                        ))}
                     </>
                   )
                 })}

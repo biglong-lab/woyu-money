@@ -33,6 +33,7 @@ import { Plus, Edit, Trash2, Settings, Building2, Zap, Archive } from "lucide-re
 import { useToast } from "@/hooks/use-toast"
 import { apiRequest, queryClient } from "@/lib/queryClient"
 import type { DebtCategory, PaymentProject, FixedCategory } from "@shared/schema"
+import { useDocumentTitle } from "@/hooks/use-document-title"
 
 type Category = {
   id: number
@@ -69,6 +70,7 @@ type ErrorWithMessage = {
 }
 
 export default function SimpleCategoryManagement() {
+  useDocumentTitle("分類管理")
   const { toast } = useToast()
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
