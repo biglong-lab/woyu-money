@@ -212,13 +212,15 @@ export default function RevenueForecastPage() {
       }
     }
 
-    // PMS 預估（source = pms-bridge 含 bookedRevenue）
+    // PMS 預估（source = pms-bridge）
+    // 合計模式時、同日多館需加總（companyId=all 抓到的是各館明細）
     const addBooked = (snaps: Snapshot[]) => {
       for (const s of snaps) {
         if (s.source !== "pms-bridge") continue
         const day = new Date(s.snapshotDate).getDate()
         if (!byDay.has(day)) byDay.set(day, { day })
-        byDay.get(day)!["PMS 預估"] = parseFloat(s.bookedRevenue)
+        const existing = (byDay.get(day)!["PMS 預估"] as number | undefined) ?? 0
+        byDay.get(day)!["PMS 預估"] = existing + parseFloat(s.bookedRevenue)
       }
     }
 
