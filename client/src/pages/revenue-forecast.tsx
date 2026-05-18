@@ -63,6 +63,38 @@ interface SeasonalForecast {
   confidence: "high" | "medium" | "low" | "insufficient"
 }
 
+interface CalibratedPrediction {
+  targetMonth: string
+  companyId: number | null
+  currentEstimate: number
+  daysAhead: number
+  bucket: {
+    bucket: string
+    samples: number
+    medianRatio: number
+    p25Ratio: number
+    p75Ratio: number
+  } | null
+  pointEstimate: number
+  ci80Lower: number
+  ci80Upper: number
+  confidence: "high" | "medium" | "low" | "insufficient"
+  note: string
+}
+
+interface CalibrationCurve {
+  companyId: number | null
+  buckets: Array<{
+    bucket: string
+    samples: number
+    medianRatio: number
+    p25Ratio: number
+    p75Ratio: number
+    meanRatio: number
+  }>
+  totalSamples: number
+}
+
 const CONFIDENCE_LABEL: Record<SeasonalForecast["confidence"], { label: string; color: string }> = {
   high: { label: "高（≥6 樣本 & 波動低）", color: "bg-green-100 text-green-800" },
   medium: { label: "中（≥4 樣本）", color: "bg-blue-100 text-blue-800" },
@@ -106,6 +138,16 @@ export default function RevenueForecastPage() {
   // 季節性預測
   const { data: seasonal } = useQuery<SeasonalForecast>({
     queryKey: [`/api/forecast/seasonal?targetMonth=${targetMonth}&companyId=${companyParam}`],
+  })
+
+  // PMS 校準預測
+  const { data: pmsPrediction } = useQuery<CalibratedPrediction>({
+    queryKey: [`/api/forecast/pms-prediction?targetMonth=${targetMonth}&companyId=${companyParam}`],
+  })
+
+  // PMS 校準曲線
+  const { data: calibrationCurve } = useQuery<CalibrationCurve>({
+    queryKey: [`/api/forecast/calibration?companyId=${companyParam}`],
   })
 
   // 同期比較：拉過去 3 個月相同 targetMonth offset
@@ -423,6 +465,102 @@ export default function RevenueForecastPage() {
                 ⚠️ 目前歷史快照不足、退化為線性推估。建議：等資料累積 3+ 個月後此預測會大幅準確。
               </div>
             )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* PMS 校準預估（使用「我多年來不定期填入的預估 vs 實際」訓練）*/}
+      {pmsPrediction && pmsPrediction.currentEstimate > 0 && (
+        <Card className="border-2 border-orange-200">
+          <CardContent className="py-4 px-3 sm:px-4">
+            <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+              <div className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                <span className="text-orange-600">📊</span>
+                PMS 校準預估（用歷史「預估 vs 實際」訓練）
+              </div>
+              <Badge className={CONFIDENCE_LABEL[pmsPrediction.confidence].color}>
+                {CONFIDENCE_LABEL[pmsPrediction.confidence].label}
+              </Badge>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+              <div className="bg-orange-50 rounded-lg p-3">
+                <div className="text-xs text-orange-700">PMS 當前預估</div>
+                <div className="text-lg font-semibold text-orange-900">
+                  {formatMoney(pmsPrediction.currentEstimate)}
+                </div>
+                <div className="text-xs text-orange-600 mt-1">
+                  離月底 {pmsPrediction.daysAhead} 天
+                </div>
+              </div>
+              <div className="bg-indigo-50 rounded-lg p-3 border-2 border-indigo-300">
+                <div className="text-xs text-indigo-700">校準後最終估</div>
+                <div className="text-2xl font-bold text-indigo-900">
+                  {formatMoney(pmsPrediction.pointEstimate)}
+                </div>
+                <div className="text-xs text-indigo-600 mt-1">
+                  × {pmsPrediction.bucket?.medianRatio.toFixed(2) ?? "—"} 中位 ratio
+                </div>
+              </div>
+              <div className="bg-blue-50 rounded-lg p-3">
+                <div className="text-xs text-blue-700">80% 信心區間</div>
+                <div className="text-sm font-bold text-blue-900">
+                  {formatMoney(pmsPrediction.ci80Lower)}
+                </div>
+                <div className="text-sm font-bold text-blue-900">
+                  ~ {formatMoney(pmsPrediction.ci80Upper)}
+                </div>
+              </div>
+            </div>
+
+            <div className="text-xs text-gray-600 mt-2">{pmsPrediction.note}</div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* 校準曲線表 */}
+      {calibrationCurve && calibrationCurve.buckets.length > 0 && (
+        <Card>
+          <CardContent className="py-4 px-3 sm:px-4">
+            <div className="text-sm font-semibold text-gray-700 mb-3">
+              校準曲線（離月底天數 → 歷史 ratio）
+            </div>
+            <div className="text-xs text-gray-500 mb-2">
+              ratio = 實際最終 / PMS 預估、共 {calibrationCurve.totalSamples} 筆訓練樣本
+            </div>
+            <div className="space-y-2">
+              {calibrationCurve.buckets.map((b) => (
+                <div key={b.bucket} className="flex items-center gap-3 text-xs flex-wrap">
+                  <span className="w-16 font-mono">{b.bucket}</span>
+                  <span className="w-12 text-gray-500">{b.samples} 筆</span>
+                  <div className="flex-1 min-w-[200px]">
+                    <div className="bg-gray-100 rounded h-5 relative overflow-hidden">
+                      <div
+                        className="bg-blue-300 h-full absolute"
+                        style={{
+                          left: `${Math.min(100, b.p25Ratio * 20)}%`,
+                          width: `${Math.min(100, (b.p75Ratio - b.p25Ratio) * 20)}%`,
+                        }}
+                      />
+                      <div
+                        className="absolute top-0 bottom-0 w-0.5 bg-indigo-700"
+                        style={{ left: `${Math.min(100, b.medianRatio * 20)}%` }}
+                      />
+                    </div>
+                  </div>
+                  <span className="font-semibold text-indigo-700 w-20 text-right">
+                    {b.medianRatio.toFixed(2)}x
+                  </span>
+                  <span className="text-gray-400 w-32 text-right">
+                    [{b.p25Ratio.toFixed(2)} ~ {b.p75Ratio.toFixed(2)}]
+                  </span>
+                </div>
+              ))}
+            </div>
+            <div className="text-xs text-gray-500 mt-3 leading-relaxed">
+              💡 <strong>解讀</strong>：藍色條 = P25~P75 範圍、深紫線 = 中位數。離月底越遠、ratio
+              越大代表 PMS 早期預估較保守、實際通常會比預估多很多。
+            </div>
           </CardContent>
         </Card>
       )}
