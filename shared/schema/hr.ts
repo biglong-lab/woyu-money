@@ -28,6 +28,13 @@ export const employees = pgTable("employees", {
   // 是否投保勞健保（兼職、約聘、外包等可能不投保）
   // false → 月成本只算薪資、不算勞保/健保/勞退
   hasInsurance: boolean("has_insurance").default(true).notNull(),
+  // 員工類型（影響薪資計算、勞健保提示）
+  // full_time = 正職、part_time = 計時、temporary = 臨時、intern = 工讀、contractor = 約聘
+  employmentType: varchar("employment_type", { length: 20 }).default("full_time").notNull(),
+  // 時薪（計時人員用，選填，若有值則月薪 = hourly_rate × monthly_hours）
+  hourlyRate: decimal("hourly_rate", { precision: 8, scale: 2 }),
+  // 每月平均工時（計時人員用，選填）
+  monthlyHours: decimal("monthly_hours", { precision: 6, scale: 2 }),
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
