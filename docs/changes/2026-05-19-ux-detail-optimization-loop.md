@@ -67,6 +67,27 @@
   - 內容：參數 / 收支淨利對比 / 模板覆寫明細
   - 檔名：`沙盤推演_<targetMonth>_<today>.csv`
 
+### Phase 6（commit `c6d2856`）— Dashboard 單館切換 + 場景 JSON 匯出入
+
+- `/financial-dashboard` 標題下加單館切換器（合計 + 各館按鈕、影響未來 3 月 forecast）
+- YTD 維持合計（限制標示 amber badge）
+- `/scenario-simulator` 場景區加「匯出 / 匯入 JSON」按鈕（merge by name、檔案格式驗證、上限 20）
+
+### Phase 7-9（commit `1af3323` ~ `e3b2fec`）— 無障礙（a11y）系統補完
+
+**Phase 7（`1af3323`）— icon-only Button aria-label**：補 9 個（ai-chat-input × 2、ai-assistant-sheet × 1、unified-search-filter × 6）
+
+**Phase 8（`95f376c`、`a3231a1`）— TopNavigation / mobile-tab-bar**：
+- top-navigation：4 處（主導航 / 使用者選單 / 完整選單 / hamburger）
+- mobile-tab-bar：TabItem 加 role + aria-label（含 badge 數）+ aria-current + 鍵盤支援、中間 + 按鈕 aria-expanded、X 關閉、底部 nav aria-label
+
+**Phase 9（`c9ec014`、`e3b2fec`）— Dialog / Sheet Description**：
+- pages（6 個）：loan-investment / simple-category / user-management
+- components（24 個）：batch / document-inbox / file-upload / general-payment 系列 / installment 系列 / loan 系列 / monthly-payment / quick-payment / rental-contract
+- ai-assistant-sheet：SheetDescription（sr-only）
+
+合計修補 30+ 個元件、消除全站 Radix UI a11y warning。
+
 ---
 
 ## 實作步驟
@@ -78,6 +99,12 @@
 | 3 | `59e92f4` | 14 個頁面 useDocumentTitle + `recurring-expenses.tsx` |
 | 4 | `c204a6a` | `late-fee-settings.tsx`、`command-palette.tsx` |
 | 5 | `7ca2d46` | `command-palette.tsx`、`scenario-simulator.tsx` |
+| 6 | `c6d2856` | `financial-dashboard.tsx`、`scenario-simulator.tsx` |
+| 7 | `1af3323` | `ai-chat-input.tsx`、`ai-assistant-sheet.tsx`、`unified-search-filter.tsx` |
+| 8a | `95f376c` | `top-navigation.tsx` |
+| 8b | `a3231a1` | `mobile-tab-bar.tsx` |
+| 9a | `c9ec014` | 3 個 pages × DialogDescription |
+| 9b | `e3b2fec` | 20 個 components × DialogDescription（24 dialogs） |
 
 ---
 
@@ -99,21 +126,20 @@
 
 ## 已知限制 / 後續優化
 
-### 🔍 已研究、未做（資源 / 範圍考量）
+### ✅ 已於後續輪次完成（移出 follow-up）
+
+- ✅ `/financial-dashboard` 單館切換（Phase 6、forecast 部分）
+- ✅ 場景匯出 / 匯入 JSON（Phase 6、純前端 + merge by name）
+- ✅ 全站 a11y audit + 補完（Phase 7-9、30+ 元件）
+
+### 🔍 仍待做
 
 | 項目 | 狀態 | 備註 |
 |------|------|------|
-| `/financial-dashboard` 單館切換 | ⚠️ 部分可行 | `/api/forecast/*` 全支援 companyId、但 `/api/dashboard/ytd` 沒（payment_items 無 company_id 欄位、需 join project→company mapping）。若做、forecast 切館可立刻、YTD 維持合計 |
-| 全站常用按鈕 aria-label / title 補齊 | TODO | 範圍大、需 audit |
-| `/home` 主頁 RWD 微調 | TODO | 待具體場景反饋 |
-| 場景 / 最近訪問 export / import | TODO | localStorage 跨裝置遷移用 |
-
-### 📦 follow-up 建議實作順序
-
-1. 加 `/api/dashboard/ytd?companyId=` 支援（先建 project↔company mapping table）
-2. dashboard 加 companyId 切換器（state + UI + 各 query 傳參）
-3. aria-label 全站 audit
-4. 場景匯出 / 匯入 JSON（純前端、`localStorage` ↔ `<input type="file">`）
+| dashboard YTD 加 companyId 支援 | TODO | 需建 project↔company mapping table |
+| `/scenario-simulator` 比較模式 | TODO | 同時對比 2 個場景的差異 |
+| `/home` 主頁 RWD 微調 | TODO | payment-home 已 mobile-first、待具體場景反饋 |
+| `/receipt-match-helper` 細部優化 | TODO | 待 audit |
 
 ---
 
