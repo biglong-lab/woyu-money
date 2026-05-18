@@ -1,6 +1,12 @@
 import { useState } from "react"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -223,6 +229,7 @@ export function BatchImportWizard({ isOpen, onClose }: BatchImportWizardProps) {
       <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>批量導入付款項目</DialogTitle>
+          <DialogDescription className="sr-only">批量導入付款項目 — 對話框</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6">

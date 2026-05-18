@@ -10,6 +10,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog"
 import {
@@ -97,6 +98,7 @@ export default function DocumentInboxPreviewDialog({
                 <TypeBadge type={selectedDoc.documentType} />
                 <StatusBadge status={selectedDoc.status} />
               </DialogTitle>
+              <DialogDescription className="sr-only">操作對話框</DialogDescription>
             </DialogHeader>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

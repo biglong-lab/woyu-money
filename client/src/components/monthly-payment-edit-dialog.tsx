@@ -2,7 +2,13 @@
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog"
 import {
   Form,
   FormControl,
@@ -62,6 +68,7 @@ export function MonthlyPaymentEditDialog({
               {isEditUnlocked ? "鎖定編輯" : "解鎖編輯"}
             </Button>
           </DialogTitle>
+          <DialogDescription className="sr-only">編輯月付項目 — 對話框</DialogDescription>
           <div
             className={`text-sm p-3 rounded-lg ${isEditUnlocked ? "bg-red-50 border border-red-200" : "bg-blue-50 border border-blue-200"}`}
           >

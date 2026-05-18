@@ -1,6 +1,12 @@
 // 分期付款詳細檢視對話框元件
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
@@ -32,6 +38,7 @@ export default function InstallmentDetailDialog({
             <CreditCard className="w-5 h-5 text-purple-600" />
             分期付款詳細資料
           </DialogTitle>
+          <DialogDescription className="sr-only">分期付款詳細資料 — 對話框</DialogDescription>
         </DialogHeader>
 
         {item && (

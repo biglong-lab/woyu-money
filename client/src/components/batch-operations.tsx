@@ -1,142 +1,164 @@
-import { useState, useCallback } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { 
-  Upload, Download, Trash2, Edit, CheckCircle, 
-  AlertTriangle, FileSpreadsheet, Users 
-} from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { useState, useCallback } from "react"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Checkbox } from "@/components/ui/checkbox"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Badge } from "@/components/ui/badge"
+import { Progress } from "@/components/ui/progress"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import {
+  Upload,
+  Download,
+  Trash2,
+  Edit,
+  CheckCircle,
+  AlertTriangle,
+  FileSpreadsheet,
+  Users,
+} from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
 
 interface BatchUpdateData {
-  status?: string;
-  priority?: number;
-  categoryId?: number;
-  notes?: string;
+  status?: string
+  priority?: number
+  categoryId?: number
+  notes?: string
 }
 
 interface BatchOperationsProps {
-  selectedItems: string[];
-  onSelectionChange: (items: string[]) => void;
-  onBatchUpdate: (action: string, data: BatchUpdateData) => Promise<void>;
-  onBulkImport: (file: File) => Promise<void>;
-  onExport: (format: string) => void;
-  totalItems: number;
+  selectedItems: string[]
+  onSelectionChange: (items: string[]) => void
+  onBatchUpdate: (action: string, data: BatchUpdateData) => Promise<void>
+  onBulkImport: (file: File) => Promise<void>
+  onExport: (format: string) => void
+  totalItems: number
 }
 
 interface ImportProgress {
-  total: number;
-  processed: number;
-  errors: string[];
-  warnings: string[];
+  total: number
+  processed: number
+  errors: string[]
+  warnings: string[]
 }
 
-export function BatchOperations({ 
-  selectedItems, 
-  onSelectionChange, 
-  onBatchUpdate, 
+export function BatchOperations({
+  selectedItems,
+  onSelectionChange,
+  onBatchUpdate,
   onBulkImport,
   onExport,
-  totalItems 
+  totalItems,
 }: BatchOperationsProps) {
-  const [isImportOpen, setIsImportOpen] = useState(false);
-  const [isBatchUpdateOpen, setIsBatchUpdateOpen] = useState(false);
-  const [importProgress, setImportProgress] = useState<ImportProgress | null>(null);
-  const [batchAction, setBatchAction] = useState('');
-  const [batchData, setBatchData] = useState<BatchUpdateData>({});
-  const { toast } = useToast();
+  const [isImportOpen, setIsImportOpen] = useState(false)
+  const [isBatchUpdateOpen, setIsBatchUpdateOpen] = useState(false)
+  const [importProgress, setImportProgress] = useState<ImportProgress | null>(null)
+  const [batchAction, setBatchAction] = useState("")
+  const [batchData, setBatchData] = useState<BatchUpdateData>({})
+  const { toast } = useToast()
 
   // 檔案匯入處理
-  const handleFileImport = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+  const handleFileImport = useCallback(
+    async (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0]
+      if (!file) return
 
-    const allowedTypes = [
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'application/vnd.ms-excel',
-      'text/csv'
-    ];
+      const allowedTypes = [
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "application/vnd.ms-excel",
+        "text/csv",
+      ]
 
-    if (!allowedTypes.includes(file.type)) {
-      toast({
-        title: "檔案格式錯誤",
-        description: "請選擇 Excel (.xlsx, .xls) 或 CSV 檔案",
-        variant: "destructive"
-      });
-      return;
-    }
+      if (!allowedTypes.includes(file.type)) {
+        toast({
+          title: "檔案格式錯誤",
+          description: "請選擇 Excel (.xlsx, .xls) 或 CSV 檔案",
+          variant: "destructive",
+        })
+        return
+      }
 
-    try {
-      setImportProgress({ total: 0, processed: 0, errors: [], warnings: [] });
-      await onBulkImport(file);
-      
-      toast({
-        title: "匯入成功",
-        description: "檔案已成功匯入系統"
-      });
-      setIsImportOpen(false);
-    } catch (error) {
-      toast({
-        title: "匯入失敗",
-        description: error instanceof Error ? error.message : "匯入過程中發生錯誤",
-        variant: "destructive"
-      });
-    } finally {
-      setImportProgress(null);
-    }
-  }, [onBulkImport, toast]);
+      try {
+        setImportProgress({ total: 0, processed: 0, errors: [], warnings: [] })
+        await onBulkImport(file)
+
+        toast({
+          title: "匯入成功",
+          description: "檔案已成功匯入系統",
+        })
+        setIsImportOpen(false)
+      } catch (error) {
+        toast({
+          title: "匯入失敗",
+          description: error instanceof Error ? error.message : "匯入過程中發生錯誤",
+          variant: "destructive",
+        })
+      } finally {
+        setImportProgress(null)
+      }
+    },
+    [onBulkImport, toast]
+  )
 
   // 批量更新處理
   const handleBatchUpdate = useCallback(async () => {
-    if (!batchAction || selectedItems.length === 0) return;
+    if (!batchAction || selectedItems.length === 0) return
 
     try {
-      await onBatchUpdate(batchAction, batchData);
-      
+      await onBatchUpdate(batchAction, batchData)
+
       toast({
         title: "批量更新成功",
-        description: `已更新 ${selectedItems.length} 個項目`
-      });
-      
-      setIsBatchUpdateOpen(false);
-      setBatchAction('');
-      setBatchData({});
-      onSelectionChange([]);
+        description: `已更新 ${selectedItems.length} 個項目`,
+      })
+
+      setIsBatchUpdateOpen(false)
+      setBatchAction("")
+      setBatchData({})
+      onSelectionChange([])
     } catch (error) {
       toast({
         title: "批量更新失敗",
         description: error instanceof Error ? error.message : "更新過程中發生錯誤",
-        variant: "destructive"
-      });
+        variant: "destructive",
+      })
     }
-  }, [batchAction, batchData, selectedItems, onBatchUpdate, toast, onSelectionChange]);
+  }, [batchAction, batchData, selectedItems, onBatchUpdate, toast, onSelectionChange])
 
   // 批量操作選項
   const batchActions = [
-    { value: 'updateStatus', label: '更新狀態', icon: CheckCircle },
-    { value: 'updatePriority', label: '更新優先級', icon: AlertTriangle },
-    { value: 'updateCategory', label: '更新分類', icon: Edit },
-    { value: 'archive', label: '歸檔項目', icon: Trash2 },
-    { value: 'delete', label: '刪除項目', icon: Trash2, dangerous: true }
-  ];
+    { value: "updateStatus", label: "更新狀態", icon: CheckCircle },
+    { value: "updatePriority", label: "更新優先級", icon: AlertTriangle },
+    { value: "updateCategory", label: "更新分類", icon: Edit },
+    { value: "archive", label: "歸檔項目", icon: Trash2 },
+    { value: "delete", label: "刪除項目", icon: Trash2, dangerous: true },
+  ]
 
   // 渲染批量更新表單
   const renderBatchUpdateForm = () => {
     switch (batchAction) {
-      case 'updateStatus':
+      case "updateStatus":
         return (
           <div className="space-y-4">
             <div>
               <Label>新狀態</Label>
-              <Select 
-                value={batchData.status || ''} 
+              <Select
+                value={batchData.status || ""}
                 onValueChange={(value) => setBatchData({ ...batchData, status: value })}
               >
                 <SelectTrigger>
@@ -151,15 +173,15 @@ export function BatchOperations({
               </Select>
             </div>
           </div>
-        );
-      
-      case 'updatePriority':
+        )
+
+      case "updatePriority":
         return (
           <div className="space-y-4">
             <div>
               <Label>優先級</Label>
-              <Select 
-                value={batchData.priority?.toString() || ''} 
+              <Select
+                value={batchData.priority?.toString() || ""}
                 onValueChange={(value) => setBatchData({ ...batchData, priority: parseInt(value) })}
               >
                 <SelectTrigger>
@@ -173,16 +195,18 @@ export function BatchOperations({
               </Select>
             </div>
           </div>
-        );
-      
-      case 'updateCategory':
+        )
+
+      case "updateCategory":
         return (
           <div className="space-y-4">
             <div>
               <Label>新分類</Label>
-              <Select 
-                value={batchData.categoryId?.toString() || ''} 
-                onValueChange={(value) => setBatchData({ ...batchData, categoryId: parseInt(value) })}
+              <Select
+                value={batchData.categoryId?.toString() || ""}
+                onValueChange={(value) =>
+                  setBatchData({ ...batchData, categoryId: parseInt(value) })
+                }
               >
                 <SelectTrigger>
                   <SelectValue placeholder="選擇分類" />
@@ -196,24 +220,24 @@ export function BatchOperations({
               </Select>
             </div>
           </div>
-        );
-      
+        )
+
       default:
         return (
           <div className="space-y-4">
             <div>
               <Label>備註</Label>
               <Textarea
-                value={batchData.notes || ''}
+                value={batchData.notes || ""}
                 onChange={(e) => setBatchData({ ...batchData, notes: e.target.value })}
                 placeholder="輸入操作備註..."
                 rows={3}
               />
             </div>
           </div>
-        );
+        )
     }
-  };
+  }
 
   return (
     <div className="space-y-4">
@@ -229,7 +253,7 @@ export function BatchOperations({
                     if (checked) {
                       // 選擇全部的邏輯需要從父組件傳入
                     } else {
-                      onSelectionChange([]);
+                      onSelectionChange([])
                     }
                   }}
                 />
@@ -237,13 +261,9 @@ export function BatchOperations({
                   已選擇 {selectedItems.length} / {totalItems} 個項目
                 </span>
               </div>
-              
+
               <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => onSelectionChange([])}
-                >
+                <Button variant="outline" size="sm" onClick={() => onSelectionChange([])}>
                   清除選擇
                 </Button>
               </div>
@@ -273,6 +293,9 @@ export function BatchOperations({
               <DialogContent>
                 <DialogHeader>
                   <DialogTitle>批量匯入付款項目</DialogTitle>
+                  <DialogDescription className="sr-only">
+                    批量匯入付款項目 — 對話框
+                  </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4">
                   <div>
@@ -287,17 +310,23 @@ export function BatchOperations({
                       支援 Excel (.xlsx, .xls) 和 CSV 格式
                     </p>
                   </div>
-                  
+
                   {importProgress && (
                     <div className="space-y-2">
                       <div className="flex justify-between text-sm">
                         <span>匯入進度</span>
-                        <span>{importProgress.processed} / {importProgress.total}</span>
+                        <span>
+                          {importProgress.processed} / {importProgress.total}
+                        </span>
                       </div>
-                      <Progress 
-                        value={importProgress.total > 0 ? (importProgress.processed / importProgress.total) * 100 : 0} 
+                      <Progress
+                        value={
+                          importProgress.total > 0
+                            ? (importProgress.processed / importProgress.total) * 100
+                            : 0
+                        }
                       />
-                      
+
                       {importProgress.errors.length > 0 && (
                         <div className="text-sm text-red-600">
                           <p className="font-medium">錯誤：</p>
@@ -315,19 +344,19 @@ export function BatchOperations({
             </Dialog>
 
             {/* 資料匯出 */}
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               className="flex items-center gap-2"
-              onClick={() => onExport('excel')}
+              onClick={() => onExport("excel")}
             >
               <Download className="h-4 w-4" />
               匯出 Excel
             </Button>
 
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               className="flex items-center gap-2"
-              onClick={() => onExport('csv')}
+              onClick={() => onExport("csv")}
             >
               <FileSpreadsheet className="h-4 w-4" />
               匯出 CSV
@@ -336,8 +365,8 @@ export function BatchOperations({
             {/* 批量更新 */}
             <Dialog open={isBatchUpdateOpen} onOpenChange={setIsBatchUpdateOpen}>
               <DialogTrigger asChild>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   className="flex items-center gap-2"
                   disabled={selectedItems.length === 0}
                 >
@@ -348,13 +377,14 @@ export function BatchOperations({
               <DialogContent>
                 <DialogHeader>
                   <DialogTitle>批量編輯項目</DialogTitle>
+                  <DialogDescription className="sr-only">批量編輯項目 — 對話框</DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4">
                   <div className="flex items-center gap-2 p-3 bg-blue-50 rounded-lg">
                     <Badge variant="secondary">{selectedItems.length}</Badge>
                     <span className="text-sm">個項目將被更新</span>
                   </div>
-                  
+
                   <div>
                     <Label>操作類型</Label>
                     <Select value={batchAction} onValueChange={setBatchAction}>
@@ -363,10 +393,10 @@ export function BatchOperations({
                       </SelectTrigger>
                       <SelectContent>
                         {batchActions.map((action) => (
-                          <SelectItem 
-                            key={action.value} 
+                          <SelectItem
+                            key={action.value}
                             value={action.value}
-                            className={action.dangerous ? 'text-red-600' : ''}
+                            className={action.dangerous ? "text-red-600" : ""}
                           >
                             <div className="flex items-center gap-2">
                               <action.icon className="h-4 w-4" />
@@ -377,17 +407,21 @@ export function BatchOperations({
                       </SelectContent>
                     </Select>
                   </div>
-                  
+
                   {batchAction && renderBatchUpdateForm()}
-                  
+
                   <div className="flex justify-end gap-2">
                     <Button variant="outline" onClick={() => setIsBatchUpdateOpen(false)}>
                       取消
                     </Button>
-                    <Button 
+                    <Button
                       onClick={handleBatchUpdate}
                       disabled={!batchAction}
-                      variant={batchActions.find(a => a.value === batchAction)?.dangerous ? 'destructive' : 'default'}
+                      variant={
+                        batchActions.find((a) => a.value === batchAction)?.dangerous
+                          ? "destructive"
+                          : "default"
+                      }
                     >
                       確認執行
                     </Button>
@@ -399,5 +433,5 @@ export function BatchOperations({
         </CardContent>
       </Card>
     </div>
-  );
+  )
 }

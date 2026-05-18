@@ -8,6 +8,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { useQuery } from "@tanstack/react-query"
@@ -380,6 +381,7 @@ export function LoanDocumentExport({ recordId, recordTitle, recordData }: LoanDo
       <DialogContent className="w-[95vw] max-w-md">
         <DialogHeader>
           <DialogTitle>文件輸出選項</DialogTitle>
+          <DialogDescription className="sr-only">文件輸出選項 — 對話框</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">

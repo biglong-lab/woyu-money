@@ -5,7 +5,13 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { formatNT } from "@/lib/utils"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog"
 import {
   Form,
   FormControl,
@@ -87,6 +93,7 @@ export function GeneralPaymentPaymentDialog({
       <DialogContent className="w-[95vw] max-w-md">
         <DialogHeader>
           <DialogTitle>付款記錄</DialogTitle>
+          <DialogDescription className="sr-only">付款記錄 — 對話框</DialogDescription>
           {paymentItem && (
             <div className="text-sm text-gray-600 space-y-1">
               <p>

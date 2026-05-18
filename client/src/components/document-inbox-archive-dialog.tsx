@@ -10,6 +10,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog"
 import {
@@ -198,6 +199,7 @@ export default function DocumentInboxArchiveDialog({
       <DialogContent className="w-[95vw] max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>歸檔整理</DialogTitle>
+          <DialogDescription className="sr-only">歸檔整理 — 對話框</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">

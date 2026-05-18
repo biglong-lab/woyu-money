@@ -9,7 +9,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog"
 import {
   Table,
   TableBody,
@@ -116,6 +122,7 @@ export function RentalContractDetailsDialog({
           <DialogTitle>
             租約詳情 - {viewingContractDetails?.contractName || "載入中..."}
           </DialogTitle>
+          <DialogDescription className="sr-only">租約詳情 - — 對話框</DialogDescription>
         </DialogHeader>
 
         {isLoading ? (

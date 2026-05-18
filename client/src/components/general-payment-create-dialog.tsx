@@ -7,6 +7,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogTrigger,
 } from "@/components/ui/dialog"
 import {
@@ -53,6 +54,7 @@ export function GeneralPaymentCreateDialog({
         >
           <DialogHeader>
             <DialogTitle>新增一般付款項目</DialogTitle>
+            <DialogDescription className="sr-only">新增一般付款項目 — 對話框</DialogDescription>
           </DialogHeader>
           <div id="create-payment-description" className="sr-only">
             建立新的一般付款項目，設定分類、專案、金額及付款日期

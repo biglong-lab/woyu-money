@@ -11,6 +11,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogTrigger,
 } from "@/components/ui/dialog"
 import {
@@ -100,6 +101,7 @@ export function GeneralPaymentDetailDialog({
       <DialogContent className="w-[95vw] max-w-3xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-lg">{detailItem?.itemName || "付款項目詳情"}</DialogTitle>
+          <DialogDescription className="sr-only">操作對話框</DialogDescription>
         </DialogHeader>
         {detailItem && (
           <div className="space-y-4">
@@ -384,6 +386,7 @@ function PaymentRecordCard({ record }: { record: PaymentRecordData }) {
                   <DialogTitle>
                     付款憑證 - {new Date(record.paymentDate).toLocaleDateString("zh-TW")}
                   </DialogTitle>
+                  <DialogDescription className="sr-only">付款憑證 - — 對話框</DialogDescription>
                 </DialogHeader>
                 <div className="flex justify-center">
                   <img
