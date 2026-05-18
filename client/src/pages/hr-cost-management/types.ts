@@ -47,6 +47,7 @@ export interface MonthlyHrCost {
   totalCost: string
   isPaid: boolean
   insurancePaid: boolean
+  actualHours?: string | null // 計時人員當月實際工時（覆蓋預估）
   employee?: Employee
 }
 

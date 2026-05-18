@@ -226,6 +226,65 @@ router.post(
   })
 )
 
+// 更新月度實際工時（計時人員、會自動重算薪資與保費）
+router.put(
+  "/api/hr/monthly-costs/:id/actual-hours",
+  asyncHandler(async (req, res) => {
+    const id = parseInt(req.params.id)
+    if (isNaN(id)) throw new AppError(400, "無效的記錄 ID")
+
+    const { actualHours } = req.body
+    const cost = await hrStorage.getMonthlyHrCostById(id)
+    if (!cost) throw new AppError(404, "找不到該記錄")
+
+    const emp = await hrStorage.getEmployee(cost.employeeId)
+    if (!emp) throw new AppError(404, "找不到員工")
+
+    // actualHours = null → 清空、用回 employees.monthly_hours 預估
+    if (actualHours === null || actualHours === undefined || actualHours === "") {
+      const result = await hrStorage.updateMonthlyHrCost(id, { actualHours: null })
+      return res.json(result)
+    }
+
+    const hours = parseFloat(String(actualHours))
+    if (isNaN(hours) || hours < 0) throw new AppError(400, "工時必須為非負數")
+
+    const hourlyRate = emp.hourlyRate ? parseFloat(emp.hourlyRate) : 0
+    if (hourlyRate <= 0) {
+      throw new AppError(400, "該員工未設定時薪（請先到員工資料設定 hourly_rate）")
+    }
+
+    // 重算
+    const newSalary = hourlyRate * hours
+    const calc = calculateInsurance({
+      monthlySalary: newSalary,
+      insuredSalary: emp.insuredSalary ? parseFloat(emp.insuredSalary) : undefined,
+      dependentsCount: emp.dependentsCount || 0,
+      voluntaryPensionRate: parseFloat(emp.voluntaryPensionRate || "0"),
+      hasInsurance: emp.hasInsurance,
+    })
+
+    const result = await hrStorage.updateMonthlyHrCost(id, {
+      actualHours: hours.toString(),
+      baseSalary: newSalary.toString(),
+      insuredSalary: calc.laborInsuredSalary.toString(),
+      employerLaborInsurance: calc.employerLaborInsurance.toString(),
+      employerHealthInsurance: calc.employerHealthInsurance.toString(),
+      employerPension: calc.employerPension.toString(),
+      employerEmploymentInsurance: calc.employerEmploymentInsurance.toString(),
+      employerAccidentInsurance: calc.employerAccidentInsurance.toString(),
+      employerTotal: calc.employerTotal.toString(),
+      employeeLaborInsurance: calc.employeeLaborInsurance.toString(),
+      employeeHealthInsurance: calc.employeeHealthInsurance.toString(),
+      employeePension: calc.employeePension.toString(),
+      employeeTotal: calc.employeeTotal.toString(),
+      netSalary: calc.netSalary.toString(),
+      totalCost: calc.totalCost.toString(),
+    })
+    res.json(result)
+  })
+)
+
 // 更新月度人事費付款狀態
 router.put(
   "/api/hr/monthly-costs/:id/pay",
