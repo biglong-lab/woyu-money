@@ -19,6 +19,7 @@ import {
   type PriorityInput,
   type PriorityResult,
   type UrgencyLevel,
+  type LateFeePolicyMap,
 } from "@shared/payment-priority"
 
 // ─────────────────────────────────────────────
@@ -101,9 +102,10 @@ function countByUrgency(
 
 export function buildPriorityReport(
   items: PriorityInput[],
-  asOf: Date = new Date()
+  asOf: Date = new Date(),
+  policy?: LateFeePolicyMap
 ): PriorityReport {
-  const sorted = sortByPriority(items, asOf)
+  const sorted = sortByPriority(items, asOf, policy)
   const byUrgency = groupByUrgency(sorted)
   const totalUnpaid = sorted.reduce((sum, r) => sum + r.unpaidAmount, 0)
 
@@ -129,9 +131,10 @@ function isMandatory(result: PriorityResult): boolean {
 export function buildAllocation(
   items: PriorityInput[],
   availableBudget: number,
-  asOf: Date = new Date()
+  asOf: Date = new Date(),
+  policy?: LateFeePolicyMap
 ): AllocationResult {
-  const sorted = sortByPriority(items, asOf).filter((r) => r.unpaidAmount > 0)
+  const sorted = sortByPriority(items, asOf, policy).filter((r) => r.unpaidAmount > 0)
 
   const suggested: PriorityResult[] = []
   const deferred: PriorityResult[] = []
@@ -241,33 +244,56 @@ function filterLowUrgency(report: PriorityReport, includeLow: boolean | undefine
   }
 }
 
+// 載入 DB late_fee_policies → 組 policyMap
+async function loadPolicyMap(): Promise<LateFeePolicyMap> {
+  try {
+    const { listPolicies, seedDefaultPolicies } = await import("../storage/late-fee-policies")
+    await seedDefaultPolicies()
+    const policies = await listPolicies()
+    const rateMap: Record<string, number> = {}
+    const graceMap: Record<string, number> = {}
+    for (const p of policies) {
+      rateMap[p.categoryKey] = p.isEnabled ? parseFloat(p.dailyRate) : 0
+      graceMap[p.categoryKey] = p.gracePeriodDays
+    }
+    return { rateMap, graceMap }
+  } catch {
+    // 表還沒建好（migration 未跑）→ fallback 用 hardcode CATEGORY_RULES
+    return {}
+  }
+}
+
 // Service：可注入 fetcher 版本（單元測試友善）
 export async function getPriorityReportWith(
   fetcher: UnpaidItemsFetcher,
-  opts: FetchOptions = {}
+  opts: FetchOptions = {},
+  policy?: LateFeePolicyMap
 ): Promise<PriorityReport> {
   const asOf = opts.asOf ?? new Date()
   const rows = await fetcher()
   const items = mapRawRowsToInputs(rows)
-  const report = buildPriorityReport(items, asOf)
+  const report = buildPriorityReport(items, asOf, policy)
   return filterLowUrgency(report, opts.includeLow)
 }
 
 export async function suggestAllocationWith(
   fetcher: UnpaidItemsFetcher,
-  input: AllocationInput
+  input: AllocationInput,
+  policy?: LateFeePolicyMap
 ): Promise<AllocationResult> {
   const asOf = input.asOf ?? new Date()
   const rows = await fetcher()
   const items = mapRawRowsToInputs(rows)
-  return buildAllocation(items, input.availableBudget, asOf)
+  return buildAllocation(items, input.availableBudget, asOf, policy)
 }
 
-// Public API：使用預設 DB fetcher
+// Public API：使用預設 DB fetcher + 自動載入 policy map
 export async function getPriorityReport(opts: FetchOptions = {}): Promise<PriorityReport> {
-  return getPriorityReportWith(fetchUnpaidRowsFromDb, opts)
+  const policy = await loadPolicyMap()
+  return getPriorityReportWith(fetchUnpaidRowsFromDb, opts, policy)
 }
 
 export async function suggestAllocation(input: AllocationInput): Promise<AllocationResult> {
-  return suggestAllocationWith(fetchUnpaidRowsFromDb, input)
+  const policy = await loadPolicyMap()
+  return suggestAllocationWith(fetchUnpaidRowsFromDb, input, policy)
 }
