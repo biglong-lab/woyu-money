@@ -419,17 +419,45 @@ export default function RevenueForecastPage() {
               </div>
               <div className="bg-blue-50 rounded-lg p-3">
                 <div className="text-xs text-blue-700">80% 信心區間</div>
-                <div className="text-sm font-bold text-blue-900">
-                  {formatMoney(seasonal.ci80.lower)} ~ {formatMoney(seasonal.ci80.upper)}
-                </div>
-                <div className="text-xs text-blue-600 mt-1">8 成機會落在此範圍</div>
+                {seasonal.confidence === "insufficient" || seasonal.sampleSize < 2 ? (
+                  <>
+                    <div className="text-sm font-medium text-gray-400">— 資料不足 —</div>
+                    <div className="text-xs text-blue-600 mt-1">需至少 2 個歷史月樣本</div>
+                  </>
+                ) : seasonal.ci80.lower === seasonal.ci80.upper ? (
+                  <>
+                    <div className="text-sm font-medium text-gray-400">— 樣本相同 —</div>
+                    <div className="text-xs text-blue-600 mt-1">歷史比率無波動、僅單點估</div>
+                  </>
+                ) : (
+                  <>
+                    <div className="text-sm font-bold text-blue-900">
+                      {formatMoney(seasonal.ci80.lower)} ~ {formatMoney(seasonal.ci80.upper)}
+                    </div>
+                    <div className="text-xs text-blue-600 mt-1">8 成機會落在此範圍</div>
+                  </>
+                )}
               </div>
               <div className="bg-gray-50 rounded-lg p-3">
                 <div className="text-xs text-gray-700">95% 信心區間</div>
-                <div className="text-sm font-bold text-gray-900">
-                  {formatMoney(seasonal.ci95.lower)} ~ {formatMoney(seasonal.ci95.upper)}
-                </div>
-                <div className="text-xs text-gray-600 mt-1">幾乎都會落在此範圍</div>
+                {seasonal.confidence === "insufficient" || seasonal.sampleSize < 2 ? (
+                  <>
+                    <div className="text-sm font-medium text-gray-400">— 資料不足 —</div>
+                    <div className="text-xs text-gray-600 mt-1">需至少 2 個歷史月樣本</div>
+                  </>
+                ) : seasonal.ci95.lower === seasonal.ci95.upper ? (
+                  <>
+                    <div className="text-sm font-medium text-gray-400">— 樣本相同 —</div>
+                    <div className="text-xs text-gray-600 mt-1">歷史比率無波動、僅單點估</div>
+                  </>
+                ) : (
+                  <>
+                    <div className="text-sm font-bold text-gray-900">
+                      {formatMoney(seasonal.ci95.lower)} ~ {formatMoney(seasonal.ci95.upper)}
+                    </div>
+                    <div className="text-xs text-gray-600 mt-1">幾乎都會落在此範圍</div>
+                  </>
+                )}
               </div>
             </div>
 
@@ -604,8 +632,10 @@ export default function RevenueForecastPage() {
                   dataKey={targetMonth}
                   stroke="#2563eb"
                   strokeWidth={3}
-                  dot={{ r: 3 }}
-                  name={`${targetMonth}（已實現）`}
+                  dot={{ r: 3, fill: "#2563eb" }}
+                  activeDot={{ r: 6 }}
+                  connectNulls
+                  name={`${targetMonth}（已實現累積）`}
                 />
                 <Line
                   type="monotone"
@@ -613,8 +643,10 @@ export default function RevenueForecastPage() {
                   stroke="#ea580c"
                   strokeWidth={2}
                   strokeDasharray="6 3"
-                  dot={{ r: 3 }}
-                  name="PMS 預估"
+                  dot={{ r: 4, fill: "#ea580c", stroke: "#fff", strokeWidth: 1 }}
+                  activeDot={{ r: 6 }}
+                  connectNulls
+                  name="PMS 預估（你填的月底估）"
                 />
                 {compareMonths.map((m, i) => (
                   <Line

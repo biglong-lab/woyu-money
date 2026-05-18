@@ -94,7 +94,7 @@ export default function FinancialDashboardPage() {
     queryKey: ["/api/recurring-expense-templates"],
   })
 
-  // 計算固定每月支出
+  // 計算固定每月支出（週期支出模板合計）
   const fixedMonthlyExpense = useMemo(
     () =>
       templates
@@ -102,17 +102,6 @@ export default function FinancialDashboardPage() {
         .reduce((sum, t) => sum + parseFloat(t.estimatedAmount), 0),
     [templates]
   )
-
-  // 組裝未來 3 月預測表
-  const futureRows: MonthRow[] = useMemo(() => {
-    if (!forecastQueries.data) return []
-    return forecastQueries.data.map((f) => ({
-      month: f.targetMonth,
-      income: f.pointEstimate,
-      expense: fixedMonthlyExpense,
-      profit: f.pointEstimate - fixedMonthlyExpense,
-    }))
-  }, [forecastQueries.data, fixedMonthlyExpense])
 
   // 今年迄今 YTD
   interface YtdData {
@@ -126,6 +115,27 @@ export default function FinancialDashboardPage() {
   })
 
   const ytd: YtdData = ytdQuery.data ?? { income: 0, expense: 0, profit: 0, months: [] }
+
+  // YTD 月均支出（含 HR / 一次性 / 模板）— 比純 templates 更全面
+  const ytdAvgMonthlyExpense = useMemo(() => {
+    const completedMonths = ytd.months.filter((m) => m.expense > 0)
+    if (completedMonths.length === 0) return 0
+    return ytd.expense / completedMonths.length
+  }, [ytd])
+
+  // 估計未來月支出：取「YTD 月均」與「模板合計」較大值（保守估）
+  const estimatedFutureExpense = Math.max(fixedMonthlyExpense, ytdAvgMonthlyExpense)
+
+  // 組裝未來 3 月預測表
+  const futureRows: MonthRow[] = useMemo(() => {
+    if (!forecastQueries.data) return []
+    return forecastQueries.data.map((f) => ({
+      month: f.targetMonth,
+      income: f.pointEstimate,
+      expense: estimatedFutureExpense,
+      profit: f.pointEstimate - estimatedFutureExpense,
+    }))
+  }, [forecastQueries.data, estimatedFutureExpense])
 
   // 未來 3 月合計
   const futureTotal = futureRows.reduce(
@@ -290,10 +300,12 @@ export default function FinancialDashboardPage() {
                       )}
                     </div>
                     <div>
-                      <div className="text-xs text-gray-500">支出（模板）</div>
+                      <div className="text-xs text-gray-500">支出預估</div>
                       <div className="text-red-700 font-semibold">{formatMoney(r.expense)}</div>
                       <div className="text-xs text-gray-400">
-                        {templates.filter((t) => t.isActive).length} 筆模板
+                        {ytdAvgMonthlyExpense > fixedMonthlyExpense
+                          ? `YTD 月均（${templates.filter((t) => t.isActive).length} 模板 + HR / 一次性）`
+                          : `${templates.filter((t) => t.isActive).length} 筆模板`}
                       </div>
                     </div>
                     <div>
