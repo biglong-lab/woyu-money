@@ -21,11 +21,27 @@ const DEFAULT_POLICIES: Array<{
 }> = [
   {
     categoryKey: "labor_insurance",
-    label: "勞健保",
+    label: "勞保",
     dailyRate: 0.003,
     gracePeriodDays: 0,
     isEnabled: true,
-    notes: "政府強制執行；每月 25 日截止，逾期立即計息",
+    notes: "勞保局，每月寄繳款單，每日 0.3%（勞保條例第 17 條）",
+  },
+  {
+    categoryKey: "health_insurance",
+    label: "健保",
+    dailyRate: 0.001,
+    gracePeriodDays: 0,
+    isEnabled: true,
+    notes: "健保署，每月寄繳款單，每日 0.1%（最高 15%，全民健保法第 35 條）",
+  },
+  {
+    categoryKey: "pension",
+    label: "勞退（雇主提繳）",
+    dailyRate: 0.001,
+    gracePeriodDays: 0,
+    isEnabled: true,
+    notes: "勞保局，每月 25 日截止，每日 0.1%（最高 100%，勞工退休金條例第 53 條）",
   },
   {
     categoryKey: "tax",
@@ -117,12 +133,13 @@ export async function updatePolicy(
   return row
 }
 
-/** 首次啟動時建立預設 policies（若不存在） */
+/** 確保所有 DEFAULT_POLICIES 在 DB 都存在；既存的不會被覆蓋（保留使用者設定）*/
 export async function seedDefaultPolicies(): Promise<void> {
   const existing = await listPolicies()
-  if (existing.length > 0) return
+  const existingKeys = new Set(existing.map((p) => p.categoryKey))
 
   for (const p of DEFAULT_POLICIES) {
+    if (existingKeys.has(p.categoryKey)) continue
     await db.insert(lateFeePolicies).values({
       categoryKey: p.categoryKey,
       label: p.label,
