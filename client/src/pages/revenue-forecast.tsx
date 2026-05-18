@@ -158,21 +158,33 @@ export default function RevenueForecastPage() {
   const chartData = useMemo(() => {
     if (trend.length === 0) return []
 
-    // 取本月走勢（按 day）+ 同期比較
     const byDay = new Map<number, Record<string, number | null>>()
 
-    const addSeries = (key: string, snaps: Snapshot[]) => {
+    // PM 已實現累積（source = pm-daily-snapshot 含 accumulatedRevenue）
+    const addAccumulated = (key: string, snaps: Snapshot[]) => {
       for (const s of snaps) {
+        if (s.source !== "pm-daily-snapshot") continue
         const day = new Date(s.snapshotDate).getDate()
         if (!byDay.has(day)) byDay.set(day, { day })
         byDay.get(day)![key] = parseFloat(s.accumulatedRevenue)
       }
     }
 
-    addSeries(targetMonth, trend)
+    // PMS 預估（source = pms-bridge 含 bookedRevenue）
+    const addBooked = (snaps: Snapshot[]) => {
+      for (const s of snaps) {
+        if (s.source !== "pms-bridge") continue
+        const day = new Date(s.snapshotDate).getDate()
+        if (!byDay.has(day)) byDay.set(day, { day })
+        byDay.get(day)!["PMS 預估"] = parseFloat(s.bookedRevenue)
+      }
+    }
+
+    addAccumulated(targetMonth, trend)
+    addBooked(trend)
     if (comparisonQueries.data) {
       for (const c of comparisonQueries.data) {
-        if (c.data.length > 0) addSeries(c.month, c.data)
+        if (c.data.length > 0) addAccumulated(c.month, c.data)
       }
     }
 
@@ -453,7 +465,16 @@ export default function RevenueForecastPage() {
                   stroke="#2563eb"
                   strokeWidth={3}
                   dot={{ r: 3 }}
-                  name={`${targetMonth}（當前）`}
+                  name={`${targetMonth}（已實現）`}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="PMS 預估"
+                  stroke="#ea580c"
+                  strokeWidth={2}
+                  strokeDasharray="6 3"
+                  dot={{ r: 3 }}
+                  name="PMS 預估"
                 />
                 {compareMonths.map((m, i) => (
                   <Line

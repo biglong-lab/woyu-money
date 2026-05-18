@@ -89,16 +89,11 @@ export const dashboardNavItem: NavItem = {
   description: "YTD + 未來 3 月預估 + 缺口警示一頁看完",
 }
 
-export const forecastInputNavItem: NavItem = {
-  title: "預訂金額輸入",
-  href: "/forecast-input",
-  icon: Calendar,
-  description: "手動填本月/下月/下下月預訂金額、餵預測模型",
-}
+// 註：/forecast-input 已下架，PMS 系統已自動同步「不定期填入」資料
+// 路由保留可訪問供舊連結，但不顯示在導航
 
 export const decisionNavItems: NavItem[] = [
   dashboardNavItem,
-  forecastInputNavItem,
   forecastNavItem,
   scenarioNavItem,
   {
