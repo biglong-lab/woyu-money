@@ -3,6 +3,7 @@ import { useState } from "react"
 import { useQuery, useMutation } from "@tanstack/react-query"
 import { queryClient, apiRequest } from "@/lib/queryClient"
 import { useToast } from "@/hooks/use-toast"
+import { useDocumentTitle } from "@/hooks/use-document-title"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
@@ -548,6 +549,7 @@ function PmSyncDialog({ onClose, onDone }: { onClose: () => void; onDone: () => 
 
 // ─── 主頁面 ──────────────────────────────────────
 export default function IncomeWebhooksInboxPage() {
+  useDocumentTitle("進帳收件箱")
   const { toast } = useToast()
   const [statusFilter, setStatusFilter] = useState("pending")
   const [sourceFilter, setSourceFilter] = useState("")

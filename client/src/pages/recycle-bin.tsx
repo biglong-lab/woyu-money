@@ -39,6 +39,7 @@ import {
 import { format, formatDistanceToNow } from "date-fns"
 import { zhTW } from "date-fns/locale"
 import type { PaymentItem } from "@shared/schema"
+import { useDocumentTitle } from "@/hooks/use-document-title"
 
 interface AuditLog {
   id: number
@@ -60,6 +61,7 @@ interface PaymentItemWithProject extends PaymentItem {
 }
 
 export default function RecycleBin() {
+  useDocumentTitle("回收筒")
   const { toast } = useToast()
   const queryClient = useQueryClient()
   const [expandedItem, setExpandedItem] = useState<number | null>(null)

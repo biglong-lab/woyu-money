@@ -12,6 +12,7 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useToast } from "@/hooks/use-toast"
 import { localDateISO } from "@/lib/utils"
+import { useDocumentTitle } from "@/hooks/use-document-title"
 
 import {
   StatisticsCards,
@@ -36,6 +37,7 @@ import type {
 const ITEMS_PER_PAGE = 10
 
 export default function MonthlyPaymentAnalysis() {
+  useDocumentTitle("月度付款分析")
   const currentDate = new Date()
   const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear())
   const [selectedMonth, setSelectedMonth] = useState(currentDate.getMonth() + 1)

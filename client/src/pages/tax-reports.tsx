@@ -2,17 +2,17 @@
  * 稅務報表頁面
  * 營業稅申報表、薪資扣繳表、二代健保補充保費試算
  */
-import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useState } from "react"
+import { useQuery } from "@tanstack/react-query"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
+} from "@/components/ui/select"
 import {
   Table,
   TableBody,
@@ -20,96 +20,107 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import { Receipt, FileText, Users, AlertTriangle, Info } from 'lucide-react';
-import { apiRequest } from '@/lib/queryClient';
+} from "@/components/ui/table"
+import { Badge } from "@/components/ui/badge"
+import { Separator } from "@/components/ui/separator"
+import { Receipt, FileText, Users, AlertTriangle, Info } from "lucide-react"
+import { apiRequest } from "@/lib/queryClient"
+import { useDocumentTitle } from "@/hooks/use-document-title"
 
-const fmt = (n: number) => Math.round(n).toLocaleString();
+const fmt = (n: number) => Math.round(n).toLocaleString()
 
 // === 型別定義 ===
 
 interface BusinessTaxItem {
-  category: string;
-  invoiceCount: number;
-  amount: number;
+  category: string
+  invoiceCount: number
+  amount: number
 }
 
 interface BusinessTaxData {
-  year: number;
-  period: number;
-  periodLabel: string;
-  sales: { items: BusinessTaxItem[]; total: number; tax: number };
-  purchases: { items: BusinessTaxItem[]; total: number; tax: number };
-  taxPayable: number;
-  taxRate: number;
+  year: number
+  period: number
+  periodLabel: string
+  sales: { items: BusinessTaxItem[]; total: number; tax: number }
+  purchases: { items: BusinessTaxItem[]; total: number; tax: number }
+  taxPayable: number
+  taxRate: number
 }
 
 interface WithholdingEmployee {
-  employeeName: string;
-  idNumber: string;
-  totalSalary: number;
-  totalLaborInsurance: number;
-  totalHealthInsurance: number;
-  totalPension: number;
-  totalDeduction: number;
-  totalNetSalary: number;
-  monthsWorked: number;
+  employeeName: string
+  idNumber: string
+  totalSalary: number
+  totalLaborInsurance: number
+  totalHealthInsurance: number
+  totalPension: number
+  totalDeduction: number
+  totalNetSalary: number
+  monthsWorked: number
 }
 
 interface WithholdingData {
-  year: number;
-  employees: WithholdingEmployee[];
-  totals: { totalSalary: number; totalDeduction: number; totalNetSalary: number };
+  year: number
+  employees: WithholdingEmployee[]
+  totals: { totalSalary: number; totalDeduction: number; totalNetSalary: number }
 }
 
 interface SupplementaryEmployee {
-  employeeName: string;
-  avgMonthlySalary: number;
-  estimatedBonus: number;
-  taxableAmount: number;
-  supplementaryPremium: number;
+  employeeName: string
+  avgMonthlySalary: number
+  estimatedBonus: number
+  taxableAmount: number
+  supplementaryPremium: number
 }
 
 interface SupplementaryData {
-  year: number;
-  supplementaryRate: number;
-  baseWageThreshold: number;
-  employees: SupplementaryEmployee[];
-  totalPremium: number;
-  note: string;
+  year: number
+  supplementaryRate: number
+  baseWageThreshold: number
+  employees: SupplementaryEmployee[]
+  totalPremium: number
+  note: string
 }
 
 export default function TaxReports() {
-  const currentYear = new Date().getFullYear();
-  const [selectedYear, setSelectedYear] = useState(String(currentYear));
-  const [selectedPeriod, setSelectedPeriod] = useState('1');
+  useDocumentTitle("稅務報表")
+  const currentYear = new Date().getFullYear()
+  const [selectedYear, setSelectedYear] = useState(String(currentYear))
+  const [selectedPeriod, setSelectedPeriod] = useState("1")
 
-  const year = parseInt(selectedYear);
-  const period = parseInt(selectedPeriod);
-  const years = Array.from({ length: 5 }, (_, i) => String(currentYear - i));
+  const year = parseInt(selectedYear)
+  const period = parseInt(selectedPeriod)
+  const years = Array.from({ length: 5 }, (_, i) => String(currentYear - i))
 
   // 營業稅
   const { data: businessTax, isLoading: isLoadingBT } = useQuery<BusinessTaxData>({
-    queryKey: ['/api/reports/tax/business-tax', year, period],
+    queryKey: ["/api/reports/tax/business-tax", year, period],
     queryFn: () =>
-      apiRequest('GET', `/api/reports/tax/business-tax?year=${year}&period=${period}`) as Promise<BusinessTaxData>,
-  });
+      apiRequest(
+        "GET",
+        `/api/reports/tax/business-tax?year=${year}&period=${period}`
+      ) as Promise<BusinessTaxData>,
+  })
 
   // 薪資扣繳
   const { data: withholding, isLoading: isLoadingWH } = useQuery<WithholdingData>({
-    queryKey: ['/api/reports/tax/salary-withholding', year],
+    queryKey: ["/api/reports/tax/salary-withholding", year],
     queryFn: () =>
-      apiRequest('GET', `/api/reports/tax/salary-withholding?year=${year}`) as Promise<WithholdingData>,
-  });
+      apiRequest(
+        "GET",
+        `/api/reports/tax/salary-withholding?year=${year}`
+      ) as Promise<WithholdingData>,
+  })
 
   // 二代健保
   const { data: supplementary, isLoading: isLoadingSH } = useQuery<SupplementaryData>({
-    queryKey: ['/api/reports/tax/supplementary-health', year],
+    queryKey: ["/api/reports/tax/supplementary-health", year],
     queryFn: () =>
-      apiRequest('GET', `/api/reports/tax/supplementary-health?year=${year}`) as Promise<SupplementaryData>,
-  });
+      apiRequest(
+        "GET",
+        `/api/reports/tax/supplementary-health?year=${year}`
+      ) as Promise<SupplementaryData>,
+  })
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -128,7 +139,9 @@ export default function TaxReports() {
           </SelectTrigger>
           <SelectContent>
             {years.map((y) => (
-              <SelectItem key={y} value={y}>{y}年</SelectItem>
+              <SelectItem key={y} value={y}>
+                {y}年
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -141,8 +154,8 @@ export default function TaxReports() {
           <div className="text-sm text-amber-800">
             <p className="font-medium">注意事項</p>
             <p className="mt-1">
-              本報表為試算參考，實際申報金額請依政府規定和會計師建議為準。
-              營業稅稅率以 5% 計算，二代健保補充保費費率以 2.11% 計算。
+              本報表為試算參考，實際申報金額請依政府規定和會計師建議為準。 營業稅稅率以 5%
+              計算，二代健保補充保費費率以 2.11% 計算。
             </p>
           </div>
         </CardContent>
@@ -181,12 +194,20 @@ export default function TaxReports() {
           ) : businessTax ? (
             <>
               {/* 應繳稅額摘要 */}
-              <Card className={businessTax.taxPayable >= 0 ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200'}>
+              <Card
+                className={
+                  businessTax.taxPayable >= 0
+                    ? "bg-red-50 border-red-200"
+                    : "bg-green-50 border-green-200"
+                }
+              >
                 <CardContent className="pt-4 text-center">
                   <p className="text-sm text-gray-600">
                     {year}年 第{period}期（{businessTax.periodLabel}）應繳營業稅
                   </p>
-                  <p className={`text-3xl font-bold mt-1 ${businessTax.taxPayable >= 0 ? 'text-red-700' : 'text-green-700'}`}>
+                  <p
+                    className={`text-3xl font-bold mt-1 ${businessTax.taxPayable >= 0 ? "text-red-700" : "text-green-700"}`}
+                  >
                     ${fmt(Math.abs(businessTax.taxPayable))}
                   </p>
                   {businessTax.taxPayable < 0 && (
@@ -223,7 +244,9 @@ export default function TaxReports() {
                         ))}
                         {businessTax.sales.items.length === 0 && (
                           <TableRow>
-                            <TableCell colSpan={3} className="text-center text-gray-400">無銷項資料</TableCell>
+                            <TableCell colSpan={3} className="text-center text-gray-400">
+                              無銷項資料
+                            </TableCell>
                           </TableRow>
                         )}
                         <TableRow className="bg-green-50 font-bold">
@@ -231,11 +254,15 @@ export default function TaxReports() {
                           <TableCell className="text-right">
                             {businessTax.sales.items.reduce((s, i) => s + i.invoiceCount, 0)}
                           </TableCell>
-                          <TableCell className="text-right">${fmt(businessTax.sales.total)}</TableCell>
+                          <TableCell className="text-right">
+                            ${fmt(businessTax.sales.total)}
+                          </TableCell>
                         </TableRow>
                         <TableRow className="bg-green-100">
                           <TableCell colSpan={2}>銷項稅額（5%）</TableCell>
-                          <TableCell className="text-right font-bold">${fmt(businessTax.sales.tax)}</TableCell>
+                          <TableCell className="text-right font-bold">
+                            ${fmt(businessTax.sales.tax)}
+                          </TableCell>
                         </TableRow>
                       </TableBody>
                     </Table>
@@ -269,7 +296,9 @@ export default function TaxReports() {
                         ))}
                         {businessTax.purchases.items.length === 0 && (
                           <TableRow>
-                            <TableCell colSpan={3} className="text-center text-gray-400">無進項資料</TableCell>
+                            <TableCell colSpan={3} className="text-center text-gray-400">
+                              無進項資料
+                            </TableCell>
                           </TableRow>
                         )}
                         <TableRow className="bg-red-50 font-bold">
@@ -277,11 +306,15 @@ export default function TaxReports() {
                           <TableCell className="text-right">
                             {businessTax.purchases.items.reduce((s, i) => s + i.invoiceCount, 0)}
                           </TableCell>
-                          <TableCell className="text-right">${fmt(businessTax.purchases.total)}</TableCell>
+                          <TableCell className="text-right">
+                            ${fmt(businessTax.purchases.total)}
+                          </TableCell>
                         </TableRow>
                         <TableRow className="bg-red-100">
                           <TableCell colSpan={2}>進項稅額（5%）</TableCell>
-                          <TableCell className="text-right font-bold">${fmt(businessTax.purchases.tax)}</TableCell>
+                          <TableCell className="text-right font-bold">
+                            ${fmt(businessTax.purchases.tax)}
+                          </TableCell>
                         </TableRow>
                       </TableBody>
                     </Table>
@@ -305,19 +338,25 @@ export default function TaxReports() {
                 <Card className="bg-blue-50 border-blue-200">
                   <CardContent className="pt-4 text-center">
                     <p className="text-xs text-blue-600">年度薪資總額</p>
-                    <p className="text-xl font-bold text-blue-800">${fmt(withholding.totals.totalSalary)}</p>
+                    <p className="text-xl font-bold text-blue-800">
+                      ${fmt(withholding.totals.totalSalary)}
+                    </p>
                   </CardContent>
                 </Card>
                 <Card className="bg-orange-50 border-orange-200">
                   <CardContent className="pt-4 text-center">
                     <p className="text-xs text-orange-600">年度扣繳總額</p>
-                    <p className="text-xl font-bold text-orange-800">${fmt(withholding.totals.totalDeduction)}</p>
+                    <p className="text-xl font-bold text-orange-800">
+                      ${fmt(withholding.totals.totalDeduction)}
+                    </p>
                   </CardContent>
                 </Card>
                 <Card className="bg-green-50 border-green-200">
                   <CardContent className="pt-4 text-center">
                     <p className="text-xs text-green-600">年度實發總額</p>
-                    <p className="text-xl font-bold text-green-800">${fmt(withholding.totals.totalNetSalary)}</p>
+                    <p className="text-xl font-bold text-green-800">
+                      ${fmt(withholding.totals.totalNetSalary)}
+                    </p>
                   </CardContent>
                 </Card>
               </div>
@@ -350,14 +389,26 @@ export default function TaxReports() {
                         {withholding.employees.map((e, i) => (
                           <TableRow key={i}>
                             <TableCell className="font-medium">{e.employeeName}</TableCell>
-                            <TableCell className="text-right text-gray-400 text-xs">{e.idNumber || '-'}</TableCell>
+                            <TableCell className="text-right text-gray-400 text-xs">
+                              {e.idNumber || "-"}
+                            </TableCell>
                             <TableCell className="text-right">{e.monthsWorked}</TableCell>
                             <TableCell className="text-right">${fmt(e.totalSalary)}</TableCell>
-                            <TableCell className="text-right text-orange-600">${fmt(e.totalLaborInsurance)}</TableCell>
-                            <TableCell className="text-right text-orange-600">${fmt(e.totalHealthInsurance)}</TableCell>
-                            <TableCell className="text-right text-purple-600">${fmt(e.totalPension)}</TableCell>
-                            <TableCell className="text-right font-medium text-red-600">${fmt(e.totalDeduction)}</TableCell>
-                            <TableCell className="text-right font-medium text-green-600">${fmt(e.totalNetSalary)}</TableCell>
+                            <TableCell className="text-right text-orange-600">
+                              ${fmt(e.totalLaborInsurance)}
+                            </TableCell>
+                            <TableCell className="text-right text-orange-600">
+                              ${fmt(e.totalHealthInsurance)}
+                            </TableCell>
+                            <TableCell className="text-right text-purple-600">
+                              ${fmt(e.totalPension)}
+                            </TableCell>
+                            <TableCell className="text-right font-medium text-red-600">
+                              ${fmt(e.totalDeduction)}
+                            </TableCell>
+                            <TableCell className="text-right font-medium text-green-600">
+                              ${fmt(e.totalNetSalary)}
+                            </TableCell>
                           </TableRow>
                         ))}
                         {withholding.employees.length === 0 && (
@@ -372,10 +423,18 @@ export default function TaxReports() {
                             <TableCell>合計 ({withholding.employees.length} 人)</TableCell>
                             <TableCell />
                             <TableCell />
-                            <TableCell className="text-right">${fmt(withholding.totals.totalSalary)}</TableCell>
-                            <TableCell className="text-right" colSpan={3}>-</TableCell>
-                            <TableCell className="text-right text-red-700">${fmt(withholding.totals.totalDeduction)}</TableCell>
-                            <TableCell className="text-right text-green-700">${fmt(withholding.totals.totalNetSalary)}</TableCell>
+                            <TableCell className="text-right">
+                              ${fmt(withholding.totals.totalSalary)}
+                            </TableCell>
+                            <TableCell className="text-right" colSpan={3}>
+                              -
+                            </TableCell>
+                            <TableCell className="text-right text-red-700">
+                              ${fmt(withholding.totals.totalDeduction)}
+                            </TableCell>
+                            <TableCell className="text-right text-green-700">
+                              ${fmt(withholding.totals.totalNetSalary)}
+                            </TableCell>
                           </TableRow>
                         )}
                       </TableBody>
@@ -402,8 +461,8 @@ export default function TaxReports() {
                   <div className="text-sm text-blue-800">
                     <p className="font-medium">二代健保補充保費說明</p>
                     <p className="mt-1">
-                      費率：{(supplementary.supplementaryRate * 100).toFixed(2)}% ｜
-                      起扣門檻：${fmt(supplementary.baseWageThreshold)}（基本工資）
+                      費率：{(supplementary.supplementaryRate * 100).toFixed(2)}% ｜ 起扣門檻：$
+                      {fmt(supplementary.baseWageThreshold)}（基本工資）
                     </p>
                     <p className="mt-1 text-blue-600">{supplementary.note}</p>
                   </div>
@@ -445,14 +504,17 @@ export default function TaxReports() {
                             <TableCell className="text-right">${fmt(e.avgMonthlySalary)}</TableCell>
                             <TableCell className="text-right">${fmt(e.estimatedBonus)}</TableCell>
                             <TableCell className="text-right">
-                              {e.taxableAmount > 0 ? `$${fmt(e.taxableAmount)}` : '-'}
+                              {e.taxableAmount > 0 ? `$${fmt(e.taxableAmount)}` : "-"}
                             </TableCell>
                             <TableCell className="text-right font-medium text-purple-600">
-                              {e.supplementaryPremium > 0 ? `$${fmt(e.supplementaryPremium)}` : '-'}
+                              {e.supplementaryPremium > 0 ? `$${fmt(e.supplementaryPremium)}` : "-"}
                             </TableCell>
                             <TableCell className="text-center">
-                              <Badge variant={e.taxableAmount > 0 ? 'destructive' : 'secondary'} className="text-xs">
-                                {e.taxableAmount > 0 ? '需扣繳' : '免扣繳'}
+                              <Badge
+                                variant={e.taxableAmount > 0 ? "destructive" : "secondary"}
+                                className="text-xs"
+                              >
+                                {e.taxableAmount > 0 ? "需扣繳" : "免扣繳"}
                               </Badge>
                             </TableCell>
                           </TableRow>
@@ -474,5 +536,5 @@ export default function TaxReports() {
         </TabsContent>
       </Tabs>
     </div>
-  );
+  )
 }

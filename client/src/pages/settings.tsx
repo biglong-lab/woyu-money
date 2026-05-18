@@ -1,16 +1,18 @@
 // 系統設定頁面 - 主框架
-import { useState } from "react";
-import { Settings as SettingsIcon } from "lucide-react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useState } from "react"
+import { Settings as SettingsIcon } from "lucide-react"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
-import SettingsCategoriesTab from "@/components/settings-categories-tab";
-import SettingsProjectsTab from "@/components/settings-projects-tab";
-import SettingsLineConfigTab from "@/components/settings-line-config-tab";
-import SettingsAdminTab from "@/components/settings-admin-tab";
-import { SettingsAiTab } from "@/components/settings-ai-tab";
+import SettingsCategoriesTab from "@/components/settings-categories-tab"
+import SettingsProjectsTab from "@/components/settings-projects-tab"
+import SettingsLineConfigTab from "@/components/settings-line-config-tab"
+import SettingsAdminTab from "@/components/settings-admin-tab"
+import { SettingsAiTab } from "@/components/settings-ai-tab"
+import { useDocumentTitle } from "@/hooks/use-document-title"
 
 export default function Settings() {
-  const [activeTab, setActiveTab] = useState("categories");
+  useDocumentTitle("系統設定")
+  const [activeTab, setActiveTab] = useState("categories")
 
   return (
     <div className="space-y-6">
@@ -19,9 +21,7 @@ export default function Settings() {
         <SettingsIcon className="w-8 h-8" />
         <div>
           <h1 className="text-3xl font-bold tracking-tight">系統設定</h1>
-          <p className="text-muted-foreground">
-            管理分類、專案和系統配置
-          </p>
+          <p className="text-muted-foreground">管理分類、專案和系統配置</p>
         </div>
       </div>
 
@@ -61,5 +61,5 @@ export default function Settings() {
         </TabsContent>
       </Tabs>
     </div>
-  );
+  )
 }
