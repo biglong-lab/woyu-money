@@ -105,7 +105,7 @@ export const CATEGORY_RULES: Record<CategoryKey, CategoryRule> = {
     key: "bank_loan",
     label: "銀行貸款",
     keywords: ["房貸", "車貸", "銀行貸款", "信貸", "企業貸款", "貸款"],
-    lateFeeRate: 0.0005,
+    lateFeeRate: 0, // 預設關閉：銀行各家計息規則不一，使用者可從 /late-fee-settings 自行設定
     consequenceWeight: 90,
     flexibility: 10,
     description: "聯徵不良紀錄 5~7 年",
@@ -114,7 +114,7 @@ export const CATEGORY_RULES: Record<CategoryKey, CategoryRule> = {
     key: "credit_card",
     label: "信用卡",
     keywords: ["信用卡", "卡費", "信用卡費"],
-    lateFeeRate: 0.0005,
+    lateFeeRate: 0, // 預設關閉
     consequenceWeight: 80,
     flexibility: 10,
     description: "循環利息年化 15%，影響信用",
@@ -123,7 +123,7 @@ export const CATEGORY_RULES: Record<CategoryKey, CategoryRule> = {
     key: "utility",
     label: "水電瓦斯",
     keywords: ["電費", "水費", "瓦斯", "電話費", "網路費", "電信費", "市話", "手機費"],
-    lateFeeRate: 0.001,
+    lateFeeRate: 0, // 預設關閉：水電通常一個月寬限、未斷供前不算滯納金
     consequenceWeight: 70,
     flexibility: 20,
     description: "有斷供風險、影響營運",
@@ -132,7 +132,7 @@ export const CATEGORY_RULES: Record<CategoryKey, CategoryRule> = {
     key: "insurance",
     label: "商業保險",
     keywords: ["壽險", "產險", "意外險", "汽車保險", "火險", "商業保險"],
-    lateFeeRate: 0.0001,
+    lateFeeRate: 0, // 預設關閉
     consequenceWeight: 60,
     flexibility: 30,
     description: "斷保、復效手續",
@@ -141,7 +141,7 @@ export const CATEGORY_RULES: Record<CategoryKey, CategoryRule> = {
     key: "rental_pay",
     label: "租金",
     keywords: ["房租", "租金", "租賃費"],
-    lateFeeRate: 0.0001,
+    lateFeeRate: 0, // 預設關閉：租金跟房東關係維護、不算滯納金
     consequenceWeight: 50,
     flexibility: 50,
     description: "關係維護（多為友好房東）",
