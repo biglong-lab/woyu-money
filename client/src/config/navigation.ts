@@ -82,7 +82,23 @@ export const scenarioNavItem: NavItem = {
   description: "調整行銷/訂價/固定支出，即時看下月收支影響",
 }
 
+export const dashboardNavItem: NavItem = {
+  title: "綜合儀表板",
+  href: "/financial-dashboard",
+  icon: BarChart3,
+  description: "YTD + 未來 3 月預估 + 缺口警示一頁看完",
+}
+
+export const forecastInputNavItem: NavItem = {
+  title: "預訂金額輸入",
+  href: "/forecast-input",
+  icon: Calendar,
+  description: "手動填本月/下月/下下月預訂金額、餵預測模型",
+}
+
 export const decisionNavItems: NavItem[] = [
+  dashboardNavItem,
+  forecastInputNavItem,
   forecastNavItem,
   scenarioNavItem,
   {
@@ -475,6 +491,16 @@ export const breadcrumbConfig: Record<string, BreadcrumbItem[]> = {
     { title: "首頁", href: "/" },
     { title: "財務助理" },
     { title: "沙盤推演" },
+  ],
+  "/financial-dashboard": [
+    { title: "首頁", href: "/" },
+    { title: "財務助理" },
+    { title: "綜合儀表板" },
+  ],
+  "/forecast-input": [
+    { title: "首頁", href: "/" },
+    { title: "財務助理" },
+    { title: "預訂金額輸入" },
   ],
   "/expense/inbox": [
     { title: "首頁", href: "/" },
