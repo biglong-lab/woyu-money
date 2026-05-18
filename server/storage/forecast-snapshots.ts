@@ -54,7 +54,13 @@ export async function getMonthlyTrend(
   companyId: number | null = null
 ): Promise<RevenueForecastSnapshot[]> {
   const conditions = [eq(revenueForecastSnapshots.targetMonth, targetMonth)]
-  if (companyId !== null) conditions.push(eq(revenueForecastSnapshots.companyId, companyId))
+  // companyId = null → 拿合計列（明確 IS NULL）
+  // companyId = number → 拿該館
+  if (companyId === null) {
+    conditions.push(sql`${revenueForecastSnapshots.companyId} IS NULL`)
+  } else {
+    conditions.push(eq(revenueForecastSnapshots.companyId, companyId))
+  }
 
   return db
     .select()
@@ -330,9 +336,16 @@ export async function getSeasonalForecast(
   ci95: { lower: number; upper: number }
   confidence: "high" | "medium" | "low" | "insufficient"
 }> {
-  // 1. 取本月最新快照
-  const conditions = [eq(revenueForecastSnapshots.targetMonth, targetMonth)]
-  if (companyId !== null) conditions.push(eq(revenueForecastSnapshots.companyId, companyId))
+  // 1. 取本月最新快照（只看 PM 已實現累積、不混 PMS 預估）
+  const conditions = [
+    eq(revenueForecastSnapshots.targetMonth, targetMonth),
+    eq(revenueForecastSnapshots.source, "pm-daily-snapshot"),
+  ]
+  if (companyId === null) {
+    conditions.push(sql`${revenueForecastSnapshots.companyId} IS NULL`)
+  } else {
+    conditions.push(eq(revenueForecastSnapshots.companyId, companyId))
+  }
 
   const currentSnapshots = await db
     .select()
@@ -372,8 +385,15 @@ export async function getSeasonalForecast(
     []
 
   for (const hm of pastMonths) {
-    const hmConditions = [eq(revenueForecastSnapshots.targetMonth, hm)]
-    if (companyId !== null) hmConditions.push(eq(revenueForecastSnapshots.companyId, companyId))
+    const hmConditions = [
+      eq(revenueForecastSnapshots.targetMonth, hm),
+      eq(revenueForecastSnapshots.source, "pm-daily-snapshot"),
+    ]
+    if (companyId === null) {
+      hmConditions.push(sql`${revenueForecastSnapshots.companyId} IS NULL`)
+    } else {
+      hmConditions.push(eq(revenueForecastSnapshots.companyId, companyId))
+    }
 
     const hmSnaps = await db
       .select()
