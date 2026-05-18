@@ -95,11 +95,11 @@ export default function RecurringExpensesPage() {
   })
 
   const generateMutation = useMutation({
-    mutationFn: (vars: { id: number; force: boolean }) =>
+    mutationFn: (vars: { id: number; force: boolean; month: string }) =>
       apiRequest<{ generated: number[]; skipped: { id: number; reason: string }[] }>(
         "POST",
         `/api/recurring-expense-templates/${vars.id}/generate`,
-        { force: vars.force }
+        { force: vars.force, month: vars.month }
       ),
     onSuccess: (r) => {
       toast({
@@ -116,13 +116,16 @@ export default function RecurringExpensesPage() {
       toast({ title: "產出失敗", description: err.message, variant: "destructive" }),
   })
 
+  // 月份選擇（預設當月）
+  const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().slice(0, 7))
+
   const generateAllMutation = useMutation({
-    mutationFn: () =>
+    mutationFn: (month: string) =>
       apiRequest<{
         month: string
         generated: number[]
         skipped: { id: number; reason: string }[]
-      }>("POST", "/api/recurring-expense-templates/generate-all", {}),
+      }>("POST", "/api/recurring-expense-templates/generate-all", { month }),
     onSuccess: (r) => {
       toast({
         title: `${r.month} 全部產出完成`,
@@ -149,14 +152,35 @@ export default function RecurringExpensesPage() {
             每月固定支出（人事、洗滌、水電、保險...）模板。每月 1-3 號自動產出 unpaid 待確認項目。
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center flex-wrap">
+          <select
+            value={selectedMonth}
+            onChange={(e) => setSelectedMonth(e.target.value)}
+            className="h-9 px-2 text-sm border border-gray-300 rounded bg-white"
+          >
+            {(() => {
+              // 過去 3 月 ~ 未來 6 月
+              const opts: string[] = []
+              const now = new Date()
+              for (let i = -3; i <= 6; i++) {
+                const d = new Date(now.getFullYear(), now.getMonth() + i, 1)
+                opts.push(d.toISOString().slice(0, 7))
+              }
+              return opts.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                  {m === new Date().toISOString().slice(0, 7) ? "（本月）" : ""}
+                </option>
+              ))
+            })()}
+          </select>
           <Button
             variant="outline"
-            onClick={() => generateAllMutation.mutate()}
+            onClick={() => generateAllMutation.mutate(selectedMonth)}
             disabled={generateAllMutation.isPending}
           >
             <Play className="h-4 w-4 mr-1" />
-            全部立即產出當月
+            全部立即產出
           </Button>
           <Button onClick={() => setEditDialog({ mode: "create" })}>
             <Plus className="h-4 w-4 mr-1" />
@@ -206,7 +230,9 @@ export default function RecurringExpensesPage() {
               projectName={projectName(t.projectId)}
               onEdit={() => setEditDialog({ mode: "edit", tpl: t })}
               onDelete={() => setConfirmDelete(t)}
-              onGenerate={(force) => generateMutation.mutate({ id: t.id, force })}
+              onGenerate={(force) =>
+                generateMutation.mutate({ id: t.id, force, month: selectedMonth })
+              }
               isGenerating={generateMutation.isPending}
             />
           ))}
