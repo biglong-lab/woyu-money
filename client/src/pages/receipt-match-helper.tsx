@@ -6,7 +6,7 @@
 import { useState } from "react"
 import { useMutation } from "@tanstack/react-query"
 import { Link } from "wouter"
-import { Receipt, CheckCircle2, ArrowRight, Plus } from "lucide-react"
+import { Receipt, CheckCircle2, ArrowRight, Plus, RotateCcw } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -18,6 +18,7 @@ import { localDateISO, formatNT, friendlyApiError } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 import { useDocumentTitle } from "@/hooks/use-document-title"
 import { ReceiptUploadButton } from "@/components/receipt-upload-button"
+import { BackToTop } from "@/components/back-to-top"
 
 type Confidence = "high" | "medium" | "low"
 
@@ -146,6 +147,17 @@ export default function ReceiptMatchHelperPage() {
       toast({ title: "標記失敗", description: friendlyApiError(err), variant: "destructive" }),
   })
 
+  const handleReset = () => {
+    setAmount("")
+    setReceiptDate("")
+    setVendor("")
+    setOcrText("")
+    setReceiptUrl(null)
+    setResult(null)
+  }
+
+  const hasAnyInput = !!(amount || receiptDate || vendor || ocrText || receiptUrl || result)
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     const payload: SuggestPayload = {}
@@ -244,11 +256,23 @@ export default function ReceiptMatchHelperPage() {
               </p>
               <ReceiptUploadButton value={receiptUrl} onChange={setReceiptUrl} />
             </div>
-            <div className="sm:col-span-2">
+            <div className="sm:col-span-2 flex gap-2 flex-wrap">
               <Button type="submit" disabled={suggestMutation.isPending}>
                 {suggestMutation.isPending ? "搜尋中..." : "尋找匹配項目"}
                 <ArrowRight className="h-4 w-4 ml-1" />
               </Button>
+              {hasAnyInput && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleReset}
+                  disabled={suggestMutation.isPending}
+                  aria-label="清除表單並重新開始"
+                >
+                  <RotateCcw className="h-4 w-4 mr-1" />
+                  清除 / 搜尋另一張
+                </Button>
+              )}
             </div>
           </form>
         </CardContent>
@@ -300,6 +324,8 @@ export default function ReceiptMatchHelperPage() {
           </CardContent>
         </Card>
       )}
+
+      <BackToTop />
     </div>
   )
 }
