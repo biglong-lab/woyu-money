@@ -231,17 +231,35 @@ export function classifyItem(input: PriorityInput): CategoryKey {
 // 滯納金估算
 // ─────────────────────────────────────────────
 
+/**
+ * 滯納金規則 override（從 DB late_fee_policies 來）
+ * 若提供 → 取代 CATEGORY_RULES.lateFeeRate / 加寬限期
+ */
+export interface LateFeePolicyMap {
+  rateMap?: Record<string, number> // categoryKey → 每日費率
+  graceMap?: Record<string, number> // categoryKey → 寬限期天數
+}
+
 export function estimateLateFee(
   input: PriorityInput,
-  today: Date = new Date()
+  today: Date = new Date(),
+  policy?: LateFeePolicyMap
 ): { accumulated: number; perDay: number } {
   const category = classifyItem(input)
   const rule = CATEGORY_RULES[category]
   const unpaid = Math.max(0, input.totalAmount - input.paidAmount)
   const dueDate = new Date(input.dueDate)
-  const overdueDays = Math.max(0, daysBetween(dueDate, today))
 
-  const perDay = unpaid * rule.lateFeeRate
+  // 寬限期：dueDate + grace 天後才開始累積
+  const grace = policy?.graceMap?.[category] ?? 0
+  const effectiveDueDate = new Date(dueDate)
+  effectiveDueDate.setDate(effectiveDueDate.getDate() + grace)
+  const overdueDays = Math.max(0, daysBetween(effectiveDueDate, today))
+
+  // 費率：優先用 DB policyMap，否則 fallback CATEGORY_RULES
+  const rate = policy?.rateMap?.[category] ?? rule.lateFeeRate
+
+  const perDay = unpaid * rate
   const accumulated = perDay * overdueDays
 
   return { accumulated, perDay }
@@ -329,7 +347,11 @@ function buildReasons(
   return reasons
 }
 
-export function calculatePriority(input: PriorityInput, today: Date = new Date()): PriorityResult {
+export function calculatePriority(
+  input: PriorityInput,
+  today: Date = new Date(),
+  policy?: LateFeePolicyMap
+): PriorityResult {
   const category = classifyItem(input)
   const rule = CATEGORY_RULES[category]
   const unpaid = Math.max(0, input.totalAmount - input.paidAmount)
@@ -338,7 +360,11 @@ export function calculatePriority(input: PriorityInput, today: Date = new Date()
   const daysOverdue = Math.max(0, diff)
   const daysUntilDue = Math.max(0, -diff)
 
-  const { accumulated: lateFeeEstimate, perDay: dailyLateFee } = estimateLateFee(input, today)
+  const { accumulated: lateFeeEstimate, perDay: dailyLateFee } = estimateLateFee(
+    input,
+    today,
+    policy
+  )
   const isNegotiated = input.isNegotiated ?? false
 
   const score = computeScore(rule, unpaid, daysOverdue, daysUntilDue, lateFeeEstimate, isNegotiated)
@@ -375,9 +401,12 @@ export function calculatePriority(input: PriorityInput, today: Date = new Date()
 
 export function sortByPriority(
   inputs: PriorityInput[],
-  today: Date = new Date()
+  today: Date = new Date(),
+  policy?: LateFeePolicyMap
 ): PriorityResult[] {
-  return inputs.map((input) => calculatePriority(input, today)).sort((a, b) => b.score - a.score)
+  return inputs
+    .map((input) => calculatePriority(input, today, policy))
+    .sort((a, b) => b.score - a.score)
 }
 
 export function groupByUrgency(results: PriorityResult[]): Record<UrgencyLevel, PriorityResult[]> {
