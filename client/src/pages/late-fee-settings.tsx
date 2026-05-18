@@ -6,7 +6,7 @@
  *  - 寬限期（dueDate + N 天）
  *  - 是否啟用
  */
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { useQuery, useMutation } from "@tanstack/react-query"
 import { queryClient, apiRequest } from "@/lib/queryClient"
 import { useToast } from "@/hooks/use-toast"
@@ -49,6 +49,30 @@ export default function LateFeeSettingsPage() {
   const { data: policies = [] } = useQuery<Policy[]>({
     queryKey: ["/api/late-fee-policies"],
   })
+
+  // 影響預覽：每類別 unpaid 項目數 + 滯納金潛在累積
+  const { data: impactRows = [] } = useQuery<
+    Array<{
+      category_key: string
+      unpaid_count: number
+      total_unpaid: number
+      aggregate_overdue: number
+    }>
+  >({
+    queryKey: ["/api/late-fee-policies/impact"],
+  })
+
+  const impactByKey = useMemo(() => {
+    const m: Record<string, { count: number; unpaid: number; aggregate: number }> = {}
+    for (const r of impactRows) {
+      m[r.category_key] = {
+        count: r.unpaid_count,
+        unpaid: Number(r.total_unpaid),
+        aggregate: Number(r.aggregate_overdue),
+      }
+    }
+    return m
+  }, [impactRows])
 
   // 本地編輯狀態（暫存改動）
   const [edits, setEdits] = useState<Record<string, Partial<Policy>>>({})
@@ -140,6 +164,27 @@ export default function LateFeeSettingsPage() {
                         {p.categoryKey}
                       </code>
                       {dirty && <Badge className="bg-amber-100 text-amber-800">尚未儲存</Badge>}
+                      {(() => {
+                        const imp = impactByKey[p.categoryKey]
+                        if (!imp || imp.count === 0) return null
+                        // 估算潛在每日滯納金 = unpaid × rate
+                        const dailyFee = imp.unpaid * rate
+                        return (
+                          <Badge
+                            className={
+                              enabled
+                                ? "bg-red-100 text-red-800 border border-red-300"
+                                : "bg-gray-100 text-gray-600"
+                            }
+                            title={`現有 ${imp.count} 筆 unpaid 共 NT$${imp.unpaid.toLocaleString()} 會套用此費率`}
+                          >
+                            影響 {imp.count} 筆
+                            {enabled && dailyFee > 0
+                              ? `（${Math.round(dailyFee).toLocaleString()}/天）`
+                              : ""}
+                          </Badge>
+                        )
+                      })()}
                     </div>
                     {p.notes && <div className="text-xs text-gray-500 mt-0.5">{p.notes}</div>}
                   </div>
