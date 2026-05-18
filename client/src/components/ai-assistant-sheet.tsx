@@ -127,6 +127,7 @@ export function AiAssistantSheet({ open, onOpenChange }: AiAssistantSheetProps) 
                 className="h-8 w-8 text-gray-400 hover:text-red-500"
                 onClick={clearMessages}
                 title="清除對話"
+                aria-label="清除對話"
               >
                 <Trash2 className="w-4 h-4" />
               </Button>
