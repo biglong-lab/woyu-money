@@ -322,18 +322,44 @@ export default function ScenarioSimulatorPage() {
             unit="%"
             hint={`彈性係數 ${marketingElasticity}（每 +10% 行銷 → 收入 +${(marketingElasticity * 10).toFixed(1)}%）`}
           />
-          <div className="flex items-center gap-2 text-xs text-gray-500">
-            <span>彈性係數：</span>
-            <Input
-              type="number"
-              min={0}
-              max={1}
-              step={0.05}
-              value={marketingElasticity}
-              onChange={(e) => setMarketingElasticity(parseFloat(e.target.value) || 0)}
-              className="w-20 h-7 text-xs"
-            />
-            <span>（業界常見 0.2~0.5，越高代表行銷越敏感）</span>
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 text-xs text-gray-500 flex-wrap">
+              <span>彈性係數：</span>
+              <Input
+                type="number"
+                min={0}
+                max={1}
+                step={0.05}
+                value={marketingElasticity}
+                onChange={(e) => setMarketingElasticity(parseFloat(e.target.value) || 0)}
+                className="w-20 h-7 text-xs"
+              />
+              <span className="text-gray-400">（拖滑桿選業界範圍）</span>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              {[
+                { v: 0.1, label: "0.1 保守", desc: "成熟品牌 / 行銷已飽和" },
+                { v: 0.3, label: "0.3 中性", desc: "業界平均（旅宿業）" },
+                { v: 0.5, label: "0.5 積極", desc: "新品牌 / 行銷強敏感" },
+                { v: 0.8, label: "0.8 激進", desc: "罕見 / 新興市場" },
+              ].map((opt) => (
+                <button
+                  key={opt.v}
+                  onClick={() => setMarketingElasticity(opt.v)}
+                  className={`text-xs px-2 py-1 rounded border transition ${
+                    Math.abs(marketingElasticity - opt.v) < 0.01
+                      ? "bg-blue-100 border-blue-400 text-blue-900"
+                      : "bg-white border-gray-300 hover:border-blue-300"
+                  }`}
+                  title={opt.desc}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            <div className="text-xs text-gray-400">
+              💡 行銷預算 +10% → 收入 +{(marketingElasticity * 10).toFixed(1)}%（依目前係數）
+            </div>
           </div>
 
           <SliderRow
