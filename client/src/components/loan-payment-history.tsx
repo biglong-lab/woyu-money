@@ -8,6 +8,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
@@ -372,6 +373,7 @@ export default function LoanPaymentHistory({ recordId, recordTitle }: LoanPaymen
           >
             <DialogHeader>
               <DialogTitle>新增還款記錄</DialogTitle>
+              <DialogDescription className="sr-only">新增還款記錄 — 對話框</DialogDescription>
               <p id="add-payment-description" className="text-sm text-gray-600">
                 為 {recordTitle} 記錄還款資訊和上傳相關證明文件
               </p>
@@ -582,6 +584,9 @@ export default function LoanPaymentHistory({ recordId, recordTitle }: LoanPaymen
                       >
                         <DialogHeader>
                           <DialogTitle>匯款截圖管理</DialogTitle>
+                          <DialogDescription className="sr-only">
+                            匯款截圖管理 — 對話框
+                          </DialogDescription>
                           <p id="file-upload-description" className="text-sm text-gray-600">
                             上傳、查看和管理此筆還款的相關證明文件
                           </p>
@@ -707,6 +712,7 @@ export default function LoanPaymentHistory({ recordId, recordTitle }: LoanPaymen
         <DialogContent className="w-[95vw] max-w-2xl">
           <DialogHeader>
             <DialogTitle>編輯還款記錄</DialogTitle>
+            <DialogDescription className="sr-only">編輯還款記錄 — 對話框</DialogDescription>
           </DialogHeader>
           <div className="grid grid-cols-2 gap-4">
             <div>

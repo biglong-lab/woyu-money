@@ -7,6 +7,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
@@ -228,6 +229,7 @@ export function FileUpload({
             <DialogContent className="w-[95vw] max-w-md">
               <DialogHeader>
                 <DialogTitle>上傳新文件</DialogTitle>
+                <DialogDescription className="sr-only">上傳新文件 — 對話框</DialogDescription>
               </DialogHeader>
               <div className="space-y-4">
                 <div>

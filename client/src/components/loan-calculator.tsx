@@ -18,6 +18,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogTrigger,
 } from "@/components/ui/dialog"
 import {
@@ -561,6 +562,7 @@ ${calculation?.totalPayment ? `總還款：NT$ ${calculation.totalPayment.toLoca
                 <DialogContent className="w-[95vw] max-w-2xl max-h-[80vh] overflow-y-auto">
                   <DialogHeader>
                     <DialogTitle>建立借貸紀錄</DialogTitle>
+                    <DialogDescription className="sr-only">建立借貸紀錄 — 對話框</DialogDescription>
                   </DialogHeader>
                   <Form {...recordForm}>
                     <form

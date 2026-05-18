@@ -4,7 +4,13 @@
  */
 import { useState, useMemo } from "react"
 import { useQuery, useMutation } from "@tanstack/react-query"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
@@ -220,6 +226,7 @@ export function QuickPaymentDialog({ open, onOpenChange }: QuickPaymentDialogPro
             <DollarSign className="w-5 h-5 text-green-600" />
             快速付款
           </DialogTitle>
+          <DialogDescription className="sr-only">快速付款 — 對話框</DialogDescription>
         </DialogHeader>
 
         {/* 步驟指示器 */}

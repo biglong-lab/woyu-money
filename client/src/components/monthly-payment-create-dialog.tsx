@@ -7,6 +7,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogTrigger,
 } from "@/components/ui/dialog"
 import {
@@ -50,6 +51,7 @@ export function MonthlyPaymentCreateDialog({
       <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>新增月付項目</DialogTitle>
+          <DialogDescription className="sr-only">新增月付項目 — 對話框</DialogDescription>
           <div className="text-sm text-gray-600 bg-blue-50 p-3 rounded-lg">
             <p className="font-medium text-blue-800 mb-1">月付分期說明：</p>
             <p>* 設定期數、開始付款日期、月付金額，系統將自動創建連續月份的付款項目</p>

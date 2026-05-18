@@ -1,6 +1,12 @@
 // 一般付款管理 - 刪除確認對話框元件
 import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog"
 import { Trash2 } from "lucide-react"
 import { formatNT } from "@/lib/utils"
 import type { PaymentItem } from "./general-payment-types"
@@ -28,6 +34,7 @@ export function GeneralPaymentDeleteDialog({
             <Trash2 className="w-5 h-5 text-amber-500" />
             刪除付款項目
           </DialogTitle>
+          <DialogDescription className="sr-only">刪除付款項目 — 對話框</DialogDescription>
         </DialogHeader>
         <div className="py-4">
           <p className="text-sm text-gray-600 mb-3">
