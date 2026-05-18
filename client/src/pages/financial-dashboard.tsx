@@ -149,8 +149,22 @@ export default function FinancialDashboardPage() {
     { income: 0, expense: 0, profit: 0 }
   )
 
-  // 缺口警示
+  // 缺口警示（單月）
   const cashFlowGap = futureRows.find((r) => r.profit < 0)
+
+  // 累積現金缺口：YTD 結餘 + 未來逐月累積、若任一月轉負
+  const cumulativeWarning = useMemo(() => {
+    if (futureRows.length === 0) return null
+    let cumulative = ytd.profit
+    const trajectory: Array<{ month: string; cumulative: number; profit: number }> = []
+    let firstNegativeMonth: string | null = null
+    for (const r of futureRows) {
+      cumulative += r.profit
+      trajectory.push({ month: r.month, cumulative, profit: r.profit })
+      if (cumulative < 0 && !firstNegativeMonth) firstNegativeMonth = r.month
+    }
+    return { trajectory, firstNegativeMonth, finalCumulative: cumulative }
+  }, [ytd.profit, futureRows])
 
   // 圖表資料：歷史 + 未來
   const chartData = [
@@ -169,6 +183,39 @@ export default function FinancialDashboardPage() {
           一頁看完今年到今 + 未來 3 月預估 + 各館明細 + 缺口警示
         </p>
       </div>
+
+      {/* 累積現金缺口警示（更嚴重、YTD 結餘 + 未來累積會轉負）*/}
+      {cumulativeWarning?.firstNegativeMonth && (
+        <Card className="border-red-400 bg-red-50">
+          <CardContent className="py-3 px-4 flex items-start gap-3">
+            <AlertTriangle className="h-5 w-5 text-red-600 mt-0.5 animate-pulse" />
+            <div className="text-sm flex-1">
+              <div className="font-semibold text-red-900 text-base">
+                🚨 累積現金預估在 {cumulativeWarning.firstNegativeMonth} 轉負！
+              </div>
+              <div className="text-red-700 mt-1 text-xs space-y-0.5">
+                <div>
+                  起始現金（YTD 結餘）：
+                  <strong>{formatMoney(ytd.profit)}</strong>
+                </div>
+                {cumulativeWarning.trajectory.map((t) => (
+                  <div
+                    key={t.month}
+                    className={t.cumulative < 0 ? "text-red-900 font-semibold" : ""}
+                  >
+                    {t.month}：{t.profit >= 0 ? "+" : ""}
+                    {formatMoney(t.profit)} → 累積 {formatMoney(t.cumulative)}
+                    {t.cumulative < 0 && " ⚠️"}
+                  </div>
+                ))}
+                <div className="mt-1.5 pt-1.5 border-t border-red-200">
+                  建議：提前籌資、調整支出、或進「沙盤推演」找對策。
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* 缺口警示 */}
       {cashFlowGap && (

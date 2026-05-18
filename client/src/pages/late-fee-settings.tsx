@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
-import { AlertTriangle, Save, Info, ShieldCheck } from "lucide-react"
+import { AlertTriangle, Save, Info, ShieldCheck, Wand2 } from "lucide-react"
 import { useDocumentTitle } from "@/hooks/use-document-title"
 
 interface Policy {
@@ -77,6 +77,48 @@ export default function LateFeeSettingsPage() {
   // 本地編輯狀態（暫存改動）
   const [edits, setEdits] = useState<Record<string, Partial<Policy>>>({})
 
+  // 法規推薦值（依台灣現行勞保條例 / 健保法 / 勞退條例 / 稅捐稽徵法）
+  const LEGAL_DEFAULTS: Record<
+    string,
+    { dailyRate: number; gracePeriodDays: number; isEnabled: boolean }
+  > = {
+    labor_insurance: { dailyRate: 0.003, gracePeriodDays: 0, isEnabled: true },
+    health_insurance: { dailyRate: 0.001, gracePeriodDays: 0, isEnabled: true },
+    pension: { dailyRate: 0.001, gracePeriodDays: 0, isEnabled: true },
+    tax: { dailyRate: 0.005, gracePeriodDays: 0, isEnabled: true },
+    bank_loan: { dailyRate: 0, gracePeriodDays: 0, isEnabled: false },
+    credit_card: { dailyRate: 0, gracePeriodDays: 0, isEnabled: false },
+    utility: { dailyRate: 0, gracePeriodDays: 0, isEnabled: false },
+    insurance: { dailyRate: 0, gracePeriodDays: 0, isEnabled: false },
+    rental_pay: { dailyRate: 0, gracePeriodDays: 0, isEnabled: false },
+    vendor: { dailyRate: 0, gracePeriodDays: 0, isEnabled: false },
+    other: { dailyRate: 0, gracePeriodDays: 0, isEnabled: false },
+  }
+
+  const applyLegalDefaults = () => {
+    const newEdits: Record<string, Partial<Policy>> = {}
+    for (const p of policies) {
+      const legal = LEGAL_DEFAULTS[p.categoryKey]
+      if (!legal) continue
+      const currentRate = parseFloat(p.dailyRate)
+      const sameRate = Math.abs(currentRate - legal.dailyRate) < 1e-6
+      const sameGrace = p.gracePeriodDays === legal.gracePeriodDays
+      const sameEnabled = p.isEnabled === legal.isEnabled
+      // 跟現值不同的才放進 edits
+      if (sameRate && sameGrace && sameEnabled) continue
+      newEdits[p.categoryKey] = {
+        dailyRate: legal.dailyRate.toString() as unknown as string,
+        gracePeriodDays: legal.gracePeriodDays,
+        isEnabled: legal.isEnabled,
+      }
+    }
+    setEdits(newEdits)
+    toast({
+      title: "✅ 已套用法規建議",
+      description: `${Object.keys(newEdits).length} 項類別將被調整、請按各卡「儲存此項」確認`,
+    })
+  }
+
   const updateMutation = useMutation({
     mutationFn: (vars: { categoryKey: string; data: Partial<Policy> }) =>
       apiRequest("PUT", `/api/late-fee-policies/${vars.categoryKey}`, vars.data),
@@ -117,14 +159,20 @@ export default function LateFeeSettingsPage() {
 
   return (
     <div className="container mx-auto py-4 sm:py-6 space-y-4 sm:space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <ShieldCheck className="h-6 w-6 text-amber-600" />
-          滯納金規則設定
-        </h1>
-        <p className="text-sm text-gray-500 mt-1">
-          設定各類別的每日費率與寬限期。**只有勞健保與稅務有法律強制滯納金**、其他類別預設關閉。
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            <ShieldCheck className="h-6 w-6 text-amber-600" />
+            滯納金規則設定
+          </h1>
+          <p className="text-sm text-gray-500 mt-1">
+            設定各類別的每日費率與寬限期。**只有勞健保與稅務有法律強制滯納金**、其他類別預設關閉。
+          </p>
+        </div>
+        <Button variant="outline" size="sm" onClick={applyLegalDefaults}>
+          <Wand2 className="h-4 w-4 mr-1" />
+          套用法規建議
+        </Button>
       </div>
 
       <Card className="border-amber-200 bg-amber-50">
