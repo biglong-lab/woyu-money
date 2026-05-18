@@ -29,12 +29,14 @@ interface Policy {
 }
 
 const ICON_BY_KEY: Record<string, string> = {
-  labor_insurance: "🏥",
+  labor_insurance: "🛡️", // 勞保
+  health_insurance: "🏥", // 健保
+  pension: "💰", // 勞退
   tax: "🏛️",
   bank_loan: "🏦",
   credit_card: "💳",
   utility: "⚡",
-  insurance: "🛡️",
+  insurance: "🛞", // 商業保險改用車輪 icon、與盾牌（勞保）區別
   rental_pay: "🏠",
   vendor: "📦",
   other: "📋",
