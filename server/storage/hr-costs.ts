@@ -107,12 +107,27 @@ export async function deleteMonthlyHrCosts(year: number, month: number): Promise
     .where(and(eq(monthlyHrCosts.year, year), eq(monthlyHrCosts.month, month)))
 }
 
-/** 更新單筆月度人事費 */
+/** 更新單筆月度人事費（含 actual_hours 重算邏輯）*/
 export async function updateMonthlyHrCost(
   id: number,
   data: Partial<{
     isPaid: boolean
     insurancePaid: boolean
+    actualHours: string | null
+    baseSalary: string
+    insuredSalary: string
+    employerLaborInsurance: string
+    employerHealthInsurance: string
+    employerPension: string
+    employerEmploymentInsurance: string
+    employerAccidentInsurance: string
+    employerTotal: string
+    employeeLaborInsurance: string
+    employeeHealthInsurance: string
+    employeePension: string
+    employeeTotal: string
+    netSalary: string
+    totalCost: string
   }>
 ): Promise<MonthlyHrCost | undefined> {
   const [result] = await db
@@ -120,6 +135,12 @@ export async function updateMonthlyHrCost(
     .set({ ...data, updatedAt: new Date() })
     .where(eq(monthlyHrCosts.id, id))
     .returning()
+  return result
+}
+
+/** 取得單筆月度人事費 */
+export async function getMonthlyHrCostById(id: number): Promise<MonthlyHrCost | undefined> {
+  const [result] = await db.select().from(monthlyHrCosts).where(eq(monthlyHrCosts.id, id))
   return result
 }
 

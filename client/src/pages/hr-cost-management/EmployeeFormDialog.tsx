@@ -18,10 +18,23 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { useEffect } from "react"
 import { Loader2, Info } from "lucide-react"
 import { Switch } from "@/components/ui/switch"
 import type { Employee, EmployeeFormData, EmploymentType } from "./types"
 import { EMPLOYMENT_TYPE_LABELS } from "./types"
+
+/** 員工類型 → 預設投保（依法規常識） */
+const INSURANCE_DEFAULT_BY_TYPE: Record<EmploymentType, boolean> = {
+  full_time: true, // 正職強制加保
+  part_time: true, // 計時 5 人以上強制加保（中小企業常見不加，但預設依法）
+  temporary: false, // 臨時 <5 天可不加，預設不加
+  intern: true, // 工讀生受僱即強制加保
+  contractor: false, // 承攬關係預設不加
+}
+
+/** 時薪型員工類型 */
+const HOURLY_TYPES: EmploymentType[] = ["part_time", "temporary", "intern"]
 
 interface EmployeeFormDialogProps {
   /** 是否顯示對話框 */
@@ -68,6 +81,32 @@ export function EmployeeFormDialog({
     onFormChange({ ...formData, [field]: value })
   }
 
+  /** 切換員工類型時、自動帶投保預設（新增模式才覆蓋；編輯模式保留使用者既有設定） */
+  const handleEmploymentTypeChange = (newType: EmploymentType) => {
+    onFormChange({
+      ...formData,
+      employmentType: newType,
+      // 新增模式 → 帶預設；編輯模式只在類型確實改變時帶
+      hasInsurance: editingEmployee ? formData.hasInsurance : INSURANCE_DEFAULT_BY_TYPE[newType],
+    })
+  }
+
+  /** 自動計算月薪：時薪 × 工時，僅限時薪型員工 */
+  const isHourlyType = HOURLY_TYPES.includes(formData.employmentType)
+  const autoMonthly =
+    (parseFloat(formData.hourlyRate) || 0) * (parseFloat(formData.monthlyHours) || 0)
+  const isAutoMonthly = isHourlyType && autoMonthly > 0
+
+  // 自動同步月薪欄位（時薪型員工 + 有時薪+工時）
+  useEffect(() => {
+    if (!isAutoMonthly) return
+    const expected = autoMonthly.toString()
+    if (formData.monthlySalary !== expected) {
+      onFormChange({ ...formData, monthlySalary: expected })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.hourlyRate, formData.monthlyHours, formData.employmentType])
+
   const isValid = formData.employeeName && formData.monthlySalary
 
   return (
@@ -104,7 +143,7 @@ export function EmployeeFormDialog({
             <Label htmlFor="employmentType">員工類型</Label>
             <Select
               value={formData.employmentType}
-              onValueChange={(v) => updateField("employmentType", v as EmploymentType)}
+              onValueChange={(v) => handleEmploymentTypeChange(v as EmploymentType)}
             >
               <SelectTrigger>
                 <SelectValue />
@@ -193,13 +232,12 @@ export function EmployeeFormDialog({
                   className="h-9"
                 />
               </div>
-              {formData.hourlyRate && formData.monthlyHours && (
+              {isAutoMonthly && (
                 <div className="col-span-2 text-xs text-amber-800">
-                  自動估算月薪：$
-                  {(
-                    parseFloat(formData.hourlyRate) * parseFloat(formData.monthlyHours)
-                  ).toLocaleString()}
-                  <span className="ml-2 text-amber-700">（請填入下方「月薪」欄位）</span>
+                  ✓ 月薪自動計算：<strong>${autoMonthly.toLocaleString()}</strong>
+                  <span className="ml-2 text-amber-700">
+                    （已自動填入下方月薪欄位、不需手動填）
+                  </span>
                 </div>
               )}
             </div>
@@ -208,13 +246,18 @@ export function EmployeeFormDialog({
           {/* 月薪與投保薪資 */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label htmlFor="salary">月薪 *</Label>
+              <Label htmlFor="salary">
+                月薪 *
+                {isAutoMonthly && <span className="ml-1 text-xs text-amber-600">（自動）</span>}
+              </Label>
               <Input
                 id="salary"
                 type="number"
                 value={formData.monthlySalary}
                 onChange={(e) => updateField("monthlySalary", e.target.value)}
-                placeholder="30000"
+                disabled={isAutoMonthly}
+                placeholder={isAutoMonthly ? "由時薪 × 工時自動算" : "30000"}
+                className={isAutoMonthly ? "bg-gray-100" : ""}
               />
             </div>
             <div>

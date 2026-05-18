@@ -70,6 +70,9 @@ export const monthlyHrCosts = pgTable(
     isPaid: boolean("is_paid").default(false),
     insurancePaid: boolean("insurance_paid").default(false),
     paymentRecordId: integer("payment_record_id"),
+    // 計時人員當月實際工時（覆蓋 employees.monthly_hours 預估）
+    // 若填了 → 該月 base_salary 採用 actual_hours × employees.hourly_rate
+    actualHours: decimal("actual_hours", { precision: 6, scale: 2 }),
     notes: text("notes"),
     createdAt: timestamp("created_at").defaultNow(),
     updatedAt: timestamp("updated_at").defaultNow(),
