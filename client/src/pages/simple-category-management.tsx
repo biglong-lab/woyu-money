@@ -9,6 +9,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogTrigger,
 } from "@/components/ui/dialog"
 import {
@@ -287,6 +288,7 @@ export default function SimpleCategoryManagement() {
               <DialogContent className="w-[95vw] max-w-md">
                 <DialogHeader>
                   <DialogTitle>新增固定分類</DialogTitle>
+                  <DialogDescription>建立全域共用的固定支出分類（如水電、瓦斯）</DialogDescription>
                 </DialogHeader>
                 <Form {...createForm}>
                   <form
@@ -544,6 +546,7 @@ export default function SimpleCategoryManagement() {
         <DialogContent className="w-[95vw] max-w-md">
           <DialogHeader>
             <DialogTitle>編輯分類</DialogTitle>
+            <DialogDescription>修改分類名稱與啟用狀態</DialogDescription>
           </DialogHeader>
           <Form {...editForm}>
             <form onSubmit={editForm.handleSubmit(handleUpdate)} className="space-y-4">
