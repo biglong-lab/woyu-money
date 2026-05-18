@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Loader2, Shield, CreditCard, BarChart3, FileText } from "lucide-react"
+import { useDocumentTitle } from "@/hooks/use-document-title"
 
 const loginSchema = z.object({
   username: z.string().min(1, "請輸入用戶名"),
@@ -28,6 +29,7 @@ type LoginFormData = z.infer<typeof loginSchema>
 type RegisterFormData = z.infer<typeof registerSchema>
 
 export default function AuthPage() {
+  useDocumentTitle("登入")
   const { user, loginMutation, registerMutation } = useAuth()
   const [activeTab, setActiveTab] = useState("login")
   const [, setLocation] = useLocation()

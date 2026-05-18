@@ -1,55 +1,68 @@
-import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Checkbox } from "@/components/ui/checkbox";
-import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
-import { Trash2, Edit, Key, Settings, Plus } from "lucide-react";
+import { useState } from "react"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Badge } from "@/components/ui/badge"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import { Checkbox } from "@/components/ui/checkbox"
+import { useToast } from "@/hooks/use-toast"
+import { apiRequest } from "@/lib/queryClient"
+import { Trash2, Edit, Key, Settings, Plus } from "lucide-react"
+import { useDocumentTitle } from "@/hooks/use-document-title"
 
 interface User {
-  id: number;
-  username: string;
-  email: string | null;
-  fullName: string | null;
-  role: string;
-  isActive: boolean;
-  menuPermissions: MenuPermissions;
-  lastLogin: Date | null;
-  createdAt: Date;
-  updatedAt: Date;
+  id: number
+  username: string
+  email: string | null
+  fullName: string | null
+  role: string
+  isActive: boolean
+  menuPermissions: MenuPermissions
+  lastLogin: Date | null
+  createdAt: Date
+  updatedAt: Date
 }
 
 interface MenuPermissions {
-  payment?: boolean;
-  loanInvestment?: boolean;
-  household?: boolean;
-  reports?: boolean;
-  system?: boolean;
-  templates?: boolean;
-  other?: boolean;
+  payment?: boolean
+  loanInvestment?: boolean
+  household?: boolean
+  reports?: boolean
+  system?: boolean
+  templates?: boolean
+  other?: boolean
 }
 
 interface CreateUserData {
-  username: string;
-  password: string;
-  email: string;
-  fullName: string;
-  role: string;
-  menuPermissions: MenuPermissions;
+  username: string
+  password: string
+  email: string
+  fullName: string
+  role: string
+  menuPermissions: MenuPermissions
 }
 
 interface UpdateUserData {
-  username: string;
-  email: string | null;
-  fullName: string | null;
-  role: string;
-  isActive: boolean;
+  username: string
+  email: string | null
+  fullName: string | null
+  role: string
+  isActive: boolean
 }
 
 const defaultPermissions: Record<string, MenuPermissions> = {
@@ -80,151 +93,158 @@ const defaultPermissions: Record<string, MenuPermissions> = {
     templates: false,
     other: false,
   },
-};
+}
 
 export default function UserManagement() {
+  useDocumentTitle("使用者管理")
   // All hooks must be at the top level
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
-  const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [permissionDialogOpen, setPermissionDialogOpen] = useState(false);
-  const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const { toast } = useToast()
+  const queryClient = useQueryClient()
+  const [createDialogOpen, setCreateDialogOpen] = useState(false)
+  const [editDialogOpen, setEditDialogOpen] = useState(false)
+  const [permissionDialogOpen, setPermissionDialogOpen] = useState(false)
+  const [passwordDialogOpen, setPasswordDialogOpen] = useState(false)
+  const [selectedUser, setSelectedUser] = useState<User | null>(null)
   const [newUserData, setNewUserData] = useState({
     username: "",
     password: "",
     email: "",
     fullName: "",
-    role: "user2"
-  });
-  const [newPassword, setNewPassword] = useState("");
-  const [userPermissions, setUserPermissions] = useState<MenuPermissions>({});
+    role: "user2",
+  })
+  const [newPassword, setNewPassword] = useState("")
+  const [userPermissions, setUserPermissions] = useState<MenuPermissions>({})
 
-  const { data: users, isLoading, error } = useQuery<User[]>({
+  const {
+    data: users,
+    isLoading,
+    error,
+  } = useQuery<User[]>({
     queryKey: ["/api/admin/users"],
-    refetchInterval: 30000
-  });
+    refetchInterval: 30000,
+  })
 
   const createUserMutation = useMutation({
     mutationFn: async (userData: CreateUserData) => {
-      const response = await apiRequest("POST", "/api/admin/users", userData);
-      return response;
+      const response = await apiRequest("POST", "/api/admin/users", userData)
+      return response
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
-      setCreateDialogOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] })
+      setCreateDialogOpen(false)
       setNewUserData({
         username: "",
         password: "",
         email: "",
         fullName: "",
-        role: "user2"
-      });
+        role: "user2",
+      })
       toast({
         title: "成功",
         description: "用戶已創建",
-      });
+      })
     },
     onError: (error: Error) => {
       toast({
         title: "錯誤",
         description: error.message || "創建用戶失敗",
         variant: "destructive",
-      });
+      })
     },
-  });
+  })
 
   const updateUserMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: UpdateUserData }) => {
-      const response = await apiRequest("PUT", `/api/admin/users/${id}`, data);
-      return response;
+      const response = await apiRequest("PUT", `/api/admin/users/${id}`, data)
+      return response
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
-      setEditDialogOpen(false);
-      setSelectedUser(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] })
+      setEditDialogOpen(false)
+      setSelectedUser(null)
       toast({
         title: "成功",
         description: "用戶已更新",
-      });
+      })
     },
     onError: (error: Error) => {
       toast({
         title: "錯誤",
         description: error.message || "更新用戶失敗",
         variant: "destructive",
-      });
+      })
     },
-  });
+  })
 
   const updatePasswordMutation = useMutation({
     mutationFn: async ({ id, password }: { id: number; password: string }) => {
-      const response = await apiRequest("PUT", `/api/admin/users/${id}/password`, { password });
-      return response;
+      const response = await apiRequest("PUT", `/api/admin/users/${id}/password`, { password })
+      return response
     },
     onSuccess: () => {
-      setPasswordDialogOpen(false);
-      setSelectedUser(null);
-      setNewPassword("");
+      setPasswordDialogOpen(false)
+      setSelectedUser(null)
+      setNewPassword("")
       toast({
         title: "成功",
         description: "密碼已更新",
-      });
+      })
     },
     onError: (error: Error) => {
       toast({
         title: "錯誤",
         description: error.message || "更新密碼失敗",
         variant: "destructive",
-      });
+      })
     },
-  });
+  })
 
   const updatePermissionsMutation = useMutation({
     mutationFn: async ({ id, permissions }: { id: number; permissions: MenuPermissions }) => {
-      const response = await apiRequest("PUT", `/api/admin/users/${id}/permissions`, { menuPermissions: permissions });
-      return response;
+      const response = await apiRequest("PUT", `/api/admin/users/${id}/permissions`, {
+        menuPermissions: permissions,
+      })
+      return response
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
-      setPermissionDialogOpen(false);
-      setSelectedUser(null);
-      setUserPermissions({});
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] })
+      setPermissionDialogOpen(false)
+      setSelectedUser(null)
+      setUserPermissions({})
       toast({
         title: "成功",
         description: "權限已更新",
-      });
+      })
     },
     onError: (error: Error) => {
       toast({
         title: "錯誤",
         description: error.message || "更新權限失敗",
         variant: "destructive",
-      });
+      })
     },
-  });
+  })
 
   const deleteUserMutation = useMutation({
     mutationFn: async (id: number) => {
-      const response = await apiRequest("DELETE", `/api/admin/users/${id}`);
-      return response;
+      const response = await apiRequest("DELETE", `/api/admin/users/${id}`)
+      return response
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] })
       toast({
         title: "成功",
         description: "用戶已刪除",
-      });
+      })
     },
     onError: (error: Error) => {
       toast({
         title: "錯誤",
         description: error.message || "刪除用戶失敗",
         variant: "destructive",
-      });
+      })
     },
-  });
+  })
 
   // Early returns after all hooks
   if (isLoading) {
@@ -242,7 +262,7 @@ export default function UserManagement() {
           </CardContent>
         </Card>
       </div>
-    );
+    )
   }
 
   if (error) {
@@ -258,19 +278,19 @@ export default function UserManagement() {
           </CardContent>
         </Card>
       </div>
-    );
+    )
   }
 
   // Event handlers
   const handleCreateUser = () => {
     createUserMutation.mutate({
       ...newUserData,
-      menuPermissions: defaultPermissions[newUserData.role] || {}
-    });
-  };
+      menuPermissions: defaultPermissions[newUserData.role] || {},
+    })
+  }
 
   const handleUpdateUser = () => {
-    if (!selectedUser) return;
+    if (!selectedUser) return
     updateUserMutation.mutate({
       id: selectedUser.id,
       data: {
@@ -278,66 +298,74 @@ export default function UserManagement() {
         email: selectedUser.email,
         fullName: selectedUser.fullName,
         role: selectedUser.role,
-        isActive: selectedUser.isActive
-      }
-    });
-  };
+        isActive: selectedUser.isActive,
+      },
+    })
+  }
 
   const handleUpdatePassword = () => {
-    if (!selectedUser || !newPassword) return;
+    if (!selectedUser || !newPassword) return
     updatePasswordMutation.mutate({
       id: selectedUser.id,
-      password: newPassword
-    });
-  };
+      password: newPassword,
+    })
+  }
 
   const handleUpdatePermissions = () => {
-    if (!selectedUser) return;
+    if (!selectedUser) return
     updatePermissionsMutation.mutate({
       id: selectedUser.id,
-      permissions: userPermissions
-    });
-  };
+      permissions: userPermissions,
+    })
+  }
 
   const handleDeleteUser = (userId: number) => {
     if (confirm("確定要刪除此用戶嗎？")) {
-      deleteUserMutation.mutate(userId);
+      deleteUserMutation.mutate(userId)
     }
-  };
+  }
 
   const openEditDialog = (user: User) => {
-    setSelectedUser(user);
-    setEditDialogOpen(true);
-  };
+    setSelectedUser(user)
+    setEditDialogOpen(true)
+  }
 
   const openPasswordDialog = (user: User) => {
-    setSelectedUser(user);
-    setPasswordDialogOpen(true);
-  };
+    setSelectedUser(user)
+    setPasswordDialogOpen(true)
+  }
 
   const openPermissionDialog = (user: User) => {
-    setSelectedUser(user);
-    setUserPermissions(user.menuPermissions || {});
-    setPermissionDialogOpen(true);
-  };
+    setSelectedUser(user)
+    setUserPermissions(user.menuPermissions || {})
+    setPermissionDialogOpen(true)
+  }
 
   const getRoleBadgeColor = (role: string) => {
     switch (role) {
-      case "admin": return "bg-red-100 text-red-800";
-      case "user1": return "bg-blue-100 text-blue-800";
-      case "user2": return "bg-green-100 text-green-800";
-      default: return "bg-gray-100 text-gray-800";
+      case "admin":
+        return "bg-red-100 text-red-800"
+      case "user1":
+        return "bg-blue-100 text-blue-800"
+      case "user2":
+        return "bg-green-100 text-green-800"
+      default:
+        return "bg-gray-100 text-gray-800"
     }
-  };
+  }
 
   const getRoleDisplayName = (role: string) => {
     switch (role) {
-      case "admin": return "管理員";
-      case "user1": return "使用者1";
-      case "user2": return "使用者2";
-      default: return role;
+      case "admin":
+        return "管理員"
+      case "user1":
+        return "使用者1"
+      case "user2":
+        return "使用者2"
+      default:
+        return role
     }
-  };
+  }
 
   return (
     <div className="container mx-auto py-6">
@@ -365,7 +393,7 @@ export default function UserManagement() {
                     <Input
                       id="username"
                       value={newUserData.username}
-                      onChange={(e) => setNewUserData({...newUserData, username: e.target.value})}
+                      onChange={(e) => setNewUserData({ ...newUserData, username: e.target.value })}
                     />
                   </div>
                   <div className="space-y-2">
@@ -374,7 +402,7 @@ export default function UserManagement() {
                       id="password"
                       type="password"
                       value={newUserData.password}
-                      onChange={(e) => setNewUserData({...newUserData, password: e.target.value})}
+                      onChange={(e) => setNewUserData({ ...newUserData, password: e.target.value })}
                     />
                   </div>
                   <div className="space-y-2">
@@ -383,7 +411,7 @@ export default function UserManagement() {
                       id="email"
                       type="email"
                       value={newUserData.email}
-                      onChange={(e) => setNewUserData({...newUserData, email: e.target.value})}
+                      onChange={(e) => setNewUserData({ ...newUserData, email: e.target.value })}
                     />
                   </div>
                   <div className="space-y-2">
@@ -391,12 +419,15 @@ export default function UserManagement() {
                     <Input
                       id="fullName"
                       value={newUserData.fullName}
-                      onChange={(e) => setNewUserData({...newUserData, fullName: e.target.value})}
+                      onChange={(e) => setNewUserData({ ...newUserData, fullName: e.target.value })}
                     />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="role">角色</Label>
-                    <Select value={newUserData.role} onValueChange={(value) => setNewUserData({...newUserData, role: value})}>
+                    <Select
+                      value={newUserData.role}
+                      onValueChange={(value) => setNewUserData({ ...newUserData, role: value })}
+                    >
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
@@ -423,23 +454,22 @@ export default function UserManagement() {
         <CardContent>
           <div className="space-y-4">
             {users?.map((user) => (
-              <div key={user.id} className="flex items-center justify-between p-4 border rounded-lg">
+              <div
+                key={user.id}
+                className="flex items-center justify-between p-4 border rounded-lg"
+              >
                 <div className="flex-1">
                   <div className="flex items-center space-x-3">
                     <h3 className="font-medium">{user.username}</h3>
                     <Badge className={getRoleBadgeColor(user.role)}>
                       {getRoleDisplayName(user.role)}
                     </Badge>
-                    {!user.isActive && (
-                      <Badge variant="secondary">已停用</Badge>
-                    )}
+                    {!user.isActive && <Badge variant="secondary">已停用</Badge>}
                   </div>
                   <div className="text-sm text-gray-600 mt-1">
                     <p>{user.fullName || "未設定全名"}</p>
                     <p>{user.email || "未設定郵件"}</p>
-                    {user.lastLogin && (
-                      <p>最後登入: {new Date(user.lastLogin).toLocaleString()}</p>
-                    )}
+                    {user.lastLogin && <p>最後登入: {new Date(user.lastLogin).toLocaleString()}</p>}
                   </div>
                 </div>
                 <div className="flex space-x-2">
@@ -477,7 +507,7 @@ export default function UserManagement() {
                 <Input
                   id="edit-username"
                   value={selectedUser.username}
-                  onChange={(e) => setSelectedUser({...selectedUser, username: e.target.value})}
+                  onChange={(e) => setSelectedUser({ ...selectedUser, username: e.target.value })}
                 />
               </div>
               <div className="space-y-2">
@@ -486,7 +516,7 @@ export default function UserManagement() {
                   id="edit-email"
                   type="email"
                   value={selectedUser.email || ""}
-                  onChange={(e) => setSelectedUser({...selectedUser, email: e.target.value})}
+                  onChange={(e) => setSelectedUser({ ...selectedUser, email: e.target.value })}
                 />
               </div>
               <div className="space-y-2">
@@ -494,12 +524,15 @@ export default function UserManagement() {
                 <Input
                   id="edit-fullName"
                   value={selectedUser.fullName || ""}
-                  onChange={(e) => setSelectedUser({...selectedUser, fullName: e.target.value})}
+                  onChange={(e) => setSelectedUser({ ...selectedUser, fullName: e.target.value })}
                 />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="edit-role">角色</Label>
-                <Select value={selectedUser.role} onValueChange={(value) => setSelectedUser({...selectedUser, role: value})}>
+                <Select
+                  value={selectedUser.role}
+                  onValueChange={(value) => setSelectedUser({ ...selectedUser, role: value })}
+                >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -514,7 +547,9 @@ export default function UserManagement() {
                 <Checkbox
                   id="edit-isActive"
                   checked={selectedUser.isActive}
-                  onCheckedChange={(checked) => setSelectedUser({...selectedUser, isActive: checked as boolean})}
+                  onCheckedChange={(checked) =>
+                    setSelectedUser({ ...selectedUser, isActive: checked as boolean })
+                  }
                 />
                 <Label htmlFor="edit-isActive">帳號啟用</Label>
               </div>
@@ -568,22 +603,22 @@ export default function UserManagement() {
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               {[
-                { key: 'payment', label: '付款管理' },
-                { key: 'loanInvestment', label: '借貸投資' },
-                { key: 'household', label: '家用管理' },
-                { key: 'reports', label: '報表分析' },
-                { key: 'system', label: '系統管理' },
-                { key: 'templates', label: '範本管理' },
-                { key: 'other', label: '其他功能' }
+                { key: "payment", label: "付款管理" },
+                { key: "loanInvestment", label: "借貸投資" },
+                { key: "household", label: "家用管理" },
+                { key: "reports", label: "報表分析" },
+                { key: "system", label: "系統管理" },
+                { key: "templates", label: "範本管理" },
+                { key: "other", label: "其他功能" },
               ].map(({ key, label }) => (
                 <div key={key} className="flex items-center space-x-2">
                   <Checkbox
                     id={`perm-${key}`}
                     checked={userPermissions[key as keyof MenuPermissions] || false}
-                    onCheckedChange={(checked) => 
+                    onCheckedChange={(checked) =>
                       setUserPermissions({
-                        ...userPermissions, 
-                        [key]: checked as boolean
+                        ...userPermissions,
+                        [key]: checked as boolean,
                       })
                     }
                   />
@@ -595,7 +630,10 @@ export default function UserManagement() {
               <Button variant="outline" onClick={() => setPermissionDialogOpen(false)}>
                 取消
               </Button>
-              <Button onClick={handleUpdatePermissions} disabled={updatePermissionsMutation.isPending}>
+              <Button
+                onClick={handleUpdatePermissions}
+                disabled={updatePermissionsMutation.isPending}
+              >
                 {updatePermissionsMutation.isPending ? "更新中..." : "更新權限"}
               </Button>
             </div>
@@ -603,5 +641,5 @@ export default function UserManagement() {
         </DialogContent>
       </Dialog>
     </div>
-  );
+  )
 }
