@@ -73,13 +73,20 @@
 - YTD 維持合計（限制標示 amber badge）
 - `/scenario-simulator` 場景區加「匯出 / 匯入 JSON」按鈕（merge by name、檔案格式驗證、上限 20）
 
-### Phase 10（commit `e0536f8` ~ `bdbb7af`、本輪 `+ next`）— BackToTop 全站擴散
+### Phase 10（commit `e0536f8` ~ `d869c61`）— ✅ BackToTop 全站擴散完成
 
-從 Phase 1 的 3 頁、擴散至 **32 個 500 行+ 長頁面**（覆蓋率 ~100%）：
-- 進度：4 頁 → 8 頁 → 12 頁 → 20 頁 → 32 頁
+從 Phase 1 的 3 頁、擴散至 **35 個 500 行+ 長頁面**（覆蓋率 **100%**）：
+- 進度：4 頁 → 8 頁 → 12 頁 → 20 頁 → 32 頁 → **35 頁 ✓**
 - batch script 自動處理（純 main component 結尾）
 - 含 helper functions 的檔案手動處理（避免插到 helper 內）
-- 最後 3 個含 helper 的：financial-statements / recurring-expenses / property-groups-management（下輪補）
+- 最後完成：financial-statements / recurring-expenses / property-groups-management
+
+涵蓋頁面類型：
+- 儀表板（dashboard / overview / scenario / forecast）
+- 列表頁（payment-projects / general-payment / payment-records / income-webhooks）
+- 管理頁（user / category / project / rental / loan）
+- 報表頁（payment-reports / revenue-reports / tax-reports / hr-cost-reports）
+- 設定頁（settings / late-fee-settings / recurring-expenses）
 
 ### Phase 7-9（commit `1af3323` ~ `e3b2fec`）— 無障礙（a11y）系統補完
 
@@ -113,6 +120,14 @@
 | 8b | `a3231a1` | `mobile-tab-bar.tsx` |
 | 9a | `c9ec014` | 3 個 pages × DialogDescription |
 | 9b | `e3b2fec` | 20 個 components × DialogDescription（24 dialogs） |
+| 9c | `79b2ac2` | ai-assistant-sheet SheetDescription + docs/CHANGELOG |
+| 9d | `a31df19` | /receipt-match-helper 清除按鈕 + BackToTop |
+| 9e | `5694d93` | /receipt-match-helper amountInputRef 連續處理 |
+| 10a | `e0536f8` | BackToTop 擴增 4 頁（payment-home / cash-allocation / integrations / income-webhooks）|
+| 10b | `5a90da1` | BackToTop 再 4 頁（budget / expense-webhooks / general-payment / payment-records） |
+| 10c | `bdbb7af` | BackToTop 再 8 頁（categories / rental-management / overview-v2 / 等）|
+| 10d | `5f251c2` | BackToTop 再 12 頁（project-budget / payment-stats / 等）|
+| 10e | `d869c61` | BackToTop 最後 3 頁（financial-statements / recurring-expenses / property-groups）|
 
 ---
 
