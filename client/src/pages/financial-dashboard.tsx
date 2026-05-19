@@ -66,11 +66,17 @@ interface MonthRow {
 const formatMoney = (v: number) =>
   v >= 0 ? "$" + Math.round(v).toLocaleString() : "-$" + Math.round(-v).toLocaleString()
 
+/**
+ * 取「未來 N 個月」字串（本月不算未來、所以 offset 從 1 開始）
+ * 避免 toISOString() 時區 bug（UTC+8 會把本地 5/1 轉成 UTC 4/30）
+ */
 function nextMonths(count: number): string[] {
   const now = new Date()
   return [...Array(count)].map((_, i) => {
-    const d = new Date(now.getFullYear(), now.getMonth() + i, 1)
-    return d.toISOString().slice(0, 7)
+    const d = new Date(now.getFullYear(), now.getMonth() + 1 + i, 1)
+    const y = d.getFullYear()
+    const m = String(d.getMonth() + 1).padStart(2, "0")
+    return `${y}-${m}`
   })
 }
 

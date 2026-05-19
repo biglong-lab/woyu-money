@@ -46,6 +46,60 @@ router.get(
         rows: Array<{ month: string; income: number; expense: number; profit: number }>
       }
     ).rows
+
+    // 每月分類明細（expense 按分類、income 按 source 系統）
+    const breakdownRows = await db.execute(sql`
+      WITH expense_by_cat AS (
+        SELECT
+          TO_CHAR(pi.start_date, 'YYYY-MM') AS month,
+          COALESCE(dc.category_name, fc.category_name, '(未分類)') AS category,
+          SUM(pi.total_amount::numeric)::bigint AS amt,
+          COUNT(*)::int AS n
+        FROM payment_items pi
+        LEFT JOIN debt_categories dc ON pi.category_id = dc.id
+        LEFT JOIN fixed_categories fc ON pi.fixed_category_id = fc.id
+        WHERE pi.item_type IN ('project', 'home') AND NOT pi.is_deleted
+          AND pi.start_date >= ${yearStart}::date AND pi.start_date <= ${today}::date
+        GROUP BY 1, 2
+      ),
+      income_by_proj AS (
+        SELECT
+          TO_CHAR(pi.start_date, 'YYYY-MM') AS month,
+          COALESCE(pp.project_name, '(未指定)') AS category,
+          SUM(pi.total_amount::numeric)::bigint AS amt,
+          COUNT(*)::int AS n
+        FROM payment_items pi
+        LEFT JOIN payment_projects pp ON pi.project_id = pp.id
+        WHERE pi.item_type = 'income' AND NOT pi.is_deleted
+          AND pi.start_date >= ${yearStart}::date AND pi.start_date <= ${today}::date
+        GROUP BY 1, 2
+      )
+      SELECT 'expense' AS kind, month, category, amt::bigint, n FROM expense_by_cat
+      UNION ALL
+      SELECT 'income' AS kind, month, category, amt::bigint, n FROM income_by_proj
+      ORDER BY kind, month, amt DESC
+    `)
+
+    const breakdownArr = (
+      breakdownRows as unknown as {
+        rows: Array<{ kind: string; month: string; category: string; amt: number; n: number }>
+      }
+    ).rows
+
+    // 按 month 群組 breakdown
+    const breakdown: Record<
+      string,
+      {
+        expense: Array<{ category: string; amount: number; count: number }>
+        income: Array<{ category: string; amount: number; count: number }>
+      }
+    > = {}
+    for (const r of breakdownArr) {
+      if (!breakdown[r.month]) breakdown[r.month] = { expense: [], income: [] }
+      const arr = r.kind === "expense" ? breakdown[r.month].expense : breakdown[r.month].income
+      arr.push({ category: r.category, amount: Number(r.amt), count: r.n })
+    }
+
     const totals = months.reduce(
       (acc, m) => ({
         income: acc.income + (m.income || 0),
@@ -58,6 +112,7 @@ router.get(
     res.json({
       ...totals,
       months,
+      breakdown,
     })
   })
 )
