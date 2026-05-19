@@ -59,6 +59,7 @@ import {
   type AllocationRule,
   type PropertyGroupMemberInput,
 } from "@shared/cost-allocation"
+import { BackToTop } from "@/components/back-to-top"
 
 interface PreviewItem {
   fixedCategoryId: number | null
@@ -468,6 +469,8 @@ export default function BudgetEstimates() {
           </>
         )
       )}
+
+      <BackToTop />
     </div>
   )
 }

@@ -51,6 +51,7 @@ import {
 import { useDocumentTitle } from "@/hooks/use-document-title"
 import { EmptyState } from "@/components/ui/empty-state"
 import type { PaymentProject } from "@shared/schema"
+import { BackToTop } from "@/components/back-to-top"
 
 interface ExpenseWebhook {
   id: number
@@ -696,6 +697,8 @@ export default function ExpenseWebhooksInbox() {
           }
         />
       )}
+
+      <BackToTop />
     </div>
   )
 }
