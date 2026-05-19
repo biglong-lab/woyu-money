@@ -156,18 +156,24 @@ router.get(
     ).rows
 
     // 組裝 rental items：合約 + 對應的 payment_item 狀態
+    // 注意：空字串會被 .includes("") 永遠回 true、要先確認非空
+    const matchedPaymentItemIds = new Set<number>()
     const rentalItems: RentalItem[] = rentalContracts.map((c) => {
-      const matched = rentalPaymentItems.find(
-        (it) =>
-          it.itemName.includes(String(c.contractName)) ||
-          it.itemName.includes(String(c.tenantName ?? ""))
-      )
+      const contractName = String(c.contractName ?? "")
+      const tenantName = String(c.tenantName ?? "")
+      const matched = rentalPaymentItems.find((it) => {
+        if (contractName.length >= 2 && it.itemName.includes(contractName)) return true
+        if (tenantName.length >= 2 && it.itemName.includes(tenantName)) return true
+        return false
+      })
+      if (matched) matchedPaymentItemIds.add(matched.paymentItemId)
       return {
         contractId: c.contractId as number,
         contractName: c.contractName as string,
         tenantName: (c.tenantName as string) ?? null,
         projectName: (c.projectName as string) ?? null,
-        amount: parseFloat(matched?.amount ?? String(c.amount)),
+        // 已產出 → 用實際 payment_item 金額；未產出 → 用合約 base_amount
+        amount: matched ? parseFloat(matched.amount) : parseFloat(String(c.amount)),
         paymentDay: c.paymentDay as number,
         paid: matched?.status === "paid",
         paymentItemId: matched?.paymentItemId ?? null,
@@ -366,9 +372,18 @@ router.get(
     // 4. 一般單項（manual / webhook / pm-bridge / ai_scan）
     // ============================================================
     // 排除：source='template_scheduled' / 'hr' / 'auto_backfill'
-    // 排除：item_name LIKE '%租約%' / '%租金%'（rental 那邊算）
+    // 排除：category_id IN (2=租金, 28=租金物業)（rental_contracts 那邊算）
+    // 排除：item_name LIKE '%租約%' / '%租金%'（兜底）
     // 排除：item_name LIKE '%薪資%' / '%勞保%' 等（HR 那邊算）
     // 排除：notes LIKE '%自動補建%'
+    // 排除：rental matching 已用過的 payment_item id（避免雙算）
+    const RENTAL_CATEGORY_IDS = [2, 28]
+    const usedRentalIds = Array.from(matchedPaymentItemIds)
+    // Drizzle sql template 對 array 用 sql.raw 拼接 ID 清單（無 user 輸入、安全）
+    const usedRentalIdsSql =
+      usedRentalIds.length > 0
+        ? sql.raw(`AND pi.id NOT IN (${usedRentalIds.join(",")})`)
+        : sql.raw("")
     const manualRows = await db.execute(sql`
       SELECT
         pi.id,
@@ -388,6 +403,9 @@ router.get(
         AND pi.start_date >= ${monthStart}::date
         AND pi.start_date < ${nextMonth}::date
         AND pi.source NOT IN ('template_scheduled', 'hr', 'auto_backfill')
+        -- 排除租金分類（rental_contracts 那邊算）
+        AND (pi.category_id IS NULL OR pi.category_id NOT IN (${sql.raw(RENTAL_CATEGORY_IDS.join(","))}))
+        -- 兜底：item_name 含租字也排除
         AND pi.item_name NOT LIKE '%租約%'
         AND pi.item_name NOT LIKE '%租金%'
         AND pi.item_name NOT LIKE '%薪資%'
@@ -399,6 +417,7 @@ router.get(
         AND pi.item_name NOT LIKE '%客務薪%'
         AND (pp.project_name IS NULL OR pp.project_name != '人力成本')
         AND (pi.notes IS NULL OR pi.notes NOT LIKE '%自動補建%')
+        ${usedRentalIdsSql}
       ORDER BY pi.total_amount::numeric DESC
     `)
     const manualItems: ManualItem[] = (
