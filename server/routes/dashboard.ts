@@ -163,11 +163,13 @@ router.get(
           AND pi.start_date >= ${yearStart}::date AND pi.start_date <= ${lookaheadEnd}::date
         GROUP BY 1, 2
       )
-      SELECT 'expense' AS kind, month, category, actual, planned, n FROM expense_by_cat
-      UNION ALL
-      SELECT 'expense' AS kind, month, category, actual, planned, n FROM hr_by_month
-      UNION ALL
-      SELECT 'income' AS kind, month, category, actual, planned, n FROM income_by_proj
+      SELECT * FROM (
+        SELECT 'expense' AS kind, month, category, actual, planned, n FROM expense_by_cat
+        UNION ALL
+        SELECT 'expense' AS kind, month, category, actual, planned, n FROM hr_by_month
+        UNION ALL
+        SELECT 'income' AS kind, month, category, actual, planned, n FROM income_by_proj
+      ) t
       ORDER BY kind, month, (actual + planned) DESC
     `)
 
