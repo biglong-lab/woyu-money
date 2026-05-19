@@ -275,26 +275,51 @@ export default function RevenueForecastPage() {
   }, [trend, comparisonQueries.data, targetMonth])
 
   // 簡單線性推估
+  //
+  // 累積數字優先順序（避免 PM 21:00 才結帳、白天卡片顯示 $0 的問題）：
+  // 1. seasonal.currentAccumulated（payment_items income 即時值、與季節性同口徑）
+  // 2. fallback：trend 最後一筆 snapshot.accumulatedRevenue
   const forecast = useMemo(() => {
-    if (trend.length === 0) return null
-    const latest = trend[trend.length - 1]
-    const latestDate = new Date(latest.snapshotDate)
+    const today = new Date()
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`
+    const isCurrent =
+      targetMonth === `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`
+
     const [y, m] = targetMonth.split("-").map(Number)
     const monthEnd = new Date(y, m, 0).getDate()
-    const isCurrent = targetMonth === new Date().toISOString().slice(0, 7)
-    const daysElapsed = isCurrent ? Math.min(latestDate.getDate(), monthEnd) : monthEnd
+
+    const seasonalAcc = seasonal?.currentAccumulated ?? 0
+    const snapshotLatest = trend[trend.length - 1]
+    const snapshotAcc = snapshotLatest ? parseFloat(snapshotLatest.accumulatedRevenue) : 0
+
+    // 取兩者較大的（payment_items 通常更新更即時）
+    const useSeasonal = seasonalAcc > snapshotAcc
+    const accumulated = Math.max(seasonalAcc, snapshotAcc)
+
+    if (accumulated === 0 && trend.length === 0) return null
+
+    const referenceDate = useSeasonal ? todayStr : (snapshotLatest?.snapshotDate ?? todayStr)
+    const refDay = new Date(referenceDate).getDate()
+    const daysElapsed = isCurrent ? Math.min(refDay, monthEnd) : monthEnd
     const daysRemaining = monthEnd - daysElapsed
-    const accumulated = parseFloat(latest.accumulatedRevenue)
     const linear = daysElapsed > 0 ? (accumulated / daysElapsed) * monthEnd : 0
+
     return {
-      latestSnapshot: latest,
+      latestSnapshot:
+        snapshotLatest ??
+        ({
+          snapshotDate: todayStr,
+          accumulatedRevenue: accumulated.toString(),
+          source: "payment-items",
+        } as Snapshot),
       latestAmount: accumulated,
+      accumulatedSource: useSeasonal ? "payment_items" : "pm-snapshot",
       daysElapsed,
       daysRemaining,
       daysInMonth: monthEnd,
       linearProjection: Math.round(linear),
     }
-  }, [trend, targetMonth])
+  }, [trend, targetMonth, seasonal])
 
   // 同期比較：相同 daysElapsed 時對方累積值
   const comparison = useMemo(() => {
@@ -427,7 +452,19 @@ export default function RevenueForecastPage() {
               <div className="text-lg font-bold text-blue-900">
                 {formatMoney(forecast.latestAmount)}
               </div>
-              <div className="text-xs text-blue-600 mt-0.5">已累積</div>
+              <div
+                className="text-xs text-blue-600 mt-0.5"
+                title={
+                  forecast.accumulatedSource === "payment_items"
+                    ? "來自 payment_items（即時、PM 入帳前先顯示）"
+                    : "來自 PM 每日快照"
+                }
+              >
+                已累積
+                {forecast.accumulatedSource === "payment_items" && (
+                  <span className="ml-1 text-[10px] text-blue-500">（即時）</span>
+                )}
+              </div>
             </CardContent>
           </Card>
           <Card className="border-purple-200 bg-purple-50">
