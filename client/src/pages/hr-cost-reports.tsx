@@ -26,6 +26,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Users, DollarSign, TrendingUp, TrendingDown, Calendar } from "lucide-react"
 import { apiRequest } from "@/lib/queryClient"
+import { BackToTop } from "@/components/back-to-top"
 
 const fmt = (n: number) => Math.round(n).toLocaleString()
 
@@ -498,6 +499,7 @@ export default function HRCostReports() {
           </Card>
         </TabsContent>
       </Tabs>
+      <BackToTop />
     </div>
   )
 }

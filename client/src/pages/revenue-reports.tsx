@@ -33,6 +33,7 @@ import {
 
 import { DailyRevenueDialog } from "@/components/daily-revenue-dialog"
 import { useDocumentTitle } from "@/hooks/use-document-title"
+import { BackToTop } from "@/components/back-to-top"
 
 // 收入統計概覽
 interface RevenueStats {
@@ -489,6 +490,7 @@ export default function RevenueReports() {
           </Card>
         </TabsContent>
       </Tabs>
+      <BackToTop />
     </div>
   )
 }

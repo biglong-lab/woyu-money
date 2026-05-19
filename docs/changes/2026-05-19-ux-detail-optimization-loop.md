@@ -73,6 +73,14 @@
 - YTD 維持合計（限制標示 amber badge）
 - `/scenario-simulator` 場景區加「匯出 / 匯入 JSON」按鈕（merge by name、檔案格式驗證、上限 20）
 
+### Phase 10（commit `e0536f8` ~ `bdbb7af`、本輪 `+ next`）— BackToTop 全站擴散
+
+從 Phase 1 的 3 頁、擴散至 **32 個 500 行+ 長頁面**（覆蓋率 ~100%）：
+- 進度：4 頁 → 8 頁 → 12 頁 → 20 頁 → 32 頁
+- batch script 自動處理（純 main component 結尾）
+- 含 helper functions 的檔案手動處理（避免插到 helper 內）
+- 最後 3 個含 helper 的：financial-statements / recurring-expenses / property-groups-management（下輪補）
+
 ### Phase 7-9（commit `1af3323` ~ `e3b2fec`）— 無障礙（a11y）系統補完
 
 **Phase 7（`1af3323`）— icon-only Button aria-label**：補 9 個（ai-chat-input × 2、ai-assistant-sheet × 1、unified-search-filter × 6）

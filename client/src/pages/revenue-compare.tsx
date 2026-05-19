@@ -51,6 +51,7 @@ import {
 import { apiRequest } from "@/lib/queryClient"
 import { useToast } from "@/hooks/use-toast"
 import { useDocumentTitle } from "@/hooks/use-document-title"
+import { BackToTop } from "@/components/back-to-top"
 
 // ─────────────────────────────────────────────
 // 型別
@@ -571,6 +572,7 @@ export default function RevenueCompare() {
           </div>
         </CardContent>
       </Card>
+      <BackToTop />
     </div>
   )
 }

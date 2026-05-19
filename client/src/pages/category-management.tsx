@@ -39,6 +39,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { useToast } from "@/hooks/use-toast"
 import type { DebtCategory } from "@/../../shared/schema/category"
+import { BackToTop } from "@/components/back-to-top"
 
 const categorySchema = z.object({
   categoryName: z.string().min(1, "分類名稱為必填"),
@@ -566,6 +567,7 @@ export default function CategoryManagement() {
           </Form>
         </DialogContent>
       </Dialog>
+      <BackToTop />
     </div>
   )
 }

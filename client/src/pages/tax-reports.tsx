@@ -26,6 +26,7 @@ import { Separator } from "@/components/ui/separator"
 import { Receipt, FileText, Users, AlertTriangle, Info } from "lucide-react"
 import { apiRequest } from "@/lib/queryClient"
 import { useDocumentTitle } from "@/hooks/use-document-title"
+import { BackToTop } from "@/components/back-to-top"
 
 const fmt = (n: number) => Math.round(n).toLocaleString()
 
@@ -535,6 +536,7 @@ export default function TaxReports() {
           ) : null}
         </TabsContent>
       </Tabs>
+      <BackToTop />
     </div>
   )
 }
