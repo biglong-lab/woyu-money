@@ -16,6 +16,7 @@ import {
   backfillFromPMHistory,
   getSimpleForecast,
   getSeasonalForecast,
+  getPmVsPmsMonthly,
 } from "../storage/forecast-snapshots"
 import { getIncomeSourceByKey, verifyBearerToken } from "../storage/income"
 import { db } from "../db"
@@ -115,6 +116,17 @@ router.get(
     const companyId =
       companyIdRaw === undefined || companyIdRaw === "null" ? null : parseInt(companyIdRaw, 10)
     res.json(await getCalibrationCurve(companyId))
+  })
+)
+
+/**
+ * 每月 PM 實際 vs PMS 月底紀錄對照
+ * 用途：訓練校準模型 + 看訂單轉換率歷史
+ */
+router.get(
+  "/api/forecast/pm-vs-pms-monthly",
+  asyncHandler(async (_req, res) => {
+    res.json(await getPmVsPmsMonthly())
   })
 )
 

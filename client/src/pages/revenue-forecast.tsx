@@ -151,6 +151,19 @@ export default function RevenueForecastPage() {
     queryKey: [`/api/forecast/calibration?companyId=${companyParam}`],
   })
 
+  // PM vs PMS 月底對照（含 2024 historical）
+  interface PmVsPmsRow {
+    month: string
+    pmFinal: number | null
+    pmsFinal: number | null
+    diff: number | null
+    diffPct: number | null
+    source: string
+  }
+  const { data: pmVsPms = [] } = useQuery<PmVsPmsRow[]>({
+    queryKey: [`/api/forecast/pm-vs-pms-monthly`],
+  })
+
   // 同期比較：拉過去 3 個月相同 targetMonth offset
   const compareMonths = useMemo(() => {
     const [y, m] = targetMonth.split("-").map(Number)
@@ -820,6 +833,127 @@ export default function RevenueForecastPage() {
                 )
               })}
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* 年度 PM vs PMS 月底對照（訓練校準模型用）*/}
+      {pmVsPms.length > 0 && (
+        <Card>
+          <CardContent className="py-4 px-4 sm:px-6">
+            <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+              <div>
+                <h3 className="text-base font-semibold flex items-center gap-2">
+                  📊 PM vs PMS 月底對照（歷年）
+                </h3>
+                <p className="text-xs text-gray-500 mt-1">
+                  PM 實際入帳 vs PMS 訂單收尾、看訂單轉換率。差距為正 = PMS
+                  訂單比實際入帳多（部分訂單未實現）；差距為負 = PMS 估保守
+                </p>
+              </div>
+              <Badge variant="outline" className="text-xs">
+                {pmVsPms.length} 個月 ·{" "}
+                {pmVsPms.filter((r) => r.pmFinal !== null && r.pmsFinal !== null).length} 個可對比
+              </Badge>
+            </div>
+
+            <div className="overflow-x-auto -mx-4 sm:-mx-6">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 text-xs text-gray-600">
+                  <tr>
+                    <th className="text-left px-3 py-2 font-medium">月份</th>
+                    <th className="text-right px-3 py-2 font-medium">PM 實際入帳</th>
+                    <th className="text-right px-3 py-2 font-medium">PMS 訂單收尾</th>
+                    <th className="text-right px-3 py-2 font-medium">差距</th>
+                    <th className="text-right px-3 py-2 font-medium">差距 %</th>
+                    <th className="text-left px-3 py-2 font-medium hidden sm:table-cell">來源</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {[...pmVsPms].reverse().map((r) => {
+                    const hasBoth = r.pmFinal !== null && r.pmsFinal !== null
+                    const diffColor =
+                      r.diff === null
+                        ? "text-gray-400"
+                        : r.diff > 0
+                          ? "text-orange-600"
+                          : r.diff < 0
+                            ? "text-blue-600"
+                            : "text-gray-500"
+                    return (
+                      <tr key={r.month} className="hover:bg-gray-50">
+                        <td className="px-3 py-2 font-mono text-xs">{r.month}</td>
+                        <td className="px-3 py-2 text-right font-mono">
+                          {r.pmFinal !== null ? formatMoney(r.pmFinal) : "—"}
+                        </td>
+                        <td className="px-3 py-2 text-right font-mono">
+                          {r.pmsFinal !== null ? formatMoney(r.pmsFinal) : "—"}
+                        </td>
+                        <td className={`px-3 py-2 text-right font-mono ${diffColor}`}>
+                          {r.diff !== null ? (r.diff > 0 ? "+" : "") + formatMoney(r.diff) : "—"}
+                        </td>
+                        <td className={`px-3 py-2 text-right font-mono ${diffColor}`}>
+                          {r.diffPct !== null
+                            ? (r.diffPct > 0 ? "+" : "") + r.diffPct.toFixed(1) + "%"
+                            : "—"}
+                        </td>
+                        <td className="px-3 py-2 text-xs text-gray-400 hidden sm:table-cell">
+                          {r.source.replace("pms-", "")}
+                          {!hasBoth && <span className="ml-1 text-amber-600">（單邊）</span>}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* 統計區 */}
+            {(() => {
+              const valid = pmVsPms.filter(
+                (r) => r.pmFinal !== null && r.pmsFinal !== null && r.diffPct !== null
+              )
+              if (valid.length === 0) return null
+              const avgDiffPct = valid.reduce((s, r) => s + (r.diffPct ?? 0), 0) / valid.length
+              const maxOver = valid.reduce(
+                (m, r) => ((r.diffPct ?? 0) > (m?.diffPct ?? -Infinity) ? r : m),
+                valid[0]
+              )
+              const maxUnder = valid.reduce(
+                (m, r) => ((r.diffPct ?? 0) < (m?.diffPct ?? Infinity) ? r : m),
+                valid[0]
+              )
+              return (
+                <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+                  <div className="bg-gray-50 rounded p-2">
+                    <div className="text-gray-500">平均差距</div>
+                    <div
+                      className={`font-mono font-semibold ${avgDiffPct > 0 ? "text-orange-600" : "text-blue-600"}`}
+                    >
+                      {avgDiffPct > 0 ? "+" : ""}
+                      {avgDiffPct.toFixed(1)}%
+                    </div>
+                  </div>
+                  <div className="bg-gray-50 rounded p-2">
+                    <div className="text-gray-500">PMS 最樂觀</div>
+                    <div className="font-mono font-semibold text-orange-600">
+                      {maxOver.month} +{maxOver.diffPct?.toFixed(1)}%
+                    </div>
+                  </div>
+                  <div className="bg-gray-50 rounded p-2">
+                    <div className="text-gray-500">PMS 最保守</div>
+                    <div className="font-mono font-semibold text-blue-600">
+                      {maxUnder.month} {maxUnder.diffPct?.toFixed(1)}%
+                    </div>
+                  </div>
+                </div>
+              )
+            })()}
+
+            <p className="text-[10px] text-gray-400 mt-2">
+              💡 樣本越多、校準模型越準。建議定期回頭看「平均差距」、若 PMS 持續高估或低估
+              一致幅度、可作為手動調整係數的依據
+            </p>
           </CardContent>
         </Card>
       )}

@@ -583,3 +583,100 @@ export async function getSimpleForecast(
     pastMonthsComparison: [], // 未來補：同 daysElapsed 日數歷史比率
   }
 }
+
+// ─────────────────────────────────────────────
+// PM vs PMS 月底對照
+// ─────────────────────────────────────────────
+
+export interface PmVsPmsRow {
+  month: string // YYYY-MM
+  pmFinal: number | null // payment_items income 月度合計
+  pmsFinal: number | null // forecast_snapshots 該月最後一筆 booked_revenue 合計
+  diff: number | null // pmsFinal - pmFinal
+  diffPct: number | null // diff / pmFinal × 100
+  source: string // 'pms-historical' | 'pms-bridge' | 'mixed'
+}
+
+/**
+ * 取每月 PM 實際 vs PMS 月底紀錄對照
+ *
+ * - PM = payment_items.item_type='income' 月份合計
+ * - PMS = forecast_snapshots 該 target_month、每館取最新 snapshot 合計
+ *   - 對於已過月份：用月底最後一筆（最終值）
+ *   - 對於本月：用截至今日最新一筆
+ * - 涵蓋 source: pms-bridge（2025-06+ daily）+ pms-historical（2024 + 2025-01~05 月底）
+ */
+export async function getPmVsPmsMonthly(): Promise<PmVsPmsRow[]> {
+  const result = await db.execute(sql`
+    WITH pm_actual AS (
+      SELECT
+        TO_CHAR(start_date, 'YYYY-MM') AS month,
+        SUM(total_amount::numeric)::bigint AS pm_final
+      FROM payment_items
+      WHERE item_type = 'income' AND NOT is_deleted
+        AND start_date >= '2024-01-01'::date
+      GROUP BY 1
+    ),
+    -- 每個（target_month, company_id）取最新 snapshot
+    pms_latest AS (
+      SELECT DISTINCT ON (target_month, company_id)
+        target_month,
+        company_id,
+        booked_revenue::numeric AS booked,
+        source
+      FROM revenue_forecast_snapshots
+      WHERE source IN ('pms-bridge', 'pms-historical')
+        AND company_id IS NOT NULL
+      ORDER BY target_month, company_id, snapshot_date DESC
+    ),
+    pms_monthend AS (
+      SELECT
+        target_month AS month,
+        SUM(booked)::bigint AS pms_final,
+        STRING_AGG(DISTINCT source, ',') AS sources
+      FROM pms_latest
+      GROUP BY 1
+    )
+    SELECT
+      COALESCE(pms.month, pm.month) AS month,
+      pm.pm_final::bigint AS pm_final,
+      pms.pms_final,
+      CASE
+        WHEN pm.pm_final IS NOT NULL AND pms.pms_final IS NOT NULL
+          THEN (pms.pms_final - pm.pm_final)::bigint
+        ELSE NULL
+      END AS diff,
+      pms.sources
+    FROM pms_monthend pms
+    FULL OUTER JOIN pm_actual pm ON pm.month = pms.month
+    WHERE COALESCE(pms.month, pm.month) >= '2024-01'
+    ORDER BY 1
+  `)
+
+  const rows = (
+    result as unknown as {
+      rows: Array<{
+        month: string
+        pm_final: string | null
+        pms_final: string | null
+        diff: string | null
+        sources: string | null
+      }>
+    }
+  ).rows
+
+  return rows.map((r) => {
+    const pmFinal = r.pm_final !== null ? Number(r.pm_final) : null
+    const pmsFinal = r.pms_final !== null ? Number(r.pms_final) : null
+    const diff = r.diff !== null ? Number(r.diff) : null
+    const diffPct = pmFinal && pmFinal > 0 && diff !== null ? (diff / pmFinal) * 100 : null
+    return {
+      month: r.month,
+      pmFinal,
+      pmsFinal,
+      diff,
+      diffPct,
+      source: r.sources ?? "—",
+    }
+  })
+}
