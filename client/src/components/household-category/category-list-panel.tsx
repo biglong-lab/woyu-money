@@ -1,7 +1,18 @@
+import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Edit, Trash2, BarChart3 } from "lucide-react"
 import type { DebtCategory } from "../../../../shared/schema/category"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 // ============================================================
 // 分類列表面板 - 顯示左側可選取的分類清單
@@ -30,6 +41,7 @@ export function CategoryListPanel({
   onEditCategory,
   onDeleteCategory,
 }: CategoryListPanelProps) {
+  const [deleteTarget, setDeleteTarget] = useState<DebtCategory | null>(null)
   return (
     <Card className="lg:col-span-1">
       <CardHeader>
@@ -76,10 +88,9 @@ export function CategoryListPanel({
                       variant="ghost"
                       onClick={(e) => {
                         e.stopPropagation()
-                        if (confirm("確定要刪除此分類嗎？\n刪除後無法復原")) {
-                          onDeleteCategory(category.id)
-                        }
+                        setDeleteTarget(category)
                       }}
+                      aria-label={`刪除「${category.categoryName}」分類`}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -90,6 +101,36 @@ export function CategoryListPanel({
           )}
         </div>
       </CardContent>
+
+      {/* 刪除分類確認 */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>確定刪除此分類？</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteTarget && (
+                <>
+                  將刪除「<strong>{deleteTarget.categoryName}</strong>」、刪除後無法復原。
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (deleteTarget) {
+                  onDeleteCategory(deleteTarget.id)
+                  setDeleteTarget(null)
+                }
+              }}
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+            >
+              確認刪除
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   )
 }

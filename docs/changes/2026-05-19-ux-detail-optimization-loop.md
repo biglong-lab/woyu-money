@@ -73,6 +73,28 @@
 - YTD 維持合計（限制標示 amber badge）
 - `/scenario-simulator` 場景區加「匯出 / 匯入 JSON」按鈕（merge by name、檔案格式驗證、上限 20）
 
+### Phase 11（commit `9a9dff1` ~ next）— ✅ confirm() → AlertDialog 改造
+
+從原生 `window.confirm()` 改造為 Radix AlertDialog、提升 a11y 與一致性：
+
+- ✅ Pages 改造（11 處）：user-management / category-management / simple-category /
+  project-template / loan-investment / project-specific-items /
+  rental-management（刪租約 + 刪文件） / account-settings（LINE 解綁） /
+  expense-webhooks（拒絕單筆） / integrations-center（撤銷 API key） /
+  property-groups（刪群組 + 移除成員）
+- ✅ Components 改造（4 處）：household-category-dialog / project-category-dialog /
+  active-rentals-card（批量標記已付） / household-category/category-list-panel
+
+🎯 進度：17 / 18 處（94%）
+
+統一改造模式：
+- `confirm()` → `setDeleteTarget(item)` 開 Dialog
+- `<AlertDialog>` 顯示具名提示「將刪除 X」、紅色 destructive 樣式
+- 鍵盤可用：Tab/Esc/Enter
+- 螢幕閱讀器：aria-modal、aria-describedby 內建
+
+剩 1 處保留 confirm（scenario-simulator × 2、純前端、純資料覆寫場景）
+
 ### Phase 10（commit `e0536f8` ~ `d869c61`）— ✅ BackToTop 全站擴散完成
 
 從 Phase 1 的 3 頁、擴散至 **35 個 500 行+ 長頁面**（覆蓋率 **100%**）：
