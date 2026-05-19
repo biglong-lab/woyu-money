@@ -600,15 +600,28 @@ export interface PmVsPmsRow {
 /**
  * 取每月 PM 實際 vs PMS 月底紀錄對照
  *
- * - PM = payment_items.item_type='income' 月份合計
- * - PMS = forecast_snapshots 該 target_month、每館取最新 snapshot 合計
- *   - 對於已過月份：用月底最後一筆（最終值）
- *   - 對於本月：用截至今日最新一筆
- * - 涵蓋 source: pms-bridge（2025-06+ daily）+ pms-historical（2024 + 2025-01~05 月底）
+ * 採用「同日 cross-section」原則、確保與走勢圖數字一致：
+ * - 對每個 target_month、取「該月內最新 snapshot_date」
+ * - PM = pm-daily-snapshot 該日 company_id IS NULL（合計）的 accumulated_revenue
+ * - PMS = pms-bridge 該日各館 booked_revenue 合計
+ * - PM 缺資料的月份（2025-01~2026-01）fallback 用 payment_items.income 月份合計
+ * - PMS 涵蓋 source: pms-bridge（daily）+ pms-historical（月底結算）
  */
 export async function getPmVsPmsMonthly(): Promise<PmVsPmsRow[]> {
   const result = await db.execute(sql`
-    WITH pm_actual AS (
+    WITH
+    -- PM 端：每月內最大 snapshot_date 的「合計」(company_id IS NULL) 那筆
+    pm_latest AS (
+      SELECT DISTINCT ON (target_month)
+        target_month,
+        accumulated_revenue::numeric AS acc,
+        snapshot_date
+      FROM revenue_forecast_snapshots
+      WHERE source = 'pm-daily-snapshot' AND company_id IS NULL
+      ORDER BY target_month, snapshot_date DESC
+    ),
+    -- PM fallback：payment_items 月份合計（用於沒 pm-daily-snapshot 的月份）
+    pm_fallback AS (
       SELECT
         TO_CHAR(start_date, 'YYYY-MM') AS month,
         SUM(total_amount::numeric)::bigint AS pm_final
@@ -617,39 +630,45 @@ export async function getPmVsPmsMonthly(): Promise<PmVsPmsRow[]> {
         AND start_date >= '2024-01-01'::date
       GROUP BY 1
     ),
-    -- 每個（target_month, company_id）取最新 snapshot
-    pms_latest AS (
-      SELECT DISTINCT ON (target_month, company_id)
+    -- PMS 端：每 target_month 取最大 snapshot_date、那一天所有館合計
+    pms_latest_date AS (
+      SELECT
         target_month,
-        company_id,
-        booked_revenue::numeric AS booked,
-        source
+        MAX(snapshot_date) AS latest_date
       FROM revenue_forecast_snapshots
       WHERE source IN ('pms-bridge', 'pms-historical')
         AND company_id IS NOT NULL
-      ORDER BY target_month, company_id, snapshot_date DESC
+      GROUP BY target_month
     ),
     pms_monthend AS (
       SELECT
-        target_month AS month,
-        SUM(booked)::bigint AS pms_final,
-        STRING_AGG(DISTINCT source, ',') AS sources
-      FROM pms_latest
-      GROUP BY 1
+        l.target_month AS month,
+        SUM(s.booked_revenue::numeric)::bigint AS pms_final,
+        STRING_AGG(DISTINCT s.source, ',') AS sources,
+        l.latest_date AS pms_snapshot_date
+      FROM pms_latest_date l
+      JOIN revenue_forecast_snapshots s
+        ON s.target_month = l.target_month
+        AND s.snapshot_date = l.latest_date
+        AND s.source IN ('pms-bridge', 'pms-historical')
+        AND s.company_id IS NOT NULL
+      GROUP BY 1, l.latest_date
     )
     SELECT
-      COALESCE(pms.month, pm.month) AS month,
-      pm.pm_final::bigint AS pm_final,
+      COALESCE(pms.month, pm_latest.target_month, pm_fallback.month) AS month,
+      COALESCE(pm_latest.acc, pm_fallback.pm_final)::bigint AS pm_final,
       pms.pms_final,
       CASE
-        WHEN pm.pm_final IS NOT NULL AND pms.pms_final IS NOT NULL
-          THEN (pms.pms_final - pm.pm_final)::bigint
+        WHEN COALESCE(pm_latest.acc, pm_fallback.pm_final) IS NOT NULL
+          AND pms.pms_final IS NOT NULL
+          THEN (pms.pms_final - COALESCE(pm_latest.acc, pm_fallback.pm_final))::bigint
         ELSE NULL
       END AS diff,
       pms.sources
     FROM pms_monthend pms
-    FULL OUTER JOIN pm_actual pm ON pm.month = pms.month
-    WHERE COALESCE(pms.month, pm.month) >= '2024-01'
+    FULL OUTER JOIN pm_latest ON pm_latest.target_month = pms.month
+    FULL OUTER JOIN pm_fallback ON pm_fallback.month = COALESCE(pms.month, pm_latest.target_month)
+    WHERE COALESCE(pms.month, pm_latest.target_month, pm_fallback.month) >= '2024-01'
     ORDER BY 1
   `)
 
