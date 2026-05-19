@@ -815,9 +815,38 @@ export default function ScenarioSimulatorPage() {
       {/* 支出參數 */}
       <Card>
         <CardContent className="py-4 px-4">
-          <div className="text-sm font-semibold text-gray-700 flex items-center gap-2 mb-3">
-            <TrendingDown className="h-4 w-4 text-red-600" />
-            支出參數（個別調整每個模板）
+          <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+            <div className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+              <TrendingDown className="h-4 w-4 text-red-600" />
+              支出參數（個別調整每個模板）
+            </div>
+            {(() => {
+              const hasOverride = templates.some((t) => {
+                const o = tplOverrides[t.id]
+                if (!o) return false
+                return o.active !== t.isActive || o.amount !== parseFloat(t.estimatedAmount)
+              })
+              if (!hasOverride) return null
+              return (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const init: Record<number, { active: boolean; amount: number }> = {}
+                    for (const t of templates) {
+                      init[t.id] = { active: t.isActive, amount: parseFloat(t.estimatedAmount) }
+                    }
+                    setTplOverrides(init)
+                    toast({ title: "已重置全部模板覆寫" })
+                  }}
+                  className="text-xs h-7"
+                >
+                  <RotateCcw className="h-3 w-3 mr-1" />
+                  重置模板
+                </Button>
+              )
+            })()}
           </div>
 
           {templates.length === 0 ? (
