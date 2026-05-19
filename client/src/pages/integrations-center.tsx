@@ -24,6 +24,16 @@ import { useDocumentTitle } from "@/hooks/use-document-title"
 import { apiRequest } from "@/lib/queryClient"
 import { BackToTop } from "@/components/back-to-top"
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import {
   Activity,
   AlertTriangle,
   BookOpen,
@@ -787,6 +797,7 @@ function ApiKeysPanel() {
   })
   const [showCreate, setShowCreate] = useState(false)
   const [newKey, setNewKey] = useState<string | null>(null)
+  const [revokeTarget, setRevokeTarget] = useState<ApiKeyRow | null>(null)
 
   const revokeMutation = useMutation({
     mutationFn: async (id: number) => apiRequest("DELETE", `/api/integrations/api-keys/${id}`),
@@ -861,15 +872,7 @@ function ApiKeysPanel() {
               啟用中（{activeKeys.length}）
             </div>
             {activeKeys.map((k) => (
-              <ApiKeyRowCard
-                key={k.id}
-                k={k}
-                onRevoke={() => {
-                  if (confirm(`確定撤銷「${k.name}」？對接方將立即失效。`)) {
-                    revokeMutation.mutate(k.id)
-                  }
-                }}
-              />
+              <ApiKeyRowCard key={k.id} k={k} onRevoke={() => setRevokeTarget(k)} />
             ))}
           </div>
 
@@ -896,6 +899,36 @@ function ApiKeysPanel() {
           }}
         />
       )}
+
+      {/* 撤銷 API Key 確認 */}
+      <AlertDialog open={!!revokeTarget} onOpenChange={(open) => !open && setRevokeTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>確定撤銷此 API Key？</AlertDialogTitle>
+            <AlertDialogDescription>
+              {revokeTarget && (
+                <>
+                  將撤銷「<strong>{revokeTarget.name}</strong>」、對接方將立即失效、無法復原。
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (revokeTarget) {
+                  revokeMutation.mutate(revokeTarget.id)
+                  setRevokeTarget(null)
+                }
+              }}
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+            >
+              確認撤銷
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

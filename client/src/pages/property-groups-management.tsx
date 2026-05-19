@@ -33,6 +33,16 @@ import {
 import { Plus, Trash2, Users, Edit, Save, X, Building2 } from "lucide-react"
 import { friendlyApiError } from "@/lib/utils"
 import { BackToTop } from "@/components/back-to-top"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 interface PropertyProject {
   id: number
@@ -71,6 +81,11 @@ export default function PropertyGroupsManagement() {
   const [addMemberFor, setAddMemberFor] = useState<PropertyGroup | null>(null)
   const [newMemberProject, setNewMemberProject] = useState<string>("")
   const [newMemberWeight, setNewMemberWeight] = useState<string>("1")
+  const [deleteGroupTarget, setDeleteGroupTarget] = useState<PropertyGroup | null>(null)
+  const [deleteMemberTarget, setDeleteMemberTarget] = useState<{
+    group: PropertyGroup
+    member: GroupMember
+  } | null>(null)
 
   // ── Queries ─────────────────────────────────────────
   const { data: groups = [], isLoading } = useQuery<PropertyGroup[]>({
@@ -163,13 +178,21 @@ export default function PropertyGroupsManagement() {
 
   // ── Handlers ────────────────────────────────────────
   const handleDelete = (group: PropertyGroup) => {
-    if (
-      !confirm(
-        `確定要刪除「${group.name}」？\n所有成員（${group.members.length} 個）也會被一併刪除。`
-      )
-    )
-      return
-    deleteGroup.mutate(group.id)
+    setDeleteGroupTarget(group)
+  }
+
+  const confirmDeleteGroup = () => {
+    if (deleteGroupTarget) {
+      deleteGroup.mutate(deleteGroupTarget.id)
+      setDeleteGroupTarget(null)
+    }
+  }
+
+  const confirmDeleteMember = () => {
+    if (deleteMemberTarget) {
+      deleteMember.mutate(deleteMemberTarget.member.id)
+      setDeleteMemberTarget(null)
+    }
   }
 
   const handleAddMember = () => {
@@ -265,10 +288,7 @@ export default function PropertyGroupsManagement() {
                         key={m.id}
                         member={m}
                         onUpdateWeight={(weight) => updateMember.mutate({ id: m.id, weight })}
-                        onDelete={() => {
-                          if (!confirm(`從「${group.name}」移除「${m.projectName}」？`)) return
-                          deleteMember.mutate(m.id)
-                        }}
+                        onDelete={() => setDeleteMemberTarget({ group, member: m })}
                       />
                     ))
                   )}
@@ -403,6 +423,64 @@ export default function PropertyGroupsManagement() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* 刪除群組確認 */}
+      <AlertDialog
+        open={!!deleteGroupTarget}
+        onOpenChange={(open) => !open && setDeleteGroupTarget(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>確定刪除此群組？</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteGroupTarget && (
+                <>
+                  將刪除「<strong>{deleteGroupTarget.name}</strong>」、 所有成員（
+                  {deleteGroupTarget.members.length} 個）也會被一併刪除。
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteGroup}
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+            >
+              確認刪除
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* 移除成員確認 */}
+      <AlertDialog
+        open={!!deleteMemberTarget}
+        onOpenChange={(open) => !open && setDeleteMemberTarget(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>確定移除此成員？</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteMemberTarget && (
+                <>
+                  將從「<strong>{deleteMemberTarget.group.name}</strong>」群組中移除「
+                  <strong>{deleteMemberTarget.member.projectName}</strong>」。
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteMember}
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+            >
+              確認移除
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <BackToTop />
     </div>
