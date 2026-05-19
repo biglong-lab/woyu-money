@@ -131,17 +131,29 @@ export default function FinancialDashboardPage() {
   )
 
   // 今年迄今 YTD
+  interface BreakdownItem {
+    category: string
+    amount: number
+    count: number
+  }
   interface YtdData {
     income: number
     expense: number
     profit: number
     months: MonthRow[]
+    breakdown?: Record<string, { expense: BreakdownItem[]; income: BreakdownItem[] }>
   }
   const ytdQuery = useQuery<YtdData>({
     queryKey: ["/api/dashboard/ytd"],
   })
 
-  const ytd: YtdData = ytdQuery.data ?? { income: 0, expense: 0, profit: 0, months: [] }
+  const ytd: YtdData = ytdQuery.data ?? {
+    income: 0,
+    expense: 0,
+    profit: 0,
+    months: [],
+    breakdown: {},
+  }
 
   // YTD 月均支出（含 HR / 一次性 / 模板）— 比純 templates 更全面
   const ytdAvgMonthlyExpense = useMemo(() => {
@@ -368,10 +380,89 @@ export default function FinancialDashboardPage() {
                   tickFormatter={(v) => (Math.abs(v) >= 1000 ? `${Math.round(v / 1000)}K` : v)}
                 />
                 <Tooltip
-                  formatter={(v: number) => formatMoney(v)}
-                  labelFormatter={(label) => {
+                  content={({ active, payload, label }) => {
+                    if (!active || !payload || payload.length === 0) return null
                     const row = chartData.find((d) => d.month === label)
-                    return `${label}${row?.isForecast ? " (預估)" : ""}`
+                    const bd = ytd.breakdown?.[label as string]
+                    const incomeTop = bd?.income.slice(0, 5) ?? []
+                    const expenseTop = bd?.expense.slice(0, 8) ?? []
+                    const incomeRest = bd?.income.slice(5) ?? []
+                    const expenseRest = bd?.expense.slice(8) ?? []
+                    return (
+                      <div className="bg-white border border-gray-200 rounded shadow-lg p-3 text-xs max-w-xs">
+                        <div className="font-semibold mb-2 pb-1 border-b">
+                          {label}
+                          {row?.isForecast && <span className="ml-1 text-amber-600">(預估)</span>}
+                        </div>
+                        {/* payload 顯示主要數字 */}
+                        <div className="space-y-0.5 mb-2">
+                          {payload.map((p, i) => (
+                            <div
+                              key={i}
+                              className="flex justify-between gap-3"
+                              style={{ color: p.color }}
+                            >
+                              <span>{p.name}</span>
+                              <span className="font-mono font-medium">
+                                {formatMoney(Number(p.value))}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                        {/* 分類 breakdown（過去月才有資料）*/}
+                        {!row?.isForecast && bd && (
+                          <>
+                            {incomeTop.length > 0 && (
+                              <div className="border-t pt-2 mt-2">
+                                <div className="text-blue-700 font-medium mb-1">
+                                  收入來源（前 5）
+                                </div>
+                                {incomeTop.map((it, i) => (
+                                  <div
+                                    key={i}
+                                    className="flex justify-between text-gray-600 text-[10px]"
+                                  >
+                                    <span className="truncate max-w-[140px]">{it.category}</span>
+                                    <span className="font-mono">{formatMoney(it.amount)}</span>
+                                  </div>
+                                ))}
+                                {incomeRest.length > 0 && (
+                                  <div className="text-[10px] text-gray-400 italic">
+                                    + {incomeRest.length} 個其他來源
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                            {expenseTop.length > 0 && (
+                              <div className="border-t pt-2 mt-2">
+                                <div className="text-red-700 font-medium mb-1">
+                                  支出分類（前 8）
+                                </div>
+                                {expenseTop.map((it, i) => (
+                                  <div
+                                    key={i}
+                                    className="flex justify-between text-gray-600 text-[10px]"
+                                  >
+                                    <span className="truncate max-w-[140px]">{it.category}</span>
+                                    <span className="font-mono">{formatMoney(it.amount)}</span>
+                                  </div>
+                                ))}
+                                {expenseRest.length > 0 && (
+                                  <div className="text-[10px] text-gray-400 italic">
+                                    + {expenseRest.length} 個其他分類
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </>
+                        )}
+                        {row?.isForecast && (
+                          <div className="border-t pt-2 mt-2 text-[10px] text-gray-500">
+                            預估：收入採季節性預測、支出用 YTD 月均
+                          </div>
+                        )}
+                      </div>
+                    )
                   }}
                 />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
