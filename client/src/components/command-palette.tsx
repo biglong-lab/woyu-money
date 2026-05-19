@@ -260,15 +260,24 @@ export function CommandPalette() {
             {category.items.map((item) => {
               const Icon = item.icon
               const keywords = [item.title, item.href, item.description].filter(Boolean) as string[]
+              const isCurrent = item.href === location
               return (
                 <CommandItem
                   key={item.href}
                   onSelect={() => runCommand(() => setLocation(item.href))}
                   keywords={keywords}
+                  className={isCurrent ? "bg-blue-50/50" : ""}
                 >
-                  <Icon className="mr-2 h-4 w-4 text-gray-500" />
-                  <span>{item.title}</span>
-                  {item.description && (
+                  <Icon
+                    className={`mr-2 h-4 w-4 ${isCurrent ? "text-blue-600" : "text-gray-500"}`}
+                  />
+                  <span className={isCurrent ? "font-medium text-blue-900" : ""}>{item.title}</span>
+                  {isCurrent && (
+                    <span className="ml-2 text-[10px] text-blue-600 bg-blue-100 px-1.5 py-0.5 rounded">
+                      您正在此頁
+                    </span>
+                  )}
+                  {!isCurrent && item.description && (
                     <span className="ml-auto text-xs text-gray-400 truncate max-w-[40%]">
                       {item.description}
                     </span>

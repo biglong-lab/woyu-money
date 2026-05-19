@@ -41,10 +41,22 @@ export function BackToTop({ threshold = 400 }: BackToTopProps) {
   const dashOffset = CIRCUMFERENCE * (1 - progress)
   const pctLabel = Math.round(progress * 100)
 
+  const handleClick = () => {
+    // 觸覺回饋（Android Chrome 支援、iOS Safari silently no-op）
+    if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+      try {
+        navigator.vibrate(10)
+      } catch {
+        // 部分瀏覽器 throw、忽略即可
+      }
+    }
+    window.scrollTo({ top: 0, behavior: "smooth" })
+  }
+
   return (
     <button
       type="button"
-      onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+      onClick={handleClick}
       aria-label={`回到頂端（已捲動 ${pctLabel}%）`}
       title={`回到頂端（${pctLabel}%）`}
       className="fixed bottom-20 right-4 z-40 h-11 w-11 rounded-full bg-white border border-gray-300 shadow-lg
