@@ -7,6 +7,7 @@ import {
   recurringExpenseTemplates,
   paymentItems,
   paymentProjects,
+  paymentRecords,
   type RecurringExpenseTemplate,
   type InsertRecurringExpenseTemplate,
 } from "@shared/schema"
@@ -167,4 +168,131 @@ export async function generateItemsForMonth(
   }
 
   return { generated, skipped }
+}
+
+/**
+ * 列出指定月份的所有「模板自動產出占位項」
+ * 給前端「本月待填實際金額」清單用
+ */
+export async function listScheduledItems(targetMonth: string) {
+  if (!/^\d{4}-\d{2}$/.test(targetMonth)) {
+    throw new Error("月份格式錯誤、需 YYYY-MM")
+  }
+  const rows = await db.execute(sql`
+    SELECT
+      pi.id,
+      pi.item_name             AS "itemName",
+      pi.total_amount::numeric AS "estimatedAmount",
+      pi.paid_amount::numeric  AS "paidAmount",
+      pi.status,
+      pi.start_date            AS "startDate",
+      pi.notes,
+      pi.recurring_template_id AS "templateId",
+      t.template_name          AS "templateName",
+      t.estimated_amount::numeric AS "templateEstimatedAmount",
+      p.project_name           AS "projectName"
+    FROM payment_items pi
+    LEFT JOIN recurring_expense_templates t ON t.id = pi.recurring_template_id
+    LEFT JOIN payment_projects p            ON p.id = pi.project_id
+    WHERE NOT pi.is_deleted
+      AND pi.source = 'template_scheduled'
+      AND TO_CHAR(pi.start_date, 'YYYY-MM') = ${targetMonth}
+    ORDER BY pi.status, pi.start_date, pi.id
+  `)
+  return (rows as unknown as { rows: unknown[] }).rows
+}
+
+/**
+ * 將模板自動產出的「估算占位」更新成「實際支付」
+ *
+ * 流程：
+ * - 找該 payment_item 並確認來自 template_scheduled（避免誤改一般項目）
+ * - 更新 totalAmount = actualAmount、paidAmount = actualAmount、status = 'paid'
+ * - 在 notes 加上「✅ 已實付：原估算 $X → 實際 $Y（差額 ±$Z、Date）」
+ * - 同時新增一筆 payment_record（含 paymentDate、receiptImageUrl 選填）
+ *
+ * 設計選擇：不新增另一筆 payment_item、保留 recurringTemplateId 連結
+ * → 統計時用真實金額、後台可從 template 回溯所有實際發生
+ */
+export async function replaceScheduledWithActual(params: {
+  itemId: number
+  actualAmount: number
+  paymentDate: string // YYYY-MM-DD
+  paymentMethod?: string | null
+  notes?: string | null
+  receiptImageUrl?: string | null
+}): Promise<{ itemId: number; recordId: number; estimatedAmount: number; diff: number }> {
+  const { itemId, actualAmount, paymentDate, paymentMethod, notes, receiptImageUrl } = params
+
+  if (!(actualAmount > 0)) throw new Error("實際金額需大於 0")
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(paymentDate)) throw new Error("付款日格式需 YYYY-MM-DD")
+
+  // 用 transaction 確保 item update + record insert 同步
+  return db.transaction(async (tx) => {
+    // 1. 取現有 item
+    const [item] = await tx
+      .select({
+        id: paymentItems.id,
+        source: paymentItems.source,
+        totalAmount: paymentItems.totalAmount,
+        recurringTemplateId: paymentItems.recurringTemplateId,
+        notes: paymentItems.notes,
+        status: paymentItems.status,
+        isDeleted: paymentItems.isDeleted,
+      })
+      .from(paymentItems)
+      .where(eq(paymentItems.id, itemId))
+
+    if (!item) throw new Error("付款項目不存在")
+    if (item.isDeleted) throw new Error("付款項目已刪除")
+    if (item.source !== "template_scheduled" && !item.recurringTemplateId) {
+      throw new Error("此項目非模板自動產出、不可用此 API 取代（請改用一般付款流程）")
+    }
+
+    const estimatedAmount = parseFloat(item.totalAmount)
+    const diff = actualAmount - estimatedAmount
+    const diffStr =
+      diff === 0
+        ? "持平"
+        : diff > 0
+          ? `+$${diff.toLocaleString()}`
+          : `-$${Math.abs(diff).toLocaleString()}`
+
+    const updatedNotes = [
+      `✅ 已實付（${paymentDate}）：原估算 $${estimatedAmount.toLocaleString()} → 實際 $${actualAmount.toLocaleString()}（${diffStr}）`,
+      notes?.trim() || null,
+      item.notes ? `[原占位備註] ${item.notes}` : null,
+    ]
+      .filter(Boolean)
+      .join("\n")
+
+    // 2. 更新 payment_item
+    await tx
+      .update(paymentItems)
+      .set({
+        totalAmount: actualAmount.toFixed(2),
+        paidAmount: actualAmount.toFixed(2),
+        status: "paid",
+        notes: updatedNotes,
+        updatedAt: new Date(),
+      })
+      .where(eq(paymentItems.id, itemId))
+
+    // 3. 新增 payment_record
+    const [record] = await tx
+      .insert(paymentRecords)
+      .values({
+        itemId,
+        amountPaid: actualAmount.toFixed(2),
+        paymentDate,
+        paymentMethod: paymentMethod ?? null,
+        notes: notes?.trim() || `由「模板占位 → 實際金額」介面新增`,
+        receiptImageUrl: receiptImageUrl ?? null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .returning({ id: paymentRecords.id })
+
+    return { itemId, recordId: record.id, estimatedAmount, diff }
+  })
 }

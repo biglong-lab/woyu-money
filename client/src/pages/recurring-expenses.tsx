@@ -43,6 +43,8 @@ import {
   DollarSign,
   Pause,
   CheckCircle2,
+  AlertCircle,
+  Receipt,
 } from "lucide-react"
 import { useDocumentTitle } from "@/hooks/use-document-title"
 import { EmptyState } from "@/components/ui/empty-state"
@@ -64,6 +66,20 @@ interface Template {
   lastGeneratedMonth: string | null
   createdAt: string
   updatedAt: string
+}
+
+interface ScheduledItem {
+  id: number
+  itemName: string
+  estimatedAmount: string | number
+  paidAmount: string | number
+  status: string
+  startDate: string
+  notes: string | null
+  templateId: number | null
+  templateName: string | null
+  templateEstimatedAmount: string | number | null
+  projectName: string | null
 }
 
 export default function RecurringExpensesPage() {
@@ -117,8 +133,23 @@ export default function RecurringExpensesPage() {
       toast({ title: "產出失敗", description: err.message, variant: "destructive" }),
   })
 
-  // 月份選擇（預設當月）
-  const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().slice(0, 7))
+  // 月份選擇（預設當月、避開 toISOString UTC 偏移）
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
+  })
+
+  // 該月已產出的占位項清單（給「填入實際金額」用）
+  const { data: scheduledData } = useQuery<{ month: string; items: ScheduledItem[] }>({
+    queryKey: ["/api/recurring-expense-templates/scheduled-items", selectedMonth],
+    queryFn: () =>
+      apiRequest("GET", `/api/recurring-expense-templates/scheduled-items?month=${selectedMonth}`),
+  })
+  const scheduledItems = scheduledData?.items ?? []
+  const pendingItems = scheduledItems.filter((it) => it.status !== "paid")
+  const paidItems = scheduledItems.filter((it) => it.status === "paid")
+
+  const [actualDialog, setActualDialog] = useState<ScheduledItem | null>(null)
 
   const generateAllMutation = useMutation({
     mutationFn: (month: string) =>
@@ -248,6 +279,95 @@ export default function RecurringExpensesPage() {
         </Card>
       )}
 
+      {/* 占位 → 實際金額（本月待填）*/}
+      {pendingItems.length > 0 && (
+        <Card className="border-amber-300 bg-amber-50">
+          <CardContent className="py-3 px-3 sm:px-4 space-y-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              <AlertCircle className="h-4 w-4 text-amber-700" />
+              <span className="font-semibold text-amber-900">
+                {selectedMonth} 待填實際金額（{pendingItems.length} 筆）
+              </span>
+              <span className="text-xs text-amber-700">
+                估算總額 $
+                {Math.round(
+                  pendingItems.reduce((s, it) => s + parseFloat(String(it.estimatedAmount)), 0)
+                ).toLocaleString()}
+              </span>
+            </div>
+            <div className="space-y-1.5">
+              {pendingItems.map((it) => (
+                <div
+                  key={it.id}
+                  className="flex items-center gap-2 flex-wrap bg-white rounded px-2 py-1.5 border border-amber-200"
+                >
+                  <div className="flex-1 min-w-[180px]">
+                    <div className="text-sm font-medium text-gray-900">{it.itemName}</div>
+                    <div className="text-xs text-gray-500">
+                      {it.startDate}
+                      {it.projectName ? ` · ${it.projectName}` : ""}
+                      {it.templateName ? ` · 來自模板「${it.templateName}」` : ""}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-xs text-gray-500">估算</div>
+                    <div className="text-sm font-semibold text-amber-700">
+                      ${Math.round(parseFloat(String(it.estimatedAmount))).toLocaleString()}
+                    </div>
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={() => setActualDialog(it)}
+                    className="bg-amber-600 hover:bg-amber-700 text-white"
+                  >
+                    <Receipt className="h-3.5 w-3.5 mr-1" />
+                    填入實際
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {paidItems.length > 0 && (
+        <details className="rounded-md border border-green-200 bg-green-50 px-3 py-2">
+          <summary className="cursor-pointer text-sm font-medium text-green-900">
+            ✅ {selectedMonth} 已實付（{paidItems.length} 筆、總額 $
+            {Math.round(
+              paidItems.reduce((s, it) => s + parseFloat(String(it.paidAmount)), 0)
+            ).toLocaleString()}
+            ）
+          </summary>
+          <div className="mt-2 space-y-1">
+            {paidItems.map((it) => {
+              const tplEst = it.templateEstimatedAmount
+                ? parseFloat(String(it.templateEstimatedAmount))
+                : null
+              const actual = parseFloat(String(it.paidAmount))
+              const diff = tplEst !== null ? actual - tplEst : null
+              return (
+                <div
+                  key={it.id}
+                  className="flex items-center justify-between gap-2 text-xs text-green-900 px-2 py-1 bg-white rounded"
+                >
+                  <span className="truncate">{it.itemName}</span>
+                  <span className="font-semibold">
+                    ${Math.round(actual).toLocaleString()}
+                    {diff !== null && diff !== 0 && (
+                      <span className={`ml-1.5 ${diff > 0 ? "text-red-600" : "text-blue-600"}`}>
+                        ({diff > 0 ? "+" : ""}
+                        {Math.round(diff).toLocaleString()})
+                      </span>
+                    )}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        </details>
+      )}
+
       {/* 列表 */}
       {templates.length === 0 ? (
         <Card>
@@ -283,6 +403,14 @@ export default function RecurringExpensesPage() {
           template={editDialog.tpl}
           projects={projects}
           onClose={() => setEditDialog(null)}
+        />
+      )}
+
+      {actualDialog && (
+        <ReplaceWithActualDialog
+          item={actualDialog}
+          selectedMonth={selectedMonth}
+          onClose={() => setActualDialog(null)}
         />
       )}
 
@@ -402,6 +530,164 @@ function TemplateCard({
         </div>
       </CardContent>
     </Card>
+  )
+}
+
+function ReplaceWithActualDialog({
+  item,
+  selectedMonth,
+  onClose,
+}: {
+  item: ScheduledItem
+  selectedMonth: string
+  onClose: () => void
+}) {
+  const { toast } = useToast()
+  const estimated = parseFloat(String(item.estimatedAmount))
+  const [actualAmount, setActualAmount] = useState(estimated.toString())
+  const [paymentDate, setPaymentDate] = useState(() => {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+  })
+  const [paymentMethod, setPaymentMethod] = useState<string>("")
+  const [notes, setNotes] = useState("")
+
+  const mut = useMutation({
+    mutationFn: () =>
+      apiRequest("POST", `/api/recurring-expense-templates/replace-with-actual/${item.id}`, {
+        actualAmount: parseFloat(actualAmount),
+        paymentDate,
+        paymentMethod: paymentMethod || null,
+        notes: notes.trim() || null,
+      }),
+    onSuccess: () => {
+      toast({
+        title: "✅ 已更新為實際金額",
+        description: `${item.itemName} → $${parseFloat(actualAmount).toLocaleString()}`,
+      })
+      queryClient.invalidateQueries({
+        queryKey: ["/api/recurring-expense-templates/scheduled-items", selectedMonth],
+      })
+      queryClient.invalidateQueries({ queryKey: ["/api/payment/items"] })
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/ytd"] })
+      onClose()
+    },
+    onError: (err: Error) =>
+      toast({ title: "更新失敗", description: err.message, variant: "destructive" }),
+  })
+
+  const actualNum = parseFloat(actualAmount)
+  const diff = Number.isFinite(actualNum) ? actualNum - estimated : 0
+  const canSubmit =
+    Number.isFinite(actualNum) && actualNum > 0 && /^\d{4}-\d{2}-\d{2}$/.test(paymentDate)
+
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent className="w-[95vw] max-w-md">
+        <DialogHeader>
+          <DialogTitle>填入實際金額（取代占位）</DialogTitle>
+          <DialogDescription>
+            此操作會更新「{item.itemName}」為實際支付、並建立付款記錄（不會新增另一筆）
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-3 text-sm">
+          <div className="bg-gray-50 rounded px-3 py-2 space-y-1">
+            <div className="flex justify-between">
+              <span className="text-gray-500">原估算金額</span>
+              <span className="font-semibold text-amber-700">${estimated.toLocaleString()}</span>
+            </div>
+            {item.templateName && (
+              <div className="flex justify-between">
+                <span className="text-gray-500">來自模板</span>
+                <span className="text-gray-700">{item.templateName}</span>
+              </div>
+            )}
+            <div className="flex justify-between">
+              <span className="text-gray-500">預定日</span>
+              <span className="text-gray-700">{item.startDate}</span>
+            </div>
+          </div>
+
+          <div>
+            <Label>實際金額 *</Label>
+            <div className="relative">
+              <DollarSign className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input
+                type="number"
+                value={actualAmount}
+                onChange={(e) => setActualAmount(e.target.value)}
+                className="pl-8"
+                placeholder="0"
+              />
+            </div>
+            {Number.isFinite(actualNum) && actualNum > 0 && (
+              <p
+                className={`text-xs mt-1 ${
+                  diff === 0 ? "text-gray-500" : diff > 0 ? "text-red-600" : "text-blue-600"
+                }`}
+              >
+                差額：
+                {diff === 0 ? "持平" : (diff > 0 ? "+$" : "-$") + Math.abs(diff).toLocaleString()}
+                （vs 估算 ${estimated.toLocaleString()}）
+              </p>
+            )}
+          </div>
+
+          <div>
+            <Label>實際付款日 *</Label>
+            <Input
+              type="date"
+              value={paymentDate}
+              onChange={(e) => setPaymentDate(e.target.value)}
+            />
+          </div>
+
+          <div>
+            <Label>付款方式</Label>
+            <Select
+              value={paymentMethod || "none"}
+              onValueChange={(v) => setPaymentMethod(v === "none" ? "" : v)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="（選填）" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">（不指定）</SelectItem>
+                <SelectItem value="現金">現金</SelectItem>
+                <SelectItem value="轉帳">轉帳</SelectItem>
+                <SelectItem value="信用卡">信用卡</SelectItem>
+                <SelectItem value="LinePay">LinePay</SelectItem>
+                <SelectItem value="其他">其他</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <Label>備註</Label>
+            <Textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={2}
+              placeholder="（選填）例如：本月電費漲價、含夏季調整"
+            />
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            取消
+          </Button>
+          <Button
+            onClick={() => mut.mutate()}
+            disabled={!canSubmit || mut.isPending}
+            className="bg-amber-600 hover:bg-amber-700"
+          >
+            {mut.isPending ? "更新中…" : "確認、更新為實際"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 
