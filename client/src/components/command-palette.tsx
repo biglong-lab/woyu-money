@@ -22,6 +22,7 @@ import {
   Sparkles,
   Wallet,
   History,
+  Trash2,
 } from "lucide-react"
 import {
   CommandDialog,
@@ -58,6 +59,14 @@ function loadRecent(): string[] {
     return Array.isArray(parsed) ? parsed : []
   } catch {
     return []
+  }
+}
+
+function clearRecent() {
+  try {
+    localStorage.removeItem(RECENT_STORAGE_KEY)
+  } catch {
+    // 靜默失敗
   }
 }
 
@@ -178,6 +187,18 @@ export function CommandPalette() {
                   </CommandItem>
                 )
               })}
+              <CommandItem
+                key="recent-clear"
+                onSelect={() => {
+                  clearRecent()
+                  setRecentHrefs([])
+                }}
+                keywords={["clear", "清除", "歷史", "history"]}
+                className="text-xs text-gray-500"
+              >
+                <Trash2 className="mr-2 h-3.5 w-3.5 text-gray-400" />
+                <span>清除最近訪問紀錄</span>
+              </CommandItem>
             </CommandGroup>
             <CommandSeparator />
           </>
