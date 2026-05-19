@@ -46,6 +46,16 @@ import {
 import { useDocumentTitle } from "@/hooks/use-document-title"
 import { useToast } from "@/hooks/use-toast"
 import { BackToTop } from "@/components/back-to-top"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 interface SavedScenario {
   id: string
@@ -123,6 +133,9 @@ export default function ScenarioSimulatorPage() {
   // 場景儲存（localStorage）
   const [savedScenarios, setSavedScenarios] = useState<SavedScenario[]>(() => loadScenarios())
   const [newScenarioName, setNewScenarioName] = useState("")
+  // confirm() → AlertDialog: 場景覆寫 / 刪除確認
+  const [overwriteTarget, setOverwriteTarget] = useState<SavedScenario | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<SavedScenario | null>(null)
 
   // 模擬參數
   const [marketingDelta, setMarketingDelta] = useState(0) // -50 ~ +100 %
@@ -234,23 +247,8 @@ export default function ScenarioSimulatorPage() {
     setTplOverrides(init)
   }
 
-  const handleSaveScenario = () => {
-    const name = newScenarioName.trim()
-    if (!name) {
-      toast({ title: "請先輸入場景名稱", variant: "destructive" })
-      return
-    }
-    if (savedScenarios.length >= 20) {
-      toast({
-        title: "已達上限",
-        description: "最多儲存 20 個場景、請先刪除不用的",
-        variant: "destructive",
-      })
-      return
-    }
-    const dup = savedScenarios.find((s) => s.name === name)
-    if (dup && !confirm(`已存在同名場景「${name}」、要覆蓋嗎？`)) return
-
+  /** 實際寫入場景（覆蓋既有 or append 新）*/
+  const commitSaveScenario = (name: string, dup: SavedScenario | null) => {
     const next: SavedScenario = {
       id: dup?.id ?? `s_${Date.now()}`,
       name,
@@ -273,6 +271,35 @@ export default function ScenarioSimulatorPage() {
     toast({ title: "✅ 已儲存場景", description: name })
   }
 
+  const handleSaveScenario = () => {
+    const name = newScenarioName.trim()
+    if (!name) {
+      toast({ title: "請先輸入場景名稱", variant: "destructive" })
+      return
+    }
+    if (savedScenarios.length >= 20) {
+      toast({
+        title: "已達上限",
+        description: "最多儲存 20 個場景、請先刪除不用的",
+        variant: "destructive",
+      })
+      return
+    }
+    const dup = savedScenarios.find((s) => s.name === name)
+    if (dup) {
+      setOverwriteTarget(dup)
+      return
+    }
+    commitSaveScenario(name, null)
+  }
+
+  const confirmOverwrite = () => {
+    if (overwriteTarget) {
+      commitSaveScenario(overwriteTarget.name, overwriteTarget)
+      setOverwriteTarget(null)
+    }
+  }
+
   const handleLoadScenario = (s: SavedScenario) => {
     setMarketingDelta(s.params.marketingDelta)
     setPriceDelta(s.params.priceDelta)
@@ -286,10 +313,16 @@ export default function ScenarioSimulatorPage() {
   const handleDeleteScenario = (id: string) => {
     const target = savedScenarios.find((s) => s.id === id)
     if (!target) return
-    if (!confirm(`確定刪除「${target.name}」？`)) return
-    const list = savedScenarios.filter((s) => s.id !== id)
-    setSavedScenarios(list)
-    saveScenarios(list)
+    setDeleteTarget(target)
+  }
+
+  const confirmDeleteScenario = () => {
+    if (deleteTarget) {
+      const list = savedScenarios.filter((s) => s.id !== deleteTarget.id)
+      setSavedScenarios(list)
+      saveScenarios(list)
+      setDeleteTarget(null)
+    }
   }
 
   /** 匯出所有儲存場景為 JSON（跨裝置遷移用） */
@@ -811,6 +844,55 @@ export default function ScenarioSimulatorPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* 場景覆寫確認 */}
+      <AlertDialog
+        open={!!overwriteTarget}
+        onOpenChange={(open) => !open && setOverwriteTarget(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>確定覆寫此場景？</AlertDialogTitle>
+            <AlertDialogDescription>
+              {overwriteTarget && (
+                <>
+                  已存在同名場景「<strong>{overwriteTarget.name}</strong>」、
+                  覆寫後原參數將以當前設定取代、無法復原。
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmOverwrite}>確認覆寫</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* 場景刪除確認 */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>確定刪除此場景？</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteTarget && (
+                <>
+                  將刪除「<strong>{deleteTarget.name}</strong>」、此操作無法復原。
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteScenario}
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+            >
+              確認刪除
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <BackToTop />
 

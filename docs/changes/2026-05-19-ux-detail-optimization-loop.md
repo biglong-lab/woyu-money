@@ -85,7 +85,7 @@
 - ✅ Components 改造（4 處）：household-category-dialog / project-category-dialog /
   active-rentals-card（批量標記已付） / household-category/category-list-panel
 
-🎯 進度：17 / 18 處（94%）
+🎯 進度：**18 / 18 處（100%）** ✅
 
 統一改造模式：
 - `confirm()` → `setDeleteTarget(item)` 開 Dialog
@@ -93,7 +93,7 @@
 - 鍵盤可用：Tab/Esc/Enter
 - 螢幕閱讀器：aria-modal、aria-describedby 內建
 
-剩 1 處保留 confirm（scenario-simulator × 2、純前端、純資料覆寫場景）
+最後 2 處 scenario-simulator confirm（覆寫場景 / 刪除場景）改用 commitSaveScenario helper 拆分流程、加 overwriteTarget / deleteTarget state + 2 個 AlertDialog
 
 ### Phase 10（commit `e0536f8` ~ `d869c61`）— ✅ BackToTop 全站擴散完成
 
