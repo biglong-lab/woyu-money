@@ -279,6 +279,28 @@ export function CommandPalette() {
           </CommandGroup>
         ))}
       </CommandList>
+
+      {/* 快捷鍵說明 footer */}
+      <div className="border-t px-3 py-2 text-[10px] text-gray-400 flex items-center gap-3 flex-wrap bg-gray-50/50">
+        <span>
+          <kbd className="px-1 py-0.5 bg-white border rounded font-mono text-[9px]">↑↓</kbd> 選擇
+        </span>
+        <span>
+          <kbd className="px-1 py-0.5 bg-white border rounded font-mono text-[9px]">Enter</kbd> 跳轉
+        </span>
+        <span>
+          <kbd className="px-1 py-0.5 bg-white border rounded font-mono text-[9px]">Esc</kbd> 關閉
+        </span>
+        <span className="ml-auto text-gray-300">
+          快捷鍵：
+          <kbd className="px-1 py-0.5 bg-white border rounded font-mono text-[9px] mx-0.5">/</kbd>
+          開啟 ·
+          <kbd className="px-1 py-0.5 bg-white border rounded font-mono text-[9px] mx-0.5">N</kbd>
+          記帳 ·
+          <kbd className="px-1 py-0.5 bg-white border rounded font-mono text-[9px] mx-0.5">P</kbd>
+          付款
+        </span>
+      </div>
     </CommandDialog>
   )
 }
