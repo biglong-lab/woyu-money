@@ -34,6 +34,7 @@ import {
 } from "lucide-react"
 import { useDocumentTitle } from "@/hooks/use-document-title"
 import { BackToTop } from "@/components/back-to-top"
+import { formatStatus, isCompletedStatus } from "@/lib/status-labels"
 import {
   Dialog,
   DialogContent,
@@ -959,9 +960,11 @@ export default function FinancialDashboardPage() {
                           {it.start_date && <span>日期：{String(it.start_date).slice(0, 10)}</span>}
                           {it.status && (
                             <span
-                              className={it.status === "paid" ? "text-green-700" : "text-amber-700"}
+                              className={
+                                isCompletedStatus(it.status) ? "text-green-700" : "text-amber-700"
+                              }
                             >
-                              {it.status === "paid" ? "已付" : it.status}
+                              {formatStatus(it.status)}
                             </span>
                           )}
                           {it.is_paid !== undefined && (
