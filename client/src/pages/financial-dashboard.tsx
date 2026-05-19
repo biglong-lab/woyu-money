@@ -26,6 +26,13 @@ import {
 import { useDocumentTitle } from "@/hooks/use-document-title"
 import { BackToTop } from "@/components/back-to-top"
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {
   BarChart,
   Bar,
   XAxis,
@@ -91,6 +98,40 @@ export default function FinancialDashboardPage() {
   // 單館篩選器（"all" = 合計、否則 PM company_id）
   // 注意：目前僅 forecast 區塊吃此參數、YTD 維持合計（payment_items 無 company_id）
   const [companyFilter, setCompanyFilter] = useState<"all" | number>("all")
+
+  // 點擊明細 dialog
+  const [detailQuery, setDetailQuery] = useState<{
+    month: string
+    category: string
+    kind: "expense" | "income"
+  } | null>(null)
+  interface DetailItem {
+    id?: number
+    employee_id?: number
+    employee_name?: string
+    item_name?: string
+    amount?: number
+    total_cost?: number
+    base_salary?: number
+    employer_total?: number
+    net_salary?: number
+    start_date?: string
+    status?: string
+    project_name?: string
+    notes?: string
+    cat_name?: string
+    is_paid?: boolean
+  }
+  const detailFetch = useQuery<{ source: string; category: string; items: DetailItem[] }>({
+    queryKey: detailQuery
+      ? [
+          `/api/dashboard/month-detail?month=${detailQuery.month}&category=${encodeURIComponent(
+            detailQuery.category
+          )}&kind=${detailQuery.kind}`,
+        ]
+      : [],
+    enabled: !!detailQuery,
+  })
 
   const { data: companies = [] } = useQuery<Company[]>({
     queryKey: ["/api/pm-bridge/companies"],
@@ -372,7 +413,18 @@ export default function FinancialDashboardPage() {
             </div>
           ) : (
             <ResponsiveContainer width="100%" height={320}>
-              <ComposedChart data={chartData}>
+              <ComposedChart
+                data={chartData}
+                onClick={(state: { activeLabel?: string } | null) => {
+                  if (state?.activeLabel) {
+                    const row = chartData.find((d) => d.month === state.activeLabel)
+                    if (!row?.isForecast) {
+                      setDetailQuery({ month: state.activeLabel, category: "", kind: "expense" })
+                    }
+                  }
+                }}
+                style={{ cursor: "pointer" }}
+              >
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                 <XAxis dataKey="month" tick={{ fontSize: 11 }} />
                 <YAxis
@@ -454,6 +506,9 @@ export default function FinancialDashboardPage() {
                                 )}
                               </div>
                             )}
+                            <div className="border-t pt-2 mt-2 text-[10px] text-blue-600 italic">
+                              👆 點柱子可查看分類明細
+                            </div>
                           </>
                         )}
                         {row?.isForecast && (
@@ -614,6 +669,177 @@ export default function FinancialDashboardPage() {
           </ul>
         </CardContent>
       </Card>
+
+      {/* 月份明細 Dialog */}
+      <Dialog
+        open={!!detailQuery}
+        onOpenChange={(open) => {
+          if (!open) setDetailQuery(null)
+        }}
+      >
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {detailQuery?.month} 月明細
+              {detailQuery?.category && `：${detailQuery.category}`}
+            </DialogTitle>
+            <DialogDescription>
+              {detailQuery?.category
+                ? `該分類下的所有項目（按金額大小排序）`
+                : `點擊任一分類可查看詳細項目`}
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* 分類列表（無 category 時顯示）*/}
+          {detailQuery &&
+            !detailQuery.category &&
+            (() => {
+              const bd = ytd.breakdown?.[detailQuery.month]
+              if (!bd) return <div className="text-sm text-gray-400">無資料</div>
+              return (
+                <div className="space-y-4">
+                  {bd.expense.length > 0 && (
+                    <div>
+                      <div className="text-sm font-semibold text-red-700 mb-2">
+                        支出分類（{bd.expense.length} 個）
+                      </div>
+                      <div className="space-y-1">
+                        {bd.expense.map((it) => (
+                          <button
+                            key={it.category}
+                            type="button"
+                            onClick={() =>
+                              setDetailQuery({
+                                month: detailQuery.month,
+                                category: it.category,
+                                kind: "expense",
+                              })
+                            }
+                            className="w-full flex justify-between items-center px-3 py-2 hover:bg-red-50 rounded text-sm transition group"
+                          >
+                            <span className="flex items-center gap-2">
+                              <span>{it.category}</span>
+                              <span className="text-xs text-gray-400">({it.count} 筆)</span>
+                            </span>
+                            <span className="font-mono text-red-700 group-hover:underline">
+                              {formatMoney(it.amount)} ›
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {bd.income.length > 0 && (
+                    <div className="border-t pt-3">
+                      <div className="text-sm font-semibold text-blue-700 mb-2">
+                        收入來源（{bd.income.length} 個）
+                      </div>
+                      <div className="space-y-1">
+                        {bd.income.map((it) => (
+                          <button
+                            key={it.category}
+                            type="button"
+                            onClick={() =>
+                              setDetailQuery({
+                                month: detailQuery.month,
+                                category: it.category,
+                                kind: "income",
+                              })
+                            }
+                            className="w-full flex justify-between items-center px-3 py-2 hover:bg-blue-50 rounded text-sm transition group"
+                          >
+                            <span className="flex items-center gap-2">
+                              <span>{it.category}</span>
+                              <span className="text-xs text-gray-400">({it.count} 筆)</span>
+                            </span>
+                            <span className="font-mono text-blue-700 group-hover:underline">
+                              {formatMoney(it.amount)} ›
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            })()}
+
+          {/* 分類明細 list */}
+          {detailQuery?.category && (
+            <div className="space-y-1">
+              {detailFetch.isLoading && (
+                <div className="text-sm text-gray-400 py-4 text-center">載入中…</div>
+              )}
+              {detailFetch.data?.items.length === 0 && (
+                <div className="text-sm text-gray-400 py-4 text-center">該分類無項目</div>
+              )}
+              {detailFetch.data?.source === "monthly_hr_costs" && (
+                <div className="text-xs text-amber-700 bg-amber-50 rounded p-2 mb-2">
+                  資料來自 HR 系統（monthly_hr_costs）、含 8 員工完整薪資 + 雇主負擔
+                </div>
+              )}
+              {detailFetch.data?.items.map((it, i) => (
+                <div
+                  key={i}
+                  className="flex justify-between items-start gap-3 py-2 px-3 border-b last:border-0 text-sm"
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium truncate">
+                      {it.employee_name ?? it.item_name ?? "—"}
+                    </div>
+                    <div className="text-xs text-gray-500 flex gap-2 flex-wrap mt-0.5">
+                      {it.project_name && <span>專案：{it.project_name}</span>}
+                      {it.start_date && <span>日期：{String(it.start_date).slice(0, 10)}</span>}
+                      {it.status && (
+                        <span
+                          className={it.status === "paid" ? "text-green-700" : "text-amber-700"}
+                        >
+                          {it.status === "paid" ? "已付" : it.status}
+                        </span>
+                      )}
+                      {it.is_paid !== undefined && (
+                        <span className={it.is_paid ? "text-green-700" : "text-amber-700"}>
+                          {it.is_paid ? "已付" : "未付"}
+                        </span>
+                      )}
+                    </div>
+                    {it.notes && (
+                      <div className="text-[10px] text-gray-400 mt-1 italic line-clamp-2">
+                        {it.notes}
+                      </div>
+                    )}
+                  </div>
+                  <div className="text-right shrink-0">
+                    <div className="font-mono font-semibold">
+                      {formatMoney(it.amount ?? it.total_cost ?? 0)}
+                    </div>
+                    {it.employer_total !== undefined && (
+                      <div className="text-[10px] text-gray-400">
+                        雇主負擔 {formatMoney(it.employer_total)}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+              {detailFetch.data && detailFetch.data.items.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setDetailQuery({
+                      month: detailQuery.month,
+                      category: "",
+                      kind: detailQuery.kind,
+                    })
+                  }
+                  className="w-full text-xs text-blue-600 hover:underline pt-2"
+                >
+                  ← 返回該月分類列表
+                </button>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <BackToTop />
     </div>
