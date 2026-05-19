@@ -49,6 +49,8 @@ router.get(
           AND pi.item_name NOT LIKE '%健保%'
           AND pi.item_name NOT LIKE '%房務薪%'
           AND pi.item_name NOT LIKE '%客務薪%'
+          -- 排除「自動補建」的預估占位項（不是實際發生、避免重複估算）
+          AND (pi.notes IS NULL OR pi.notes NOT LIKE '%自動補建%')
         GROUP BY 1
       ),
       expense_hr AS (
@@ -103,6 +105,8 @@ router.get(
           AND pi.item_name NOT LIKE '%健保%'
           AND pi.item_name NOT LIKE '%房務薪%'
           AND pi.item_name NOT LIKE '%客務薪%'
+          -- 排除「自動補建」占位項
+          AND (pi.notes IS NULL OR pi.notes NOT LIKE '%自動補建%')
         GROUP BY 1, 2
       ),
       hr_by_month AS (
@@ -168,6 +172,115 @@ router.get(
       ...totals,
       months,
       breakdown,
+    })
+  })
+)
+
+/**
+ * 某月某分類的明細（給 dashboard 點擊查看）
+ * GET /api/dashboard/month-detail?month=2026-05&category=租金
+ * 特殊 category：「人事成本（HR）」會回傳 monthly_hr_costs 員工明細
+ */
+router.get(
+  "/api/dashboard/month-detail",
+  asyncHandler(async (req, res) => {
+    const month = String(req.query.month || "")
+    const category = String(req.query.category || "")
+    const kind = String(req.query.kind || "expense") // expense | income
+
+    if (!/^\d{4}-\d{2}$/.test(month)) {
+      res.status(400).json({ error: "month 格式 YYYY-MM" })
+      return
+    }
+    const [year, mo] = month.split("-").map(Number)
+    const monthStart = `${year}-${String(mo).padStart(2, "0")}-01`
+    const nextMonth =
+      mo === 12 ? `${year + 1}-01-01` : `${year}-${String(mo + 1).padStart(2, "0")}-01`
+
+    // 特殊：人事成本（HR）→ 從 monthly_hr_costs
+    if (category === "人事成本（HR）") {
+      const hr = await db.execute(sql`
+        SELECT
+          m.employee_id,
+          e.name AS employee_name,
+          m.base_salary::bigint AS base_salary,
+          m.employer_total::bigint AS employer_total,
+          m.net_salary::bigint AS net_salary,
+          m.total_cost::bigint AS total_cost,
+          m.is_paid
+        FROM monthly_hr_costs m
+        LEFT JOIN employees e ON e.id = m.employee_id
+        WHERE m.year = ${year} AND m.month = ${mo}
+        ORDER BY m.total_cost::numeric DESC
+      `)
+      res.json({
+        source: "monthly_hr_costs",
+        category,
+        items: (hr as unknown as { rows: unknown[] }).rows,
+      })
+      return
+    }
+
+    // 一般：從 payment_items
+    if (kind === "income") {
+      const rows = await db.execute(sql`
+        SELECT
+          pi.id,
+          pi.item_name,
+          pi.total_amount::bigint AS amount,
+          pi.start_date,
+          pi.status,
+          pp.project_name,
+          pi.notes
+        FROM payment_items pi
+        LEFT JOIN payment_projects pp ON pi.project_id = pp.id
+        WHERE pi.item_type = 'income' AND NOT pi.is_deleted
+          AND pi.start_date >= ${monthStart}::date
+          AND pi.start_date < ${nextMonth}::date
+          AND COALESCE(pp.project_name, '(未指定)') = ${category}
+        ORDER BY pi.total_amount::numeric DESC
+      `)
+      res.json({
+        source: "payment_items",
+        category,
+        items: (rows as unknown as { rows: unknown[] }).rows,
+      })
+      return
+    }
+
+    const rows = await db.execute(sql`
+      SELECT
+        pi.id,
+        pi.item_name,
+        pi.total_amount::bigint AS amount,
+        pi.start_date,
+        pi.status,
+        pp.project_name,
+        pi.notes,
+        COALESCE(dc.category_name, fc.category_name, '(未分類)') AS cat_name
+      FROM payment_items pi
+      LEFT JOIN debt_categories dc ON pi.category_id = dc.id
+      LEFT JOIN fixed_categories fc ON pi.fixed_category_id = fc.id
+      LEFT JOIN payment_projects pp ON pi.project_id = pp.id
+      WHERE pi.item_type IN ('project', 'home') AND NOT pi.is_deleted
+        AND pi.start_date >= ${monthStart}::date
+        AND pi.start_date < ${nextMonth}::date
+        AND COALESCE(dc.category_name, fc.category_name, '(未分類)') = ${category}
+        AND (pp.project_name IS NULL OR pp.project_name != '人力成本')
+        AND pi.item_name NOT LIKE '%薪資%'
+        AND pi.item_name NOT LIKE '%薪水%'
+        AND pi.item_name NOT LIKE '%勞保%'
+        AND pi.item_name NOT LIKE '%勞退%'
+        AND pi.item_name NOT LIKE '%健保%'
+        AND pi.item_name NOT LIKE '%房務薪%'
+        AND pi.item_name NOT LIKE '%客務薪%'
+        AND (pi.notes IS NULL OR pi.notes NOT LIKE '%自動補建%')
+      ORDER BY pi.total_amount::numeric DESC
+    `)
+    res.json({
+      source: "payment_items",
+      category,
+      items: (rows as unknown as { rows: unknown[] }).rows,
     })
   })
 )
