@@ -155,6 +155,59 @@ describe.skipIf(skipIfNoDb)("Recurring Expense — 占位 → 實際", () => {
     expect(res.status).toBe(400)
   })
 
+  it("link-item：把既有 payment_item 連結到模板（不改金額、可選 markPaid）", async () => {
+    await setup()
+    // 用 normalItem 模擬「未分類項目歸到模板」場景
+    const res = await request(app)
+      .post(`/api/recurring-expense-templates/${templateId}/link-item/${normalItemId}`)
+      .send({ markPaid: true })
+    expect(res.status).toBe(200)
+    expect(res.body.ok).toBe(true)
+    expect(res.body.templateName).toBe("測試模板")
+
+    const rows = (
+      await db.execute(
+        sql`SELECT recurring_template_id AS tid, status, paid_amount::numeric AS paid,
+                   total_amount::numeric AS amt, notes
+            FROM payment_items WHERE id = ${normalItemId}`
+      )
+    ).rows as unknown as {
+      tid: number
+      status: string
+      paid: number
+      amt: number
+      notes: string
+    }[]
+    expect(rows[0].tid).toBe(templateId)
+    expect(rows[0].status).toBe("paid")
+    expect(Number(rows[0].paid)).toBe(Number(rows[0].amt)) // markPaid → paidAmount = totalAmount
+    expect(rows[0].notes).toContain("已連結模板")
+  })
+
+  it("link-item：不傳 markPaid 應保留原狀態", async () => {
+    await setup()
+    const res = await request(app)
+      .post(`/api/recurring-expense-templates/${templateId}/link-item/${normalItemId}`)
+      .send({})
+    expect(res.status).toBe(200)
+
+    const rows = (
+      await db.execute(
+        sql`SELECT status, paid_amount::numeric AS paid FROM payment_items WHERE id = ${normalItemId}`
+      )
+    ).rows as unknown as { status: string; paid: number }[]
+    expect(rows[0].status).toBe("unpaid") // 原狀態保留
+    expect(Number(rows[0].paid)).toBe(0)
+  })
+
+  it("link-item：模板不存在應 400", async () => {
+    await setup()
+    const res = await request(app)
+      .post(`/api/recurring-expense-templates/999999/link-item/${normalItemId}`)
+      .send({})
+    expect(res.status).toBe(400)
+  })
+
   it("list scheduled items 可回傳占位項", async () => {
     await setup()
     const res = await request(app).get(

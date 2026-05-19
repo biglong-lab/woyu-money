@@ -120,12 +120,15 @@ export default function FinancialDashboardPage() {
     employee_name?: string
     item_name?: string
     amount?: number
+    paid_amount?: number
     total_cost?: number
     base_salary?: number
     employer_total?: number
     net_salary?: number
     start_date?: string
     status?: string
+    source?: string
+    recurringTemplateId?: number | null
     project_name?: string
     notes?: string
     cat_name?: string
@@ -182,6 +185,31 @@ export default function FinancialDashboardPage() {
       }),
     onSuccess: () => {
       toast({ title: "✅ 已軟刪除（可從回收筒恢復）" })
+      invalidateDashboard()
+    },
+    onError: (e: Error) => toast({ title: "失敗", description: e.message, variant: "destructive" }),
+  })
+
+  const linkTemplateMutation = useMutation({
+    mutationFn: ({
+      itemId,
+      templateId,
+      markPaid,
+    }: {
+      itemId: number
+      templateId: number
+      markPaid: boolean
+    }) =>
+      apiRequest<{ ok: true; templateName: string; itemId: number }>(
+        "POST",
+        `/api/recurring-expense-templates/${templateId}/link-item/${itemId}`,
+        { markPaid }
+      ),
+    onSuccess: (r) => {
+      toast({
+        title: "📎 已歸檔到模板",
+        description: `連結到「${r.templateName}」`,
+      })
       invalidateDashboard()
     },
     onError: (e: Error) => toast({ title: "失敗", description: e.message, variant: "destructive" }),
@@ -875,43 +903,83 @@ export default function FinancialDashboardPage() {
                         )}
                       </div>
                     </div>
-                    {/* 改分類 + 刪除（僅 payment_items 來源）*/}
+                    {/* 改分類 / 歸到模板 / 刪除（僅 payment_items 來源）*/}
                     {isPaymentItem && (
-                      <div className="flex items-center gap-1 pt-1">
-                        <span className="text-[10px] text-gray-400">改分類：</span>
-                        <Select
-                          onValueChange={(v) => {
-                            const catId = Number(v)
-                            if (!Number.isFinite(catId) || !it.id) return
-                            updateCategoryMutation.mutate({ id: it.id, categoryId: catId })
-                          }}
-                          disabled={updateCategoryMutation.isPending}
-                        >
-                          <SelectTrigger className="h-6 text-[10px] w-32">
-                            <SelectValue placeholder="選擇..." />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {categories.map((c) => (
-                              <SelectItem key={c.id} value={String(c.id)}>
-                                {c.categoryName}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (it.id && confirm("確定刪除這筆？（軟刪除、可從回收筒復原）")) {
-                              deleteItemMutation.mutate(it.id)
-                            }
-                          }}
-                          disabled={deleteItemMutation.isPending}
-                          className="ml-auto text-red-600 hover:bg-red-50 rounded p-1"
-                          title="軟刪除"
-                          aria-label="刪除此項"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </button>
+                      <div className="space-y-1 pt-1">
+                        {it.recurringTemplateId && (
+                          <div className="text-[10px] text-blue-700 bg-blue-50 rounded px-1.5 py-0.5 inline-block">
+                            📎 已歸檔模板 #{it.recurringTemplateId}
+                          </div>
+                        )}
+                        <div className="flex items-center gap-1 flex-wrap">
+                          <span className="text-[10px] text-gray-400">改分類：</span>
+                          <Select
+                            onValueChange={(v) => {
+                              const catId = Number(v)
+                              if (!Number.isFinite(catId) || !it.id) return
+                              updateCategoryMutation.mutate({ id: it.id, categoryId: catId })
+                            }}
+                            disabled={updateCategoryMutation.isPending}
+                          >
+                            <SelectTrigger className="h-6 text-[10px] w-28">
+                              <SelectValue placeholder="選擇..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {categories.map((c) => (
+                                <SelectItem key={c.id} value={String(c.id)}>
+                                  {c.categoryName}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <span className="text-[10px] text-gray-400 ml-1">歸模板：</span>
+                          <Select
+                            onValueChange={(v) => {
+                              if (!it.id) return
+                              const [tid, mark] = v.split(":")
+                              linkTemplateMutation.mutate({
+                                itemId: it.id,
+                                templateId: Number(tid),
+                                markPaid: mark === "paid",
+                              })
+                            }}
+                            disabled={linkTemplateMutation.isPending}
+                          >
+                            <SelectTrigger className="h-6 text-[10px] w-36">
+                              <SelectValue placeholder="選模板..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {templates
+                                .filter((t) => t.isActive)
+                                .map((t) => (
+                                  <SelectItem key={t.id} value={`${t.id}:paid`}>
+                                    {t.templateName}（標已付）
+                                  </SelectItem>
+                                ))}
+                              {templates
+                                .filter((t) => t.isActive)
+                                .map((t) => (
+                                  <SelectItem key={`${t.id}-keep`} value={`${t.id}:keep`}>
+                                    {t.templateName}（保留狀態）
+                                  </SelectItem>
+                                ))}
+                            </SelectContent>
+                          </Select>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (it.id && confirm("確定刪除這筆？（軟刪除、可從回收筒復原）")) {
+                                deleteItemMutation.mutate(it.id)
+                              }
+                            }}
+                            disabled={deleteItemMutation.isPending}
+                            className="ml-auto text-red-600 hover:bg-red-50 rounded p-1"
+                            title="軟刪除"
+                            aria-label="刪除此項"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </button>
+                        </div>
                       </div>
                     )}
                   </div>
