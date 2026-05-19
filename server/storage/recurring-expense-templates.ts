@@ -99,13 +99,13 @@ export async function generateItemsForMonth(
       }
     }
 
-    // 3. 該月該 (cat,project) 已有紀錄 → skip
+    // 3. 該月已有「同模板」對應的 payment_item → skip
+    // 用 recurring_template_id FK 對照（精準），不再用 (cat, project) 因 category 多為 NULL、
+    // IS NOT DISTINCT FROM NULL = NULL 會誤判「該月該專案任何未分類項目」全部 skip
     const duplicate = await db.execute(sql`
       SELECT 1 FROM payment_items
       WHERE NOT is_deleted
-        AND (category_id IS NOT DISTINCT FROM ${tpl.categoryId})
-        AND (fixed_category_id IS NOT DISTINCT FROM ${tpl.fixedCategoryId})
-        AND project_id IS NOT DISTINCT FROM ${tpl.projectId}
+        AND recurring_template_id = ${tpl.id}
         AND DATE_TRUNC('month', start_date)::date = (${targetMonth} || '-01')::date
       LIMIT 1
     `)
@@ -113,7 +113,7 @@ export async function generateItemsForMonth(
       (duplicate as { rowCount?: number }).rowCount &&
       (duplicate as { rowCount?: number }).rowCount! > 0
     ) {
-      skipped.push({ id: tpl.id, reason: "該月已有相同 (cat,project) 紀錄" })
+      skipped.push({ id: tpl.id, reason: "該月已有此模板的占位" })
       continue
     }
 

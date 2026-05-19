@@ -81,13 +81,41 @@ router.get(
         WHERE year >= EXTRACT(year FROM ${yearStart}::date)
         GROUP BY 1
       ),
+      -- 該月 active 模板中、無對應 payment_item 的「未產出」估算金額
+      -- 加入 expense.planned 對齊 /cost-overview（看到完整成本、不依賴是否手動產出占位）
+      template_missing AS (
+        WITH RECURSIVE month_series AS (
+          SELECT ${yearStart}::date AS m
+          UNION ALL
+          SELECT (m + INTERVAL '1 month')::date FROM month_series WHERE m < ${lookaheadEnd}::date
+        )
+        SELECT
+          TO_CHAR(ms.m, 'YYYY-MM') AS m,
+          SUM(t.estimated_amount::numeric)::bigint AS amt
+        FROM month_series ms
+        CROSS JOIN recurring_expense_templates t
+        WHERE t.is_active = true
+          AND (
+            t.active_months = '*'
+            OR POSITION(',' || EXTRACT(MONTH FROM ms.m)::text || ',' IN
+                        ',' || REPLACE(t.active_months, ' ', '') || ',') > 0
+          )
+          AND NOT EXISTS (
+            SELECT 1 FROM payment_items pi
+            WHERE pi.recurring_template_id = t.id
+              AND TO_CHAR(pi.start_date, 'YYYY-MM') = TO_CHAR(ms.m, 'YYYY-MM')
+              AND NOT pi.is_deleted
+          )
+        GROUP BY 1
+      ),
       expense_split AS (
         SELECT
-          COALESCE(n.m, h.m) AS m,
+          COALESCE(n.m, h.m, tm.m) AS m,
           (COALESCE(n.actual, 0) + COALESCE(h.amt, 0))::bigint AS actual,
-          COALESCE(n.planned, 0)::bigint AS planned
+          (COALESCE(n.planned, 0) + COALESCE(tm.amt, 0))::bigint AS planned
         FROM expense_non_hr_split n
         FULL OUTER JOIN expense_hr h ON n.m = h.m
+        FULL OUTER JOIN template_missing tm ON COALESCE(n.m, h.m) = tm.m
       )
       SELECT COALESCE(i.m, e.m) AS month,
              COALESCE(i.actual,  0)::int AS income_actual,
@@ -179,11 +207,42 @@ router.get(
         WHERE pi.item_type = 'income' AND NOT pi.is_deleted
           AND pi.start_date >= ${yearStart}::date AND pi.start_date <= ${lookaheadEnd}::date
         GROUP BY 1, 2
+      ),
+      template_missing_by_cat AS (
+        -- 未產出模板 → 全部歸入「週期模板（未產出）」分類、全 planned
+        WITH RECURSIVE month_series AS (
+          SELECT ${yearStart}::date AS m
+          UNION ALL
+          SELECT (m + INTERVAL '1 month')::date FROM month_series WHERE m < ${lookaheadEnd}::date
+        )
+        SELECT
+          TO_CHAR(ms.m, 'YYYY-MM') AS month,
+          '週期模板（未產出）' AS category,
+          0::bigint AS actual,
+          SUM(t.estimated_amount::numeric)::bigint AS planned,
+          COUNT(*)::int AS n
+        FROM month_series ms
+        CROSS JOIN recurring_expense_templates t
+        WHERE t.is_active = true
+          AND (
+            t.active_months = '*'
+            OR POSITION(',' || EXTRACT(MONTH FROM ms.m)::text || ',' IN
+                        ',' || REPLACE(t.active_months, ' ', '') || ',') > 0
+          )
+          AND NOT EXISTS (
+            SELECT 1 FROM payment_items pi
+            WHERE pi.recurring_template_id = t.id
+              AND TO_CHAR(pi.start_date, 'YYYY-MM') = TO_CHAR(ms.m, 'YYYY-MM')
+              AND NOT pi.is_deleted
+          )
+        GROUP BY 1
       )
       SELECT * FROM (
         SELECT 'expense' AS kind, month, category, actual, planned, n FROM expense_by_cat
         UNION ALL
         SELECT 'expense' AS kind, month, category, actual, planned, n FROM hr_by_month
+        UNION ALL
+        SELECT 'expense' AS kind, month, category, actual, planned, n FROM template_missing_by_cat
         UNION ALL
         SELECT 'income' AS kind, month, category, actual, planned, n FROM income_by_proj
       ) t
