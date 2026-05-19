@@ -36,6 +36,16 @@ import { apiRequest, queryClient } from "@/lib/queryClient"
 import type { DebtCategory, PaymentProject, FixedCategory } from "@shared/schema"
 import { useDocumentTitle } from "@/hooks/use-document-title"
 import { BackToTop } from "@/components/back-to-top"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 type Category = {
   id: number
@@ -79,6 +89,7 @@ export default function SimpleCategoryManagement() {
   const [isCreateProjectCategoryOpen, setIsCreateProjectCategoryOpen] = useState(false)
   const [editingCategory, setEditingCategory] = useState<Category | null>(null)
   const [selectedCategoryType, setSelectedCategoryType] = useState<string>("fixed")
+  const [deleteTarget, setDeleteTarget] = useState<Category | null>(null)
 
   // Queries
   const { data: fixedCategories = [] } = useQuery<FixedCategory[]>({
@@ -242,8 +253,13 @@ export default function SimpleCategoryManagement() {
   }
 
   const handleDelete = (category: Category) => {
-    if (confirm(`確定要刪除分類「${category.categoryName}」嗎？`)) {
-      deleteMutation.mutate({ id: category.id, type: category.categoryType })
+    setDeleteTarget(category)
+  }
+
+  const confirmDelete = () => {
+    if (deleteTarget) {
+      deleteMutation.mutate({ id: deleteTarget.id, type: deleteTarget.categoryType })
+      setDeleteTarget(null)
     }
   }
 
@@ -663,6 +679,33 @@ export default function SimpleCategoryManagement() {
           </Form>
         </DialogContent>
       </Dialog>
+      {/* 刪除分類確認 */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>確定刪除此分類？</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteTarget && (
+                <>
+                  將刪除「<strong>{deleteTarget.categoryName}</strong>」（
+                  {deleteTarget.categoryType === "fixed" ? "固定分類" : "專案分類"}
+                  ）、此操作無法復原。
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+            >
+              確認刪除
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <BackToTop />
     </div>
   )

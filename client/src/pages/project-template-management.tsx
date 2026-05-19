@@ -36,6 +36,16 @@ import { Plus, Edit2, Trash2, Phone, Zap, Droplets, Wifi, Building } from "lucid
 import type { ProjectCategoryTemplate, DebtCategory, PaymentProject } from "@shared/schema"
 import { useDocumentTitle } from "@/hooks/use-document-title"
 import { BackToTop } from "@/components/back-to-top"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 const templateFormSchema = z.object({
   projectId: z.number(),
@@ -55,6 +65,7 @@ export default function ProjectTemplateManagement() {
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingTemplate, setEditingTemplate] = useState<ProjectCategoryTemplate | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<ProjectCategoryTemplate | null>(null)
 
   const form = useForm<TemplateFormData>({
     resolver: zodResolver(templateFormSchema),
@@ -170,9 +181,14 @@ export default function ProjectTemplateManagement() {
     setDialogOpen(true)
   }
 
-  const handleDelete = (id: number) => {
-    if (confirm("確定要刪除此模板嗎？")) {
-      deleteTemplateMutation.mutate(id)
+  const handleDelete = (template: ProjectCategoryTemplate) => {
+    setDeleteTarget(template)
+  }
+
+  const confirmDelete = () => {
+    if (deleteTarget) {
+      deleteTemplateMutation.mutate(deleteTarget.id)
+      setDeleteTarget(null)
     }
   }
 
@@ -322,7 +338,7 @@ export default function ProjectTemplateManagement() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleDelete(template.id)}
+                            onClick={() => handleDelete(template)}
                             className="text-red-600 hover:text-red-800"
                           >
                             <Trash2 className="h-3 w-3" />
@@ -478,6 +494,31 @@ export default function ProjectTemplateManagement() {
           </Form>
         </DialogContent>
       </Dialog>
+      {/* 刪除模板確認 */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>確定刪除此模板？</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteTarget && (
+                <>
+                  將刪除「<strong>{deleteTarget.templateName}</strong>」模板、此操作無法復原。
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+            >
+              確認刪除
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <BackToTop />
     </div>
   )
