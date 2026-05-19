@@ -213,15 +213,19 @@ export default function RevenueForecastPage() {
       }
     }
 
-    // PMS 預估（source = pms-bridge）
+    // PMS 累積已下單（source = pms-bridge）
     // 合計模式時、同日多館需加總（companyId=all 抓到的是各館明細）
+    // 注意：必須只取 snapshot_date 落在 target_month 範圍內的點
+    // 否則上個月底的 snapshot（如 4/29、4/30）會被 getDate() 誤放到本月 29、30 日位置
     const addBooked = (snaps: Snapshot[]) => {
       for (const s of snaps) {
         if (s.source !== "pms-bridge") continue
+        // 過濾：只取 snapshot_date 在 target_month 內的點
+        if (s.snapshotDate.slice(0, 7) !== targetMonth) continue
         const day = new Date(s.snapshotDate).getDate()
         if (!byDay.has(day)) byDay.set(day, { day })
-        const existing = (byDay.get(day)!["PMS 預估"] as number | undefined) ?? 0
-        byDay.get(day)!["PMS 預估"] = existing + parseFloat(s.bookedRevenue)
+        const existing = (byDay.get(day)!["PMS 累積"] as number | undefined) ?? 0
+        byDay.get(day)!["PMS 累積"] = existing + parseFloat(s.bookedRevenue)
       }
     }
 
@@ -310,7 +314,7 @@ export default function RevenueForecastPage() {
                 )}
                 {latestPms && (
                   <span>
-                    🎯 PMS 預估：<span className="font-mono">{latestPms.slice(0, 10)}</span>
+                    🎯 PMS 累積：<span className="font-mono">{latestPms.slice(0, 10)}</span>
                   </span>
                 )}
               </div>
@@ -745,14 +749,14 @@ export default function RevenueForecastPage() {
                 />
                 <Line
                   type="monotone"
-                  dataKey="PMS 預估"
+                  dataKey="PMS 累積"
                   stroke="#ea580c"
                   strokeWidth={2}
                   strokeDasharray="6 3"
                   dot={{ r: 4, fill: "#ea580c", stroke: "#fff", strokeWidth: 1 }}
                   activeDot={{ r: 6 }}
                   connectNulls
-                  name="PMS 預估（你填的月底估）"
+                  name="PMS 累積（已下單、含未來訂單）"
                 />
                 {compareMonths.map((m, i) => (
                   <Line
