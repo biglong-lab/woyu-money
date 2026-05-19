@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/select"
 import { Plus, Trash2, Users, Edit, Save, X, Building2 } from "lucide-react"
 import { friendlyApiError } from "@/lib/utils"
+import { BackToTop } from "@/components/back-to-top"
 
 interface PropertyProject {
   id: number
@@ -402,6 +403,8 @@ export default function PropertyGroupsManagement() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <BackToTop />
     </div>
   )
 }
