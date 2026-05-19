@@ -6,7 +6,7 @@
 import { useRef, useState } from "react"
 import { useMutation } from "@tanstack/react-query"
 import { Link } from "wouter"
-import { Receipt, CheckCircle2, ArrowRight, Plus, RotateCcw } from "lucide-react"
+import { Receipt, CheckCircle2, ArrowRight, Plus, RotateCcw, Copy } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -17,6 +17,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient"
 import { localDateISO, formatNT, friendlyApiError } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 import { useDocumentTitle } from "@/hooks/use-document-title"
+import { useCopyAmount } from "@/hooks/use-copy-amount"
 import { ReceiptUploadButton } from "@/components/receipt-upload-button"
 import { BackToTop } from "@/components/back-to-top"
 
@@ -74,6 +75,7 @@ function CandidateCard({
 }) {
   const conf = CONF_META[candidate.confidence]
   const unpaid = candidate.item.totalAmount - candidate.item.paidAmount
+  const copyAmount = useCopyAmount()
   return (
     <div className={`rounded-lg border-l-4 p-3 ${conf.color}`}>
       <div className="flex items-center justify-between mb-2">
@@ -83,9 +85,21 @@ function CandidateCard({
         </Badge>
       </div>
       <div className="text-xs text-gray-700 space-y-0.5">
-        <div>
-          應付 {formatNT(candidate.item.totalAmount)} / 已付 {formatNT(candidate.item.paidAmount)} /
-          未付 <strong>{formatNT(unpaid)}</strong>
+        <div className="flex items-center gap-1 flex-wrap">
+          <span>
+            應付 {formatNT(candidate.item.totalAmount)} / 已付 {formatNT(candidate.item.paidAmount)}{" "}
+            / 未付 <strong>{formatNT(unpaid)}</strong>
+          </span>
+          <button
+            type="button"
+            onClick={() => copyAmount(unpaid, candidate.item.itemName)}
+            className="inline-flex items-center gap-0.5 text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-1 py-0.5 rounded transition"
+            title="複製未付金額（給網銀轉帳用）"
+            aria-label={`複製未付金額 ${formatNT(unpaid)}`}
+          >
+            <Copy className="h-3 w-3" />
+            <span className="text-[10px]">複製</span>
+          </button>
         </div>
         {candidate.item.categoryName && <div>分類：{candidate.item.categoryName}</div>}
         {candidate.reasons.length > 0 && (
