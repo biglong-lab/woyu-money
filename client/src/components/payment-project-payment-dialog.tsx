@@ -28,6 +28,7 @@ import {
   FormMessage,
 } from "@/components/ui/form"
 import type { PaymentItem, PaymentFormValues } from "./payment-project-types"
+import { formatStatus } from "@/lib/status-labels"
 
 export interface PaymentProjectPaymentDialogProps {
   isOpen: boolean
@@ -97,7 +98,7 @@ export default function PaymentProjectPaymentDialog({
               </div>
               <div>
                 <span className="text-gray-600">狀態:</span>
-                <div className="font-medium">{paymentItem.status}</div>
+                <div className="font-medium">{formatStatus(paymentItem.status)}</div>
               </div>
             </div>
 
