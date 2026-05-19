@@ -27,6 +27,11 @@ router.get(
     // 區分「actual（實際發生、start_date <= today）」與「planned（預定未到日、start_date > today）」
     // - 走勢圖可堆疊顯示
     // - YTD totals 只算 actual（避免未到日的預定膨脹數字）
+    //
+    // 重要：模板自動產出占位（source='template_scheduled'、status='unpaid'）
+    // 強制歸 planned、不管 start_date 是否到日 — 因為這些只是估算占位、不是實際支付。
+    // 使用者要在 /recurring-expenses 「填入實際金額」介面取代為 paid 才算 actual。
+    //
     // expense 計算合併兩個來源、避免 payment_items 內薪資項與 monthly_hr_costs 不一致：
     // 1. payment_items 排除「人力成本」專案下的所有薪資 / 勞健保 / 勞退項目
     // 2. monthly_hr_costs.total_cost 月度合計（HR 的 source of truth、完整 8 員工）
@@ -43,8 +48,14 @@ router.get(
       expense_non_hr_split AS (
         SELECT
           TO_CHAR(pi.start_date, 'YYYY-MM') AS m,
-          SUM(CASE WHEN pi.start_date <= ${today}::date THEN pi.total_amount::numeric ELSE 0 END)::bigint AS actual,
-          SUM(CASE WHEN pi.start_date >  ${today}::date THEN pi.total_amount::numeric ELSE 0 END)::bigint AS planned
+          SUM(CASE
+            WHEN pi.start_date <= ${today}::date
+             AND NOT (pi.source = 'template_scheduled' AND pi.status = 'unpaid')
+            THEN pi.total_amount::numeric ELSE 0 END)::bigint AS actual,
+          SUM(CASE
+            WHEN pi.start_date >  ${today}::date
+              OR (pi.source = 'template_scheduled' AND pi.status = 'unpaid')
+            THEN pi.total_amount::numeric ELSE 0 END)::bigint AS planned
         FROM payment_items pi
         LEFT JOIN payment_projects pp ON pi.project_id = pp.id
         WHERE pi.item_type IN ('project', 'home') AND NOT pi.is_deleted
@@ -119,8 +130,14 @@ router.get(
         SELECT
           TO_CHAR(pi.start_date, 'YYYY-MM') AS month,
           COALESCE(dc.category_name, fc.category_name, '(未分類)') AS category,
-          SUM(CASE WHEN pi.start_date <= ${today}::date THEN pi.total_amount::numeric ELSE 0 END)::bigint AS actual,
-          SUM(CASE WHEN pi.start_date >  ${today}::date THEN pi.total_amount::numeric ELSE 0 END)::bigint AS planned,
+          SUM(CASE
+            WHEN pi.start_date <= ${today}::date
+             AND NOT (pi.source = 'template_scheduled' AND pi.status = 'unpaid')
+            THEN pi.total_amount::numeric ELSE 0 END)::bigint AS actual,
+          SUM(CASE
+            WHEN pi.start_date >  ${today}::date
+              OR (pi.source = 'template_scheduled' AND pi.status = 'unpaid')
+            THEN pi.total_amount::numeric ELSE 0 END)::bigint AS planned,
           COUNT(*)::int AS n
         FROM payment_items pi
         LEFT JOIN debt_categories dc ON pi.category_id = dc.id
