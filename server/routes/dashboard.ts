@@ -15,9 +15,7 @@ router.get(
   asyncHandler(async (_req, res) => {
     const now = new Date()
     const yearStart = `${now.getFullYear()}-01-01`
-    // 月度視角：用「該月完整範圍」，避免本月末預定支出（租金、月結帳單）被
-    // 「<= today」截掉。yearEnd 取年底、不是 today、好把當月未到日的預定算進來。
-    const yearEnd = `${now.getFullYear()}-12-31`
+    const today = now.toISOString().slice(0, 10)
 
     // 月度明細
     //
@@ -30,7 +28,7 @@ router.get(
         SELECT TO_CHAR(start_date, 'YYYY-MM') AS m, SUM(total_amount::numeric)::bigint AS amt
         FROM payment_items
         WHERE item_type = 'income' AND NOT is_deleted
-          AND start_date >= ${yearStart}::date AND start_date <= ${yearEnd}::date
+          AND start_date >= ${yearStart}::date AND start_date <= ${today}::date
         GROUP BY 1
       ),
       expense_non_hr AS (
@@ -40,7 +38,7 @@ router.get(
         FROM payment_items pi
         LEFT JOIN payment_projects pp ON pi.project_id = pp.id
         WHERE pi.item_type IN ('project', 'home') AND NOT pi.is_deleted
-          AND pi.start_date >= ${yearStart}::date AND pi.start_date <= ${yearEnd}::date
+          AND pi.start_date >= ${yearStart}::date AND pi.start_date <= ${today}::date
           -- 排除「人力成本」專案下的所有項目（避免與 monthly_hr_costs 重複）
           AND (pp.project_name IS NULL OR pp.project_name != '人力成本')
           -- 排除其他專案下、看起來是薪資 / 勞健保的項目（房務/客務薪資）
@@ -97,7 +95,7 @@ router.get(
         LEFT JOIN fixed_categories fc ON pi.fixed_category_id = fc.id
         LEFT JOIN payment_projects pp ON pi.project_id = pp.id
         WHERE pi.item_type IN ('project', 'home') AND NOT pi.is_deleted
-          AND pi.start_date >= ${yearStart}::date AND pi.start_date <= ${yearEnd}::date
+          AND pi.start_date >= ${yearStart}::date AND pi.start_date <= ${today}::date
           -- 排除「人力成本」項目（由 monthly_hr_costs 統一顯示）
           AND (pp.project_name IS NULL OR pp.project_name != '人力成本')
           AND pi.item_name NOT LIKE '%薪資%'
@@ -130,7 +128,7 @@ router.get(
         FROM payment_items pi
         LEFT JOIN payment_projects pp ON pi.project_id = pp.id
         WHERE pi.item_type = 'income' AND NOT pi.is_deleted
-          AND pi.start_date >= ${yearStart}::date AND pi.start_date <= ${yearEnd}::date
+          AND pi.start_date >= ${yearStart}::date AND pi.start_date <= ${today}::date
         GROUP BY 1, 2
       )
       SELECT 'expense' AS kind, month, category, amt::bigint, n FROM expense_by_cat
