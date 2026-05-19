@@ -22,7 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
-import { Plus, Camera, Wallet, TrendingDown, TrendingUp, Calendar } from "lucide-react"
+import { Plus, Camera, Wallet, TrendingDown, TrendingUp, Calendar, Trash2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { apiRequest } from "@/lib/queryClient"
 import { localDateISO, formatNT } from "@/lib/utils"
@@ -32,14 +32,27 @@ import type { HouseholdExpense } from "@shared/schema/household"
 import type { DebtCategory } from "@shared/schema/category"
 import { BackToTop } from "@/components/back-to-top"
 
-// API 回應型別定義
+// API 回應型別定義（對齊 server /api/household/budget 和 /api/household/stats）
 interface MonthlyBudgetResponse {
-  amount: string | number
+  month: string
+  budgetAmount: string | number
+  hasBudget: boolean
+  id: number | null
 }
 
 interface MonthlyStatsResponse {
+  month: string
+  budgetAmount: number
   totalSpent: number
-  categoryBreakdown: Record<string, number>
+  remaining: number
+  count: number
+  progressPercent: number
+  categoryBreakdown: Array<{
+    categoryId: number | null
+    categoryName: string
+    amount: number
+    count: number
+  }>
 }
 
 interface HouseholdCategory {
@@ -81,16 +94,23 @@ interface SetBudgetPayload {
 
 export default function HouseholdBudget() {
   useDocumentTitle("家用預算")
+
+  // 月份切換（預設本月、用本地時區避 UTC 偏移）
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
+  })
+
   const { data: monthlyBudget, isLoading: isLoadingBudget } = useQuery<MonthlyBudgetResponse>({
-    queryKey: ["/api/household/budget"],
+    queryKey: [`/api/household/budget?month=${selectedMonth}`],
   })
 
   const { data: dailyExpenses, isLoading: isLoadingExpenses } = useQuery<ExpenseWithCategory[]>({
-    queryKey: ["/api/household/expenses"],
+    queryKey: [`/api/household/expenses?month=${selectedMonth}`],
   })
 
   const { data: monthlyStats, isLoading: isLoadingStats } = useQuery<MonthlyStatsResponse>({
-    queryKey: ["/api/household/stats"],
+    queryKey: [`/api/household/stats?month=${selectedMonth}`],
   })
 
   // Load household categories from the category management system
@@ -121,11 +141,16 @@ export default function HouseholdBudget() {
   // 預算設定表單
   const budgetForm = useForm<BudgetFormData>({
     defaultValues: {
-      monthlyBudget: monthlyBudget?.amount?.toString() || "",
+      monthlyBudget: monthlyBudget?.budgetAmount?.toString() || "",
     },
   })
 
   // 快速記帳
+  const invalidateHousehold = () => {
+    queryClient.invalidateQueries({
+      predicate: (q) => String(q.queryKey[0] ?? "").startsWith("/api/household/"),
+    })
+  }
   const addExpenseMutation = useMutation({
     mutationFn: async (data: QuickAddFormData) => {
       const formattedData: AddExpensePayload = {
@@ -140,8 +165,7 @@ export default function HouseholdBudget() {
         title: "記帳成功",
         description: "支出已記錄",
       })
-      queryClient.invalidateQueries({ queryKey: ["/api/household/expenses"] })
-      queryClient.invalidateQueries({ queryKey: ["/api/household/stats"] })
+      invalidateHousehold()
       setShowQuickAdd(false)
       quickAddForm.reset()
     },
@@ -154,25 +178,32 @@ export default function HouseholdBudget() {
     },
   })
 
-  // 設定預算
+  // 刪除支出
+  const deleteExpenseMutation = useMutation({
+    mutationFn: (id: number) => apiRequest("DELETE", `/api/household-expenses/${id}`),
+    onSuccess: () => {
+      toast({ title: "✅ 已刪除支出" })
+      invalidateHousehold()
+    },
+    onError: (e: Error) =>
+      toast({ title: "刪除失敗", description: e.message, variant: "destructive" }),
+  })
+
+  // 設定預算（用 selectedMonth、不是固定本月）
   const setBudgetMutation = useMutation({
     mutationFn: async (data: BudgetFormData) => {
-      // 用本地時區、避免 toISOString 在 UTC+8 凌晨把 5/1 變 4/30
-      const now = new Date()
-      const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
       const budgetData: SetBudgetPayload = {
         budgetAmount: parseFloat(data.monthlyBudget),
-        month: currentMonth,
+        month: selectedMonth,
       }
       return await apiRequest("POST", "/api/household/budget", budgetData)
     },
     onSuccess: () => {
       toast({
         title: "預算設定成功",
-        description: "每月預算已更新",
+        description: `${selectedMonth} 預算已更新`,
       })
-      queryClient.invalidateQueries({ queryKey: ["/api/household/budget"] })
-      queryClient.invalidateQueries({ queryKey: ["/api/household/stats"] })
+      invalidateHousehold()
       setShowBudgetSetup(false)
     },
     onError: (e: Error) => {
@@ -200,19 +231,15 @@ export default function HouseholdBudget() {
     setBudgetMutation.mutate(data)
   }
 
-  // 計算本月統計
-  const currentMonth = new Date().toISOString().slice(0, 7)
-  const thisMonthExpenses = Array.isArray(dailyExpenses)
-    ? dailyExpenses.filter((expense) => expense.date?.startsWith(currentMonth))
-    : []
+  // 用 stats API 拿正確統計（後端已聚合，避免前端再算一次）
+  // server /api/household/expenses?month=X 已按月過濾、直接列即可
+  const thisMonthExpenses = Array.isArray(dailyExpenses) ? dailyExpenses : []
 
-  const totalSpent = thisMonthExpenses.reduce(
-    (sum, expense) => sum + parseFloat(expense.amount?.toString() || "0"),
-    0
-  )
-  const budgetAmount = parseFloat(monthlyBudget?.amount?.toString() || "0")
-  const remaining = budgetAmount - totalSpent
-  const spentPercentage = budgetAmount > 0 ? (totalSpent / budgetAmount) * 100 : 0
+  const totalSpent = monthlyStats?.totalSpent ?? 0
+  const budgetAmount =
+    monthlyStats?.budgetAmount ?? parseFloat(monthlyBudget?.budgetAmount?.toString() || "0")
+  const remaining = monthlyStats?.remaining ?? budgetAmount - totalSpent
+  const spentPercentage = monthlyStats?.progressPercent ?? 0
 
   if (isLoadingBudget || isLoadingExpenses || isLoadingStats) {
     return (
@@ -225,12 +252,35 @@ export default function HouseholdBudget() {
   return (
     <div className="container mx-auto p-6 space-y-6">
       {/* 頁面標題 */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-3xl font-bold">家用記帳</h1>
           <p className="text-muted-foreground">簡單記錄，輕鬆管理每月預算</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center flex-wrap">
+          {/* 月份切換 */}
+          <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+            <SelectTrigger className="w-36">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {(() => {
+                const opts: string[] = []
+                const now = new Date()
+                for (let i = -6; i <= 1; i++) {
+                  const d = new Date(now.getFullYear(), now.getMonth() + i, 1)
+                  opts.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`)
+                }
+                const cm = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
+                return opts.map((m) => (
+                  <SelectItem key={m} value={m}>
+                    {m}
+                    {m === cm ? "（本月）" : ""}
+                  </SelectItem>
+                ))
+              })()}
+            </SelectContent>
+          </Select>
           <Dialog open={showQuickAdd} onOpenChange={setShowQuickAdd}>
             <DialogTrigger asChild>
               <Button className="flex items-center gap-2">
@@ -483,11 +533,50 @@ export default function HouseholdBudget() {
         </Card>
       )}
 
+      {/* 分類佔比（前 5）*/}
+      {monthlyStats &&
+        Array.isArray(monthlyStats.categoryBreakdown) &&
+        monthlyStats.categoryBreakdown.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">分類佔比</CardTitle>
+              <CardDescription>{selectedMonth} 各分類支出排名</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {monthlyStats.categoryBreakdown.slice(0, 5).map((c) => {
+                const pct = totalSpent > 0 ? Math.round((c.amount / totalSpent) * 100) : 0
+                return (
+                  <div key={c.categoryId ?? c.categoryName} className="text-sm">
+                    <div className="flex justify-between mb-0.5">
+                      <span>{c.categoryName}</span>
+                      <span className="font-mono">
+                        NT$ {Math.round(c.amount).toLocaleString()}{" "}
+                        <span className="text-xs text-gray-400">({pct}%)</span>
+                      </span>
+                    </div>
+                    <div className="h-1.5 rounded bg-gray-100 overflow-hidden">
+                      <div
+                        className="h-full bg-blue-500"
+                        style={{ width: `${Math.min(100, pct)}%` }}
+                      />
+                    </div>
+                  </div>
+                )
+              })}
+              {monthlyStats.categoryBreakdown.length > 5 && (
+                <div className="text-xs text-gray-400 italic pt-1">
+                  + {monthlyStats.categoryBreakdown.length - 5} 個其他分類
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
       {/* 最近記錄 */}
       <Card>
         <CardHeader>
-          <CardTitle>最近記錄</CardTitle>
-          <CardDescription>本月已記錄 {thisMonthExpenses.length} 筆支出</CardDescription>
+          <CardTitle>{selectedMonth} 記錄</CardTitle>
+          <CardDescription>已記錄 {thisMonthExpenses.length} 筆支出</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
@@ -516,15 +605,31 @@ export default function HouseholdBudget() {
                         )}
                       </div>
                     </div>
-                    <div className="text-right">
-                      <div className="font-medium text-red-600">
-                        -NT$ {parseInt(expense.amount?.toString() || "0").toLocaleString()}
+                    <div className="flex items-center gap-2">
+                      <div className="text-right">
+                        <div className="font-medium text-red-600">
+                          -NT$ {parseInt(expense.amount?.toString() || "0").toLocaleString()}
+                        </div>
+                        {expense.receiptPhoto && (
+                          <Badge variant="outline" className="text-xs">
+                            有發票
+                          </Badge>
+                        )}
                       </div>
-                      {expense.receiptPhoto && (
-                        <Badge variant="outline" className="text-xs">
-                          有發票
-                        </Badge>
-                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (expense.id && confirm(`刪除此筆 -NT$ ${expense.amount} ？`)) {
+                            deleteExpenseMutation.mutate(expense.id)
+                          }
+                        }}
+                        disabled={deleteExpenseMutation.isPending}
+                        className="text-red-500 hover:bg-red-50 rounded p-1.5"
+                        title="刪除這筆"
+                        aria-label="刪除"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
                     </div>
                   </div>
                 )
