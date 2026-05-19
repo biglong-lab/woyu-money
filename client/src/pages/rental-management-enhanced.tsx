@@ -164,6 +164,7 @@ export default function RentalManagementEnhanced() {
   const [isContractDetailsDialogOpen, setIsContractDetailsDialogOpen] = useState(false)
   const [isPaymentDetailOpen, setIsPaymentDetailOpen] = useState(false)
   const [deleteContractId, setDeleteContractId] = useState<number | null>(null)
+  const [deleteDocumentId, setDeleteDocumentId] = useState<number | null>(null)
 
   // 編輯和查看狀態
   const [editingContract, setEditingContract] = useState<RentalContractListItem | null>(null)
@@ -551,9 +552,14 @@ export default function RentalManagementEnhanced() {
     }
   }
 
-  const handleDocumentDelete = async (documentId: number) => {
-    if (!confirm("確定要刪除此文件嗎？此操作無法復原。")) return
+  const handleDocumentDelete = (documentId: number) => {
+    setDeleteDocumentId(documentId)
+  }
 
+  const confirmDocumentDelete = async () => {
+    const documentId = deleteDocumentId
+    setDeleteDocumentId(null)
+    if (documentId === null) return
     try {
       const response = await fetch(`/api/rental/documents/${documentId}`, { method: "DELETE" })
       if (!response.ok) throw new Error("刪除失敗")
@@ -790,6 +796,28 @@ export default function RentalManagementEnhanced() {
           >[0]["viewingPayment"]
         }
       />
+      {/* 刪除文件確認 */}
+      <AlertDialog
+        open={deleteDocumentId !== null}
+        onOpenChange={(open) => !open && setDeleteDocumentId(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>確定刪除此文件？</AlertDialogTitle>
+            <AlertDialogDescription>此操作將永久刪除該租約文件、無法復原。</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDocumentDelete}
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+            >
+              確認刪除
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* 刪除租約確認 */}
       <AlertDialog
         open={deleteContractId !== null}
