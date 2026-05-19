@@ -8,6 +8,10 @@ import { globalErrorHandler } from "./middleware/error-handler"
 
 const app = express()
 
+// 信任 1 層 proxy（Cloudflare / nginx），讓 req.ip 拿到真實 client IP
+// 否則 rate limit 會把所有從 CF 進來的請求視為同一個 IP、瞬間爆 quota
+app.set("trust proxy", 1)
+
 // 安全中間件（必須在路由之前掛載）
 app.use(securityHeaders)
 app.use(express.json({ limit: "10kb" }))

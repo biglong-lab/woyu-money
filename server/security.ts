@@ -109,18 +109,22 @@ export const createRateLimit = (windowMs: number, max: number, message: string) 
 const isDev = process.env.NODE_ENV !== "production"
 
 // 常用的速率限制配置
+// 注意：keyGenerator 用 user.id（已登入）或 req.ip（未登入）
+// 已加 trust proxy → req.ip 是真實 client IP、不是 Cloudflare edge
 export const rateLimits = {
-  // 一般API請求：生產 100次/分鐘，開發 1000次/分鐘
-  general: createRateLimit(60 * 1000, isDev ? 1000 : 100, "請求過於頻繁"),
+  // 一般 API 請求：生產 500/分鐘、開發 1000/分鐘
+  // 提高原因：SPA 一個頁面常一次打 5-10 個 query、多頁切換易爆 100/min
+  general: createRateLimit(60 * 1000, isDev ? 1000 : 500, "請求過於頻繁"),
 
-  // 登入嘗試：生產 5次/15分鐘，開發 50次/15分鐘
-  auth: createRateLimit(15 * 60 * 1000, isDev ? 50 : 5, "登入嘗試過於頻繁"),
+  // 登入嘗試：生產 20/15 分鐘、開發 50/15 分鐘
+  // 提高原因：session 過期時前端 auto refresh 可能打多次、5 次就鎖死太嚴格
+  auth: createRateLimit(15 * 60 * 1000, isDev ? 50 : 20, "登入嘗試過於頻繁"),
 
-  // 檔案上傳：每小時10次
-  upload: createRateLimit(60 * 60 * 1000, 10, "上傳過於頻繁"),
+  // 檔案上傳：每小時 30 次（從 10 提高、含失敗重試空間）
+  upload: createRateLimit(60 * 60 * 1000, 30, "上傳過於頻繁"),
 
-  // 資料匯出：每小時3次
-  export: createRateLimit(60 * 60 * 1000, 3, "匯出請求過於頻繁"),
+  // 資料匯出：每小時 5 次（從 3 提高）
+  export: createRateLimit(60 * 60 * 1000, 5, "匯出請求過於頻繁"),
 }
 
 // 請求日誌中間件
