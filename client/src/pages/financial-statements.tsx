@@ -28,6 +28,7 @@ import {
   ChevronRight,
 } from "lucide-react"
 import { apiRequest } from "@/lib/queryClient"
+import { BackToTop } from "@/components/back-to-top"
 
 const fmt = (n: number) => Math.round(n).toLocaleString()
 
@@ -501,6 +502,8 @@ export default function FinancialStatements() {
           ) : null}
         </TabsContent>
       </Tabs>
+
+      <BackToTop />
     </div>
   )
 }
