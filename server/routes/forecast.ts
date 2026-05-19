@@ -130,6 +130,20 @@ router.get(
   })
 )
 
+/**
+ * 手動觸發 PMS daily sync（拍 PMS 最新累積 snapshot）
+ * 預設拉最近 14 天、若 PMS 端 today 有新填值會立刻 sync 進來
+ */
+router.post(
+  "/api/forecast/pms-sync",
+  asyncHandler(async (req, res) => {
+    const { sinceDays } = (req.body ?? {}) as { sinceDays?: number }
+    const { syncFromPMS } = await import("../storage/pms-forecast-sync")
+    const result = await syncFromPMS(typeof sinceDays === "number" ? sinceDays : 14)
+    res.json(result)
+  })
+)
+
 router.get(
   "/api/forecast/pms-prediction",
   asyncHandler(async (req, res) => {
