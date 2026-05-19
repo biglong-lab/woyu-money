@@ -30,15 +30,22 @@
 - **DialogDescription** × 30（pages 6 個 + components 24 個、sr-only fallback、消除全站 Radix a11y warning）
 - **SheetDescription**：ai-assistant-sheet
 
+**Phase 10 (`e0536f8` ~ `d869c61`) — 🎯 BackToTop 全站擴散完成**
+- 從 Phase 1 的 3 頁、擴散至 **35 個 500 行+ 長頁面**（覆蓋率 **100%**）
+- 漸進式：4 → 8 → 12 → 20 → 32 → **35**
+- 純 main 元件用 batch script、含 helper functions 手動處理
+- 涵蓋：儀表板 / 列表頁 / 管理頁 / 報表頁 / 設定頁
+
 完整紀錄：[`docs/changes/2026-05-19-ux-detail-optimization-loop.md`](docs/changes/2026-05-19-ux-detail-optimization-loop.md)
 
 ### 仍待做（follow-up）
 - dashboard YTD 加 project→company mapping（徹底支援單館切換）
 - /scenario-simulator 比較模式（對比 2 個場景）
-- /receipt-match-helper 細部優化
+- confirm() → AlertDialog 改造（18 處、提升一致性與 a11y）
 
-### Commit 範圍
-`c7a7a61` → `5646506` → `59e92f4` → `c204a6a` → `7ca2d46` → `c6d2856` → `1af3323` → `95f376c` → `a3231a1` → `c9ec014` → `e3b2fec`
+### Commit 範圍（21 commits、跨 20 輪 loop）
+- Phase 1-9：`c7a7a61` → `5646506` → `59e92f4` → `c204a6a` → `7ca2d46` → `c6d2856` → `1af3323` → `95f376c` → `a3231a1` → `c9ec014` → `e3b2fec` → `79b2ac2` → `a31df19` → `5694d93`
+- Phase 10：`e0536f8` → `5a90da1` → `bdbb7af` → `5f251c2` → `d869c61`
 
 ---
 
