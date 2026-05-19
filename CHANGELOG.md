@@ -36,12 +36,12 @@
 - 純 main 元件用 batch script、含 helper functions 手動處理
 - 涵蓋：儀表板 / 列表頁 / 管理頁 / 報表頁 / 設定頁
 
-**Phase 11 (`9a9dff1` ~ `061a920`) — 🎯 confirm() → AlertDialog 改造**
-- 將 17 處 `window.confirm()` 替換為 Radix AlertDialog（覆蓋率 **94%**、17/18）
-- Pages 改造 11 處 + Components 改造 4 處
+**Phase 11 (`9a9dff1` ~ next) — 🎯 confirm() → AlertDialog 改造（100%）**
+- 將 **18 處** `window.confirm()` 全數替換為 Radix AlertDialog（覆蓋率 **100%**、18/18）
+- Pages 改造 12 處 + Components 改造 6 處
 - 統一模式：`setDeleteTarget` state + AlertDialog + 紅色 destructive 樣式
+- 特殊處理：scenario-simulator 覆寫場景用 `commitSaveScenario` helper 拆分流程
 - a11y 提升：Tab/Esc/Enter 鍵盤、aria-modal、具名提示「將刪除 X」、不再阻斷主執行緒
-- 剩 scenario-simulator × 2（純前端覆寫場景、無資料風險、保留 confirm）
 
 完整紀錄：[`docs/changes/2026-05-19-ux-detail-optimization-loop.md`](docs/changes/2026-05-19-ux-detail-optimization-loop.md)
 
