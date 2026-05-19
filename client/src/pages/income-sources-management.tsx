@@ -53,6 +53,7 @@ import {
   AlertCircle,
 } from "lucide-react"
 import type { IncomeSource, PaymentProject } from "@shared/schema"
+import { BackToTop } from "@/components/back-to-top"
 
 // ─── 來源型別標籤 ───────────────────────────────
 const SOURCE_TYPE_LABELS: Record<string, { label: string; color: string }> = {
@@ -659,6 +660,7 @@ export default function IncomeSourcesManagementPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <BackToTop />
     </div>
   )
 }

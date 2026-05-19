@@ -18,6 +18,7 @@ import { MonthlyPaymentCreateDialog } from "@/components/monthly-payment-create-
 import { MonthlyPaymentEditDialog } from "@/components/monthly-payment-edit-dialog"
 import { MonthlyPaymentBatchToolbar } from "@/components/monthly-payment-batch-toolbar"
 import { BatchDeleteDialog, BatchPayDialog } from "@/components/monthly-payment-batch-dialogs"
+import { BackToTop } from "@/components/back-to-top"
 
 // 型別
 import type {
@@ -670,6 +671,7 @@ export default function MonthlyPaymentManagement() {
         onConfirm={handleBatchPayConfirm}
         isPending={batchMarkPaidMutation.isPending}
       />
+      <BackToTop />
     </div>
   )
 }

@@ -23,6 +23,7 @@ import {
 } from "@/components/rental-contract-dialog"
 import { RentalContractDetailsDialog } from "@/components/rental-contract-details-dialog"
 import { RentalPaymentDetailDialog } from "@/components/rental-payment-detail-dialog"
+import { BackToTop } from "@/components/back-to-top"
 
 interface RentalContractListItem {
   id: number
@@ -771,6 +772,7 @@ export default function RentalManagementEnhanced() {
           >[0]["viewingPayment"]
         }
       />
+      <BackToTop />
     </div>
   )
 }

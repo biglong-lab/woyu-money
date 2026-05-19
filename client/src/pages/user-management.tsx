@@ -25,6 +25,7 @@ import { useToast } from "@/hooks/use-toast"
 import { apiRequest } from "@/lib/queryClient"
 import { Trash2, Edit, Key, Settings, Plus } from "lucide-react"
 import { useDocumentTitle } from "@/hooks/use-document-title"
+import { BackToTop } from "@/components/back-to-top"
 
 interface User {
   id: number
@@ -645,6 +646,7 @@ export default function UserManagement() {
           </div>
         </DialogContent>
       </Dialog>
+      <BackToTop />
     </div>
   )
 }
