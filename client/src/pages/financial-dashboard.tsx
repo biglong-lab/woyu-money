@@ -9,8 +9,17 @@
  *  - 缺口警示
  */
 import { useMemo, useState } from "react"
-import { useQuery } from "@tanstack/react-query"
-import { apiRequest } from "@/lib/queryClient"
+import { useQuery, useMutation } from "@tanstack/react-query"
+import { apiRequest, queryClient } from "@/lib/queryClient"
+import { useToast } from "@/hooks/use-toast"
+import { Trash2 } from "lucide-react"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -131,6 +140,51 @@ export default function FinancialDashboardPage() {
         ]
       : [],
     enabled: !!detailQuery,
+  })
+
+  // 分類列表（讓使用者可改分類）
+  interface CategoryOption {
+    id: number
+    categoryName: string
+    categoryType: string
+  }
+  const { data: categories = [] } = useQuery<CategoryOption[]>({
+    queryKey: ["/api/categories"],
+    staleTime: 10 * 60_000,
+  })
+
+  const { toast } = useToast()
+
+  const invalidateDashboard = () => {
+    queryClient.invalidateQueries({ queryKey: ["/api/dashboard/ytd"] })
+    queryClient.invalidateQueries({
+      predicate: (q) => String(q.queryKey[0]).startsWith("/api/dashboard/month-detail"),
+    })
+  }
+
+  const updateCategoryMutation = useMutation({
+    mutationFn: ({ id, categoryId }: { id: number; categoryId: number }) =>
+      apiRequest("PATCH", `/api/payment/items/${id}`, {
+        categoryId,
+        changeReason: "從 dashboard 改分類",
+      }),
+    onSuccess: () => {
+      toast({ title: "✅ 已更新分類" })
+      invalidateDashboard()
+    },
+    onError: (e: Error) => toast({ title: "失敗", description: e.message, variant: "destructive" }),
+  })
+
+  const deleteItemMutation = useMutation({
+    mutationFn: (id: number) =>
+      apiRequest("DELETE", `/api/payment/items/${id}`, {
+        changeReason: "從 dashboard 刪除（重複 / 不需要）",
+      }),
+    onSuccess: () => {
+      toast({ title: "✅ 已軟刪除（可從回收筒恢復）" })
+      invalidateDashboard()
+    },
+    onError: (e: Error) => toast({ title: "失敗", description: e.message, variant: "destructive" }),
   })
 
   const { data: companies = [] } = useQuery<Company[]>({
@@ -778,49 +832,91 @@ export default function FinancialDashboardPage() {
                   資料來自 HR 系統（monthly_hr_costs）、含 8 員工完整薪資 + 雇主負擔
                 </div>
               )}
-              {detailFetch.data?.items.map((it, i) => (
-                <div
-                  key={i}
-                  className="flex justify-between items-start gap-3 py-2 px-3 border-b last:border-0 text-sm"
-                >
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium truncate">
-                      {it.employee_name ?? it.item_name ?? "—"}
+              {detailFetch.data?.items.map((it, i) => {
+                const isPaymentItem =
+                  detailFetch.data?.source === "payment_items" && typeof it.id === "number"
+                return (
+                  <div key={i} className="py-2 px-3 border-b last:border-0 text-sm space-y-1">
+                    <div className="flex justify-between items-start gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium truncate">
+                          {it.employee_name ?? it.item_name ?? "—"}
+                        </div>
+                        <div className="text-xs text-gray-500 flex gap-2 flex-wrap mt-0.5">
+                          {it.project_name && <span>專案：{it.project_name}</span>}
+                          {it.start_date && <span>日期：{String(it.start_date).slice(0, 10)}</span>}
+                          {it.status && (
+                            <span
+                              className={it.status === "paid" ? "text-green-700" : "text-amber-700"}
+                            >
+                              {it.status === "paid" ? "已付" : it.status}
+                            </span>
+                          )}
+                          {it.is_paid !== undefined && (
+                            <span className={it.is_paid ? "text-green-700" : "text-amber-700"}>
+                              {it.is_paid ? "已付" : "未付"}
+                            </span>
+                          )}
+                        </div>
+                        {it.notes && (
+                          <div className="text-[10px] text-gray-400 mt-1 italic line-clamp-2">
+                            {it.notes}
+                          </div>
+                        )}
+                      </div>
+                      <div className="text-right shrink-0">
+                        <div className="font-mono font-semibold">
+                          {formatMoney(it.amount ?? it.total_cost ?? 0)}
+                        </div>
+                        {it.employer_total !== undefined && (
+                          <div className="text-[10px] text-gray-400">
+                            雇主負擔 {formatMoney(it.employer_total)}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    <div className="text-xs text-gray-500 flex gap-2 flex-wrap mt-0.5">
-                      {it.project_name && <span>專案：{it.project_name}</span>}
-                      {it.start_date && <span>日期：{String(it.start_date).slice(0, 10)}</span>}
-                      {it.status && (
-                        <span
-                          className={it.status === "paid" ? "text-green-700" : "text-amber-700"}
+                    {/* 改分類 + 刪除（僅 payment_items 來源）*/}
+                    {isPaymentItem && (
+                      <div className="flex items-center gap-1 pt-1">
+                        <span className="text-[10px] text-gray-400">改分類：</span>
+                        <Select
+                          onValueChange={(v) => {
+                            const catId = Number(v)
+                            if (!Number.isFinite(catId) || !it.id) return
+                            updateCategoryMutation.mutate({ id: it.id, categoryId: catId })
+                          }}
+                          disabled={updateCategoryMutation.isPending}
                         >
-                          {it.status === "paid" ? "已付" : it.status}
-                        </span>
-                      )}
-                      {it.is_paid !== undefined && (
-                        <span className={it.is_paid ? "text-green-700" : "text-amber-700"}>
-                          {it.is_paid ? "已付" : "未付"}
-                        </span>
-                      )}
-                    </div>
-                    {it.notes && (
-                      <div className="text-[10px] text-gray-400 mt-1 italic line-clamp-2">
-                        {it.notes}
+                          <SelectTrigger className="h-6 text-[10px] w-32">
+                            <SelectValue placeholder="選擇..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {categories.map((c) => (
+                              <SelectItem key={c.id} value={String(c.id)}>
+                                {c.categoryName}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (it.id && confirm("確定刪除這筆？（軟刪除、可從回收筒復原）")) {
+                              deleteItemMutation.mutate(it.id)
+                            }
+                          }}
+                          disabled={deleteItemMutation.isPending}
+                          className="ml-auto text-red-600 hover:bg-red-50 rounded p-1"
+                          title="軟刪除"
+                          aria-label="刪除此項"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </button>
                       </div>
                     )}
                   </div>
-                  <div className="text-right shrink-0">
-                    <div className="font-mono font-semibold">
-                      {formatMoney(it.amount ?? it.total_cost ?? 0)}
-                    </div>
-                    {it.employer_total !== undefined && (
-                      <div className="text-[10px] text-gray-400">
-                        雇主負擔 {formatMoney(it.employer_total)}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
+                )
+              })}
               {detailFetch.data && detailFetch.data.items.length > 0 && (
                 <button
                   type="button"
