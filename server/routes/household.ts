@@ -3,8 +3,24 @@ import { storage } from "../storage"
 import { insertHouseholdBudgetSchema, insertHouseholdExpenseSchema } from "@shared/schema"
 import { receiptUpload } from "./upload-config"
 import { asyncHandler, AppError } from "../middleware/error-handler"
+import { db } from "../db"
+import { sql } from "drizzle-orm"
+import { localMonthTPE } from "@shared/date-utils"
 
 const router = Router()
+
+/** 把 "YYYY-MM" 拆成 { year, month } */
+function parseYearMonth(monthStr: string | undefined): { year: number; month: number } {
+  const ym = monthStr && /^\d{4}-\d{2}$/.test(monthStr) ? monthStr : localMonthTPE()
+  const [y, m] = ym.split("-").map(Number)
+  return { year: y, month: m }
+}
+
+/**
+ * 「總預算」用 categoryId = 0 作為哨兵值（schema categoryId NOT NULL、又不想做 migration）
+ * 之後階段 2 要做分類預算時、categoryId > 0 即為分類預算、與總預算共存
+ */
+const TOTAL_BUDGET_CATEGORY_ID = 0
 
 // 家用分類
 router.get(
@@ -98,6 +114,238 @@ router.delete(
     const id = parseInt(req.params.id)
     await storage.deleteHouseholdExpense(id)
     res.status(204).send()
+  })
+)
+
+// ============================================================
+// 前端 /household-budget 頁面用 alias endpoints（救活頁面 P1）
+// 設計：前端打 /api/household/budget（單數）、回單一物件給 UI
+// 區分既有 /api/household-budgets（複數）回 list
+// ============================================================
+
+/**
+ * GET /api/household/budget?month=YYYY-MM
+ * 取「總預算」（categoryId=0）；無預算回 budgetAmount=0
+ */
+router.get(
+  "/api/household/budget",
+  asyncHandler(async (req, res) => {
+    const { year, month } = parseYearMonth(req.query.month as string | undefined)
+    const rows = await db.execute(sql`
+      SELECT id, budget_amount::text AS "budgetAmount", year, month, notes
+      FROM household_budgets
+      WHERE year = ${year} AND month = ${month} AND category_id = ${TOTAL_BUDGET_CATEGORY_ID}
+      LIMIT 1
+    `)
+    const row = (rows as unknown as { rows: { id: number; budgetAmount: string }[] }).rows[0]
+    res.json({
+      month: `${year}-${String(month).padStart(2, "0")}`,
+      budgetAmount: row?.budgetAmount ?? "0",
+      hasBudget: !!row,
+      id: row?.id ?? null,
+    })
+  })
+)
+
+/**
+ * POST /api/household/budget
+ * Body: { month: "YYYY-MM", budgetAmount: number | string, notes? }
+ * upsert「總預算」（categoryId=0）
+ */
+router.post(
+  "/api/household/budget",
+  asyncHandler(async (req, res) => {
+    const { month: monthStr, budgetAmount, notes } = req.body ?? {}
+    const { year, month } = parseYearMonth(monthStr)
+    const amt = String(budgetAmount ?? "")
+    if (!/^\d+(\.\d{1,2})?$/.test(amt) || Number(amt) < 0) {
+      throw new AppError(400, "budgetAmount 需為非負數字（最多兩位小數）")
+    }
+
+    // 手動 upsert（household_budgets 沒有 UNIQUE constraint、ON CONFLICT 用不了）
+    const existRows = await db.execute(sql`
+      SELECT id FROM household_budgets
+      WHERE year = ${year} AND month = ${month} AND category_id = ${TOTAL_BUDGET_CATEGORY_ID}
+      LIMIT 1
+    `)
+    const existing = (existRows as unknown as { rows: { id: number }[] }).rows[0]
+
+    let result: { id: number; budgetAmount: string } | undefined
+    if (existing) {
+      const updateRes = await db.execute(sql`
+        UPDATE household_budgets
+        SET budget_amount = ${amt}, notes = COALESCE(${notes ?? null}, notes), updated_at = NOW()
+        WHERE id = ${existing.id}
+        RETURNING id, budget_amount::text AS "budgetAmount"
+      `)
+      result = (updateRes as unknown as { rows: { id: number; budgetAmount: string }[] }).rows[0]
+    } else {
+      const insertRes = await db.execute(sql`
+        INSERT INTO household_budgets (category_id, year, month, budget_amount, notes, is_active, created_at, updated_at)
+        VALUES (${TOTAL_BUDGET_CATEGORY_ID}, ${year}, ${month}, ${amt}, ${notes ?? null}, true, NOW(), NOW())
+        RETURNING id, budget_amount::text AS "budgetAmount"
+      `)
+      result = (insertRes as unknown as { rows: { id: number; budgetAmount: string }[] }).rows[0]
+    }
+    res.status(201).json({
+      month: `${year}-${String(month).padStart(2, "0")}`,
+      budgetAmount: result?.budgetAmount ?? amt,
+      id: result?.id ?? null,
+    })
+  })
+)
+
+/**
+ * GET /api/household/expenses?month=YYYY-MM&limit=N
+ * 取指定月（不傳則本月）的支出列表、按日期倒序
+ */
+router.get(
+  "/api/household/expenses",
+  asyncHandler(async (req, res) => {
+    const { year, month } = parseYearMonth(req.query.month as string | undefined)
+    const limit = Math.min(Math.max(parseInt((req.query.limit as string) || "100", 10), 1), 500)
+    const startDate = `${year}-${String(month).padStart(2, "0")}-01`
+    const endYear = month === 12 ? year + 1 : year
+    const endMonth = month === 12 ? 1 : month + 1
+    const endDate = `${endYear}-${String(endMonth).padStart(2, "0")}-01`
+
+    const rows = await db.execute(sql`
+      SELECT
+        he.id,
+        he.category_id AS "categoryId",
+        dc.category_name AS "categoryName",
+        he.amount::text AS amount,
+        he.date,
+        he.payment_method AS "paymentMethod",
+        he.description,
+        he.receipt_images AS "receiptImages",
+        he.tags,
+        he.created_at AS "createdAt"
+      FROM household_expenses he
+      LEFT JOIN debt_categories dc ON dc.id = he.category_id
+      WHERE he.date >= ${startDate}::date AND he.date < ${endDate}::date
+      ORDER BY he.date DESC, he.id DESC
+      LIMIT ${limit}
+    `)
+    res.json((rows as unknown as { rows: unknown[] }).rows)
+  })
+)
+
+/**
+ * POST /api/household/expenses
+ * Body: { categoryId?, amount, date?, paymentMethod?, description?, receiptImages? }
+ * 新增一筆家用支出
+ */
+router.post(
+  "/api/household/expenses",
+  asyncHandler(async (req, res) => {
+    const body = req.body ?? {}
+    const amt = String(body.amount ?? "")
+    if (!/^\d+(\.\d{1,2})?$/.test(amt) || Number(amt) <= 0) {
+      throw new AppError(400, "amount 需為正數")
+    }
+    const date = body.date ?? new Date().toISOString().slice(0, 10)
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      throw new AppError(400, "date 格式需 YYYY-MM-DD")
+    }
+    const insertData = {
+      categoryId: body.categoryId ?? null,
+      amount: amt,
+      date,
+      paymentMethod: body.paymentMethod ?? null,
+      description: body.description ?? null,
+      receiptImages: body.receiptImages ?? null,
+    }
+    const result = insertHouseholdExpenseSchema.safeParse(insertData)
+    if (!result.success) {
+      throw new AppError(
+        400,
+        "資料格式錯誤：" + result.error.errors.map((e) => e.message).join(", ")
+      )
+    }
+    const expense = await storage.createHouseholdExpense(result.data)
+    res.status(201).json(expense)
+  })
+)
+
+/**
+ * GET /api/household/stats?month=YYYY-MM
+ * 聚合：{ budgetAmount, totalSpent, remaining, count, categoryBreakdown[] }
+ */
+router.get(
+  "/api/household/stats",
+  asyncHandler(async (req, res) => {
+    const { year, month } = parseYearMonth(req.query.month as string | undefined)
+    const startDate = `${year}-${String(month).padStart(2, "0")}-01`
+    const endYear = month === 12 ? year + 1 : year
+    const endMonth = month === 12 ? 1 : month + 1
+    const endDate = `${endYear}-${String(endMonth).padStart(2, "0")}-01`
+
+    // 總預算
+    const budgetRows = await db.execute(sql`
+      SELECT budget_amount::text AS amt FROM household_budgets
+      WHERE year = ${year} AND month = ${month} AND category_id = ${TOTAL_BUDGET_CATEGORY_ID}
+      LIMIT 1
+    `)
+    const budgetAmount = parseFloat(
+      (budgetRows as unknown as { rows: { amt: string }[] }).rows[0]?.amt ?? "0"
+    )
+
+    // 月支出加總 + 計數
+    const totalRows = await db.execute(sql`
+      SELECT COALESCE(SUM(amount::numeric), 0)::text AS total, COUNT(*)::int AS count
+      FROM household_expenses
+      WHERE date >= ${startDate}::date AND date < ${endDate}::date
+    `)
+    const totalRow = (totalRows as unknown as { rows: { total: string; count: number }[] }).rows[0]
+    const totalSpent = parseFloat(totalRow?.total ?? "0")
+    const count = totalRow?.count ?? 0
+
+    // 分類佔比
+    const catRows = await db.execute(sql`
+      SELECT
+        he.category_id AS "categoryId",
+        COALESCE(dc.category_name, '(未分類)') AS "categoryName",
+        COALESCE(SUM(he.amount::numeric), 0)::text AS amount,
+        COUNT(*)::int AS count
+      FROM household_expenses he
+      LEFT JOIN debt_categories dc ON dc.id = he.category_id
+      WHERE he.date >= ${startDate}::date AND he.date < ${endDate}::date
+      GROUP BY he.category_id, dc.category_name
+      ORDER BY SUM(he.amount::numeric) DESC
+    `)
+    const categoryBreakdown = (
+      catRows as unknown as {
+        rows: { categoryId: number | null; categoryName: string; amount: string; count: number }[]
+      }
+    ).rows.map((r) => ({
+      categoryId: r.categoryId,
+      categoryName: r.categoryName,
+      amount: parseFloat(r.amount),
+      count: r.count,
+    }))
+
+    res.json({
+      month: `${year}-${String(month).padStart(2, "0")}`,
+      budgetAmount,
+      totalSpent,
+      remaining: budgetAmount - totalSpent,
+      count,
+      progressPercent: budgetAmount > 0 ? Math.round((totalSpent / budgetAmount) * 100) : 0,
+      categoryBreakdown,
+    })
+  })
+)
+
+/**
+ * GET /api/categories/household
+ * 給前端「分類選單」用，回家用分類（fixed_categories）
+ */
+router.get(
+  "/api/categories/household",
+  asyncHandler(async (_req, res) => {
+    const categories = await storage.getFixedCategories()
+    res.json(categories)
   })
 )
 
