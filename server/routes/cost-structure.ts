@@ -21,6 +21,7 @@ import { asyncHandler, AppError } from "../middleware/error-handler"
 import { db } from "../db"
 import { sql } from "drizzle-orm"
 import { localMonthTPE } from "@shared/date-utils"
+import { generateItemsForMonth } from "../storage/recurring-expense-templates"
 
 const router = Router()
 
@@ -496,6 +497,27 @@ router.get(
       grandActual,
       grandPlanned,
       alerts,
+    })
+  })
+)
+
+/**
+ * POST /api/dashboard/cost-structure/generate-missing?month=YYYY-MM
+ * 一鍵把該月所有 active 模板產出占位（不等 day_of_month）
+ *
+ * 用於「成本結構總覽」看完貌、不用每個模板各別產
+ */
+router.post(
+  "/api/dashboard/cost-structure/generate-missing",
+  asyncHandler(async (req, res) => {
+    const monthQ = (req.body?.month as string) ?? (req.query.month as string)
+    const { monthStr } = parseYearMonth(monthQ)
+    const result = await generateItemsForMonth(monthStr)
+    res.json({
+      month: monthStr,
+      generated: result.generated.length,
+      skipped: result.skipped.length,
+      skippedReasons: result.skipped,
     })
   })
 )
