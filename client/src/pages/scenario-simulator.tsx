@@ -587,29 +587,41 @@ export default function ScenarioSimulatorPage() {
           {/* 已存場景列表 */}
           {savedScenarios.length > 0 ? (
             <div className="flex flex-wrap gap-2">
-              {savedScenarios.map((s) => (
-                <div
-                  key={s.id}
-                  className="flex items-center gap-1 bg-violet-50 border border-violet-200 rounded-md px-2 py-1"
-                >
-                  <button
-                    type="button"
-                    onClick={() => handleLoadScenario(s)}
-                    title={`套用：${s.name}\n建立於 ${s.createdAt.slice(0, 10)}`}
-                    className="text-sm text-violet-900 hover:text-violet-700 font-medium"
+              {savedScenarios.map((s) => {
+                // 顯示「M/D」短日期；今年隱藏年份、跨年顯示完整
+                const created = new Date(s.createdAt)
+                const now = new Date()
+                const sameYear = created.getFullYear() === now.getFullYear()
+                const dateLabel = sameYear
+                  ? `${created.getMonth() + 1}/${created.getDate()}`
+                  : `${created.getFullYear()}/${created.getMonth() + 1}/${created.getDate()}`
+                return (
+                  <div
+                    key={s.id}
+                    className="flex items-center gap-1 bg-violet-50 border border-violet-200 rounded-md px-2 py-1"
                   >
-                    {s.name}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteScenario(s.id)}
-                    title="刪除"
-                    className="text-violet-400 hover:text-red-600 transition"
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </button>
-                </div>
-              ))}
+                    <button
+                      type="button"
+                      onClick={() => handleLoadScenario(s)}
+                      title={`套用：${s.name}\n建立於 ${s.createdAt.slice(0, 10)}`}
+                      className="text-sm text-violet-900 hover:text-violet-700 font-medium"
+                    >
+                      {s.name}
+                      <span className="ml-1.5 text-[10px] text-violet-500 font-normal">
+                        {dateLabel}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteScenario(s.id)}
+                      title="刪除"
+                      className="text-violet-400 hover:text-red-600 transition"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                  </div>
+                )
+              })}
             </div>
           ) : (
             <div className="text-xs text-gray-400">尚無儲存的場景。調好參數後在下方命名儲存</div>
