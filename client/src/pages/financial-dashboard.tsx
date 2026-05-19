@@ -265,6 +265,7 @@ export default function FinancialDashboardPage() {
   interface ExtendedMonthRow extends MonthRow {
     incomeActual?: number
     incomePlanned?: number
+    incomeForecast?: number // 後端從 seasonal forecast 算的「未來月收入預測」
     expenseActual?: number
     expensePlanned?: number
     profitActual?: number
@@ -570,7 +571,11 @@ export default function FinancialDashboardPage() {
                                 </div>
                                 {ip > 0 && (
                                   <div className="flex justify-between text-blue-500">
-                                    <span>· 預定/未到日</span>
+                                    <span>
+                                      {(row.incomeForecast ?? 0) > 0
+                                        ? "· 季節性預測"
+                                        : "· 預定/未到日"}
+                                    </span>
                                     <span className="font-mono">{formatMoney(ip)}</span>
                                   </div>
                                 )}
