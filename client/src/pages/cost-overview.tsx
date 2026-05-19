@@ -5,8 +5,11 @@
  * 各區塊可展開明細、點項目跳到原始頁編輯。
  */
 import { useState } from "react"
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useMutation } from "@tanstack/react-query"
 import { Link } from "wouter"
+import { apiRequest, queryClient } from "@/lib/queryClient"
+import { useToast } from "@/hooks/use-toast"
+import { Sparkles } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -159,6 +162,27 @@ export default function CostOverviewPage() {
     queryKey: [`/api/dashboard/cost-structure?month=${selectedMonth}`],
   })
 
+  const { toast } = useToast()
+  const generateMissingMutation = useMutation({
+    mutationFn: () =>
+      apiRequest<{ generated: number; skipped: number; month: string }>(
+        "POST",
+        "/api/dashboard/cost-structure/generate-missing",
+        { month: selectedMonth }
+      ),
+    onSuccess: (r) => {
+      toast({
+        title: `✅ 已產出 ${r.generated} 筆占位`,
+        description: r.skipped > 0 ? `跳過 ${r.skipped} 筆（已產過）` : `${r.month} 全部產出完成`,
+      })
+      queryClient.invalidateQueries({
+        queryKey: [`/api/dashboard/cost-structure?month=${selectedMonth}`],
+      })
+    },
+    onError: (e: Error) =>
+      toast({ title: "產出失敗", description: e.message, variant: "destructive" }),
+  })
+
   const toggle = (k: string) => setExpanded((s) => ({ ...s, [k]: !s[k] }))
 
   return (
@@ -173,18 +197,33 @@ export default function CostOverviewPage() {
             一頁看完租金 / 人事 / 週期模板 / 一般單項四大成本來源
           </p>
         </div>
-        <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-          <SelectTrigger className="w-44">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {monthOptions().map((m) => (
-              <SelectItem key={m.value} value={m.value}>
-                {m.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="flex gap-2 items-center flex-wrap">
+          {data && data.template.notGeneratedCount > 0 && (
+            <Button
+              onClick={() => generateMissingMutation.mutate()}
+              disabled={generateMissingMutation.isPending}
+              className="bg-amber-600 hover:bg-amber-700 text-white"
+              size="sm"
+            >
+              <Sparkles className="h-4 w-4 mr-1" />
+              {generateMissingMutation.isPending
+                ? "產出中…"
+                : `一鍵產出 ${data.template.notGeneratedCount} 個占位`}
+            </Button>
+          )}
+          <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+            <SelectTrigger className="w-44">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {monthOptions().map((m) => (
+                <SelectItem key={m.value} value={m.value}>
+                  {m.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {/* 警示區 */}
