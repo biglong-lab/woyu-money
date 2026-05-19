@@ -217,6 +217,46 @@ describe.skipIf(skipIfNoDb)("Cost Structure API", () => {
     )
   })
 
+  it("rental matching：tenantName 空字串不該誤匹配所有合約（避免 .includes('') = true bug）", async () => {
+    // 模擬：建一筆「2026-10 浯島文旅租約 $999999」，tenantName=空
+    // 期望：合約金額用合約本身 base_amount、不被誤改成 $999999
+    const ins = (
+      await db.execute(sql`
+        INSERT INTO payment_items
+          (item_name, total_amount, item_type, payment_type, start_date,
+           status, paid_amount, source, created_at, updated_at)
+        VALUES ('2099-10-測試獨特租約 ' || ${Date.now()}, 999999, 'project', 'single',
+                ${`${TEST_MONTH}-15`}::date, 'unpaid', 0, 'manual', NOW(), NOW())
+        RETURNING id
+      `)
+    ).rows as unknown as { id: number }[]
+    cleanupIds.paymentItems.push(ins[0].id)
+
+    const res = await request(app).get(`/api/dashboard/cost-structure?month=${TEST_MONTH}`)
+    // 任何合約（即使 tenantName 為空）都不該 match 到「測試獨特租約」這個無關項
+    const inflated = res.body.rental.items.filter((r: { amount: number }) => r.amount === 999999)
+    expect(inflated.length).toBe(0)
+  })
+
+  it("manual 排除：含「租金」分類 (category_id IN (2,28)) 即使 item_name 不含「租金」也排除", async () => {
+    // 建一筆「2026-05-總兵招待所-軍友社 $57750」、category_id=2（租金）
+    const ins = (
+      await db.execute(sql`
+        INSERT INTO payment_items
+          (item_name, total_amount, item_type, payment_type, start_date,
+           status, paid_amount, source, category_id, created_at, updated_at)
+        VALUES ('2099-10-測試館租金歸入 ' || ${Date.now()}, 12345, 'project', 'single',
+                ${`${TEST_MONTH}-10`}::date, 'unpaid', 0, 'manual', 2, NOW(), NOW())
+        RETURNING id
+      `)
+    ).rows as unknown as { id: number }[]
+    cleanupIds.paymentItems.push(ins[0].id)
+
+    const res = await request(app).get(`/api/dashboard/cost-structure?month=${TEST_MONTH}`)
+    const inManual = res.body.manual.items.find((m: { id: number }) => m.id === ins[0].id)
+    expect(inManual).toBeFalsy() // 不該在 manual（因為 category_id=2=租金）
+  })
+
   it("無 month 參數 fallback 本月（不會 500）", async () => {
     const res = await request(app).get("/api/dashboard/cost-structure")
     expect(res.status).toBe(200)
