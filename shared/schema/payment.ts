@@ -20,6 +20,7 @@ import {
   fixedCategories,
   fixedCategorySubOptions,
 } from "./category"
+import { recurringExpenseTemplates } from "./recurring-expense"
 
 // 付款項目表
 export const paymentItems = pgTable(
@@ -56,6 +57,13 @@ export const paymentItems = pgTable(
     archivedByUserId: integer("archived_by_user_id"),
     archivedByUsername: varchar("archived_by_username", { length: 255 }),
     archivedAt: timestamp("archived_at"),
+    // 連結週期性模板（template_scheduled 由 scheduler 自動產出時設定）
+    // 用途：實際支付發生時、可從模板回溯該模板下所有已產出的 items；
+    // 後台統計時可區分「估算占位」vs「實際金額已更新」。
+    recurringTemplateId: integer("recurring_template_id").references(
+      () => recurringExpenseTemplates.id,
+      { onDelete: "set null" }
+    ),
   },
   (table) => ({
     projectIdIdx: index("payment_items_project_id_idx").on(table.projectId),
@@ -71,6 +79,9 @@ export const paymentItems = pgTable(
     ),
     projectStatusIdx: index("payment_items_project_status_idx").on(table.projectId, table.status),
     dateRangeIdx: index("payment_items_date_range_idx").on(table.startDate, table.endDate),
+    recurringTemplateIdx: index("payment_items_recurring_template_idx").on(
+      table.recurringTemplateId
+    ),
   })
 )
 
