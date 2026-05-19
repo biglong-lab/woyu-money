@@ -937,6 +937,11 @@ export default function FinancialDashboardPage() {
               {detailFetch.isLoading && (
                 <div className="text-sm text-gray-400 py-4 text-center">載入中…</div>
               )}
+              {detailFetch.isError && (
+                <div className="text-sm text-red-600 bg-red-50 rounded p-3 text-center">
+                  ⚠️ 載入失敗：{(detailFetch.error as Error)?.message ?? "未知錯誤"}
+                </div>
+              )}
               {detailFetch.data?.items.length === 0 && (
                 <div className="text-sm text-gray-400 py-4 text-center">該分類無項目</div>
               )}

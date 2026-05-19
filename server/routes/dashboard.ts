@@ -264,7 +264,8 @@ router.get(
       const hr = await db.execute(sql`
         SELECT
           m.employee_id,
-          e.name AS employee_name,
+          e.employee_name AS employee_name,
+          e.position,
           m.base_salary::bigint AS base_salary,
           m.employer_total::bigint AS employer_total,
           m.net_salary::bigint AS net_salary,
