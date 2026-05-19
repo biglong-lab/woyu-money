@@ -7,6 +7,7 @@ import { Router } from "express"
 import { asyncHandler } from "../middleware/error-handler"
 import { db } from "../db"
 import { sql } from "drizzle-orm"
+import { getSeasonalForecast } from "../storage/forecast-snapshots"
 
 const router = Router()
 
@@ -139,18 +140,45 @@ router.get(
       profit_total: number
     }
     const monthsRaw = (rows as unknown as { rows: MonthRow[] }).rows
+
+    // 收入：未來月份用 seasonal forecast pointEstimate 取代 payment_items income
+    // （PMS bridge 寫的訂單 + 季節性歷史比率推算）
+    const currentMonth = today.slice(0, 7)
+    const futureMonths = monthsRaw.map((m) => m.month).filter((m) => m > currentMonth)
+    const forecastByMonth: Record<string, number> = {}
+    await Promise.all(
+      futureMonths.map(async (m) => {
+        try {
+          const fc = await getSeasonalForecast(m, null, 6)
+          forecastByMonth[m] = fc.pointEstimate
+        } catch {
+          // forecast 不可得時忽略、保留 payment_items income
+        }
+      })
+    )
+
     // 向後相容：保留 income/expense/profit 欄位（= actual + planned）
-    const months = monthsRaw.map((m) => ({
-      month: m.month,
-      income: m.income_actual + m.income_planned,
-      expense: m.expense_actual + m.expense_planned,
-      profit: m.profit_total,
-      incomeActual: m.income_actual,
-      incomePlanned: m.income_planned,
-      expenseActual: m.expense_actual,
-      expensePlanned: m.expense_planned,
-      profitActual: m.profit_actual,
-    }))
+    const months = monthsRaw.map((m) => {
+      const isFuture = m.month > currentMonth
+      // 未來月：用 seasonal forecast 取代 income_planned（若有預測值）
+      const forecastIncome = isFuture ? (forecastByMonth[m.month] ?? 0) : 0
+      const incomeActual = m.income_actual
+      const incomePlanned = isFuture ? Math.max(forecastIncome, m.income_planned) : m.income_planned
+      const totalIncome = incomeActual + incomePlanned
+      const totalExpense = m.expense_actual + m.expense_planned
+      return {
+        month: m.month,
+        income: totalIncome,
+        expense: totalExpense,
+        profit: totalIncome - totalExpense,
+        incomeActual,
+        incomePlanned,
+        incomeForecast: forecastIncome, // 給前端標識「預測值」用
+        expenseActual: m.expense_actual,
+        expensePlanned: m.expense_planned,
+        profitActual: m.profit_actual,
+      }
+    })
 
     // 每月分類明細，分 actual / planned
     const breakdownRows = await db.execute(sql`
@@ -293,7 +321,6 @@ router.get(
     }
 
     // YTD totals 只算 actual + 只算到本月（不含未到日 / 未來月的 planned）
-    const currentMonth = today.slice(0, 7)
     const totals = months.reduce(
       (acc, m) => {
         if (m.month > currentMonth) return acc
