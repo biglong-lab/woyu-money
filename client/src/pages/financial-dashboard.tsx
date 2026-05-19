@@ -257,13 +257,22 @@ export default function FinancialDashboardPage() {
   interface BreakdownItem {
     category: string
     amount: number
+    actual?: number
+    planned?: number
     count: number
+  }
+  interface ExtendedMonthRow extends MonthRow {
+    incomeActual?: number
+    incomePlanned?: number
+    expenseActual?: number
+    expensePlanned?: number
+    profitActual?: number
   }
   interface YtdData {
     income: number
     expense: number
     profit: number
-    months: MonthRow[]
+    months: ExtendedMonthRow[]
     breakdown?: Record<string, { expense: BreakdownItem[]; income: BreakdownItem[] }>
   }
   const ytdQuery = useQuery<YtdData>({
@@ -288,14 +297,19 @@ export default function FinancialDashboardPage() {
   // 估計未來月支出：取「YTD 月均」與「模板合計」較大值（保守估）
   const estimatedFutureExpense = Math.max(fixedMonthlyExpense, ytdAvgMonthlyExpense)
 
-  // 組裝未來 3 月預測表
-  const futureRows: MonthRow[] = useMemo(() => {
+  // 組裝未來 3 月預測表（季節性預測：收入 actual=0、planned=pointEstimate）
+  const futureRows: ExtendedMonthRow[] = useMemo(() => {
     if (!forecastQueries.data) return []
     return forecastQueries.data.map((f) => ({
       month: f.targetMonth,
       income: f.pointEstimate,
       expense: estimatedFutureExpense,
       profit: f.pointEstimate - estimatedFutureExpense,
+      incomeActual: 0,
+      incomePlanned: f.pointEstimate,
+      expenseActual: 0,
+      expensePlanned: estimatedFutureExpense,
+      profitActual: 0,
     }))
   }, [forecastQueries.data, estimatedFutureExpense])
 
@@ -326,11 +340,18 @@ export default function FinancialDashboardPage() {
     return { trajectory, firstNegativeMonth, finalCumulative: cumulative }
   }, [ytd.profit, futureRows])
 
-  // 圖表資料：歷史 + 未來
-  const chartData = [
-    ...ytd.months.slice(-6).map((m) => ({ ...m, isForecast: false })),
-    ...futureRows.map((m) => ({ ...m, isForecast: true })),
-  ]
+  // 圖表資料：直接用 server months（已含 actual + planned 拆分）
+  // 過去月：actual = 整月實際、planned = 0
+  // 本月：actual = 截至今日已發生、planned = 月底未到日（如 5/31 大筆租金）
+  // 未來月：actual = 0、planned = 已登錄合約 / 模板占位
+  // isForecast：本月之後（月 > currentMonth）顯示半透明、加虛線分界
+  const currentMonthClient = (() => {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
+  })()
+  const chartData = ytd.months
+    .slice(-9) // 最多顯示 9 個月
+    .map((m) => ({ ...m, isForecast: m.month > currentMonthClient }))
 
   return (
     <div className="container mx-auto py-4 sm:py-6 space-y-4">
@@ -517,34 +538,71 @@ export default function FinancialDashboardPage() {
                   content={({ active, payload, label }) => {
                     if (!active || !payload || payload.length === 0) return null
                     const row = chartData.find((d) => d.month === label)
+                    if (!row) return null
                     const bd = ytd.breakdown?.[label as string]
                     const incomeTop = bd?.income.slice(0, 5) ?? []
                     const expenseTop = bd?.expense.slice(0, 8) ?? []
                     const incomeRest = bd?.income.slice(5) ?? []
                     const expenseRest = bd?.expense.slice(8) ?? []
+                    const ia = row.incomeActual ?? row.income ?? 0
+                    const ip = row.incomePlanned ?? 0
+                    const ea = row.expenseActual ?? row.expense ?? 0
+                    const ep = row.expensePlanned ?? 0
                     return (
                       <div className="bg-white border border-gray-200 rounded shadow-lg p-3 text-xs max-w-xs">
                         <div className="font-semibold mb-2 pb-1 border-b">
                           {label}
-                          {row?.isForecast && <span className="ml-1 text-amber-600">(預估)</span>}
+                          {row.isForecast && <span className="ml-1 text-amber-600">(預估)</span>}
                         </div>
-                        {/* payload 顯示主要數字 */}
-                        <div className="space-y-0.5 mb-2">
-                          {payload.map((p, i) => (
-                            <div
-                              key={i}
-                              className="flex justify-between gap-3"
-                              style={{ color: p.color }}
-                            >
-                              <span>{p.name}</span>
-                              <span className="font-mono font-medium">
-                                {formatMoney(Number(p.value))}
-                              </span>
+                        {/* 收入 / 支出 / 淨利 — 拆 actual + planned */}
+                        <div className="space-y-1.5 mb-2 text-[11px]">
+                          <div>
+                            <div className="flex justify-between text-blue-700 font-medium">
+                              <span>收入合計</span>
+                              <span className="font-mono">{formatMoney(ia + ip)}</span>
                             </div>
-                          ))}
+                            {(ia > 0 || ip > 0) && (
+                              <div className="pl-2 text-[10px] text-gray-500">
+                                <div className="flex justify-between">
+                                  <span>· 已發生</span>
+                                  <span className="font-mono">{formatMoney(ia)}</span>
+                                </div>
+                                {ip > 0 && (
+                                  <div className="flex justify-between text-blue-500">
+                                    <span>· 預定/未到日</span>
+                                    <span className="font-mono">{formatMoney(ip)}</span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                          <div>
+                            <div className="flex justify-between text-red-700 font-medium">
+                              <span>支出合計</span>
+                              <span className="font-mono">{formatMoney(ea + ep)}</span>
+                            </div>
+                            {(ea > 0 || ep > 0) && (
+                              <div className="pl-2 text-[10px] text-gray-500">
+                                <div className="flex justify-between">
+                                  <span>· 已發生</span>
+                                  <span className="font-mono">{formatMoney(ea)}</span>
+                                </div>
+                                {ep > 0 && (
+                                  <div className="flex justify-between text-red-500">
+                                    <span>· 預定/未到日</span>
+                                    <span className="font-mono">{formatMoney(ep)}</span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex justify-between text-green-700 font-semibold pt-1 border-t">
+                            <span>淨利</span>
+                            <span className="font-mono">{formatMoney(ia + ip - ea - ep)}</span>
+                          </div>
                         </div>
-                        {/* 分類 breakdown（過去月才有資料）*/}
-                        {!row?.isForecast && bd && (
+                        {/* 分類 breakdown */}
+                        {bd && (
                           <>
                             {incomeTop.length > 0 && (
                               <div className="border-t pt-2 mt-2">
@@ -557,7 +615,14 @@ export default function FinancialDashboardPage() {
                                     className="flex justify-between text-gray-600 text-[10px]"
                                   >
                                     <span className="truncate max-w-[140px]">{it.category}</span>
-                                    <span className="font-mono">{formatMoney(it.amount)}</span>
+                                    <span className="font-mono">
+                                      {formatMoney(it.amount)}
+                                      {(it.planned ?? 0) > 0 && (
+                                        <span className="text-blue-400 ml-1">
+                                          (預{formatMoney(it.planned ?? 0)})
+                                        </span>
+                                      )}
+                                    </span>
                                   </div>
                                 ))}
                                 {incomeRest.length > 0 && (
@@ -578,7 +643,14 @@ export default function FinancialDashboardPage() {
                                     className="flex justify-between text-gray-600 text-[10px]"
                                   >
                                     <span className="truncate max-w-[140px]">{it.category}</span>
-                                    <span className="font-mono">{formatMoney(it.amount)}</span>
+                                    <span className="font-mono">
+                                      {formatMoney(it.amount)}
+                                      {(it.planned ?? 0) > 0 && (
+                                        <span className="text-red-400 ml-1">
+                                          (預{formatMoney(it.planned ?? 0)})
+                                        </span>
+                                      )}
+                                    </span>
                                   </div>
                                 ))}
                                 {expenseRest.length > 0 && (
@@ -593,9 +665,9 @@ export default function FinancialDashboardPage() {
                             </div>
                           </>
                         )}
-                        {row?.isForecast && (
-                          <div className="border-t pt-2 mt-2 text-[10px] text-gray-500">
-                            預估：收入採季節性預測、支出用 YTD 月均
+                        {row.isForecast && (
+                          <div className="border-t pt-2 mt-2 text-[10px] text-amber-600">
+                            未來月：已登錄合約 / 模板占位、收入採季節性預測
                           </div>
                         )}
                       </div>
@@ -612,14 +684,26 @@ export default function FinancialDashboardPage() {
                     label={{ value: "預估", position: "top", fontSize: 10, fill: "#6b7280" }}
                   />
                 )}
-                <Bar dataKey="income" name="收入" fill="#3b82f6">
+                {/* 收入：實際（深藍） + 預定（淺藍）堆疊 */}
+                <Bar dataKey="incomeActual" stackId="income" name="收入(實際)" fill="#3b82f6">
                   {chartData.map((d, i) => (
                     <Cell key={i} fill="#3b82f6" fillOpacity={d.isForecast ? 0.4 : 1} />
                   ))}
                 </Bar>
-                <Bar dataKey="expense" name="支出" fill="#ef4444">
+                <Bar dataKey="incomePlanned" stackId="income" name="收入(預定)" fill="#93c5fd">
+                  {chartData.map((d, i) => (
+                    <Cell key={i} fill="#93c5fd" fillOpacity={d.isForecast ? 0.5 : 0.75} />
+                  ))}
+                </Bar>
+                {/* 支出：實際（深紅） + 預定（淺紅）堆疊 */}
+                <Bar dataKey="expenseActual" stackId="expense" name="支出(實際)" fill="#ef4444">
                   {chartData.map((d, i) => (
                     <Cell key={i} fill="#ef4444" fillOpacity={d.isForecast ? 0.4 : 1} />
+                  ))}
+                </Bar>
+                <Bar dataKey="expensePlanned" stackId="expense" name="支出(預定)" fill="#fca5a5">
+                  {chartData.map((d, i) => (
+                    <Cell key={i} fill="#fca5a5" fillOpacity={d.isForecast ? 0.5 : 0.75} />
                   ))}
                 </Bar>
                 <Line
