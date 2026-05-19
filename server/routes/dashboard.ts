@@ -140,32 +140,90 @@ router.get(
       profit_total: number
     }
     const monthsRaw = (rows as unknown as { rows: MonthRow[] }).rows
-
-    // 收入：未來月份用 seasonal forecast pointEstimate 取代 payment_items income
-    // （PMS bridge 寫的訂單 + 季節性歷史比率推算）
     const currentMonth = today.slice(0, 7)
+
+    // ============================================================
+    // 未來月份預估：4 大區塊都要有值（user 要求）
+    // ============================================================
+    // 1) 收入：先試 seasonal forecast、不可得 fallback 到歷史 6 月平均
+    // 2) HR：未來月用「最近一個 monthly_hr_costs 月總額」當 baseline
+    // 3) 租金 / template 已經自然涵蓋（rental_contracts 12 期 + template_missing CTE）
+    // ============================================================
+
     const futureMonths = monthsRaw.map((m) => m.month).filter((m) => m > currentMonth)
+
+    // 收入：每月 seasonal forecast（不可得 fallback 歷史平均）
     const forecastByMonth: Record<string, number> = {}
     await Promise.all(
       futureMonths.map(async (m) => {
         try {
           const fc = await getSeasonalForecast(m, null, 6)
-          forecastByMonth[m] = fc.pointEstimate
+          if (fc.pointEstimate > 0) forecastByMonth[m] = fc.pointEstimate
         } catch {
-          // forecast 不可得時忽略、保留 payment_items income
+          // ignore
         }
       })
     )
 
-    // 向後相容：保留 income/expense/profit 欄位（= actual + planned）
+    // 收入 fallback：歷史 6 月平均（用最近 6 個有 income 紀錄的月份）
+    let avgHistoricalIncome = 0
+    if (futureMonths.length > 0) {
+      const histRows = await db.execute(sql`
+        SELECT AVG(monthly_total)::bigint AS avg_income FROM (
+          SELECT TO_CHAR(start_date, 'YYYY-MM') AS ym,
+                 SUM(total_amount::numeric) AS monthly_total
+          FROM payment_items
+          WHERE item_type = 'income' AND NOT is_deleted
+            AND start_date < ${`${currentMonth}-01`}::date
+            AND start_date >= (${`${currentMonth}-01`}::date - INTERVAL '6 months')
+          GROUP BY 1
+          HAVING SUM(total_amount::numeric) > 0
+        ) t
+      `)
+      const r = (histRows as unknown as { rows: { avg_income: string | null }[] }).rows[0]
+      avgHistoricalIncome = parseInt(r?.avg_income ?? "0", 10) || 0
+    }
+
+    // HR：取「最近一個 monthly_hr_costs 月總額」當未來月 baseline
+    let hrBaseline = 0
+    if (futureMonths.length > 0) {
+      const hrRows = await db.execute(sql`
+        SELECT SUM(total_cost::numeric)::bigint AS amt
+        FROM monthly_hr_costs
+        WHERE (year, month) = (
+          SELECT year, month FROM monthly_hr_costs
+          ORDER BY year DESC, month DESC LIMIT 1
+        )
+      `)
+      const r = (hrRows as unknown as { rows: { amt: string | null }[] }).rows[0]
+      hrBaseline = parseInt(r?.amt ?? "0", 10) || 0
+    }
+
     const months = monthsRaw.map((m) => {
       const isFuture = m.month > currentMonth
-      // 未來月：用 seasonal forecast 取代 income_planned（若有預測值）
-      const forecastIncome = isFuture ? (forecastByMonth[m.month] ?? 0) : 0
       const incomeActual = m.income_actual
-      const incomePlanned = isFuture ? Math.max(forecastIncome, m.income_planned) : m.income_planned
+      let incomePlanned = m.income_planned
+      let incomeForecast = 0
+      let hrEstimate = 0
+
+      if (isFuture) {
+        // 收入：seasonal forecast > 歷史平均 > payment_items planned 取最大
+        const fc = forecastByMonth[m.month] ?? 0
+        incomeForecast = fc > 0 ? fc : avgHistoricalIncome
+        incomePlanned = Math.max(incomeForecast, m.income_planned)
+
+        // HR baseline：若該月 monthly_hr_costs 無紀錄（expense_actual 沒包含 HR）→ 補上
+        // 判斷：HR 已包含時 expense_actual 通常 ~= HR baseline 等級、無 HR 時 ~= 0
+        // 這裡保守做法：若 expense_actual < hrBaseline * 0.5 表示無 HR → 補
+        if (m.expense_actual < hrBaseline * 0.5) {
+          hrEstimate = hrBaseline
+        }
+      }
+
+      const totalExpensePlanned = m.expense_planned + hrEstimate
       const totalIncome = incomeActual + incomePlanned
-      const totalExpense = m.expense_actual + m.expense_planned
+      const totalExpense = m.expense_actual + totalExpensePlanned
+
       return {
         month: m.month,
         income: totalIncome,
@@ -173,9 +231,10 @@ router.get(
         profit: totalIncome - totalExpense,
         incomeActual,
         incomePlanned,
-        incomeForecast: forecastIncome, // 給前端標識「預測值」用
+        incomeForecast, // > 0 表示有預測值
         expenseActual: m.expense_actual,
-        expensePlanned: m.expense_planned,
+        expensePlanned: totalExpensePlanned,
+        expenseHrEstimate: hrEstimate, // 未來月補的 HR baseline
         profitActual: m.profit_actual,
       }
     })
@@ -318,6 +377,38 @@ router.get(
         planned,
         count: r.n,
       })
+    }
+
+    // 未來月補：人事成本（HR baseline）、季節性收入預測 — 加進 breakdown
+    for (const m of months) {
+      if (m.expenseHrEstimate && m.expenseHrEstimate > 0) {
+        if (!breakdown[m.month]) breakdown[m.month] = { expense: [], income: [] }
+        breakdown[m.month].expense.unshift({
+          category: "人事成本（HR baseline）",
+          amount: m.expenseHrEstimate,
+          actual: 0,
+          planned: m.expenseHrEstimate,
+          count: 0,
+        })
+      }
+      if (m.incomeForecast && m.incomeForecast > 0 && m.month > currentMonth) {
+        if (!breakdown[m.month]) breakdown[m.month] = { expense: [], income: [] }
+        // 排除已被 payment_items income 涵蓋的部分
+        const alreadyIncome = breakdown[m.month].income.reduce(
+          (s, i) => s + i.actual + i.planned,
+          0
+        )
+        const remaining = Math.max(0, m.incomeForecast - alreadyIncome)
+        if (remaining > 0) {
+          breakdown[m.month].income.push({
+            category: "季節性預測",
+            amount: remaining,
+            actual: 0,
+            planned: remaining,
+            count: 0,
+          })
+        }
+      }
     }
 
     // YTD totals 只算 actual + 只算到本月（不含未到日 / 未來月的 planned）
