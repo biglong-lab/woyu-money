@@ -40,6 +40,7 @@ import { format, formatDistanceToNow } from "date-fns"
 import { zhTW } from "date-fns/locale"
 import type { PaymentItem } from "@shared/schema"
 import { useDocumentTitle } from "@/hooks/use-document-title"
+import { BackToTop } from "@/components/back-to-top"
 
 interface AuditLog {
   id: number
@@ -516,6 +517,7 @@ export default function RecycleBin() {
           )}
         </DialogContent>
       </Dialog>
+      <BackToTop />
     </div>
   )
 }

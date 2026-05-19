@@ -42,6 +42,7 @@ import {
   AreaChart,
 } from "recharts"
 import { useDocumentTitle } from "@/hooks/use-document-title"
+import { BackToTop } from "@/components/back-to-top"
 
 interface PaymentItem {
   id: number
@@ -601,6 +602,7 @@ export default function PaymentProjectStatsOptimized() {
           </TabsContent>
         </Tabs>
       </div>
+      <BackToTop />
     </div>
   )
 }

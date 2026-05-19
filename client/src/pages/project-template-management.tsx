@@ -35,6 +35,7 @@ import { useToast } from "@/hooks/use-toast"
 import { Plus, Edit2, Trash2, Phone, Zap, Droplets, Wifi, Building } from "lucide-react"
 import type { ProjectCategoryTemplate, DebtCategory, PaymentProject } from "@shared/schema"
 import { useDocumentTitle } from "@/hooks/use-document-title"
+import { BackToTop } from "@/components/back-to-top"
 
 const templateFormSchema = z.object({
   projectId: z.number(),
@@ -477,6 +478,7 @@ export default function ProjectTemplateManagement() {
           </Form>
         </DialogContent>
       </Dialog>
+      <BackToTop />
     </div>
   )
 }

@@ -30,6 +30,7 @@ import { useDocumentTitle } from "@/hooks/use-document-title"
 import { useCopyAmount } from "@/hooks/use-copy-amount"
 import type { HouseholdExpense } from "@shared/schema/household"
 import type { DebtCategory } from "@shared/schema/category"
+import { BackToTop } from "@/components/back-to-top"
 
 // API 回應型別定義
 interface MonthlyBudgetResponse {
@@ -533,6 +534,7 @@ export default function HouseholdBudget() {
           </div>
         </CardContent>
       </Card>
+      <BackToTop />
     </div>
   )
 }

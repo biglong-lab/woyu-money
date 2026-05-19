@@ -35,6 +35,7 @@ import {
 // 型別
 import type { BudgetPlan, BudgetItem, Project, Category } from "@/components/project-budget-types"
 import { useDocumentTitle } from "@/hooks/use-document-title"
+import { BackToTop } from "@/components/back-to-top"
 
 // 預算計劃摘要 API 回傳型別
 interface PaymentTypeStat {
@@ -629,6 +630,7 @@ export default function ProjectBudgetManagement() {
         onClose={() => setConvertItem(null)}
         onConfirm={(id) => convertItemMutation.mutate(id)}
       />
+      <BackToTop />
     </div>
   )
 }

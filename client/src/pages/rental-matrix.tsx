@@ -21,6 +21,7 @@ import { formatNT, friendlyApiError } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 import { useCopyAmount } from "@/hooks/use-copy-amount"
 import { useDocumentTitle } from "@/hooks/use-document-title"
+import { BackToTop } from "@/components/back-to-top"
 
 type CellStatus = "paid" | "partial" | "unpaid" | "upcoming" | "out_of_contract"
 
@@ -561,6 +562,7 @@ export default function RentalMatrixPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <BackToTop />
     </div>
   )
 }

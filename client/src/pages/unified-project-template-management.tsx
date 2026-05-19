@@ -53,6 +53,7 @@ import type {
   FixedCategorySubOption,
 } from "@shared/schema"
 import { useDocumentTitle } from "@/hooks/use-document-title"
+import { BackToTop } from "@/components/back-to-top"
 
 const templateFormSchema = z.object({
   projectId: z.number(),
@@ -548,6 +549,7 @@ export default function UnifiedProjectTemplateManagement() {
           </Form>
         </DialogContent>
       </Dialog>
+      <BackToTop />
     </div>
   )
 }
