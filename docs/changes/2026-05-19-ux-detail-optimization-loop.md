@@ -95,6 +95,27 @@
 
 最後 2 處 scenario-simulator confirm（覆寫場景 / 刪除場景）改用 commitSaveScenario helper 拆分流程、加 overwriteTarget / deleteTarget state + 2 個 AlertDialog
 
+### Phase 12（commit `026dd50` ~ `78e1085`）— ✅ 細節打磨（9 個 commit）
+
+最後一波細節優化、所有 commit 集中在共用元件與高頻頁面：
+
+- **BackToTop 視覺升級**（`026dd50`）：加 SVG 滾動進度環（0~100% 平滑動畫、aria-label 含百分比）
+- **command-palette 擴增**：
+  - 加「清除最近訪問紀錄」按鈕（`4dfd885`）
+  - 加快捷鍵說明 footer（↑↓/Enter/Esc + /N/P、`c3dda8a`）
+  - 標示當前頁「您正在此頁」徽章（`804ead2`）
+- **scenario-simulator UX 升級**：
+  - 場景顯示 createdAt 短日期（`4dfd885`）
+  - 場景按時間排序最新在前（`c3dda8a`）
+  - 場景名稱字數計數器（25 字 amber 警示、`3c54e37`）
+  - 模板覆寫加「重置模板」按鈕（只在 dirty 時顯示、`78e1085`）
+- **金額可複製按鈕**：
+  - /receipt-match-helper 候選項（`b46a467`）
+  - /cash-allocation ItemCard 金額（`3b07446`）
+- **觸覺回饋**：BackToTop 點擊 navigator.vibrate(10)（`804ead2`）
+
+全部用既有 hooks（useCopyAmount）、保持一致 UX 模式。
+
 ### Phase 10（commit `e0536f8` ~ `d869c61`）— ✅ BackToTop 全站擴散完成
 
 從 Phase 1 的 3 頁、擴散至 **35 個 500 行+ 長頁面**（覆蓋率 **100%**）：

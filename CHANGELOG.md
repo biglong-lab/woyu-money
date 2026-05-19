@@ -8,7 +8,7 @@
 
 ## [1.0.5] - 2026-05-19
 
-### 改善 — UX 細部優化連續 loop（11 phase、28 commit）
+### 改善 — UX 細部優化連續 loop（12 phase、38 commit）
 
 **Phase 1-5 (`c7a7a61` ~ `7ca2d46`) — 元件 / 功能**
 - **共用 BackToTop 按鈕**：滾動 400px+ 顯示、右下浮動、套用至 dashboard / forecast / scenario
@@ -36,7 +36,14 @@
 - 純 main 元件用 batch script、含 helper functions 手動處理
 - 涵蓋：儀表板 / 列表頁 / 管理頁 / 報表頁 / 設定頁
 
-**Phase 11 (`9a9dff1` ~ next) — 🎯 confirm() → AlertDialog 改造（100%）**
+**Phase 12 (`026dd50` ~ `78e1085`) — ✨ 細節打磨（9 commit）**
+- BackToTop 加滾動進度環（SVG 0~100% 平滑動畫）+ 觸覺回饋
+- command-palette：清除最近訪問、快捷鍵 footer、當前頁徽章
+- scenario：場景顯示日期、按時間排序、字數計數、重置模板按鈕
+- 金額可複製按鈕：/receipt-match-helper、/cash-allocation
+- 全部基於既有 hooks（useCopyAmount）、一致 UX 模式
+
+**Phase 11 (`9a9dff1` ~ `8316879`) — 🎯 confirm() → AlertDialog 改造（100%）**
 - 將 **18 處** `window.confirm()` 全數替換為 Radix AlertDialog（覆蓋率 **100%**、18/18）
 - Pages 改造 12 處 + Components 改造 6 處
 - 統一模式：`setDeleteTarget` state + AlertDialog + 紅色 destructive 樣式
@@ -49,10 +56,11 @@
 - dashboard YTD 加 project→company mapping（徹底支援單館切換）
 - /scenario-simulator 比較模式（對比 2 個場景）
 
-### Commit 範圍（28 commits、跨 28 輪 dynamic loop）
+### Commit 範圍（38 commits、跨 38 輪 dynamic loop）
 - Phase 1-9：`c7a7a61` → `5646506` → `59e92f4` → `c204a6a` → `7ca2d46` → `c6d2856` → `1af3323` → `95f376c` → `a3231a1` → `c9ec014` → `e3b2fec` → `79b2ac2` → `a31df19` → `5694d93`
 - Phase 10：`e0536f8` → `5a90da1` → `bdbb7af` → `5f251c2` → `d869c61` → `47b0e79`
-- Phase 11：`9a9dff1` → `eb71934` → `8172790` → `be6d8b9` → `81d2416` → `2e495b1` → `061a920`
+- Phase 11：`9a9dff1` → `eb71934` → `8172790` → `be6d8b9` → `81d2416` → `2e495b1` → `061a920` → `8316879`
+- Phase 12：`026dd50` → `4dfd885` → `c3dda8a` → `804ead2` → `3c54e37` → `b46a467` → `3b07446` → `78e1085`
 
 ---
 
