@@ -11,6 +11,16 @@ import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
@@ -62,6 +72,7 @@ export default function AccountSettings() {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false)
   const [showNewPassword, setShowNewPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [lineUnlinkDialogOpen, setLineUnlinkDialogOpen] = useState(false)
 
   // Profile update form
   const profileForm = useForm<ProfileUpdateData>({
@@ -161,9 +172,12 @@ export default function AccountSettings() {
   }
 
   const handleLineUnlink = () => {
-    if (confirm("確定要解綁LINE帳號嗎？解綁後您將無法使用LINE登入。")) {
-      lineUnlinkMutation.mutate()
-    }
+    setLineUnlinkDialogOpen(true)
+  }
+
+  const confirmLineUnlink = () => {
+    setLineUnlinkDialogOpen(false)
+    lineUnlinkMutation.mutate()
   }
 
   if (!user) {
@@ -447,6 +461,28 @@ export default function AccountSettings() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* LINE 解綁確認 */}
+      <AlertDialog open={lineUnlinkDialogOpen} onOpenChange={setLineUnlinkDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>確定解綁 LINE 帳號？</AlertDialogTitle>
+            <AlertDialogDescription>
+              解綁後您將無法使用 LINE 登入此系統。 若已綁定其他登入方式（如帳密 /
+              Email）、仍可繼續使用。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmLineUnlink}
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+            >
+              確認解綁
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

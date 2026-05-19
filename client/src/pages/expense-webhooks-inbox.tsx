@@ -52,6 +52,16 @@ import { useDocumentTitle } from "@/hooks/use-document-title"
 import { EmptyState } from "@/components/ui/empty-state"
 import type { PaymentProject } from "@shared/schema"
 import { BackToTop } from "@/components/back-to-top"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 interface ExpenseWebhook {
   id: number
@@ -121,6 +131,7 @@ export default function ExpenseWebhooksInbox() {
     webhook?: ExpenseWebhook
   } | null>(null)
   const [rejectDialog, setRejectDialog] = useState<{ ids: number[] } | null>(null)
+  const [rejectSingleId, setRejectSingleId] = useState<number | null>(null)
 
   // 搜尋與篩選
   const [search, setSearch] = useState("")
@@ -657,11 +668,7 @@ export default function ExpenseWebhooksInbox() {
                 setSelectedIds(next)
               }}
               onConfirm={() => setConfirmDialog({ mode: "single", webhook: w })}
-              onReject={() => {
-                if (confirm("確定拒絕這筆帳單？拒絕後不會建立付款項目。")) {
-                  rejectMutation.mutate({ id: w.id })
-                }
-              }}
+              onReject={() => setRejectSingleId(w.id)}
             />
           ))}
         </div>
@@ -697,6 +704,35 @@ export default function ExpenseWebhooksInbox() {
           }
         />
       )}
+
+      {/* 拒絕單筆帳單確認 */}
+      <AlertDialog
+        open={rejectSingleId !== null}
+        onOpenChange={(open) => !open && setRejectSingleId(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>確定拒絕這筆帳單？</AlertDialogTitle>
+            <AlertDialogDescription>
+              拒絕後不會建立付款項目、可在「已拒絕」分頁查看歷史紀錄。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (rejectSingleId !== null) {
+                  rejectMutation.mutate({ id: rejectSingleId })
+                  setRejectSingleId(null)
+                }
+              }}
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+            >
+              確認拒絕
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <BackToTop />
     </div>
