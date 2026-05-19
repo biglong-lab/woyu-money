@@ -16,32 +16,40 @@ router.get(
     const now = new Date()
     const yearStart = `${now.getFullYear()}-01-01`
     const today = now.toISOString().slice(0, 10)
+    // 月度上限抓到「本月後 6 個月」止、避免把太遠未來合約全列進來，又能涵蓋
+    // template_scheduled 占位 + 分期付款（如 12 期租金）的未來幾個月預定
+    const lookaheadEnd = new Date(now.getFullYear(), now.getMonth() + 7, 0)
+      .toISOString()
+      .slice(0, 10)
 
     // 月度明細
     //
+    // 區分「actual（實際發生、start_date <= today）」與「planned（預定未到日、start_date > today）」
+    // - 走勢圖可堆疊顯示
+    // - YTD totals 只算 actual（避免未到日的預定膨脹數字）
     // expense 計算合併兩個來源、避免 payment_items 內薪資項與 monthly_hr_costs 不一致：
     // 1. payment_items 排除「人力成本」專案下的所有薪資 / 勞健保 / 勞退項目
-    //    + 排除 item_name LIKE '%薪資%' OR '%薪水%' OR '%勞保%' OR '%勞退%' OR '%健保%'
     // 2. monthly_hr_costs.total_cost 月度合計（HR 的 source of truth、完整 8 員工）
     const rows = await db.execute(sql`
-      WITH income AS (
-        SELECT TO_CHAR(start_date, 'YYYY-MM') AS m, SUM(total_amount::numeric)::bigint AS amt
+      WITH income_split AS (
+        SELECT TO_CHAR(start_date, 'YYYY-MM') AS m,
+               SUM(CASE WHEN start_date <= ${today}::date THEN total_amount::numeric ELSE 0 END)::bigint AS actual,
+               SUM(CASE WHEN start_date >  ${today}::date THEN total_amount::numeric ELSE 0 END)::bigint AS planned
         FROM payment_items
         WHERE item_type = 'income' AND NOT is_deleted
-          AND start_date >= ${yearStart}::date AND start_date <= ${today}::date
+          AND start_date >= ${yearStart}::date AND start_date <= ${lookaheadEnd}::date
         GROUP BY 1
       ),
-      expense_non_hr AS (
+      expense_non_hr_split AS (
         SELECT
           TO_CHAR(pi.start_date, 'YYYY-MM') AS m,
-          SUM(pi.total_amount::numeric)::bigint AS amt
+          SUM(CASE WHEN pi.start_date <= ${today}::date THEN pi.total_amount::numeric ELSE 0 END)::bigint AS actual,
+          SUM(CASE WHEN pi.start_date >  ${today}::date THEN pi.total_amount::numeric ELSE 0 END)::bigint AS planned
         FROM payment_items pi
         LEFT JOIN payment_projects pp ON pi.project_id = pp.id
         WHERE pi.item_type IN ('project', 'home') AND NOT pi.is_deleted
-          AND pi.start_date >= ${yearStart}::date AND pi.start_date <= ${today}::date
-          -- 排除「人力成本」專案下的所有項目（避免與 monthly_hr_costs 重複）
+          AND pi.start_date >= ${yearStart}::date AND pi.start_date <= ${lookaheadEnd}::date
           AND (pp.project_name IS NULL OR pp.project_name != '人力成本')
-          -- 排除其他專案下、看起來是薪資 / 勞健保的項目（房務/客務薪資）
           AND pi.item_name NOT LIKE '%薪資%'
           AND pi.item_name NOT LIKE '%薪水%'
           AND pi.item_name NOT LIKE '%勞保%'
@@ -49,11 +57,12 @@ router.get(
           AND pi.item_name NOT LIKE '%健保%'
           AND pi.item_name NOT LIKE '%房務薪%'
           AND pi.item_name NOT LIKE '%客務薪%'
-          -- 排除「自動補建」的預估占位項（不是實際發生、避免重複估算）
           AND (pi.notes IS NULL OR pi.notes NOT LIKE '%自動補建%')
         GROUP BY 1
       ),
       expense_hr AS (
+        -- HR 不分 actual/planned（monthly_hr_costs 是每月結算事實、含當月全部）
+        -- 但本月超過今天的 HR 也視為 actual（已發生事實、是月結結果）
         SELECT
           (year || '-' || LPAD(month::text, 2, '0')) AS m,
           SUM(total_cost::numeric)::bigint AS amt
@@ -61,42 +70,64 @@ router.get(
         WHERE year >= EXTRACT(year FROM ${yearStart}::date)
         GROUP BY 1
       ),
-      expense AS (
+      expense_split AS (
         SELECT
           COALESCE(n.m, h.m) AS m,
-          (COALESCE(n.amt, 0) + COALESCE(h.amt, 0))::bigint AS amt
-        FROM expense_non_hr n
+          (COALESCE(n.actual, 0) + COALESCE(h.amt, 0))::bigint AS actual,
+          COALESCE(n.planned, 0)::bigint AS planned
+        FROM expense_non_hr_split n
         FULL OUTER JOIN expense_hr h ON n.m = h.m
       )
       SELECT COALESCE(i.m, e.m) AS month,
-             COALESCE(i.amt, 0)::int AS income,
-             COALESCE(e.amt, 0)::int AS expense,
-             (COALESCE(i.amt, 0) - COALESCE(e.amt, 0))::int AS profit
-      FROM income i FULL OUTER JOIN expense e ON i.m = e.m
+             COALESCE(i.actual,  0)::int AS income_actual,
+             COALESCE(i.planned, 0)::int AS income_planned,
+             COALESCE(e.actual,  0)::int AS expense_actual,
+             COALESCE(e.planned, 0)::int AS expense_planned,
+             (COALESCE(i.actual, 0) - COALESCE(e.actual, 0))::int AS profit_actual,
+             ((COALESCE(i.actual, 0) + COALESCE(i.planned, 0)) -
+              (COALESCE(e.actual, 0) + COALESCE(e.planned, 0)))::int AS profit_total
+      FROM income_split i FULL OUTER JOIN expense_split e ON i.m = e.m
       ORDER BY month
     `)
 
-    const months = (
-      rows as unknown as {
-        rows: Array<{ month: string; income: number; expense: number; profit: number }>
-      }
-    ).rows
+    interface MonthRow {
+      month: string
+      income_actual: number
+      income_planned: number
+      expense_actual: number
+      expense_planned: number
+      profit_actual: number
+      profit_total: number
+    }
+    const monthsRaw = (rows as unknown as { rows: MonthRow[] }).rows
+    // 向後相容：保留 income/expense/profit 欄位（= actual + planned）
+    const months = monthsRaw.map((m) => ({
+      month: m.month,
+      income: m.income_actual + m.income_planned,
+      expense: m.expense_actual + m.expense_planned,
+      profit: m.profit_total,
+      incomeActual: m.income_actual,
+      incomePlanned: m.income_planned,
+      expenseActual: m.expense_actual,
+      expensePlanned: m.expense_planned,
+      profitActual: m.profit_actual,
+    }))
 
-    // 每月分類明細（expense 按分類、income 按專案；HR 從 monthly_hr_costs 顯示為「人事成本（HR）」）
+    // 每月分類明細，分 actual / planned
     const breakdownRows = await db.execute(sql`
       WITH expense_by_cat AS (
         SELECT
           TO_CHAR(pi.start_date, 'YYYY-MM') AS month,
           COALESCE(dc.category_name, fc.category_name, '(未分類)') AS category,
-          SUM(pi.total_amount::numeric)::bigint AS amt,
+          SUM(CASE WHEN pi.start_date <= ${today}::date THEN pi.total_amount::numeric ELSE 0 END)::bigint AS actual,
+          SUM(CASE WHEN pi.start_date >  ${today}::date THEN pi.total_amount::numeric ELSE 0 END)::bigint AS planned,
           COUNT(*)::int AS n
         FROM payment_items pi
         LEFT JOIN debt_categories dc ON pi.category_id = dc.id
         LEFT JOIN fixed_categories fc ON pi.fixed_category_id = fc.id
         LEFT JOIN payment_projects pp ON pi.project_id = pp.id
         WHERE pi.item_type IN ('project', 'home') AND NOT pi.is_deleted
-          AND pi.start_date >= ${yearStart}::date AND pi.start_date <= ${today}::date
-          -- 排除「人力成本」項目（由 monthly_hr_costs 統一顯示）
+          AND pi.start_date >= ${yearStart}::date AND pi.start_date <= ${lookaheadEnd}::date
           AND (pp.project_name IS NULL OR pp.project_name != '人力成本')
           AND pi.item_name NOT LIKE '%薪資%'
           AND pi.item_name NOT LIKE '%薪水%'
@@ -105,7 +136,6 @@ router.get(
           AND pi.item_name NOT LIKE '%健保%'
           AND pi.item_name NOT LIKE '%房務薪%'
           AND pi.item_name NOT LIKE '%客務薪%'
-          -- 排除「自動補建」占位項
           AND (pi.notes IS NULL OR pi.notes NOT LIKE '%自動補建%')
         GROUP BY 1, 2
       ),
@@ -113,7 +143,8 @@ router.get(
         SELECT
           (year || '-' || LPAD(month::text, 2, '0')) AS month,
           '人事成本（HR）' AS category,
-          SUM(total_cost::numeric)::bigint AS amt,
+          SUM(total_cost::numeric)::bigint AS actual,
+          0::bigint AS planned,
           COUNT(*)::int AS n
         FROM monthly_hr_costs
         WHERE year >= EXTRACT(year FROM ${yearStart}::date)
@@ -123,48 +154,77 @@ router.get(
         SELECT
           TO_CHAR(pi.start_date, 'YYYY-MM') AS month,
           COALESCE(pp.project_name, '(未指定)') AS category,
-          SUM(pi.total_amount::numeric)::bigint AS amt,
+          SUM(CASE WHEN pi.start_date <= ${today}::date THEN pi.total_amount::numeric ELSE 0 END)::bigint AS actual,
+          SUM(CASE WHEN pi.start_date >  ${today}::date THEN pi.total_amount::numeric ELSE 0 END)::bigint AS planned,
           COUNT(*)::int AS n
         FROM payment_items pi
         LEFT JOIN payment_projects pp ON pi.project_id = pp.id
         WHERE pi.item_type = 'income' AND NOT pi.is_deleted
-          AND pi.start_date >= ${yearStart}::date AND pi.start_date <= ${today}::date
+          AND pi.start_date >= ${yearStart}::date AND pi.start_date <= ${lookaheadEnd}::date
         GROUP BY 1, 2
       )
-      SELECT 'expense' AS kind, month, category, amt::bigint, n FROM expense_by_cat
+      SELECT 'expense' AS kind, month, category, actual, planned, n FROM expense_by_cat
       UNION ALL
-      SELECT 'expense' AS kind, month, category, amt, n FROM hr_by_month
+      SELECT 'expense' AS kind, month, category, actual, planned, n FROM hr_by_month
       UNION ALL
-      SELECT 'income' AS kind, month, category, amt::bigint, n FROM income_by_proj
-      ORDER BY kind, month, amt DESC
+      SELECT 'income' AS kind, month, category, actual, planned, n FROM income_by_proj
+      ORDER BY kind, month, (actual + planned) DESC
     `)
 
-    const breakdownArr = (
-      breakdownRows as unknown as {
-        rows: Array<{ kind: string; month: string; category: string; amt: number; n: number }>
-      }
-    ).rows
+    interface BdRow {
+      kind: string
+      month: string
+      category: string
+      actual: number
+      planned: number
+      n: number
+    }
+    const breakdownArr = (breakdownRows as unknown as { rows: BdRow[] }).rows
 
-    // 按 month 群組 breakdown
     const breakdown: Record<
       string,
       {
-        expense: Array<{ category: string; amount: number; count: number }>
-        income: Array<{ category: string; amount: number; count: number }>
+        expense: Array<{
+          category: string
+          amount: number
+          actual: number
+          planned: number
+          count: number
+        }>
+        income: Array<{
+          category: string
+          amount: number
+          actual: number
+          planned: number
+          count: number
+        }>
       }
     > = {}
     for (const r of breakdownArr) {
       if (!breakdown[r.month]) breakdown[r.month] = { expense: [], income: [] }
       const arr = r.kind === "expense" ? breakdown[r.month].expense : breakdown[r.month].income
-      arr.push({ category: r.category, amount: Number(r.amt), count: r.n })
+      const actual = Number(r.actual)
+      const planned = Number(r.planned)
+      arr.push({
+        category: r.category,
+        amount: actual + planned, // 向後相容
+        actual,
+        planned,
+        count: r.n,
+      })
     }
 
+    // YTD totals 只算 actual + 只算到本月（不含未到日 / 未來月的 planned）
+    const currentMonth = today.slice(0, 7)
     const totals = months.reduce(
-      (acc, m) => ({
-        income: acc.income + (m.income || 0),
-        expense: acc.expense + (m.expense || 0),
-        profit: acc.profit + (m.profit || 0),
-      }),
+      (acc, m) => {
+        if (m.month > currentMonth) return acc
+        return {
+          income: acc.income + m.incomeActual,
+          expense: acc.expense + m.expenseActual,
+          profit: acc.profit + m.profitActual,
+        }
+      },
       { income: 0, expense: 0, profit: 0 }
     )
 
