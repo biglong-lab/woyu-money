@@ -40,6 +40,16 @@ import { z } from "zod"
 import { useToast } from "@/hooks/use-toast"
 import type { DebtCategory } from "@/../../shared/schema/category"
 import { BackToTop } from "@/components/back-to-top"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 const categorySchema = z.object({
   categoryName: z.string().min(1, "分類名稱為必填"),
@@ -62,6 +72,7 @@ export default function CategoryManagement() {
   const [editingCategory, setEditingCategory] = useState<DebtCategory | null>(null)
   const [filterType, setFilterType] = useState<"all" | "project" | "household" | "template">("all")
   const [selectedTab, setSelectedTab] = useState<"list" | "templates">("list")
+  const [deleteTarget, setDeleteTarget] = useState<DebtCategory | null>(null)
   const queryClient = useQueryClient()
   const { toast } = useToast()
 
@@ -191,8 +202,13 @@ export default function CategoryManagement() {
   }
 
   const handleDelete = (category: DebtCategory) => {
-    if (confirm(`確定要刪除分類「${category.categoryName}」嗎？`)) {
-      deleteCategoryMutation.mutate(category)
+    setDeleteTarget(category)
+  }
+
+  const confirmDelete = () => {
+    if (deleteTarget) {
+      deleteCategoryMutation.mutate(deleteTarget)
+      setDeleteTarget(null)
     }
   }
 
@@ -567,6 +583,31 @@ export default function CategoryManagement() {
           </Form>
         </DialogContent>
       </Dialog>
+      {/* 刪除分類確認 */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>確定刪除此分類？</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteTarget && (
+                <>
+                  將刪除分類「<strong>{deleteTarget.categoryName}</strong>」、此操作無法復原。
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+            >
+              確認刪除
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <BackToTop />
     </div>
   )
