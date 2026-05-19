@@ -61,6 +61,7 @@ import {
 import { useToast } from "@/hooks/use-toast"
 import { apiRequest, queryClient } from "@/lib/queryClient"
 import { useDocumentTitle } from "@/hooks/use-document-title"
+import { BackToTop } from "@/components/back-to-top"
 
 // ─────────────────────────────────────────────
 // Types
@@ -551,6 +552,8 @@ export default function CategoriesUnifiedPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <BackToTop />
     </div>
   )
 }

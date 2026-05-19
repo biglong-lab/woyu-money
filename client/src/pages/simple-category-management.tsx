@@ -35,6 +35,7 @@ import { useToast } from "@/hooks/use-toast"
 import { apiRequest, queryClient } from "@/lib/queryClient"
 import type { DebtCategory, PaymentProject, FixedCategory } from "@shared/schema"
 import { useDocumentTitle } from "@/hooks/use-document-title"
+import { BackToTop } from "@/components/back-to-top"
 
 type Category = {
   id: number
@@ -662,6 +663,7 @@ export default function SimpleCategoryManagement() {
           </Form>
         </DialogContent>
       </Dialog>
+      <BackToTop />
     </div>
   )
 }

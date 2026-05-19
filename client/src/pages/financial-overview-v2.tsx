@@ -46,6 +46,7 @@ import {
   HelpCircle,
 } from "lucide-react"
 import { formatNT } from "@/lib/utils"
+import { BackToTop } from "@/components/back-to-top"
 
 // ─────────────────────────────────────────────
 // 型別
@@ -323,6 +324,8 @@ export default function FinancialOverviewV2() {
           </div>
         </CardContent>
       </Card>
+
+      <BackToTop />
     </div>
   )
 }

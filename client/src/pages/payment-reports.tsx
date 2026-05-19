@@ -46,6 +46,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { apiRequest } from "@/lib/queryClient"
 import type { PaymentItem, PaymentProject, DebtCategory } from "@shared/schema"
 import { useDocumentTitle } from "@/hooks/use-document-title"
+import { BackToTop } from "@/components/back-to-top"
 
 // API 回傳的付款項目（含 join 欄位）
 interface PaymentItemWithDetails extends PaymentItem {
@@ -703,6 +704,7 @@ export default function PaymentReports() {
           </div>
         </CardContent>
       </Card>
+      <BackToTop />
     </div>
   )
 }
