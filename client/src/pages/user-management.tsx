@@ -20,6 +20,16 @@ import {
   DialogDescription,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Checkbox } from "@/components/ui/checkbox"
 import { useToast } from "@/hooks/use-toast"
 import { apiRequest } from "@/lib/queryClient"
@@ -116,6 +126,8 @@ export default function UserManagement() {
   })
   const [newPassword, setNewPassword] = useState("")
   const [userPermissions, setUserPermissions] = useState<MenuPermissions>({})
+  // confirm() → AlertDialog 改造：delete target
+  const [deleteTarget, setDeleteTarget] = useState<User | null>(null)
 
   const {
     data: users,
@@ -321,9 +333,14 @@ export default function UserManagement() {
     })
   }
 
-  const handleDeleteUser = (userId: number) => {
-    if (confirm("確定要刪除此用戶嗎？")) {
-      deleteUserMutation.mutate(userId)
+  const handleDeleteUser = (user: User) => {
+    setDeleteTarget(user)
+  }
+
+  const confirmDeleteUser = () => {
+    if (deleteTarget) {
+      deleteUserMutation.mutate(deleteTarget.id)
+      setDeleteTarget(null)
     }
   }
 
@@ -486,7 +503,7 @@ export default function UserManagement() {
                     <Settings className="w-4 h-4" />
                   </Button>
                   {user.id !== 1 && (
-                    <Button variant="outline" size="sm" onClick={() => handleDeleteUser(user.id)}>
+                    <Button variant="outline" size="sm" onClick={() => handleDeleteUser(user)}>
                       <Trash2 className="w-4 h-4" />
                     </Button>
                   )}
@@ -646,6 +663,33 @@ export default function UserManagement() {
           </div>
         </DialogContent>
       </Dialog>
+      {/* 刪除用戶確認 */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>確定刪除此用戶？</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteTarget && (
+                <>
+                  將刪除用戶「
+                  <strong>{deleteTarget.username}</strong>」
+                  {deleteTarget.fullName ? `（${deleteTarget.fullName}）` : ""}、此操作無法復原。
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteUser}
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+            >
+              確認刪除
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <BackToTop />
     </div>
   )
