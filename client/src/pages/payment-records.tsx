@@ -40,6 +40,7 @@ import { useCopyAmount } from "@/hooks/use-copy-amount"
 import { formatNT } from "@/lib/utils"
 import { useDocumentTitle } from "@/hooks/use-document-title"
 import type { PaymentItem } from "@shared/schema"
+import { BackToTop } from "@/components/back-to-top"
 
 // 專案篩選選項
 interface ProjectOption {
@@ -910,6 +911,7 @@ export default function PaymentRecords() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <BackToTop />
     </div>
   )
 }

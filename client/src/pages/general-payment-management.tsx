@@ -19,6 +19,7 @@ import { GeneralPaymentEditDialog } from "@/components/general-payment-edit-dial
 import { GeneralPaymentPaymentDialog } from "@/components/general-payment-payment-dialog"
 import { GeneralPaymentDetailDialog } from "@/components/general-payment-detail-dialog"
 import { GeneralPaymentDeleteDialog } from "@/components/general-payment-delete-dialog"
+import { BackToTop } from "@/components/back-to-top"
 
 // 型別
 import type {
@@ -934,6 +935,7 @@ export default function GeneralPaymentManagement() {
 
       {/* 批量導入精靈 */}
       <BatchImportWizard isOpen={isBatchImportOpen} onClose={() => setIsBatchImportOpen(false)} />
+      <BackToTop />
     </div>
   )
 }
