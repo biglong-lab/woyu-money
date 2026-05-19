@@ -198,10 +198,31 @@ export default function RevenueForecastPage() {
       ),
     onSuccess: (r) => {
       toast({
-        title: r.ok ? "✅ 已拍快照" : "失敗",
+        title: r.ok ? "✅ 已拍 PM 快照" : "失敗",
         description: r.ok
           ? `新增 ${r.inserted} 筆、跳過 ${r.skipped} 筆`
           : "請確認 PM_DATABASE_URL 設定",
+        variant: r.ok ? "default" : "destructive",
+      })
+      queryClient.invalidateQueries({
+        predicate: (q) => String(q.queryKey[0]).startsWith("/api/forecast"),
+      })
+    },
+  })
+
+  const pmsSyncMutation = useMutation({
+    mutationFn: () =>
+      apiRequest<{ ok: boolean; inserted: number; skipped: number; error?: string }>(
+        "POST",
+        "/api/forecast/pms-sync",
+        { sinceDays: 14 }
+      ),
+    onSuccess: (r) => {
+      toast({
+        title: r.ok ? "✅ 已同步 PMS" : "失敗",
+        description: r.ok
+          ? `新增 ${r.inserted} 筆、更新 ${r.skipped} 筆`
+          : r.error || "請確認 PMS_DATABASE_URL 設定",
         variant: r.ok ? "default" : "destructive",
       })
       queryClient.invalidateQueries({
@@ -343,7 +364,18 @@ export default function RevenueForecastPage() {
           <RefreshCw
             className={`h-4 w-4 mr-1 ${captureMutation.isPending ? "animate-spin" : ""}`}
           />
-          立即拍快照
+          PM 拍快照
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => pmsSyncMutation.mutate()}
+          disabled={pmsSyncMutation.isPending}
+        >
+          <RefreshCw
+            className={`h-4 w-4 mr-1 ${pmsSyncMutation.isPending ? "animate-spin" : ""}`}
+          />
+          PMS 同步
         </Button>
       </div>
 
