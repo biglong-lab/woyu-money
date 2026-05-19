@@ -75,7 +75,7 @@ interface AddExpensePayload {
 }
 
 interface SetBudgetPayload {
-  amount: number
+  budgetAmount: number
   month: string
 }
 
@@ -133,7 +133,7 @@ export default function HouseholdBudget() {
         amount: parseFloat(data.amount),
         categoryId: parseInt(data.categoryId),
       }
-      return await apiRequest("/api/household/expenses", "POST", formattedData)
+      return await apiRequest("POST", "/api/household/expenses", formattedData)
     },
     onSuccess: () => {
       toast({
@@ -145,10 +145,10 @@ export default function HouseholdBudget() {
       setShowQuickAdd(false)
       quickAddForm.reset()
     },
-    onError: () => {
+    onError: (e: Error) => {
       toast({
         title: "記帳失敗",
-        description: "請重試",
+        description: e.message || "請重試",
         variant: "destructive",
       })
     },
@@ -157,11 +157,14 @@ export default function HouseholdBudget() {
   // 設定預算
   const setBudgetMutation = useMutation({
     mutationFn: async (data: BudgetFormData) => {
+      // 用本地時區、避免 toISOString 在 UTC+8 凌晨把 5/1 變 4/30
+      const now = new Date()
+      const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
       const budgetData: SetBudgetPayload = {
-        amount: parseFloat(data.monthlyBudget),
-        month: new Date().toISOString().slice(0, 7), // YYYY-MM
+        budgetAmount: parseFloat(data.monthlyBudget),
+        month: currentMonth,
       }
-      return await apiRequest("/api/household/budget", "POST", budgetData)
+      return await apiRequest("POST", "/api/household/budget", budgetData)
     },
     onSuccess: () => {
       toast({
@@ -172,10 +175,10 @@ export default function HouseholdBudget() {
       queryClient.invalidateQueries({ queryKey: ["/api/household/stats"] })
       setShowBudgetSetup(false)
     },
-    onError: () => {
+    onError: (e: Error) => {
       toast({
         title: "設定失敗",
-        description: "請重試",
+        description: e.message || "請重試",
         variant: "destructive",
       })
     },
