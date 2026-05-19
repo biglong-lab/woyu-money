@@ -27,6 +27,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useToast } from "@/hooks/use-toast"
 import { apiRequest } from "@/lib/queryClient"
 import type { DebtCategory } from "@shared/schema"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 const categorySchema = z.object({
   categoryName: z.string().min(1, "分類名稱為必填"),
@@ -45,6 +55,7 @@ export function HouseholdCategoryDialog({ open, onOpenChange }: HouseholdCategor
   const queryClient = useQueryClient()
   const [selectedCategory, setSelectedCategory] = useState<DebtCategory | null>(null)
   const [isEditing, setIsEditing] = useState(false)
+  const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null)
 
   // 獲取家用分類
   const { data: categories = [], isLoading } = useQuery<DebtCategory[]>({
@@ -144,10 +155,19 @@ export function HouseholdCategoryDialog({ open, onOpenChange }: HouseholdCategor
   }
 
   const handleDelete = (id: number) => {
-    if (confirm("確定要刪除這個分類嗎？\n刪除後無法復原")) {
-      deleteCategoryMutation.mutate(id)
+    setDeleteTargetId(id)
+  }
+
+  const confirmDelete = () => {
+    if (deleteTargetId !== null) {
+      deleteCategoryMutation.mutate(deleteTargetId)
+      setDeleteTargetId(null)
     }
   }
+
+  const deleteCategoryName = categories.find(
+    (c: DebtCategory) => c.id === deleteTargetId
+  )?.categoryName
 
   const handleAddNew = () => {
     setSelectedCategory(null)
@@ -287,6 +307,36 @@ export function HouseholdCategoryDialog({ open, onOpenChange }: HouseholdCategor
           </div>
         </div>
       </DialogContent>
+
+      {/* 刪除分類確認 */}
+      <AlertDialog
+        open={deleteTargetId !== null}
+        onOpenChange={(open) => !open && setDeleteTargetId(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>確定刪除此分類？</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteCategoryName ? (
+                <>
+                  將刪除「<strong>{deleteCategoryName}</strong>」、刪除後無法復原。
+                </>
+              ) : (
+                "刪除後無法復原。"
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+            >
+              確認刪除
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   )
 }

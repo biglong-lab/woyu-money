@@ -14,6 +14,16 @@ import { formatNT, friendlyApiError } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 import { useOnlineStatus } from "@/hooks/use-online-status"
 import { useCopyAmount } from "@/hooks/use-copy-amount"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { shareOrCopy } from "@/lib/share-or-copy"
 
 type CellStatus = "paid" | "partial" | "unpaid" | "upcoming" | "out_of_contract"
@@ -51,6 +61,7 @@ export function ActiveRentalsCard() {
   const isOnline = useOnlineStatus()
   const copyAmount = useCopyAmount()
   const [pendingId, setPendingId] = useState<number | null>(null)
+  const [batchMarkPaidOpen, setBatchMarkPaidOpen] = useState(false)
 
   const { data, isLoading } = useQuery<MatrixData>({
     queryKey: [`/api/rental-matrix?year=${year}`],
@@ -102,8 +113,11 @@ export function ActiveRentalsCard() {
   })
 
   const handleBatchMarkPaid = () => {
-    if (!window.confirm(`確定為 ${month} 月所有未付租金標記為已付？\n會自動為每筆租金建立付款記錄`))
-      return
+    setBatchMarkPaidOpen(true)
+  }
+
+  const confirmBatchMarkPaid = () => {
+    setBatchMarkPaidOpen(false)
     batchMarkPaidMutation.mutate()
   }
 
@@ -350,6 +364,22 @@ export function ActiveRentalsCard() {
           )
         })}
       </CardContent>
+
+      {/* 批量標記已付確認 */}
+      <AlertDialog open={batchMarkPaidOpen} onOpenChange={setBatchMarkPaidOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>批量標記 {month} 月租金為已付？</AlertDialogTitle>
+            <AlertDialogDescription>
+              將為「{month} 月」所有未付租金建立付款記錄、操作後可在「付款紀錄」查看。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmBatchMarkPaid}>確認標記</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   )
 }
