@@ -8,7 +8,7 @@
 
 ## [1.0.5] - 2026-05-19
 
-### 改善 — UX 細部優化連續 loop（9 phase、12 commit）
+### 改善 — UX 細部優化連續 loop（11 phase、28 commit）
 
 **Phase 1-5 (`c7a7a61` ~ `7ca2d46`) — 元件 / 功能**
 - **共用 BackToTop 按鈕**：滾動 400px+ 顯示、右下浮動、套用至 dashboard / forecast / scenario
@@ -36,16 +36,23 @@
 - 純 main 元件用 batch script、含 helper functions 手動處理
 - 涵蓋：儀表板 / 列表頁 / 管理頁 / 報表頁 / 設定頁
 
+**Phase 11 (`9a9dff1` ~ `061a920`) — 🎯 confirm() → AlertDialog 改造**
+- 將 17 處 `window.confirm()` 替換為 Radix AlertDialog（覆蓋率 **94%**、17/18）
+- Pages 改造 11 處 + Components 改造 4 處
+- 統一模式：`setDeleteTarget` state + AlertDialog + 紅色 destructive 樣式
+- a11y 提升：Tab/Esc/Enter 鍵盤、aria-modal、具名提示「將刪除 X」、不再阻斷主執行緒
+- 剩 scenario-simulator × 2（純前端覆寫場景、無資料風險、保留 confirm）
+
 完整紀錄：[`docs/changes/2026-05-19-ux-detail-optimization-loop.md`](docs/changes/2026-05-19-ux-detail-optimization-loop.md)
 
 ### 仍待做（follow-up）
 - dashboard YTD 加 project→company mapping（徹底支援單館切換）
 - /scenario-simulator 比較模式（對比 2 個場景）
-- confirm() → AlertDialog 改造（18 處、提升一致性與 a11y）
 
-### Commit 範圍（21 commits、跨 20 輪 loop）
+### Commit 範圍（28 commits、跨 28 輪 dynamic loop）
 - Phase 1-9：`c7a7a61` → `5646506` → `59e92f4` → `c204a6a` → `7ca2d46` → `c6d2856` → `1af3323` → `95f376c` → `a3231a1` → `c9ec014` → `e3b2fec` → `79b2ac2` → `a31df19` → `5694d93`
-- Phase 10：`e0536f8` → `5a90da1` → `bdbb7af` → `5f251c2` → `d869c61`
+- Phase 10：`e0536f8` → `5a90da1` → `bdbb7af` → `5f251c2` → `d869c61` → `47b0e79`
+- Phase 11：`9a9dff1` → `eb71934` → `8172790` → `be6d8b9` → `81d2416` → `2e495b1` → `061a920`
 
 ---
 
