@@ -31,6 +31,7 @@ import { localDateISO, formatNT, friendlyApiError } from "@/lib/utils"
 import { shareOrCopy } from "@/lib/share-or-copy"
 import { useToast } from "@/hooks/use-toast"
 import { useDocumentTitle } from "@/hooks/use-document-title"
+import { useCopyAmount } from "@/hooks/use-copy-amount"
 import { MarkPaidConfirmDialog } from "@/components/mark-paid-confirm-dialog"
 
 const BUDGET_PRESETS = [50000, 100000, 200000, 300000, 500000, 1000000]
@@ -146,6 +147,7 @@ function ItemCard({
   isPending?: boolean
 }) {
   const style = URGENCY_STYLES[item.urgency]
+  const copyAmount = useCopyAmount()
   return (
     <div className={`rounded-lg border-l-4 ${style.border} ${style.bg} p-3 sm:p-4`}>
       <div className="flex items-start justify-between gap-3">
@@ -196,9 +198,16 @@ function ItemCard({
           )}
         </div>
         <div className="text-right shrink-0">
-          <div className="text-lg sm:text-xl font-bold text-gray-900">
-            {formatNT(item.unpaidAmount)}
-          </div>
+          <button
+            type="button"
+            onClick={() => copyAmount(item.unpaidAmount, item.itemName)}
+            className="text-lg sm:text-xl font-bold text-gray-900 hover:text-blue-700 hover:bg-blue-50 px-2 py-0.5 rounded transition group inline-flex items-center gap-1.5"
+            title={`複製金額 ${formatNT(item.unpaidAmount)}（給網銀轉帳用）`}
+            aria-label={`複製金額 ${formatNT(item.unpaidAmount)}`}
+          >
+            <span>{formatNT(item.unpaidAmount)}</span>
+            <Copy className="h-3.5 w-3.5 opacity-0 group-hover:opacity-100 transition-opacity text-blue-500" />
+          </button>
         </div>
       </div>
     </div>
