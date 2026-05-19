@@ -47,6 +47,7 @@ import recurringExpenseTemplatesRoutes from "./recurring-expense-templates"
 import forecastRoutes from "./forecast"
 import lateFeePoliciesRoutes from "./late-fee-policies"
 import dashboardRoutes from "./dashboard"
+import costStructureRoutes from "./cost-structure"
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // 設定認證系統
@@ -143,6 +144,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use(forecastRoutes)
   app.use(lateFeePoliciesRoutes)
   app.use(dashboardRoutes)
+  app.use(costStructureRoutes)
 
   const httpServer = createServer(app)
   return httpServer

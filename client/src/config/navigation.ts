@@ -89,11 +89,19 @@ export const dashboardNavItem: NavItem = {
   description: "YTD + 未來 3 月預估 + 缺口警示一頁看完",
 }
 
+export const costOverviewNavItem: NavItem = {
+  title: "成本結構總覽",
+  href: "/cost-overview",
+  icon: Layers,
+  description: "租金 / 人事 / 週期模板 / 一般單項 四大成本一頁看完",
+}
+
 // 註：/forecast-input 已下架，PMS 系統已自動同步「不定期填入」資料
 // 路由保留可訪問供舊連結，但不顯示在導航
 
 export const decisionNavItems: NavItem[] = [
   dashboardNavItem,
+  costOverviewNavItem,
   forecastNavItem,
   scenarioNavItem,
   {
@@ -491,6 +499,11 @@ export const breadcrumbConfig: Record<string, BreadcrumbItem[]> = {
     { title: "首頁", href: "/" },
     { title: "財務助理" },
     { title: "綜合儀表板" },
+  ],
+  "/cost-overview": [
+    { title: "首頁", href: "/" },
+    { title: "財務助理" },
+    { title: "成本結構總覽" },
   ],
   "/forecast-input": [
     { title: "首頁", href: "/" },
