@@ -203,6 +203,75 @@ export async function listScheduledItems(targetMonth: string) {
 }
 
 /**
+ * 把既有的 payment_item 連結到週期模板（不改 source / 金額 / 狀態）
+ *
+ * 場景：「未分類」抽屜內、使用者把已存在的支付項標記為「這筆是電費模板的本月實際支付」
+ * 動作：
+ *  - 設 recurring_template_id = templateId
+ *  - 補 categoryId / fixedCategoryId（若 payment_item 沒設、套用 template 的）
+ *  - 補 projectId（同上）
+ *  - notes 加標記「📎 已連結模板 #N（templateName）」
+ *
+ * @param markPaid 是否同時把 status 改成 paid + paidAmount = totalAmount
+ */
+export async function linkItemToTemplate(params: {
+  itemId: number
+  templateId: number
+  markPaid?: boolean
+}): Promise<{ ok: true; templateName: string; itemId: number }> {
+  const { itemId, templateId, markPaid } = params
+
+  const [tpl] = await db
+    .select()
+    .from(recurringExpenseTemplates)
+    .where(eq(recurringExpenseTemplates.id, templateId))
+  if (!tpl) throw new Error("模板不存在")
+
+  const [item] = await db
+    .select({
+      id: paymentItems.id,
+      notes: paymentItems.notes,
+      categoryId: paymentItems.categoryId,
+      fixedCategoryId: paymentItems.fixedCategoryId,
+      projectId: paymentItems.projectId,
+      totalAmount: paymentItems.totalAmount,
+      isDeleted: paymentItems.isDeleted,
+    })
+    .from(paymentItems)
+    .where(eq(paymentItems.id, itemId))
+  if (!item) throw new Error("付款項目不存在")
+  if (item.isDeleted) throw new Error("付款項目已刪除")
+
+  const stamp = new Date().toISOString().slice(0, 10)
+  const linkNote = `📎 已連結模板 #${templateId}（${tpl.templateName}、${stamp}）`
+
+  const newNotes = item.notes
+    ? item.notes.includes(`#${templateId}`)
+      ? item.notes
+      : `${linkNote}\n${item.notes}`
+    : linkNote
+
+  const update: Record<string, unknown> = {
+    recurringTemplateId: templateId,
+    notes: newNotes,
+    updatedAt: new Date(),
+  }
+  if (item.categoryId === null && tpl.categoryId) update.categoryId = tpl.categoryId
+  if (item.fixedCategoryId === null && tpl.fixedCategoryId)
+    update.fixedCategoryId = tpl.fixedCategoryId
+  if (item.projectId === null && tpl.projectId) update.projectId = tpl.projectId
+
+  if (markPaid) {
+    update.status = "paid"
+    update.paidAmount = item.totalAmount
+  }
+
+  await db.update(paymentItems).set(update).where(eq(paymentItems.id, itemId))
+
+  return { ok: true, templateName: tpl.templateName, itemId }
+}
+
+/**
  * 將模板自動產出的「估算占位」更新成「實際支付」
  *
  * 流程：

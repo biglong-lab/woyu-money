@@ -19,6 +19,7 @@ import {
   generateItemsForMonth,
   listScheduledItems,
   replaceScheduledWithActual,
+  linkItemToTemplate,
 } from "../storage/recurring-expense-templates"
 import { insertRecurringExpenseTemplateSchema } from "@shared/schema"
 import { ZodError } from "zod"
@@ -163,6 +164,34 @@ router.post(
       res.json(result)
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "更新失敗"
+      throw new AppError(400, msg)
+    }
+  })
+)
+
+/**
+ * POST /api/recurring-expense-templates/:templateId/link-item/:itemId
+ * 把既有的 payment_item 連結到模板（用於「未分類 / 已存在」項目歸檔）
+ * Body: { markPaid?: boolean }
+ */
+router.post(
+  "/api/recurring-expense-templates/:templateId/link-item/:itemId",
+  asyncHandler(async (req, res) => {
+    const templateId = Number(req.params.templateId)
+    const itemId = Number(req.params.itemId)
+    if (!Number.isInteger(templateId) || templateId < 1)
+      throw new AppError(400, "無效的 templateId")
+    if (!Number.isInteger(itemId) || itemId < 1) throw new AppError(400, "無效的 itemId")
+
+    try {
+      const result = await linkItemToTemplate({
+        templateId,
+        itemId,
+        markPaid: Boolean(req.body?.markPaid),
+      })
+      res.json(result)
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "連結失敗"
       throw new AppError(400, msg)
     }
   })
