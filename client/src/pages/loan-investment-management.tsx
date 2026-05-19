@@ -16,6 +16,16 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useToast } from "@/hooks/use-toast"
 import { apiRequest } from "@/lib/queryClient"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 import {
   StatCards,
@@ -41,6 +51,7 @@ export default function LoanInvestmentManagement() {
   const [editingRecord, setEditingRecord] = useState<LoanInvestmentRecord | null>(null)
   const [selectedTab, setSelectedTab] = useState("all")
   const [paymentHistoryOpen, setPaymentHistoryOpen] = useState(false)
+  const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null)
   const [selectedRecordForPayments, setSelectedRecordForPayments] =
     useState<LoanInvestmentRecord | null>(null)
   const { toast } = useToast()
@@ -166,8 +177,13 @@ export default function LoanInvestmentManagement() {
   }
 
   const handleDelete = (id: number) => {
-    if (confirm("確定要刪除這筆記錄嗎？此操作無法復原。")) {
-      deleteMutation.mutate(id)
+    setDeleteTargetId(id)
+  }
+
+  const confirmDelete = () => {
+    if (deleteTargetId !== null) {
+      deleteMutation.mutate(deleteTargetId)
+      setDeleteTargetId(null)
     }
   }
 
@@ -279,6 +295,30 @@ export default function LoanInvestmentManagement() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* 刪除記錄確認 */}
+      <AlertDialog
+        open={deleteTargetId !== null}
+        onOpenChange={(open) => !open && setDeleteTargetId(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>確定刪除這筆借貸 / 投資記錄？</AlertDialogTitle>
+            <AlertDialogDescription>
+              此操作將永久刪除該筆記錄、所有關聯的還款紀錄也會被移除、無法復原。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+            >
+              確認刪除
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

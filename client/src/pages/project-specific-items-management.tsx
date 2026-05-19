@@ -37,6 +37,16 @@ import { useToast } from "@/hooks/use-toast"
 import { Plus, Edit2, Trash2, Building, Phone, Zap, Droplets, Wifi, Settings } from "lucide-react"
 import type { PaymentProject, FixedCategory, FixedCategorySubOption } from "@shared/schema"
 import { useDocumentTitle } from "@/hooks/use-document-title"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 const projectSpecificItemSchema = z.object({
   projectId: z.number(),
@@ -63,6 +73,7 @@ export default function ProjectSpecificItemsManagement() {
   const [selectedProject, setSelectedProject] = useState<number | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingItem, setEditingItem] = useState<FixedCategorySubOption | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<FixedCategorySubOption | null>(null)
 
   const form = useForm<ProjectSpecificItemFormData>({
     resolver: zodResolver(projectSpecificItemSchema),
@@ -160,8 +171,13 @@ export default function ProjectSpecificItemsManagement() {
   }
 
   const handleDelete = (item: FixedCategorySubOption) => {
-    if (confirm(`確定要刪除「${item.subOptionName}」嗎？`)) {
-      deleteMutation.mutate(item.id)
+    setDeleteTarget(item)
+  }
+
+  const confirmDelete = () => {
+    if (deleteTarget) {
+      deleteMutation.mutate(deleteTarget.id)
+      setDeleteTarget(null)
     }
   }
 
@@ -376,6 +392,31 @@ export default function ProjectSpecificItemsManagement() {
           </Form>
         </DialogContent>
       </Dialog>
+
+      {/* 刪除項目確認 */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>確定刪除此專屬項目？</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteTarget && (
+                <>
+                  將刪除「<strong>{deleteTarget.subOptionName}</strong>」、此操作無法復原。
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+            >
+              確認刪除
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
