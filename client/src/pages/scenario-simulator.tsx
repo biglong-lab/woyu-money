@@ -630,22 +630,33 @@ export default function ScenarioSimulatorPage() {
           )}
 
           {/* 新增 */}
-          <div className="flex gap-2 items-center flex-wrap">
-            <Input
-              type="text"
-              placeholder="場景名稱（例：下月行銷+20%）"
-              value={newScenarioName}
-              onChange={(e) => setNewScenarioName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") handleSaveScenario()
-              }}
-              maxLength={30}
-              className="h-8 text-sm flex-1 min-w-[180px]"
-            />
-            <Button size="sm" onClick={handleSaveScenario}>
-              <BookmarkPlus className="h-4 w-4 mr-1" />
-              儲存當前
-            </Button>
+          <div className="space-y-1">
+            <div className="flex gap-2 items-center flex-wrap">
+              <Input
+                type="text"
+                placeholder="場景名稱（例：下月行銷+20%）"
+                value={newScenarioName}
+                onChange={(e) => setNewScenarioName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleSaveScenario()
+                }}
+                maxLength={30}
+                className="h-8 text-sm flex-1 min-w-[180px]"
+              />
+              <Button size="sm" onClick={handleSaveScenario}>
+                <BookmarkPlus className="h-4 w-4 mr-1" />
+                儲存當前
+              </Button>
+            </div>
+            {newScenarioName.length > 0 && (
+              <div
+                className={`text-[10px] text-right ${
+                  newScenarioName.length >= 25 ? "text-amber-600" : "text-gray-400"
+                }`}
+              >
+                {newScenarioName.length} / 30 字
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
