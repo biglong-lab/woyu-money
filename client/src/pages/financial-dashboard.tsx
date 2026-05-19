@@ -299,9 +299,17 @@ export default function FinancialDashboardPage() {
   // 估計未來月支出：取「YTD 月均」與「模板合計」較大值（保守估）
   const estimatedFutureExpense = Math.max(fixedMonthlyExpense, ytdAvgMonthlyExpense)
 
-  // 組裝未來 3 月預測表（季節性預測：收入 actual=0、planned=pointEstimate）
+  // 組裝未來 3 月預測表
+  // 優先用 server ytd.months 內未來月（已含 forecast income + HR baseline + template_missing）
+  // forecastQueries 只當 fallback（server 還沒回來時）
   const futureRows: ExtendedMonthRow[] = useMemo(() => {
-    if (!forecastQueries.data) return []
+    const now = new Date()
+    const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
+    const fromYtd = ytd.months.filter((m) => m.month > currentMonth).slice(0, 3)
+    if (fromYtd.length === 3) return fromYtd as ExtendedMonthRow[]
+
+    // fallback：forecast batch + 月均支出
+    if (!forecastQueries.data) return fromYtd as ExtendedMonthRow[]
     return forecastQueries.data.map((f) => ({
       month: f.targetMonth,
       income: f.pointEstimate,
@@ -313,7 +321,7 @@ export default function FinancialDashboardPage() {
       expensePlanned: estimatedFutureExpense,
       profitActual: 0,
     }))
-  }, [forecastQueries.data, estimatedFutureExpense])
+  }, [ytd.months, forecastQueries.data, estimatedFutureExpense])
 
   // 未來 3 月合計
   const futureTotal = futureRows.reduce(
@@ -752,6 +760,10 @@ export default function FinancialDashboardPage() {
           <div className="space-y-2">
             {futureRows.map((r, idx) => {
               const forecast = forecastQueries.data?.[idx]
+              const hasForecastIncome = (r.incomeForecast ?? 0) > 0
+              const hasHrEstimate =
+                ((r as ExtendedMonthRow & { expenseHrEstimate?: number }).expenseHrEstimate ?? 0) >
+                0
               return (
                 <div
                   key={r.month}
@@ -761,28 +773,26 @@ export default function FinancialDashboardPage() {
                 >
                   <div className="w-20">
                     <div className="font-semibold">{r.month}</div>
-                    <div className="text-xs text-gray-400">
-                      {forecast && `${forecast.daysElapsed}/30 天`}
-                    </div>
+                    <div className="text-xs text-gray-400">未來月</div>
                   </div>
                   <div className="flex-1 grid grid-cols-3 gap-2 text-sm">
                     <div>
                       <div className="text-xs text-gray-500">收入估計</div>
                       <div className="text-blue-700 font-semibold">{formatMoney(r.income)}</div>
-                      {forecast && (
+                      {hasForecastIncome ? (
+                        <div className="text-xs text-blue-500">季節性預測 / 歷史平均</div>
+                      ) : forecast ? (
                         <div className="text-xs text-gray-400">
                           80% CI: {formatMoney(forecast.ci80.lower)}~
                           {formatMoney(forecast.ci80.upper)}
                         </div>
-                      )}
+                      ) : null}
                     </div>
                     <div>
                       <div className="text-xs text-gray-500">支出預估</div>
                       <div className="text-red-700 font-semibold">{formatMoney(r.expense)}</div>
                       <div className="text-xs text-gray-400">
-                        {ytdAvgMonthlyExpense > fixedMonthlyExpense
-                          ? `YTD 月均（${templates.filter((t) => t.isActive).length} 模板 + HR / 一次性）`
-                          : `${templates.filter((t) => t.isActive).length} 筆模板`}
+                        {hasHrEstimate ? "租金 + 模板 + HR baseline + 一般" : "租金 + 模板 + 一般"}
                       </div>
                     </div>
                     <div>
@@ -807,10 +817,12 @@ export default function FinancialDashboardPage() {
                           ? "bg-blue-100 text-blue-800"
                           : forecast?.confidence === "low"
                             ? "bg-amber-100 text-amber-800"
-                            : "bg-gray-100 text-gray-700"
+                            : hasForecastIncome
+                              ? "bg-blue-100 text-blue-800"
+                              : "bg-gray-100 text-gray-700"
                     }
                   >
-                    信心 {forecast?.confidence ?? "—"}
+                    {hasForecastIncome ? "預估" : `信心 ${forecast?.confidence ?? "—"}`}
                   </Badge>
                 </div>
               )
