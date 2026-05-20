@@ -307,6 +307,24 @@ export default function FamilyPage() {
     },
   })
 
+  // 一鍵再做任務（複製 approved 任務為新 pending）
+  const cloneTaskMutation = useMutation({
+    mutationFn: (t: Task) =>
+      apiRequest("POST", "/api/family/tasks", {
+        kidId: t.kidId,
+        title: t.title,
+        emoji: t.emoji,
+        rewardAmount: parseFloat(t.rewardAmount),
+        difficulty: t.difficulty ?? "medium",
+        category: t.category ?? "other",
+      }),
+    onSuccess: () => {
+      toast({ title: "🔁 已複製成新任務" })
+      invalidateAll()
+    },
+    onError: (e: Error) => toast({ title: "失敗", description: e.message, variant: "destructive" }),
+  })
+
   const deleteTaskMutation = useMutation({
     mutationFn: (id: number) => apiRequest("DELETE", `/api/family/tasks/${id}`),
     onSuccess: () => {
@@ -773,6 +791,17 @@ export default function FamilyPage() {
                   <span className="text-xs text-gray-500">{kid?.displayName ?? "—"}</span>
                   <span className="text-xs font-mono">{formatMoney(t.rewardAmount)}</span>
                   <TaskStatusBadge status={t.status} />
+                  {(t.status === "approved" || t.status === "rejected") && (
+                    <button
+                      type="button"
+                      onClick={() => cloneTaskMutation.mutate(t)}
+                      disabled={cloneTaskMutation.isPending}
+                      className="text-indigo-500 hover:bg-indigo-50 rounded p-1 text-xs"
+                      title="一鍵複製成新任務"
+                    >
+                      🔁
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() =>
