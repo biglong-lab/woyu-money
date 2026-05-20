@@ -197,6 +197,8 @@ async function checkStreakBadges(kidId: number, streak: number) {
     awarded.push("streak_30")
   if (streak >= 100 && (await awardBadgeIfNew(kidId, "streak_100", "連續打卡 100 天", "👑")))
     awarded.push("streak_100")
+  if (streak >= 365 && (await awardBadgeIfNew(kidId, "streak_365", "連續打卡 1 年", "🐉")))
+    awarded.push("streak_365")
   return awarded
 }
 
@@ -213,6 +215,8 @@ async function checkTaskBadges(kidId: number) {
     awarded.push("tasks_10")
   if (n >= 50 && (await awardBadgeIfNew(kidId, "tasks_50", "完成 50 個任務", "🏆")))
     awarded.push("tasks_50")
+  if (n >= 100 && (await awardBadgeIfNew(kidId, "tasks_100", "完成 100 個任務", "🚀")))
+    awarded.push("tasks_100")
   return awarded
 }
 
@@ -969,7 +973,22 @@ router.post(
       const n = (r as unknown as { rows: { n: number }[] }).rows[0]?.n ?? 0
       if (n >= 5 && (await awardBadgeIfNew(goal.kidId, "goals_5", "完成 5 個目標", "🌈")))
         awarded.push("goals_5")
+      if (n >= 10 && (await awardBadgeIfNew(goal.kidId, "goals_10", "完成 10 個目標", "🏰")))
+        awarded.push("goals_10")
     }
+
+    // 儲蓄累積徽章（看 goal current_amount 累積）
+    const saveSum = await db.execute(sql`
+      SELECT COALESCE(SUM(current_amount::numeric), 0)::numeric AS s
+      FROM kids_goals WHERE kid_id = ${goal.kidId}
+    `)
+    const saved = parseFloat(
+      String((saveSum as unknown as { rows: { s: string | number }[] }).rows[0]?.s ?? "0")
+    )
+    if (saved >= 500 && (await awardBadgeIfNew(goal.kidId, "save_500", "存錢達 $500", "🪙")))
+      awarded.push("save_500")
+    if (saved >= 2000 && (await awardBadgeIfNew(goal.kidId, "save_2000", "存錢達 $2000", "💎")))
+      awarded.push("save_2000")
 
     res.json({ goal: updated, newBadges: awarded, reached })
   })
@@ -1152,6 +1171,10 @@ router.post(
         newBadges.push("give_100")
       if (totalGiven >= 500 && (await awardBadgeIfNew(data.kidId, "give_500", "捐 $500", "💝")))
         newBadges.push("give_500")
+      if (totalGiven >= 1000 && (await awardBadgeIfNew(data.kidId, "give_1000", "捐 $1000", "🕊️")))
+        newBadges.push("give_1000")
+      if (totalGiven >= 5000 && (await awardBadgeIfNew(data.kidId, "give_5000", "捐 $5000", "👼")))
+        newBadges.push("give_5000")
     }
     res.status(201).json({ ...created, newBadges })
   })
@@ -2540,6 +2563,15 @@ router.get(
 
     const streak = await calcStreak(kidIdQ)
 
+    // 儲蓄累積（看 goal current_amount sum）
+    const saveStats = await db.execute(sql`
+      SELECT COALESCE(SUM(current_amount::numeric), 0)::numeric AS s
+      FROM kids_goals WHERE kid_id = ${kidIdQ}
+    `)
+    const totalSaved = parseFloat(
+      String((saveStats as unknown as { rows: { s: string | number }[] }).rows[0]?.s ?? "0")
+    )
+
     const earned = await db
       .select({ badgeType: kidsBadges.badgeType, earnedAt: kidsBadges.earnedAt })
       .from(kidsBadges)
@@ -2626,6 +2658,62 @@ router.get(
         emoji: "💝",
         target: 500,
         current: totalGiven,
+        unit: "dollars",
+      },
+      {
+        type: "tasks_100",
+        title: "完成 100 個任務",
+        emoji: "🚀",
+        target: 100,
+        current: totalApproved,
+        unit: "tasks",
+      },
+      {
+        type: "streak_365",
+        title: "連續打卡 1 年",
+        emoji: "🐉",
+        target: 365,
+        current: streak,
+        unit: "days",
+      },
+      {
+        type: "goals_10",
+        title: "完成 10 個目標",
+        emoji: "🏰",
+        target: 10,
+        current: totalGoals,
+        unit: "goals",
+      },
+      {
+        type: "give_1000",
+        title: "捐 $1000",
+        emoji: "🕊️",
+        target: 1000,
+        current: totalGiven,
+        unit: "dollars",
+      },
+      {
+        type: "give_5000",
+        title: "捐 $5000",
+        emoji: "👼",
+        target: 5000,
+        current: totalGiven,
+        unit: "dollars",
+      },
+      {
+        type: "save_500",
+        title: "存錢達 $500",
+        emoji: "🪙",
+        target: 500,
+        current: totalSaved,
+        unit: "dollars",
+      },
+      {
+        type: "save_2000",
+        title: "存錢達 $2000",
+        emoji: "💎",
+        target: 2000,
+        current: totalSaved,
         unit: "dollars",
       },
     ]

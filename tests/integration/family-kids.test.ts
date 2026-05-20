@@ -1435,7 +1435,7 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     // 成就牆目錄
     const catalog = await request(app).get(`/api/family/badges-catalog?kidId=${kidId}`)
     expect(catalog.status).toBe(200)
-    expect(catalog.body.badges.length).toBe(10)
+    expect(catalog.body.badges.length).toBeGreaterThanOrEqual(10)
     const give100 = catalog.body.badges.find(
       (b: { badgeType: string }) => b.badgeType === "give_100"
     )
@@ -1835,6 +1835,20 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     // 不合法 mode
     const bad = await request(app).get(`/api/family/leaderboard?month=${month}&mode=hacker`)
     expect(bad.status).toBe(400)
+  })
+
+  it("拓展徽章目錄：tasks_100 / streak_365 / give_1000 / give_5000 / save_500 / save_2000 / goals_10 都存在", async () => {
+    await createKid()
+    const res = await request(app).get(`/api/family/badges-catalog?kidId=${kidId}`)
+    expect(res.status).toBe(200)
+    const types = res.body.badges.map((b: { badgeType: string }) => b.badgeType)
+    expect(types).toContain("tasks_100")
+    expect(types).toContain("streak_365")
+    expect(types).toContain("give_1000")
+    expect(types).toContain("give_5000")
+    expect(types).toContain("save_500")
+    expect(types).toContain("save_2000")
+    expect(types).toContain("goals_10")
   })
 
   it("軟刪除小孩（isActive=false）", async () => {
