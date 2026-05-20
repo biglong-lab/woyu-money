@@ -1576,15 +1576,22 @@ router.get(
 )
 
 /**
- * GET /api/family/leaderboard?month=YYYY-MM
- * 本月排行榜：每個小孩的任務完成數 / 入帳金額 / 徽章數 / 達成目標數
- * 排序：approved sum DESC（賺最多的優先）
+ * GET /api/family/leaderboard?month=YYYY-MM&mode=score
+ * 本月排行榜、4 種 mode：
+ *   - score（預設）：weightedScore + approvedSum + approvedCount
+ *   - tasks：approvedCount
+ *   - giving：本月 give 罐 sum
+ *   - streak：當前 streak（不限本月、看當下）
  */
 router.get(
   "/api/family/leaderboard",
   asyncHandler(async (req, res) => {
     const monthStr = (req.query.month as string | undefined) ?? new Date().toISOString().slice(0, 7)
     if (!/^\d{4}-\d{2}$/.test(monthStr)) throw new AppError(400, "month 格式 YYYY-MM")
+    const mode = String(req.query.mode ?? "score")
+    if (!["score", "tasks", "giving", "streak"].includes(mode)) {
+      throw new AppError(400, "mode 須為 score / tasks / giving / streak")
+    }
     const [year, month] = monthStr.split("-").map(Number)
     const monthStart = `${year}-${String(month).padStart(2, "0")}-01`
     const endY = month === 12 ? year + 1 : year
@@ -1602,7 +1609,8 @@ router.get(
         COALESCE(t.weighted_score, 0)::int AS "weightedScore",
         COALESCE(t.hard_count, 0)::int AS "hardCount",
         COALESCE(g.completed_count, 0)::int AS "completedGoalsCount",
-        COALESCE(b.badge_count, 0)::int AS "badgeCount"
+        COALESCE(b.badge_count, 0)::int AS "badgeCount",
+        COALESCE(s.give_sum, 0)::numeric AS "giveSum"
       FROM kids_accounts k
       LEFT JOIN (
         SELECT kid_id,
@@ -1635,10 +1643,17 @@ router.get(
           AND earned_at < ${nextMonth}::timestamp
         GROUP BY kid_id
       ) b ON b.kid_id = k.id
+      LEFT JOIN (
+        SELECT kid_id, SUM(amount::numeric) AS give_sum
+        FROM kids_spendings
+        WHERE jar = 'give'
+          AND spend_date >= ${monthStart}::date
+          AND spend_date < ${nextMonth}::date
+        GROUP BY kid_id
+      ) s ON s.kid_id = k.id
       WHERE k.is_active = true
-      ORDER BY weighted_score DESC NULLS LAST, approved_sum DESC NULLS LAST, approved_count DESC NULLS LAST, k.id
     `)
-    const list = (
+    const baseList = (
       rows as unknown as {
         rows: {
           kidId: number
@@ -1651,15 +1666,40 @@ router.get(
           hardCount: number
           completedGoalsCount: number
           badgeCount: number
+          giveSum: string | number
         }[]
       }
-    ).rows.map((r, i) => ({
+    ).rows.map((r) => ({
       ...r,
       approvedSum: parseFloat(String(r.approvedSum)),
+      giveSum: parseFloat(String(r.giveSum)),
+    }))
+
+    // 補 streak（per kid 算）
+    const withStreak = await Promise.all(
+      baseList.map(async (k) => ({ ...k, streak: await calcStreak(k.kidId) }))
+    )
+
+    // 按 mode 排序
+    const sorted = [...withStreak].sort((a, b) => {
+      if (mode === "tasks")
+        return b.approvedCount - a.approvedCount || b.approvedSum - a.approvedSum
+      if (mode === "giving") return b.giveSum - a.giveSum || b.approvedSum - a.approvedSum
+      if (mode === "streak") return b.streak - a.streak || b.approvedCount - a.approvedCount
+      // score（預設）
+      return (
+        b.weightedScore - a.weightedScore ||
+        b.approvedSum - a.approvedSum ||
+        b.approvedCount - a.approvedCount
+      )
+    })
+
+    const list = sorted.map((r, i) => ({
+      ...r,
       rank: i + 1,
       medal: i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : "",
     }))
-    res.json({ month: monthStr, leaderboard: list })
+    res.json({ month: monthStr, mode, leaderboard: list })
   })
 )
 

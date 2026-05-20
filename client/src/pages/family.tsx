@@ -129,6 +129,8 @@ interface LeaderboardEntry {
   hardCount: number
   completedGoalsCount: number
   badgeCount: number
+  giveSum: number
+  streak: number
   rank: number
   medal: string
 }
@@ -229,11 +231,12 @@ export default function FamilyPage() {
     const d = new Date()
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
   })()
+  const [lbMode, setLbMode] = useState<"score" | "tasks" | "giving" | "streak">("score")
   const { data: leaderboard } = useQuery<{
     month: string
     leaderboard: LeaderboardEntry[]
   }>({
-    queryKey: [`/api/family/leaderboard?month=${currentMonth}`],
+    queryKey: [`/api/family/leaderboard?month=${currentMonth}&mode=${lbMode}`],
   })
 
   const invalidateAll = () => {
@@ -568,7 +571,29 @@ export default function FamilyPage() {
               <Trophy className="h-5 w-5 text-yellow-600" />
               本月排行榜（{leaderboard.month}）
             </CardTitle>
-            <CardDescription>賺最多 / 完成任務最多的孩子優先</CardDescription>
+            <CardDescription>切換不同角度看孩子的努力</CardDescription>
+            <div className="flex gap-1 mt-2 flex-wrap">
+              {[
+                { v: "score" as const, label: "🏆 積分", desc: "難度加權" },
+                { v: "tasks" as const, label: "📋 任務數", desc: "完成多少" },
+                { v: "giving" as const, label: "❤️ 善行", desc: "捐獻金額" },
+                { v: "streak" as const, label: "🔥 打卡", desc: "連續天數" },
+              ].map((m) => (
+                <button
+                  key={m.v}
+                  type="button"
+                  onClick={() => setLbMode(m.v)}
+                  className={`text-xs py-1 px-2.5 rounded border ${
+                    lbMode === m.v
+                      ? "bg-yellow-200 border-yellow-500 font-medium"
+                      : "bg-white border-yellow-200 hover:bg-yellow-100"
+                  }`}
+                  title={m.desc}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
           </CardHeader>
           <CardContent className="py-2 px-3 sm:px-4 space-y-2">
             {leaderboard.leaderboard.map((entry) => (
@@ -604,7 +629,13 @@ export default function FamilyPage() {
                 </div>
                 <div className="text-right">
                   <div className="font-mono font-bold text-amber-700">
-                    {formatMoney(entry.approvedSum)}
+                    {lbMode === "giving"
+                      ? `❤️ ${formatMoney(entry.giveSum)}`
+                      : lbMode === "tasks"
+                        ? `📋 ${entry.approvedCount}`
+                        : lbMode === "streak"
+                          ? `🔥 ${entry.streak} 天`
+                          : formatMoney(entry.approvedSum)}
                   </div>
                   <div className="text-[10px] text-rose-600 font-medium">
                     積分 {entry.weightedScore}

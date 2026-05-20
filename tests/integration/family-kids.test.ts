@@ -1803,6 +1803,40 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.body.grandTotal.study.count).toBeGreaterThanOrEqual(3)
   })
 
+  it("排行榜多模式：score / tasks / giving / streak 各自正確排序", async () => {
+    await createKid({ displayName: "捐獻王", spendRatio: 0, saveRatio: 0, giveRatio: 100 })
+    // 賺 + 完成 1 個任務（giveSum 高、approvedCount=1）
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId, title: "T", rewardAmount: 200 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`)
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`)
+    await request(app).post("/api/family/spendings").send({
+      kidId,
+      jar: "give",
+      amount: 100,
+      description: "捐",
+    })
+
+    const now = new Date()
+    const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
+
+    // 4 種 mode 都有回應
+    for (const mode of ["score", "tasks", "giving", "streak"]) {
+      const res = await request(app).get(`/api/family/leaderboard?month=${month}&mode=${mode}`)
+      expect(res.status).toBe(200)
+      expect(res.body.mode).toBe(mode)
+      const me = res.body.leaderboard.find((x: { kidId: number }) => x.kidId === kidId)
+      expect(me).toBeTruthy()
+      expect(me.streak).toBeDefined()
+      expect(me.giveSum).toBeGreaterThanOrEqual(100)
+    }
+
+    // 不合法 mode
+    const bad = await request(app).get(`/api/family/leaderboard?month=${month}&mode=hacker`)
+    expect(bad.status).toBe(400)
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)
