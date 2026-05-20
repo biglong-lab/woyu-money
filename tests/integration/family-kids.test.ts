@@ -1752,6 +1752,29 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
       .send({ oldPin: "5566", newPin: "9871" })
   })
 
+  it("任務分類：default other、5 種白名單可設、列表回傳", async () => {
+    await createKid()
+    const r1 = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId, title: "T1", rewardAmount: 10 })
+    expect(r1.body.category).toBe("other")
+
+    const r2 = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId, title: "練字", rewardAmount: 20, category: "study" })
+    expect(r2.body.category).toBe("study")
+
+    const r3 = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId, title: "倒垃圾", rewardAmount: 15, category: "housework" })
+    expect(r3.body.category).toBe("housework")
+
+    const list = await request(app).get(`/api/family/tasks?kidId=${kidId}`)
+    expect(list.status).toBe(200)
+    const found = list.body.find((t: { id: number }) => t.id === r2.body.id)
+    expect(found.category).toBe("study")
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)

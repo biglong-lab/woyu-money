@@ -93,9 +93,21 @@ interface Task {
   submissionNote?: string | null
   parentFeedback?: string | null
   difficulty?: "easy" | "medium" | "hard"
+  category?: "housework" | "study" | "self_care" | "kindness" | "other"
 }
 
 const difficultyStars = (d?: string) => (d === "easy" ? "⭐" : d === "hard" ? "⭐⭐⭐" : "⭐⭐")
+
+const categoryLabel = (c?: string) =>
+  c === "housework"
+    ? "🧹"
+    : c === "study"
+      ? "📚"
+      : c === "self_care"
+        ? "🪥"
+        : c === "kindness"
+          ? "❤️"
+          : ""
 
 interface Jar {
   kidId: number
@@ -422,6 +434,9 @@ export default function FamilyPage() {
                         <span className="text-[10px] text-amber-500">
                           {difficultyStars(t.difficulty)}
                         </span>
+                        {t.category && t.category !== "other" && (
+                          <span className="text-[10px]">{categoryLabel(t.category)}</span>
+                        )}
                       </div>
                       <div className="text-xs text-gray-500">
                         {kid?.displayName ?? "—"} · {formatMoney(t.rewardAmount)}
@@ -1967,6 +1982,9 @@ function TaskDialog({
   const [dueDate, setDueDate] = useState("")
   const [recurringInterval, setRecurringInterval] = useState<"none" | "weekly" | "monthly">("none")
   const [difficulty, setDifficulty] = useState<"easy" | "medium" | "hard">("medium")
+  const [category, setCategory] = useState<
+    "housework" | "study" | "self_care" | "kindness" | "other"
+  >("other")
 
   const mut = useMutation({
     mutationFn: () =>
@@ -1979,6 +1997,7 @@ function TaskDialog({
         dueDate: dueDate || null,
         recurringInterval: recurringInterval === "none" ? null : recurringInterval,
         difficulty,
+        category,
       }),
     onSuccess: () => {
       toast({ title: "✅ 已派任務" })
@@ -2065,6 +2084,33 @@ function TaskDialog({
             </div>
             <div className="text-[10px] text-gray-400 mt-1">
               排行榜按難度加權積分：簡單 ×1、普通 ×2、挑戰 ×3
+            </div>
+          </div>
+          <div>
+            <Label>分類</Label>
+            <div className="grid grid-cols-5 gap-1 mt-1">
+              {(
+                [
+                  { v: "housework", label: "🧹 家事" },
+                  { v: "study", label: "📚 學習" },
+                  { v: "self_care", label: "🪥 照顧" },
+                  { v: "kindness", label: "❤️ 善行" },
+                  { v: "other", label: "📋 其他" },
+                ] as const
+              ).map((c) => (
+                <button
+                  key={c.v}
+                  type="button"
+                  onClick={() => setCategory(c.v)}
+                  className={`text-[10px] py-1.5 rounded border ${
+                    category === c.v
+                      ? "bg-indigo-100 border-indigo-400 text-indigo-700 font-medium"
+                      : "bg-white border-gray-200 hover:bg-gray-50"
+                  }`}
+                >
+                  {c.label}
+                </button>
+              ))}
             </div>
           </div>
           <div>

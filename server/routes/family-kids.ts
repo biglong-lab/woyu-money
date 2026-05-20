@@ -570,22 +570,7 @@ router.get(
     if (statusQ) conds.push(eq(kidsTasks.status, statusQ))
 
     const rows = await db
-      .select({
-        id: kidsTasks.id,
-        kidId: kidsTasks.kidId,
-        title: kidsTasks.title,
-        emoji: kidsTasks.emoji,
-        rewardAmount: kidsTasks.rewardAmount,
-        status: kidsTasks.status,
-        notes: kidsTasks.notes,
-        dueDate: kidsTasks.dueDate,
-        completedAt: kidsTasks.completedAt,
-        approvedAt: kidsTasks.approvedAt,
-        paymentRecordId: kidsTasks.paymentRecordId,
-        proofImageUrl: kidsTasks.proofImageUrl,
-        proposedByKid: kidsTasks.proposedByKid,
-        createdAt: kidsTasks.createdAt,
-      })
+      .select()
       .from(kidsTasks)
       .where(conds.length > 0 ? and(...conds) : undefined)
       .orderBy(desc(kidsTasks.createdAt))
