@@ -163,6 +163,7 @@ export default function FamilyPage() {
   const [showAddTask, setShowAddTask] = useState(false)
   const [showBatchTask, setShowBatchTask] = useState(false)
   const [pinPrompt, setPinPrompt] = useState<null | (() => void)>(null)
+  const [commentTaskId, setCommentTaskId] = useState<number | null>(null)
 
   const { data: pinStatus } = useQuery<{ enabled: boolean }>({
     queryKey: ["/api/family/parent-pin/status"],
@@ -424,6 +425,15 @@ export default function FamilyPage() {
                       </a>
                     )}
                     <div className="flex gap-1">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setCommentTaskId(t.id)}
+                        className="text-xs h-7 px-2"
+                        title="跟小孩討論這個任務"
+                      >
+                        💬
+                      </Button>
                       <Button
                         size="sm"
                         onClick={() => {
@@ -765,7 +775,129 @@ export default function FamilyPage() {
       )}
 
       <BackToTop />
+
+      {commentTaskId !== null && (
+        <CommentDialog
+          taskId={commentTaskId}
+          author="parent"
+          onClose={() => setCommentTaskId(null)}
+        />
+      )}
     </div>
+  )
+}
+
+function CommentDialog({
+  taskId,
+  author,
+  onClose,
+}: {
+  taskId: number
+  author: "parent" | "kid"
+  onClose: () => void
+}) {
+  const { toast } = useToast()
+  const [message, setMessage] = useState("")
+
+  interface Comment {
+    id: number
+    taskId: number
+    author: "parent" | "kid"
+    message: string
+    emoji: string
+    createdAt: string
+  }
+
+  const { data: comments = [] } = useQuery<Comment[]>({
+    queryKey: [`/api/family/tasks/${taskId}/comments`],
+  })
+
+  const sendMut = useMutation({
+    mutationFn: () =>
+      apiRequest("POST", `/api/family/tasks/${taskId}/comments`, {
+        author,
+        message: message.trim(),
+      }),
+    onSuccess: () => {
+      setMessage("")
+      queryClient.invalidateQueries({
+        queryKey: [`/api/family/tasks/${taskId}/comments`],
+      })
+    },
+    onError: (e: Error) => toast({ title: "失敗", description: e.message, variant: "destructive" }),
+  })
+
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent className="w-[95vw] max-w-md">
+        <DialogHeader>
+          <DialogTitle>💬 任務討論</DialogTitle>
+          <DialogDescription>家長和小孩可在這對話、像 LINE 一樣</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+          {comments.length === 0 ? (
+            <div className="text-center text-sm text-gray-400 py-6">
+              還沒有人留言、來開始討論吧 💬
+            </div>
+          ) : (
+            comments.map((c) => {
+              const mine = c.author === author
+              return (
+                <div key={c.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
+                  <div
+                    className={`max-w-[80%] rounded-lg px-3 py-1.5 text-sm ${
+                      mine
+                        ? "bg-indigo-500 text-white"
+                        : c.author === "parent"
+                          ? "bg-amber-100 text-amber-900"
+                          : "bg-pink-100 text-pink-900"
+                    }`}
+                  >
+                    <div className="text-[10px] opacity-75 mb-0.5">
+                      {c.author === "parent" ? "👨‍👩 大人" : "🧒 小孩"} ·{" "}
+                      {new Date(c.createdAt).toLocaleString("zh-TW", {
+                        month: "numeric",
+                        day: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </div>
+                    <div>{c.message}</div>
+                  </div>
+                </div>
+              )
+            })
+          )}
+        </div>
+        <div className="flex gap-2 items-end">
+          <Input
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            placeholder="輸入訊息..."
+            maxLength={500}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey && message.trim()) {
+                e.preventDefault()
+                sendMut.mutate()
+              }
+            }}
+            className="flex-1"
+          />
+          <Button
+            disabled={!message.trim() || sendMut.isPending}
+            onClick={() => sendMut.mutate()}
+            className="bg-indigo-600 hover:bg-indigo-700"
+          >
+            送出
+          </Button>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            關閉
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 

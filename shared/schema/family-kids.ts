@@ -200,6 +200,28 @@ export const kidsSpendings = pgTable(
 )
 
 // ============================================================
+// 任務評論串（家長 + 小孩可多次往來、培養討論文化）
+// 跟 submissionNote/parentFeedback 不同：那是一次性、這是 chat-like
+// ============================================================
+export const kidsTaskComments = pgTable(
+  "kids_task_comments",
+  {
+    id: serial("id").primaryKey(),
+    familyId: integer("family_id").default(1),
+    taskId: integer("task_id")
+      .notNull()
+      .references(() => kidsTasks.id, { onDelete: "cascade" }),
+    author: varchar("author", { length: 8 }).notNull(), // 'parent' / 'kid'
+    message: text("message").notNull(),
+    emoji: varchar("emoji", { length: 8 }).default("💬"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => ({
+    taskIdx: index("kids_task_comments_task_idx").on(table.taskId, table.createdAt),
+  })
+)
+
+// ============================================================
 // 小孩願望清單（想買的東西、未必有錢、跟存錢目標區隔）
 // 培養「想要 vs 需要」判斷力：先放清單冷靜思考、確定要再 promote 成 goal
 // ============================================================
@@ -321,3 +343,4 @@ export type InsertKidsSpending = z.infer<typeof insertKidsSpendingSchema>
 export type KidsDailyMessage = typeof kidsDailyMessages.$inferSelect
 export type FamilyTaskTemplate = typeof familyTaskTemplates.$inferSelect
 export type KidsWish = typeof kidsWishes.$inferSelect
+export type KidsTaskComment = typeof kidsTaskComments.$inferSelect

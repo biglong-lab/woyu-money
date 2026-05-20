@@ -37,6 +37,7 @@ import {
   kidsDailyMessages,
   familyTaskTemplates,
   kidsWishes,
+  kidsTaskComments,
   insertKidsAccountSchema,
   insertKidsTaskSchema,
   insertKidsGoalSchema,
@@ -1628,6 +1629,51 @@ router.get(
       .where(and(eq(kidsDailyMessages.kidId, kidIdN), eq(kidsDailyMessages.messageDate, date)))
       .limit(1)
     res.json({ kidId: kidIdN, date, message: row ?? null })
+  })
+)
+
+/**
+ * 任務評論串
+ *   GET  /api/family/tasks/:id/comments      列出該任務所有評論
+ *   POST /api/family/tasks/:id/comments      新增（author: 'parent' / 'kid'、message）
+ */
+router.get(
+  "/api/family/tasks/:id/comments",
+  asyncHandler(async (req, res) => {
+    const taskId = Number(req.params.id)
+    if (!Number.isInteger(taskId) || taskId < 1) throw new AppError(400, "無效的 taskId")
+    const rows = await db
+      .select()
+      .from(kidsTaskComments)
+      .where(eq(kidsTaskComments.taskId, taskId))
+      .orderBy(kidsTaskComments.createdAt, kidsTaskComments.id)
+    res.json(rows)
+  })
+)
+
+router.post(
+  "/api/family/tasks/:id/comments",
+  asyncHandler(async (req, res) => {
+    const taskId = Number(req.params.id)
+    if (!Number.isInteger(taskId) || taskId < 1) throw new AppError(400, "無效的 taskId")
+    const author = String(req.body?.author ?? "").trim()
+    if (!["parent", "kid"].includes(author)) {
+      throw new AppError(400, "author 須為 parent 或 kid")
+    }
+    const message = String(req.body?.message ?? "").trim()
+    if (!message) throw new AppError(400, "message 必填")
+    if (message.length > 500) throw new AppError(400, "message 過長（500 字以內）")
+    const emoji = String(req.body?.emoji ?? "💬").slice(0, 8)
+
+    // 驗證 task 存在
+    const [task] = await db.select().from(kidsTasks).where(eq(kidsTasks.id, taskId)).limit(1)
+    if (!task) throw new AppError(404, "任務不存在")
+
+    const [created] = await db
+      .insert(kidsTaskComments)
+      .values({ taskId, author, message, emoji })
+      .returning()
+    res.status(201).json(created)
   })
 )
 

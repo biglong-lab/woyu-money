@@ -1279,6 +1279,64 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(withRef).toBeTruthy()
   })
 
+  it("任務評論串：parent + kid 多次往返、按時序", async () => {
+    await createKid()
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId, title: "洗碗", rewardAmount: 50 })
+    const taskId = t.body.id
+
+    // 初始無評論
+    const empty = await request(app).get(`/api/family/tasks/${taskId}/comments`)
+    expect(empty.status).toBe(200)
+    expect(empty.body).toEqual([])
+
+    // 家長加評論
+    const c1 = await request(app)
+      .post(`/api/family/tasks/${taskId}/comments`)
+      .send({ author: "parent", message: "記得擦乾喔" })
+    expect(c1.status).toBe(201)
+    expect(c1.body.author).toBe("parent")
+
+    // 小孩回應
+    const c2 = await request(app)
+      .post(`/api/family/tasks/${taskId}/comments`)
+      .send({ author: "kid", message: "好的我會擦乾", emoji: "👍" })
+    expect(c2.status).toBe(201)
+    expect(c2.body.emoji).toBe("👍")
+
+    // 家長再加
+    await request(app)
+      .post(`/api/family/tasks/${taskId}/comments`)
+      .send({ author: "parent", message: "棒！" })
+
+    // 列表按時序
+    const list = await request(app).get(`/api/family/tasks/${taskId}/comments`)
+    expect(list.status).toBe(200)
+    expect(list.body.length).toBe(3)
+    expect(list.body[0].message).toBe("記得擦乾喔")
+    expect(list.body[1].author).toBe("kid")
+    expect(list.body[2].author).toBe("parent")
+
+    // 不合法 author 400
+    const badAuthor = await request(app)
+      .post(`/api/family/tasks/${taskId}/comments`)
+      .send({ author: "stranger", message: "x" })
+    expect(badAuthor.status).toBe(400)
+
+    // 空 message 400
+    const emptyMsg = await request(app)
+      .post(`/api/family/tasks/${taskId}/comments`)
+      .send({ author: "kid", message: "" })
+    expect(emptyMsg.status).toBe(400)
+
+    // 不存在 task 404
+    const noTask = await request(app)
+      .post(`/api/family/tasks/999999/comments`)
+      .send({ author: "kid", message: "x" })
+    expect(noTask.status).toBe(404)
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)
