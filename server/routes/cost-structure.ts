@@ -90,6 +90,15 @@ interface ManualItem {
   projectName: string | null
 }
 
+interface AllowanceItem {
+  id: number
+  itemName: string
+  amount: number
+  status: string
+  startDate: string
+  notes: string | null
+}
+
 router.get(
   "/api/dashboard/cost-structure",
   asyncHandler(async (req, res) => {
@@ -370,6 +379,45 @@ router.get(
     }
 
     // ============================================================
+    // 4.5 家庭零用金（kids,allowance tag）— 獨立為第 5 區
+    // ============================================================
+    const allowanceRows = await db.execute(sql`
+      SELECT id, item_name AS "itemName", total_amount::numeric AS amount,
+             status, start_date AS "startDate", notes
+      FROM payment_items
+      WHERE NOT is_deleted
+        AND start_date >= ${monthStart}::date
+        AND start_date < ${nextMonth}::date
+        AND tags LIKE '%kids%'
+      ORDER BY start_date DESC
+    `)
+    const allowanceItems: AllowanceItem[] = (
+      allowanceRows as unknown as {
+        rows: {
+          id: number
+          itemName: string
+          amount: string
+          status: string
+          startDate: string
+          notes: string | null
+        }[]
+      }
+    ).rows.map((r) => ({
+      id: r.id,
+      itemName: r.itemName,
+      amount: parseFloat(r.amount),
+      status: r.status,
+      startDate: r.startDate,
+      notes: r.notes,
+    }))
+    const allowanceIdSet = new Set(allowanceItems.map((a) => a.id))
+    const allowanceTotal = allowanceItems.reduce((s, a) => s + a.amount, 0)
+    const allowanceActual = allowanceItems
+      .filter((a) => a.status === "paid")
+      .reduce((s, a) => s + a.amount, 0)
+    const allowancePlanned = allowanceTotal - allowanceActual
+
+    // ============================================================
     // 4. 一般單項（manual / webhook / pm-bridge / ai_scan）
     // ============================================================
     // 排除：source='template_scheduled' / 'hr' / 'auto_backfill'
@@ -378,13 +426,12 @@ router.get(
     // 排除：item_name LIKE '%薪資%' / '%勞保%' 等（HR 那邊算）
     // 排除：notes LIKE '%自動補建%'
     // 排除：rental matching 已用過的 payment_item id（避免雙算）
+    // 排除：allowance（家庭零用金）已歸第 5 區（避免雙算）
     const RENTAL_CATEGORY_IDS = [2, 28]
-    const usedRentalIds = Array.from(matchedPaymentItemIds)
+    const excludeIds = [...Array.from(matchedPaymentItemIds), ...Array.from(allowanceIdSet)]
     // Drizzle sql template 對 array 用 sql.raw 拼接 ID 清單（無 user 輸入、安全）
     const usedRentalIdsSql =
-      usedRentalIds.length > 0
-        ? sql.raw(`AND pi.id NOT IN (${usedRentalIds.join(",")})`)
-        : sql.raw("")
+      excludeIds.length > 0 ? sql.raw(`AND pi.id NOT IN (${excludeIds.join(",")})`) : sql.raw("")
     const manualRows = await db.execute(sql`
       SELECT
         pi.id,
@@ -454,8 +501,8 @@ router.get(
     // ============================================================
     // 5. 總計 + 回傳
     // ============================================================
-    const grandTotal = rentalTotal + hrTotal + tplTotal + manualTotal
-    const grandActual = rentalActual + hrPaid + tplActual + manualActual
+    const grandTotal = rentalTotal + hrTotal + tplTotal + manualTotal + allowanceTotal
+    const grandActual = rentalActual + hrPaid + tplActual + manualActual + allowanceActual
     const grandPlanned = grandTotal - grandActual
 
     res.json({
@@ -492,6 +539,13 @@ router.get(
         planned: manualPlanned,
         count: manualItems.length,
         items: manualItems,
+      },
+      allowance: {
+        total: allowanceTotal,
+        actual: allowanceActual,
+        planned: allowancePlanned,
+        count: allowanceItems.length,
+        items: allowanceItems,
       },
       grandTotal,
       grandActual,

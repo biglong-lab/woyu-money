@@ -31,6 +31,7 @@ import {
   ChevronDown,
   ChevronUp,
   ExternalLink,
+  Gift,
 } from "lucide-react"
 import { useDocumentTitle } from "@/hooks/use-document-title"
 import { BackToTop } from "@/components/back-to-top"
@@ -85,6 +86,15 @@ interface ManualItem {
   projectName: string | null
 }
 
+interface AllowanceItem {
+  id: number
+  itemName: string
+  amount: number
+  status: string
+  startDate: string
+  notes: string | null
+}
+
 interface Alert {
   level: "info" | "warning" | "error"
   type: string
@@ -114,6 +124,13 @@ interface CostStructureData {
     notGenerated: TemplateNotGenerated[]
   }
   manual: { total: number; actual: number; planned: number; count: number; items: ManualItem[] }
+  allowance: {
+    total: number
+    actual: number
+    planned: number
+    count: number
+    items: AllowanceItem[]
+  }
   grandTotal: number
   grandActual: number
   grandPlanned: number
@@ -156,6 +173,7 @@ export default function CostOverviewPage() {
     hr: false,
     template: false,
     manual: false,
+    allowance: false,
   })
 
   const { data, isLoading } = useQuery<CostStructureData>({
@@ -282,7 +300,7 @@ export default function CostOverviewPage() {
       )}
 
       {/* 4 大區塊卡 */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         <CostCard
           icon={Home}
           color="rose"
@@ -340,6 +358,19 @@ export default function CostOverviewPage() {
           isLoading={isLoading}
           onClick={() => toggle("manual")}
           expanded={expanded.manual}
+        />
+        <CostCard
+          icon={Gift}
+          color="pink"
+          title="家庭零用金"
+          total={data?.allowance.total ?? 0}
+          actual={data?.allowance.actual ?? 0}
+          planned={data?.allowance.planned ?? 0}
+          count={data?.allowance.count ?? 0}
+          subtitle="kids,allowance"
+          isLoading={isLoading}
+          onClick={() => toggle("allowance")}
+          expanded={expanded.allowance}
         />
       </div>
 
@@ -511,6 +542,34 @@ export default function CostOverviewPage() {
         </SectionTable>
       )}
 
+      {data && expanded.allowance && (
+        <SectionTable
+          title={`🎁 家庭零用金（${data.allowance.count}）`}
+          link="/family"
+          linkLabel="到家庭記帳"
+          empty={data.allowance.items.length === 0 ? "本月無零用金支出" : null}
+        >
+          {data.allowance.items.map((a) => (
+            <tr key={a.id} className="border-b last:border-0 hover:bg-pink-50">
+              <td className="px-3 py-2 text-sm">{a.itemName}</td>
+              <td className="px-3 py-2 text-xs text-gray-500">{a.startDate}</td>
+              <td className="px-3 py-2 text-sm font-mono text-pink-700">{formatMoney(a.amount)}</td>
+              <td className="px-3 py-2 text-xs">
+                <Badge
+                  className={
+                    isCompletedStatus(a.status)
+                      ? "bg-green-100 text-green-800"
+                      : "bg-amber-100 text-amber-800"
+                  }
+                >
+                  {formatStatus(a.status)}
+                </Badge>
+              </td>
+            </tr>
+          ))}
+        </SectionTable>
+      )}
+
       <BackToTop />
     </div>
   )
@@ -530,7 +589,7 @@ function CostCard({
   expanded,
 }: {
   icon: React.ComponentType<{ className?: string }>
-  color: "rose" | "purple" | "blue" | "gray"
+  color: "rose" | "purple" | "blue" | "gray" | "pink"
   title: string
   total: number
   actual: number
@@ -546,6 +605,7 @@ function CostCard({
     purple: { border: "border-purple-200", bg: "bg-purple-50", text: "text-purple-700" },
     blue: { border: "border-blue-200", bg: "bg-blue-50", text: "text-blue-700" },
     gray: { border: "border-gray-200", bg: "bg-gray-50", text: "text-gray-700" },
+    pink: { border: "border-pink-200", bg: "bg-pink-50", text: "text-pink-700" },
   }
   const c = colorMap[color]
   return (
