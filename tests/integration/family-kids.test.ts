@@ -680,6 +680,33 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     }
   })
 
+  it("streak：今天 approve 1 個任務 → streak=1、dashboard 回傳", async () => {
+    const oldEnv = process.env.FAMILY_KIDS_NO_BONUS
+    process.env.FAMILY_KIDS_NO_BONUS = "1"
+    try {
+      await createKid()
+      const t = await request(app)
+        .post("/api/family/tasks")
+        .send({ kidId, title: "T", rewardAmount: 50 })
+      await request(app).post(`/api/family/tasks/${t.body.id}/submit`)
+      const ares = await request(app).post(`/api/family/tasks/${t.body.id}/approve`)
+      if (ares.body.mainSystem?.paymentItemId) {
+        await db.execute(
+          sql`DELETE FROM payment_records WHERE payment_item_id = ${ares.body.mainSystem.paymentItemId}`
+        )
+        await db.execute(
+          sql`DELETE FROM payment_items WHERE id = ${ares.body.mainSystem.paymentItemId}`
+        )
+      }
+
+      const dash = await request(app).get(`/api/family/dashboard?kidId=${kidId}`)
+      expect(dash.body.streak).toBe(1)
+    } finally {
+      if (oldEnv === undefined) delete process.env.FAMILY_KIDS_NO_BONUS
+      else process.env.FAMILY_KIDS_NO_BONUS = oldEnv
+    }
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)

@@ -79,6 +79,51 @@ async function awardBadgeIfNew(
   return false
 }
 
+/**
+ * 計算小孩「連續打卡天數」streak
+ * 定義：往回算、每天都至少有 1 個 approved 任務（approved_at 那天）
+ * 從今天往回找連續日：今天 / 昨天 / ... 中斷則停
+ * 若今天還沒 approved 任務、從昨天開始算（給寬限）
+ */
+async function calcStreak(kidId: number): Promise<number> {
+  const rows = await db.execute(sql`
+    SELECT DISTINCT DATE(approved_at)::text AS d
+    FROM kids_tasks
+    WHERE kid_id = ${kidId} AND status = 'approved' AND approved_at IS NOT NULL
+    ORDER BY d DESC
+    LIMIT 365
+  `)
+  const dates = (rows as unknown as { rows: { d: string }[] }).rows.map((r) => r.d)
+  if (dates.length === 0) return 0
+
+  const today = new Date().toISOString().slice(0, 10)
+  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10)
+  // 寬限：今天 / 昨天有資料才算開始
+  let cursor: string
+  if (dates[0] === today) cursor = today
+  else if (dates[0] === yesterday) cursor = yesterday
+  else return 0
+
+  let streak = 0
+  const set = new Set(dates)
+  while (set.has(cursor)) {
+    streak += 1
+    cursor = new Date(new Date(cursor).getTime() - 86400000).toISOString().slice(0, 10)
+  }
+  return streak
+}
+
+async function checkStreakBadges(kidId: number, streak: number) {
+  const awarded: string[] = []
+  if (streak >= 7 && (await awardBadgeIfNew(kidId, "streak_7", "連續打卡 7 天", "🔥")))
+    awarded.push("streak_7")
+  if (streak >= 30 && (await awardBadgeIfNew(kidId, "streak_30", "連續打卡 30 天", "🌟")))
+    awarded.push("streak_30")
+  if (streak >= 100 && (await awardBadgeIfNew(kidId, "streak_100", "連續打卡 100 天", "👑")))
+    awarded.push("streak_100")
+  return awarded
+}
+
 async function checkTaskBadges(kidId: number) {
   const result = await db.execute(sql`
     SELECT COUNT(*)::int AS n FROM kids_tasks
@@ -525,8 +570,11 @@ router.post(
       .where(eq(kidsTasks.id, id))
       .returning()
 
-    // 觸發徽章
+    // 觸發徽章（任務數 + streak）
     const awarded = await checkTaskBadges(kid.id)
+    const streak = await calcStreak(kid.id)
+    const streakBadges = await checkStreakBadges(kid.id, streak)
+    awarded.push(...streakBadges)
 
     // Recurring：若任務設定週期重複、自動產生下一筆相同任務
     let nextRecurringTaskId: number | null = null
@@ -749,7 +797,8 @@ router.get(
       .where(eq(kidsBadges.kidId, kid.id))
       .orderBy(desc(kidsBadges.earnedAt))
 
-    res.json({ scope: "kid", kid, jar, tasks, goals, badges })
+    const streak = await calcStreak(kid.id)
+    res.json({ scope: "kid", kid, jar, tasks, goals, badges, streak })
   })
 )
 

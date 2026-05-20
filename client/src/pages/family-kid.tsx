@@ -162,6 +162,7 @@ interface KidDashboard {
   tasks: Task[]
   goals: Goal[]
   badges: Badge[]
+  streak: number
 }
 
 function formatMoney(v: string | number) {
@@ -428,6 +429,18 @@ function KidDashboard({
             完成 {recentApprovedCount} 個任務 · {badges.length} 個徽章
           </p>
         </div>
+        {data.streak > 0 && (
+          <motion.div
+            animate={{ scale: [1, 1.05, 1] }}
+            transition={{ duration: 1.5, repeat: Infinity }}
+            className="bg-gradient-to-br from-orange-400 to-red-500 rounded-full px-3 py-1.5 text-white font-bold shadow-lg flex items-center gap-1"
+            title={`連續 ${data.streak} 天做任務、不要中斷！`}
+          >
+            <span className="text-lg">🔥</span>
+            <span>{data.streak}</span>
+            <span className="text-xs opacity-90">天</span>
+          </motion.div>
+        )}
       </div>
 
       {/* 三罐（最大、最顯眼） */}
