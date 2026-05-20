@@ -385,6 +385,9 @@ export default function FamilyPage() {
         </div>
       )}
 
+      {/* 家長提醒中心 */}
+      <ParentReminders />
+
       {/* 待審核任務 */}
       {pendingTasks.length > 0 && (
         <Card className="border-amber-300 bg-amber-50">
@@ -913,6 +916,125 @@ function TaskStatusBadge({ status }: { status: string }) {
   }
   const s = map[status] ?? { label: status, cls: "bg-gray-100 text-gray-700" }
   return <Badge className={`${s.cls} text-[10px]`}>{s.label}</Badge>
+}
+
+function ParentReminders() {
+  interface Reminders {
+    submitted: Array<{
+      id: number
+      title: string
+      emoji: string | null
+      reward: number
+      kidName: string
+      avatar: string
+    }>
+    overdue: Array<{
+      id: number
+      title: string
+      emoji: string | null
+      dueDate: string
+      daysOverdue: number
+      kidName: string
+      avatar: string
+    }>
+    nearGoal: Array<{
+      id: number
+      name: string
+      emoji: string | null
+      target: number
+      current: number
+      progress: number
+      kidName: string
+      avatar: string
+    }>
+    inactiveKids: Array<{ id: number; displayName: string; avatar: string; lastActivity: string }>
+  }
+  const { data } = useQuery<Reminders>({
+    queryKey: ["/api/family/parent-reminders"],
+    staleTime: 30_000,
+  })
+  if (!data) return null
+  const totalReminders =
+    data.submitted.length + data.overdue.length + data.nearGoal.length + data.inactiveKids.length
+  if (totalReminders === 0) return null
+
+  return (
+    <Card className="border-orange-300 bg-gradient-to-r from-orange-50 to-yellow-50">
+      <CardHeader className="py-3 px-3 sm:px-4">
+        <CardTitle className="text-base flex items-center gap-2">
+          <span className="text-xl">📌</span>
+          家長提醒中心
+          <span className="text-xs bg-orange-200 text-orange-900 px-2 py-0.5 rounded-full font-bold">
+            {totalReminders}
+          </span>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="py-2 px-3 sm:px-4 space-y-2">
+        {data.overdue.length > 0 && (
+          <div className="bg-red-50 border border-red-200 rounded p-2">
+            <div className="text-xs font-bold text-red-700 mb-1">
+              ⏰ 逾期任務（{data.overdue.length}）
+            </div>
+            <div className="space-y-0.5">
+              {data.overdue.slice(0, 5).map((t) => (
+                <div key={t.id} className="text-xs flex items-center gap-1.5">
+                  <span>{t.avatar}</span>
+                  <span className="font-medium">{t.kidName}</span>
+                  <span className="text-gray-400">·</span>
+                  <span>
+                    {t.emoji ?? "📋"} {t.title}
+                  </span>
+                  <span className="ml-auto text-red-600 font-bold">遲 {t.daysOverdue} 天</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {data.submitted.length > 0 && (
+          <div className="bg-amber-50 border border-amber-200 rounded p-2">
+            <div className="text-xs font-bold text-amber-700">
+              📝 待審任務 {data.submitted.length} 個（滑下方審核）
+            </div>
+          </div>
+        )}
+        {data.nearGoal.length > 0 && (
+          <div className="bg-purple-50 border border-purple-200 rounded p-2">
+            <div className="text-xs font-bold text-purple-700 mb-1">🎯 即將達成目標（≥80%）</div>
+            <div className="space-y-0.5">
+              {data.nearGoal.slice(0, 5).map((g) => (
+                <div key={g.id} className="text-xs flex items-center gap-1.5">
+                  <span>{g.avatar}</span>
+                  <span className="font-medium">{g.kidName}</span>
+                  <span className="text-gray-400">·</span>
+                  <span>
+                    {g.emoji ?? "🎯"} {g.name}
+                  </span>
+                  <span className="ml-auto text-purple-700 font-bold">{g.progress}%</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {data.inactiveKids.length > 0 && (
+          <div className="bg-gray-50 border border-gray-200 rounded p-2">
+            <div className="text-xs font-bold text-gray-600 mb-1">💤 7 天以上無活動的小孩</div>
+            <div className="flex flex-wrap gap-1.5">
+              {data.inactiveKids.map((k) => (
+                <div
+                  key={k.id}
+                  className="text-xs inline-flex items-center gap-1 bg-white border border-gray-300 px-2 py-0.5 rounded-full"
+                >
+                  <span>{k.avatar}</span>
+                  <span>{k.displayName}</span>
+                </div>
+              ))}
+            </div>
+            <div className="text-[10px] text-gray-500 mt-1">考慮派點任務或留言鼓勵</div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
 }
 
 function FamilyMonthlySummary({ kids }: { kids: Kid[] }) {

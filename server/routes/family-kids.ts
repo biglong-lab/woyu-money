@@ -1785,6 +1785,155 @@ router.get(
 )
 
 /**
+ * GET /api/family/parent-reminders
+ * 家長提醒中心：一頁聚合該關注的事
+ *   - 待審任務（submitted 等家長 approve）
+ *   - 逾期任務（dueDate 已過 + still pending/submitted）
+ *   - 接近達成的目標（≥80%）
+ *   - 7 天無活動的 active 小孩
+ */
+router.get(
+  "/api/family/parent-reminders",
+  asyncHandler(async (_req, res) => {
+    const submittedRows = await db.execute(sql`
+      SELECT t.id, t.title, t.emoji, t.reward_amount::numeric AS reward,
+             k.display_name AS kid_name, k.avatar
+      FROM kids_tasks t
+      LEFT JOIN kids_accounts k ON k.id = t.kid_id
+      WHERE t.status = 'submitted'
+      ORDER BY t.completed_at DESC
+      LIMIT 20
+    `)
+
+    const overdueRows = await db.execute(sql`
+      SELECT t.id, t.title, t.emoji, t.due_date,
+             (CURRENT_DATE - t.due_date)::int AS days_overdue,
+             k.display_name AS kid_name, k.avatar
+      FROM kids_tasks t
+      LEFT JOIN kids_accounts k ON k.id = t.kid_id
+      WHERE t.status IN ('pending', 'submitted')
+        AND t.due_date IS NOT NULL
+        AND t.due_date < CURRENT_DATE
+      ORDER BY t.due_date ASC
+      LIMIT 20
+    `)
+
+    const nearGoalRows = await db.execute(sql`
+      SELECT g.id, g.name, g.emoji,
+             g.target_amount::numeric AS target,
+             g.current_amount::numeric AS current,
+             ROUND(g.current_amount::numeric / g.target_amount::numeric * 100, 0)::int AS progress,
+             k.display_name AS kid_name, k.avatar
+      FROM kids_goals g
+      LEFT JOIN kids_accounts k ON k.id = g.kid_id
+      WHERE g.status = 'active'
+        AND g.target_amount::numeric > 0
+        AND g.current_amount::numeric / g.target_amount::numeric >= 0.8
+      ORDER BY progress DESC
+      LIMIT 10
+    `)
+
+    const inactiveRows = await db.execute(sql`
+      SELECT k.id, k.display_name, k.avatar,
+             COALESCE(MAX(GREATEST(
+               COALESCE(t.approved_at, '1970-01-01'::timestamp),
+               COALESCE(s.created_at, '1970-01-01'::timestamp)
+             )), '1970-01-01'::timestamp) AS last_activity
+      FROM kids_accounts k
+      LEFT JOIN kids_tasks t ON t.kid_id = k.id AND t.status = 'approved'
+      LEFT JOIN kids_spendings s ON s.kid_id = k.id
+      WHERE k.is_active = true
+      GROUP BY k.id, k.display_name, k.avatar
+      HAVING COALESCE(MAX(GREATEST(
+        COALESCE(t.approved_at, '1970-01-01'::timestamp),
+        COALESCE(s.created_at, '1970-01-01'::timestamp)
+      )), '1970-01-01'::timestamp) < (NOW() - INTERVAL '7 days')
+    `)
+
+    res.json({
+      submitted: (
+        submittedRows as unknown as {
+          rows: Array<{
+            id: number
+            title: string
+            emoji: string | null
+            reward: string | number
+            kid_name: string
+            avatar: string
+          }>
+        }
+      ).rows.map((r) => ({
+        id: r.id,
+        title: r.title,
+        emoji: r.emoji,
+        reward: parseFloat(String(r.reward)),
+        kidName: r.kid_name,
+        avatar: r.avatar,
+      })),
+      overdue: (
+        overdueRows as unknown as {
+          rows: Array<{
+            id: number
+            title: string
+            emoji: string | null
+            due_date: string
+            days_overdue: number
+            kid_name: string
+            avatar: string
+          }>
+        }
+      ).rows.map((r) => ({
+        id: r.id,
+        title: r.title,
+        emoji: r.emoji,
+        dueDate: r.due_date,
+        daysOverdue: r.days_overdue,
+        kidName: r.kid_name,
+        avatar: r.avatar,
+      })),
+      nearGoal: (
+        nearGoalRows as unknown as {
+          rows: Array<{
+            id: number
+            name: string
+            emoji: string | null
+            target: string | number
+            current: string | number
+            progress: number
+            kid_name: string
+            avatar: string
+          }>
+        }
+      ).rows.map((r) => ({
+        id: r.id,
+        name: r.name,
+        emoji: r.emoji,
+        target: parseFloat(String(r.target)),
+        current: parseFloat(String(r.current)),
+        progress: r.progress,
+        kidName: r.kid_name,
+        avatar: r.avatar,
+      })),
+      inactiveKids: (
+        inactiveRows as unknown as {
+          rows: Array<{
+            id: number
+            display_name: string
+            avatar: string
+            last_activity: string
+          }>
+        }
+      ).rows.map((r) => ({
+        id: r.id,
+        displayName: r.display_name,
+        avatar: r.avatar,
+        lastActivity: r.last_activity,
+      })),
+    })
+  })
+)
+
+/**
  * GET /api/family/badges-catalog?kidId=
  * 所有可達徽章的目錄 + 該小孩進度（含未解鎖）
  * 培養目標感：「再做 N 個就解鎖」激勵

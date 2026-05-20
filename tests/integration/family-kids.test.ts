@@ -1455,6 +1455,50 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(catalog.body.totalEarned).toBeGreaterThanOrEqual(2) // give_100 + give_500
   })
 
+  it("家長提醒中心：待審 / 逾期 / 接近達成目標 / 無活動小孩", async () => {
+    await createKid({ spendRatio: 0, saveRatio: 100, giveRatio: 0 })
+
+    // 1) 建一個 submitted 任務（待審）
+    const t1 = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId, title: "待審任務", rewardAmount: 50 })
+    await request(app).post(`/api/family/tasks/${t1.body.id}/submit`)
+
+    // 2) 逾期任務（昨天截止、還 pending）
+    const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10)
+    const overdueT = await request(app).post("/api/family/tasks").send({
+      kidId,
+      title: "逾期",
+      rewardAmount: 30,
+      dueDate: yesterday,
+    })
+
+    // 3) 接近達成的目標
+    const earnT = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId, title: "賺", rewardAmount: 200 })
+    await request(app).post(`/api/family/tasks/${earnT.body.id}/submit`)
+    await request(app).post(`/api/family/tasks/${earnT.body.id}/approve`)
+    const g = await request(app).post("/api/family/goals").send({
+      kidId,
+      name: "近達標",
+      targetAmount: 100,
+    })
+    await request(app).post(`/api/family/goals/${g.body.id}/save`).send({ amount: 90 })
+
+    const res = await request(app).get("/api/family/parent-reminders")
+    expect(res.status).toBe(200)
+    expect(Array.isArray(res.body.submitted)).toBe(true)
+    expect(res.body.submitted.find((x: { id: number }) => x.id === t1.body.id)).toBeTruthy()
+    expect(res.body.overdue.find((x: { id: number }) => x.id === overdueT.body.id)).toBeTruthy()
+    expect(
+      res.body.overdue.find((x: { id: number }) => x.id === overdueT.body.id).daysOverdue
+    ).toBe(1)
+    expect(res.body.nearGoal.find((x: { id: number }) => x.id === g.body.id)).toBeTruthy()
+    expect(res.body.nearGoal.find((x: { id: number }) => x.id === g.body.id).progress).toBe(90)
+    expect(Array.isArray(res.body.inactiveKids)).toBe(true)
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)
