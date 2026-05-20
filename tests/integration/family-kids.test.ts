@@ -1219,6 +1219,66 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(del.status).toBe(200)
   })
 
+  it("捐贈追蹤：聚合 give jar + 按 recipient 分組 + 6 月趨勢", async () => {
+    await createKid({ spendRatio: 0, saveRatio: 0, giveRatio: 100 })
+    // 賺 200 全進 give 罐
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId, title: "T", rewardAmount: 200 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`)
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`)
+
+    // 捐 2 次（同 recipient）+ 1 次（不同 recipient）
+    const today = new Date().toISOString().slice(0, 10)
+    await request(app).post("/api/family/spendings").send({
+      kidId,
+      jar: "give",
+      amount: 30,
+      description: "捐動保",
+      recipient: "動物保護協會",
+      reflection: "希望狗狗有家",
+      spendDate: today,
+    })
+    await request(app).post("/api/family/spendings").send({
+      kidId,
+      jar: "give",
+      amount: 20,
+      description: "再捐",
+      recipient: "動物保護協會",
+      spendDate: today,
+    })
+    await request(app).post("/api/family/spendings").send({
+      kidId,
+      jar: "give",
+      amount: 50,
+      description: "學校募款",
+      recipient: "學校",
+      spendDate: today,
+    })
+
+    const res = await request(app).get(`/api/family/donations?kidId=${kidId}`)
+    expect(res.status).toBe(200)
+    expect(res.body.total).toBe(100)
+    expect(res.body.count).toBe(3)
+    expect(res.body.recipients.length).toBe(2)
+    // 「動保」總計 50 > 「學校」50 — 第一名應為「動物保護協會」(50, 2 筆) 或 學校 (50, 1 筆)
+    // 因為都 50、排序看 recipient name 不影響整體驗證
+    const animal = res.body.recipients.find(
+      (r: { recipient: string }) => r.recipient === "動物保護協會"
+    )
+    expect(animal).toBeTruthy()
+    expect(animal.count).toBe(2)
+    expect(animal.total).toBe(50)
+    // monthlyTrend 應有 6 個月、本月 total >= 100
+    expect(res.body.monthlyTrend.length).toBe(6)
+    expect(res.body.monthlyTrend[5].total).toBe(100)
+    // items 含 reflection
+    const withRef = res.body.items.find(
+      (x: { reflection: string | null }) => x.reflection === "希望狗狗有家"
+    )
+    expect(withRef).toBeTruthy()
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)

@@ -1632,6 +1632,69 @@ router.get(
 )
 
 /**
+ * 捐贈追蹤
+ * GET /api/family/donations?kidId=
+ * 聚合 give 罐 spendings、按 recipient 分組 + 總計 + 6 月趨勢
+ * 培養同理心、視覺呈現「自己幫了多少人」
+ */
+router.get(
+  "/api/family/donations",
+  asyncHandler(async (req, res) => {
+    const kidIdQ = Number(req.query.kidId)
+    if (!Number.isInteger(kidIdQ) || kidIdQ < 1) throw new AppError(400, "需傳 kidId")
+
+    const items = await db
+      .select()
+      .from(kidsSpendings)
+      .where(and(eq(kidsSpendings.kidId, kidIdQ), eq(kidsSpendings.jar, "give")))
+      .orderBy(desc(kidsSpendings.spendDate), desc(kidsSpendings.id))
+
+    const total = items.reduce((s, x) => s + parseFloat(x.amount), 0)
+
+    const byRecipient: Record<string, { count: number; total: number }> = {}
+    items.forEach((x) => {
+      const key = x.recipient ?? "未分類"
+      if (!byRecipient[key]) byRecipient[key] = { count: 0, total: 0 }
+      byRecipient[key].count += 1
+      byRecipient[key].total += parseFloat(x.amount)
+    })
+    const recipients = Object.entries(byRecipient)
+      .map(([recipient, v]) => ({ recipient, count: v.count, total: v.total }))
+      .sort((a, b) => b.total - a.total)
+
+    const monthMap: Record<string, number> = {}
+    items.forEach((x) => {
+      const m = String(x.spendDate).slice(0, 7)
+      monthMap[m] = (monthMap[m] ?? 0) + parseFloat(x.amount)
+    })
+    const now = new Date()
+    const monthlyTrend: { month: string; total: number }[] = []
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+      const m = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
+      monthlyTrend.push({ month: m, total: monthMap[m] ?? 0 })
+    }
+
+    res.json({
+      kidId: kidIdQ,
+      total,
+      count: items.length,
+      recipients,
+      monthlyTrend,
+      items: items.slice(0, 50).map((x) => ({
+        id: x.id,
+        amount: parseFloat(x.amount),
+        description: x.description,
+        emoji: x.emoji,
+        recipient: x.recipient,
+        reflection: x.reflection,
+        spendDate: x.spendDate,
+      })),
+    })
+  })
+)
+
+/**
  * 小孩願望清單
  *   GET    /api/family/wishes?kidId=          列出（按 priority desc 然後 createdAt desc）
  *   POST   /api/family/wishes                 新增（kidId + title 必填）

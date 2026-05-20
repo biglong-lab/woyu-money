@@ -723,6 +723,9 @@ function KidDashboard({
         )}
       </div>
 
+      {/* 我的善行（捐贈追蹤）*/}
+      <DonationsSection kidId={kidId} />
+
       {/* 花錢紀錄 */}
       {spendings.length > 0 && (
         <div className="mb-4">
@@ -1301,6 +1304,116 @@ function WishesSection({
               </button>
             </div>
           ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function DonationsSection({ kidId }: { kidId: number }) {
+  const [open, setOpen] = useState(false)
+  interface DonationData {
+    total: number
+    count: number
+    recipients: Array<{ recipient: string; count: number; total: number }>
+    monthlyTrend: Array<{ month: string; total: number }>
+    items: Array<{
+      id: number
+      amount: number
+      description: string
+      emoji: string | null
+      recipient: string | null
+      reflection: string | null
+      spendDate: string
+    }>
+  }
+  const { data } = useQuery<DonationData>({
+    queryKey: [`/api/family/donations?kidId=${kidId}`],
+  })
+  if (!data || data.count === 0) return null
+
+  return (
+    <div className="mb-4">
+      <button
+        type="button"
+        onClick={() => setOpen((s) => !s)}
+        className="w-full bg-gradient-to-r from-rose-100 to-pink-100 border-2 border-rose-300 rounded-xl p-3 flex items-center gap-3 shadow-sm"
+      >
+        <div className="text-3xl">❤️</div>
+        <div className="flex-1 text-left">
+          <div className="text-sm font-bold text-rose-800">我的善行</div>
+          <div className="text-xs text-rose-700">
+            幫助 {data.recipients.length} 個對象、共 {formatMoney(data.total)}（{data.count} 次）
+          </div>
+        </div>
+        {open ? (
+          <ChevronUp className="h-4 w-4 text-rose-700" />
+        ) : (
+          <ChevronDown className="h-4 w-4 text-rose-700" />
+        )}
+      </button>
+      {open && (
+        <div className="mt-2 space-y-2">
+          {/* recipients top 3 */}
+          {data.recipients.length > 0 && (
+            <div className="bg-white rounded-lg p-3 shadow-sm">
+              <div className="text-xs text-gray-500 mb-2">幫助的對象（前 3 名）</div>
+              <div className="space-y-1.5">
+                {data.recipients.slice(0, 3).map((r, i) => (
+                  <div key={r.recipient} className="flex items-center gap-2 text-sm">
+                    <span className="text-base">{i === 0 ? "🥇" : i === 1 ? "🥈" : "🥉"}</span>
+                    <span className="flex-1">{r.recipient}</span>
+                    <span className="text-xs text-gray-500">{r.count} 次</span>
+                    <span className="font-mono font-medium text-rose-700">
+                      {formatMoney(r.total)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {/* 6 月趨勢 */}
+          <div className="bg-white rounded-lg p-2 shadow-sm h-32">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={data.monthlyTrend}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
+                <XAxis
+                  dataKey="month"
+                  tickFormatter={(m: string) => m.slice(5)}
+                  tick={{ fontSize: 10 }}
+                />
+                <YAxis tick={{ fontSize: 10 }} width={30} />
+                <RTooltip
+                  formatter={(v: number) => "$" + Number(v).toLocaleString()}
+                  contentStyle={{ fontSize: "11px" }}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="total"
+                  stroke="#e11d48"
+                  strokeWidth={2}
+                  dot={{ r: 3 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+          {/* 最近反思 */}
+          {data.items.filter((x) => x.reflection).length > 0 && (
+            <div className="bg-rose-50 border border-rose-200 rounded-lg p-2 space-y-1">
+              <div className="text-xs text-rose-700 mb-1">💭 我的捐贈反思</div>
+              {data.items
+                .filter((x) => x.reflection)
+                .slice(0, 3)
+                .map((x) => (
+                  <div
+                    key={x.id}
+                    className="text-xs text-gray-700 italic pl-2 border-l-2 border-rose-300"
+                  >
+                    「{x.reflection}」<span className="text-gray-400">— {x.spendDate}</span>
+                  </div>
+                ))}
+            </div>
+          )}
         </div>
       )}
     </div>
