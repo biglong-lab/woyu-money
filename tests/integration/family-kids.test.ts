@@ -1550,6 +1550,46 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     }
   })
 
+  it("kid dashboard tasks 含 isOverdue / isDueSoon / overdueDays", async () => {
+    await createKid()
+    const today = new Date().toISOString().slice(0, 10)
+    const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10)
+    const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10)
+    const nextWeek = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10)
+
+    const dueToday = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId, title: "今天", rewardAmount: 10, dueDate: today })
+    const overdueT = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId, title: "昨天", rewardAmount: 10, dueDate: yesterday })
+    const dueTomorrow = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId, title: "明天", rewardAmount: 10, dueDate: tomorrow })
+    const dueNextWeek = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId, title: "下週", rewardAmount: 10, dueDate: nextWeek })
+
+    const res = await request(app).get(`/api/family/dashboard?kidId=${kidId}`)
+    expect(res.status).toBe(200)
+    const findTask = (id: number) => res.body.tasks.find((t: { id: number }) => t.id === id)
+
+    const todayT = findTask(dueToday.body.id)
+    expect(todayT.isDueSoon).toBe(true)
+    expect(todayT.isOverdue).toBe(false)
+
+    const overdueR = findTask(overdueT.body.id)
+    expect(overdueR.isOverdue).toBe(true)
+    expect(overdueR.overdueDays).toBe(1)
+
+    const tomorrowT = findTask(dueTomorrow.body.id)
+    expect(tomorrowT.isDueSoon).toBe(true)
+
+    const nextWeekT = findTask(dueNextWeek.body.id)
+    expect(nextWeekT.isOverdue).toBe(false)
+    expect(nextWeekT.isDueSoon).toBe(false)
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)

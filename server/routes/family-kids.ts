@@ -1036,12 +1036,30 @@ router.get(
     // Lazy 補發每月零用金（若 monthlyAllowance > 0 且本月未發）
     const allowanceJustGiven = await ensureMonthlyAllowance(kid.id)
     const [jar] = await db.select().from(kidsJars).where(eq(kidsJars.kidId, kid.id)).limit(1)
-    const tasks = await db
+    const tasksRaw = await db
       .select()
       .from(kidsTasks)
       .where(eq(kidsTasks.kidId, kid.id))
       .orderBy(desc(kidsTasks.createdAt))
       .limit(20)
+    // 加 isOverdue / isDueSoon / overdueDays（小孩端視覺警示用）
+    const today = new Date().toISOString().slice(0, 10)
+    const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10)
+    const tasks = tasksRaw.map((r) => {
+      const isPending = r.status === "pending" || r.status === "submitted"
+      const isOverdue = !!(r.dueDate && r.dueDate < today && isPending)
+      const isDueSoon = !!(
+        r.dueDate &&
+        (r.dueDate === today || r.dueDate === tomorrow) &&
+        isPending &&
+        !isOverdue
+      )
+      const overdueDays =
+        isOverdue && r.dueDate
+          ? Math.floor((new Date(today).getTime() - new Date(r.dueDate).getTime()) / 86400000)
+          : 0
+      return { ...r, isOverdue, isDueSoon, overdueDays }
+    })
     const goals = await db
       .select()
       .from(kidsGoals)

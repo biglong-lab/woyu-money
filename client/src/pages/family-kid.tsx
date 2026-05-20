@@ -91,6 +91,10 @@ interface Task {
   submissionNote?: string | null
   parentFeedback?: string | null
   difficulty?: "easy" | "medium" | "hard"
+  dueDate?: string | null
+  isOverdue?: boolean
+  isDueSoon?: boolean
+  overdueDays?: number
 }
 
 const difficultyStars = (d?: string) => (d === "easy" ? "⭐" : d === "hard" ? "⭐⭐⭐" : "⭐⭐")
@@ -554,16 +558,45 @@ function KidDashboard({
               <motion.div
                 key={t.id}
                 whileTap={{ scale: 0.98 }}
-                className="bg-white rounded-lg p-3 flex items-center gap-3 shadow-sm"
+                animate={
+                  t.isOverdue
+                    ? {
+                        boxShadow: [
+                          "0 0 0 0 rgba(239,68,68,0)",
+                          "0 0 0 4px rgba(239,68,68,0.3)",
+                          "0 0 0 0 rgba(239,68,68,0)",
+                        ],
+                      }
+                    : undefined
+                }
+                transition={t.isOverdue ? { duration: 1.5, repeat: Infinity } : undefined}
+                className={`rounded-lg p-3 flex items-center gap-3 shadow-sm border-2 ${
+                  t.isOverdue
+                    ? "bg-red-50 border-red-400"
+                    : t.isDueSoon
+                      ? "bg-amber-50 border-amber-400"
+                      : "bg-white border-transparent"
+                }`}
               >
                 <div className="text-3xl">{t.emoji ?? "📋"}</div>
                 <div className="flex-1">
-                  <div className="font-medium flex items-center gap-1.5">
+                  <div className="font-medium flex items-center gap-1.5 flex-wrap">
                     {t.title}
                     <span className="text-xs text-amber-500">{difficultyStars(t.difficulty)}</span>
+                    {t.isOverdue && (
+                      <span className="text-[10px] bg-red-500 text-white px-1.5 py-0.5 rounded font-bold">
+                        ⚠️ 過期 {t.overdueDays} 天
+                      </span>
+                    )}
+                    {t.isDueSoon && !t.isOverdue && (
+                      <span className="text-[10px] bg-amber-500 text-white px-1.5 py-0.5 rounded font-bold">
+                        ⏰ 快到期
+                      </span>
+                    )}
                   </div>
                   <div className="text-xs text-gray-500">
                     完成可得 {formatMoney(t.rewardAmount)}
+                    {t.dueDate && <span className="ml-2 text-[10px]">截止 {t.dueDate}</span>}
                   </div>
                 </div>
                 {/* 💬 跟大人聊聊 */}
