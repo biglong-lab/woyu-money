@@ -1499,6 +1499,30 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(Array.isArray(res.body.inactiveKids)).toBe(true)
   })
 
+  it("自動每月零用金：dashboard 查時補發 + 同月不重發 + 三罐分配", async () => {
+    // 建小孩、設每月 300 零用金、ratios 70/20/10
+    await createKid({ spendRatio: 70, saveRatio: 20, giveRatio: 10 })
+    await request(app).put(`/api/family/kids/${kidId}`).send({ monthlyAllowance: 300 })
+
+    // 第一次查 dashboard → 應補發
+    const r1 = await request(app).get(`/api/family/dashboard?kidId=${kidId}`)
+    expect(r1.status).toBe(200)
+    expect(r1.body.allowanceJustGiven).toBe(300)
+    // 三罐：210/60/30
+    expect(parseFloat(r1.body.jar.spendBalance)).toBe(210)
+    expect(parseFloat(r1.body.jar.saveBalance)).toBe(60)
+    expect(parseFloat(r1.body.jar.giveBalance)).toBe(30)
+
+    // 第二次查 → 同月不重發
+    const r2 = await request(app).get(`/api/family/dashboard?kidId=${kidId}`)
+    expect(r2.body.allowanceJustGiven).toBe(0)
+    expect(parseFloat(r2.body.jar.spendBalance)).toBe(210) // 沒漲
+
+    // 清掉主系統測試 payment_items（避免污染）
+    await db.execute(sql`DELETE FROM payment_records WHERE notes LIKE '家庭記帳：%自動零用金%'`)
+    await db.execute(sql`DELETE FROM payment_items WHERE tags = 'kids,allowance,monthly'`)
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)

@@ -72,6 +72,8 @@ interface Kid {
   spendRatio: number
   saveRatio: number
   giveRatio: number
+  monthlyAllowance?: string
+  lastAllowanceMonth?: string | null
 }
 
 interface Task {
@@ -1367,6 +1369,9 @@ function KidDialog({
   const [spendRatio, setSpendRatio] = useState(kid?.spendRatio ?? 70)
   const [saveRatio, setSaveRatio] = useState(kid?.saveRatio ?? 20)
   const [giveRatio, setGiveRatio] = useState(kid?.giveRatio ?? 10)
+  const [monthlyAllowance, setMonthlyAllowance] = useState(
+    kid?.monthlyAllowance ? String(parseFloat(kid.monthlyAllowance)) : "0"
+  )
 
   const total = spendRatio + saveRatio + giveRatio
   const ratioOK = total === 100
@@ -1381,6 +1386,7 @@ function KidDialog({
         spendRatio,
         saveRatio,
         giveRatio,
+        monthlyAllowance: parseFloat(monthlyAllowance) || 0,
       }
       if (mode === "create") body.pin = pin
       return mode === "create"
@@ -1487,6 +1493,28 @@ function KidDialog({
             <p className={`text-xs mt-1 ${ratioOK ? "text-green-700" : "text-red-700"}`}>
               總和 {total}（需為 100）
             </p>
+          </div>
+          <div className="border-t pt-3">
+            <Label className="flex items-center gap-2">
+              📅 每月自動零用金
+              <span className="text-[10px] text-gray-400 font-normal">（每月 1 號自動入帳）</span>
+            </Label>
+            <div className="flex items-center gap-2 mt-1">
+              <span className="text-gray-500">$</span>
+              <Input
+                type="number"
+                value={monthlyAllowance}
+                onChange={(e) => setMonthlyAllowance(e.target.value)}
+                placeholder="0"
+                min="0"
+              />
+            </div>
+            <div className="text-[10px] text-gray-400 mt-1">
+              填 0 = 關閉自動入帳、需手動派任務獎勵
+              {parseFloat(monthlyAllowance) > 0 && kid?.lastAllowanceMonth && (
+                <span className="text-green-700 ml-1">· 上次發放：{kid.lastAllowanceMonth}</span>
+              )}
+            </div>
           </div>
         </div>
         <DialogFooter>

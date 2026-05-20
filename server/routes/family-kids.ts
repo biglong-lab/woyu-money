@@ -51,6 +51,76 @@ const router = Router()
 // ============================================================
 // helpers
 // ============================================================
+/**
+ * Lazy 補發每月零用金
+ * 流程：每次 dashboard 查時呼叫、若 kid.monthlyAllowance > 0 且 lastAllowanceMonth != currentMonth
+ *   → 自動入帳 monthlyAllowance 並按三罐分配
+ *   → 更新 lastAllowanceMonth = currentMonth
+ *   → 寫一筆 payment_items / payment_records（主系統可看見）
+ * 回傳：補發金額（0 = 沒發、>0 = 發了多少）
+ */
+async function ensureMonthlyAllowance(kidId: number): Promise<number> {
+  const [kid] = await db.select().from(kidsAccounts).where(eq(kidsAccounts.id, kidId)).limit(1)
+  if (!kid) return 0
+  const amount = parseFloat(kid.monthlyAllowance)
+  if (!(amount > 0)) return 0
+  const now = new Date()
+  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
+  if (kid.lastAllowanceMonth === currentMonth) return 0
+
+  // 入帳 + 三罐分配（複用 approve 邏輯）
+  const spendAdd = Math.round((amount * kid.spendRatio) / 100)
+  const saveAdd = Math.round((amount * kid.saveRatio) / 100)
+  const giveAdd = amount - spendAdd - saveAdd
+  await ensureJarsRow(kidId)
+  await db.execute(sql`
+    UPDATE kids_jars SET
+      spend_balance = spend_balance + ${spendAdd.toFixed(2)}::numeric,
+      save_balance = save_balance + ${saveAdd.toFixed(2)}::numeric,
+      give_balance = give_balance + ${giveAdd.toFixed(2)}::numeric,
+      total_received = total_received + ${amount.toFixed(2)}::numeric,
+      updated_at = NOW()
+    WHERE kid_id = ${kidId}
+  `)
+  await db
+    .update(kidsAccounts)
+    .set({ lastAllowanceMonth: currentMonth, updatedAt: new Date() })
+    .where(eq(kidsAccounts.id, kidId))
+
+  // 寫進主系統（複用既有 tags=kids,allowance 規範）
+  try {
+    const today = now.toISOString().slice(0, 10)
+    const [pi] = await db
+      .insert(paymentItems)
+      .values({
+        itemName: `📅 ${kid.displayName} ${currentMonth} 月零用金（自動入帳）`,
+        totalAmount: amount.toFixed(2),
+        paidAmount: amount.toFixed(2),
+        itemType: "home",
+        paymentType: "single",
+        status: "paid",
+        startDate: today,
+        source: "manual",
+        notes:
+          `家庭記帳「每月零用金」自動入帳\n小孩：${kid.displayName}（id=${kid.id}）\n月份：${currentMonth}\n` +
+          `三罐分配：花用 $${spendAdd} / 儲蓄 $${saveAdd} / 捐獻 $${giveAdd}`,
+        tags: "kids,allowance,monthly",
+      })
+      .returning({ id: paymentItems.id })
+    await db.insert(paymentRecords).values({
+      itemId: pi.id,
+      amountPaid: amount.toFixed(2),
+      paymentDate: today,
+      paymentMethod: "現金",
+      notes: `家庭記帳：${kid.displayName} ${currentMonth} 月自動零用金`,
+    })
+  } catch (err) {
+    console.warn("[family-kids] 自動零用金寫入 payment_items 失敗：", err)
+  }
+
+  return amount
+}
+
 async function ensureJarsRow(kidId: number) {
   const existing = await db.select().from(kidsJars).where(eq(kidsJars.kidId, kidId)).limit(1)
   if (existing.length === 0) {
@@ -963,6 +1033,8 @@ router.get(
     const [kid] = await db.select().from(kidsAccounts).where(eq(kidsAccounts.id, kidIdQ)).limit(1)
     if (!kid) throw new AppError(404, "小孩不存在")
     await ensureJarsRow(kid.id)
+    // Lazy 補發每月零用金（若 monthlyAllowance > 0 且本月未發）
+    const allowanceJustGiven = await ensureMonthlyAllowance(kid.id)
     const [jar] = await db.select().from(kidsJars).where(eq(kidsJars.kidId, kid.id)).limit(1)
     const tasks = await db
       .select()
@@ -982,7 +1054,7 @@ router.get(
       .orderBy(desc(kidsBadges.earnedAt))
 
     const streak = await calcStreak(kid.id)
-    res.json({ scope: "kid", kid, jar, tasks, goals, badges, streak })
+    res.json({ scope: "kid", kid, jar, tasks, goals, badges, streak, allowanceJustGiven })
   })
 )
 

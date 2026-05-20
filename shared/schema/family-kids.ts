@@ -44,6 +44,12 @@ export const kidsAccounts = pgTable(
     spendRatio: integer("spend_ratio").notNull().default(70),
     saveRatio: integer("save_ratio").notNull().default(20),
     giveRatio: integer("give_ratio").notNull().default(10),
+    // 每月自動零用金（0 = 關閉、>0 = 每月 1 號自動入帳該金額並按三罐分配）
+    monthlyAllowance: decimal("monthly_allowance", { precision: 8, scale: 2 })
+      .notNull()
+      .default("0"),
+    // 上次自動入帳的月份（YYYY-MM）、避免同月重發
+    lastAllowanceMonth: varchar("last_allowance_month", { length: 7 }),
     isActive: boolean("is_active").notNull().default(true),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
@@ -300,7 +306,11 @@ export const insertKidsAccountSchema = createInsertSchema(kidsAccounts, {
   spendRatio: z.number().int().min(0).max(100),
   saveRatio: z.number().int().min(0).max(100),
   giveRatio: z.number().int().min(0).max(100),
-}).omit({ id: true, createdAt: true, updatedAt: true })
+  monthlyAllowance: z
+    .union([z.string(), z.number()])
+    .transform((v) => String(v))
+    .optional(),
+}).omit({ id: true, createdAt: true, updatedAt: true, lastAllowanceMonth: true })
 
 export const insertKidsTaskSchema = createInsertSchema(kidsTasks, {
   rewardAmount: z.union([z.string(), z.number()]).transform((v) => String(v)),
