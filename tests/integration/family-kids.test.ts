@@ -1,0 +1,237 @@
+/**
+ * 家庭記帳「小孩模式」API 測試
+ * 涵蓋：accounts CRUD + PIN 登入 + 任務 approve 三罐分配 + 目標 + 徽章
+ */
+import { describe, it, expect, beforeAll, afterEach, afterAll } from "vitest"
+import request from "supertest"
+import type { Express } from "express"
+import { db } from "../../server/db"
+import { sql } from "drizzle-orm"
+
+const skipIfNoDb = !process.env.DATABASE_URL
+
+async function createTestApp(): Promise<Express> {
+  const express = (await import("express")).default
+  const app = express()
+  app.use(express.json())
+  app.use((req, _res, next) => {
+    const r = req as typeof req & {
+      user: { id: number; username: string; isActive: boolean }
+      isAuthenticated: () => boolean
+      session: Record<string, unknown>
+    }
+    r.user = { id: 1, username: "admin", isActive: true }
+    r.isAuthenticated = () => true
+    r.session = { userId: 1, isAuthenticated: true }
+    next()
+  })
+  const routes = (await import("../../server/routes/family-kids")).default
+  app.use(routes)
+  const { globalErrorHandler } = await import("../../server/middleware/error-handler")
+  app.use(globalErrorHandler)
+  return app
+}
+
+describe.skipIf(skipIfNoDb)("Family Kids API", () => {
+  let app: Express
+  let kidId: number
+  const TEST_PIN = "9871" // 不易撞到生產資料
+
+  beforeAll(async () => {
+    app = await createTestApp()
+  })
+
+  afterEach(async () => {
+    // 每個 test 後清測試小孩（cascade 會清 jars/tasks/goals/badges）
+    if (kidId) {
+      await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${kidId}`)
+      kidId = 0
+    }
+  })
+
+  afterAll(async () => {
+    await db.execute(sql`DELETE FROM kids_accounts WHERE pin = ${TEST_PIN}`)
+  })
+
+  async function createKid(
+    overrides: Partial<{
+      displayName: string
+      spendRatio: number
+      saveRatio: number
+      giveRatio: number
+    }> = {}
+  ) {
+    const res = await request(app)
+      .post("/api/family/kids")
+      .send({
+        displayName: overrides.displayName ?? "測試小孩",
+        avatar: "🧒",
+        color: "blue",
+        pin: TEST_PIN,
+        spendRatio: overrides.spendRatio ?? 70,
+        saveRatio: overrides.saveRatio ?? 20,
+        giveRatio: overrides.giveRatio ?? 10,
+      })
+    expect(res.status).toBe(201)
+    kidId = res.body.id
+    return res.body
+  }
+
+  it("新增小孩 + 自動建 jars row + PIN 登入", async () => {
+    await createKid()
+
+    // jars 應該自動建立
+    const jars = await db.execute(sql`SELECT * FROM kids_jars WHERE kid_id = ${kidId}`)
+    expect((jars as unknown as { rows: unknown[] }).rows.length).toBe(1)
+
+    // PIN 登入應成功
+    const login = await request(app).post("/api/family/kids/pin-login").send({ pin: TEST_PIN })
+    expect(login.status).toBe(200)
+    expect(login.body.id).toBe(kidId)
+    expect(login.body.displayName).toBe("測試小孩")
+  })
+
+  it("三罐比例總和非 100 應拒絕", async () => {
+    const res = await request(app).post("/api/family/kids").send({
+      displayName: "X",
+      avatar: "🧒",
+      color: "blue",
+      pin: "9999",
+      spendRatio: 50,
+      saveRatio: 30,
+      giveRatio: 30,
+    })
+    expect(res.status).toBe(400)
+  })
+
+  it("錯誤 PIN 登入回 404", async () => {
+    await createKid()
+    const res = await request(app).post("/api/family/kids/pin-login").send({ pin: "0000" })
+    expect(res.status).toBe(404)
+  })
+
+  it("派任務 + 小孩 submit + 家長 approve 自動三罐分配", async () => {
+    await createKid({ spendRatio: 70, saveRatio: 20, giveRatio: 10 })
+
+    // 派任務
+    const tres = await request(app).post("/api/family/tasks").send({
+      kidId,
+      title: "洗碗",
+      emoji: "🍽️",
+      rewardAmount: 100,
+    })
+    expect(tres.status).toBe(201)
+    const taskId = tres.body.id
+
+    // submit
+    const sres = await request(app).post(`/api/family/tasks/${taskId}/submit`)
+    expect(sres.status).toBe(200)
+    expect(sres.body.status).toBe("submitted")
+
+    // approve → 三罐分配 70/20/10 = 70 / 20 / 10
+    const ares = await request(app).post(`/api/family/tasks/${taskId}/approve`)
+    expect(ares.status).toBe(200)
+    expect(ares.body.task.status).toBe("approved")
+    expect(ares.body.jars.spendAdd).toBe(70)
+    expect(ares.body.jars.saveAdd).toBe(20)
+    expect(ares.body.jars.giveAdd).toBe(10)
+    expect(ares.body.newBadges).toContain("first_task")
+
+    // jars DB 驗證
+    const jar = (
+      await db.execute(sql`
+        SELECT spend_balance::numeric AS s, save_balance::numeric AS sv,
+               give_balance::numeric AS g, total_received::numeric AS t
+        FROM kids_jars WHERE kid_id = ${kidId}
+      `)
+    ).rows as unknown as { s: number; sv: number; g: number; t: number }[]
+    expect(Number(jar[0].s)).toBe(70)
+    expect(Number(jar[0].sv)).toBe(20)
+    expect(Number(jar[0].g)).toBe(10)
+    expect(Number(jar[0].t)).toBe(100)
+  })
+
+  it("駁回任務", async () => {
+    await createKid()
+    const tres = await request(app).post("/api/family/tasks").send({
+      kidId,
+      title: "測試",
+      rewardAmount: 50,
+    })
+    await request(app).post(`/api/family/tasks/${tres.body.id}/submit`)
+    const rres = await request(app)
+      .post(`/api/family/tasks/${tres.body.id}/reject`)
+      .send({ notes: "做得不好" })
+    expect(rres.status).toBe(200)
+    expect(rres.body.status).toBe("rejected")
+  })
+
+  it("存錢目標：建立 + 從 save 罐撥錢 + 達成觸發徽章", async () => {
+    await createKid({ spendRatio: 0, saveRatio: 100, giveRatio: 0 })
+
+    // 先派任務入帳 200（全進 save 罐）
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId, title: "T", rewardAmount: 200 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`)
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`)
+
+    // 建目標 150
+    const g = await request(app).post("/api/family/goals").send({
+      kidId,
+      name: "玩具車",
+      emoji: "🚗",
+      targetAmount: 150,
+    })
+    expect(g.status).toBe(201)
+    const goalId = g.body.id
+
+    // 撥 100 進去（不達標）
+    const s1 = await request(app).post(`/api/family/goals/${goalId}/save`).send({ amount: 100 })
+    expect(s1.status).toBe(200)
+    expect(s1.body.reached).toBe(false)
+
+    // 撥剩 50（達標）
+    const s2 = await request(app).post(`/api/family/goals/${goalId}/save`).send({ amount: 50 })
+    expect(s2.status).toBe(200)
+    expect(s2.body.reached).toBe(true)
+    expect(s2.body.newBadges).toContain("first_goal")
+  })
+
+  it("save 餘額不足拒絕", async () => {
+    await createKid({ spendRatio: 100, saveRatio: 0, giveRatio: 0 })
+    const g = await request(app).post("/api/family/goals").send({
+      kidId,
+      name: "test",
+      targetAmount: 100,
+    })
+    const res = await request(app).post(`/api/family/goals/${g.body.id}/save`).send({ amount: 50 })
+    expect(res.status).toBe(400)
+  })
+
+  it("Dashboard 全家總覽 + 個別 kid 都正常", async () => {
+    await createKid()
+    const family = await request(app).get("/api/family/dashboard")
+    expect(family.status).toBe(200)
+    expect(family.body.scope).toBe("family")
+    expect(Array.isArray(family.body.kids)).toBe(true)
+
+    const kid = await request(app).get(`/api/family/dashboard?kidId=${kidId}`)
+    expect(kid.status).toBe(200)
+    expect(kid.body.scope).toBe("kid")
+    expect(kid.body.kid.id).toBe(kidId)
+    expect(kid.body.jar).toBeTruthy()
+    expect(Array.isArray(kid.body.tasks)).toBe(true)
+    expect(Array.isArray(kid.body.goals)).toBe(true)
+    expect(Array.isArray(kid.body.badges)).toBe(true)
+  })
+
+  it("軟刪除小孩（isActive=false）", async () => {
+    await createKid()
+    const res = await request(app).delete(`/api/family/kids/${kidId}`)
+    expect(res.status).toBe(200)
+
+    const list = await request(app).get("/api/family/kids")
+    expect(list.body.find((k: { id: number }) => k.id === kidId)).toBeFalsy()
+  })
+})

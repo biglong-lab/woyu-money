@@ -45,6 +45,8 @@ import DataQualityPage from "@/pages/data-quality"
 import PropertyGroupsManagement from "@/pages/property-groups-management"
 import BudgetEstimates from "@/pages/budget-estimates"
 import CostOverview from "@/pages/cost-overview"
+import FamilyPage from "@/pages/family"
+import FamilyKidPage from "@/pages/family-kid"
 import PropertyPLReport from "@/pages/property-pl-report"
 import VarianceReport from "@/pages/variance-report"
 import FinancialOverviewV2 from "@/pages/financial-overview-v2"
@@ -225,6 +227,8 @@ function Router() {
                 <ProtectedRoute path="/late-fee-settings" component={LateFeeSettingsPage} />
                 <ProtectedRoute path="/financial-dashboard" component={FinancialDashboardPage} />
                 <ProtectedRoute path="/cost-overview" component={CostOverview} />
+                <ProtectedRoute path="/family" component={FamilyPage} />
+                <ProtectedRoute path="/family/kid/:id" component={FamilyKidPage} />
                 <ProtectedRoute path="/forecast-input" component={ForecastInputPage} />
 
                 {/* Feature Showcase */}

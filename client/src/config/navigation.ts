@@ -96,12 +96,20 @@ export const costOverviewNavItem: NavItem = {
   description: "租金 / 人事 / 週期模板 / 一般單項 四大成本一頁看完",
 }
 
+export const familyNavItem: NavItem = {
+  title: "家庭記帳",
+  href: "/family",
+  icon: Wallet,
+  description: "家長派任務、小孩 PIN 登入、三罐分配、養成記帳習慣",
+}
+
 // 註：/forecast-input 已下架，PMS 系統已自動同步「不定期填入」資料
 // 路由保留可訪問供舊連結，但不顯示在導航
 
 export const decisionNavItems: NavItem[] = [
   dashboardNavItem,
   costOverviewNavItem,
+  familyNavItem,
   forecastNavItem,
   scenarioNavItem,
   {
@@ -505,6 +513,7 @@ export const breadcrumbConfig: Record<string, BreadcrumbItem[]> = {
     { title: "財務助理" },
     { title: "成本結構總覽" },
   ],
+  "/family": [{ title: "首頁", href: "/" }, { title: "財務助理" }, { title: "家庭記帳" }],
   "/forecast-input": [
     { title: "首頁", href: "/" },
     { title: "財務助理" },
