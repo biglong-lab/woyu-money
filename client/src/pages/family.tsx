@@ -530,8 +530,20 @@ export default function FamilyPage() {
       {allTasks.length > 0 && (
         <Card>
           <CardHeader className="py-3 px-3 sm:px-4">
-            <CardTitle className="text-base">最近任務</CardTitle>
-            <CardDescription>前 10 筆</CardDescription>
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div>
+                <CardTitle className="text-base">最近任務</CardTitle>
+                <CardDescription>前 10 筆</CardDescription>
+              </div>
+              <a
+                href="/api/family/tasks.ics"
+                download="family-tasks.ics"
+                className="text-xs inline-flex items-center gap-1 px-2.5 py-1 rounded border border-indigo-300 bg-indigo-50 text-indigo-700 hover:bg-indigo-100"
+                title="下載 .ics 匯入 Google Calendar / Apple 行事曆 / Outlook"
+              >
+                📅 匯出日曆
+              </a>
+            </div>
           </CardHeader>
           <CardContent className="py-2 px-3 sm:px-4 space-y-1">
             {allTasks.slice(0, 10).map((t) => {

@@ -1378,4 +1378,119 @@ router.get(
   })
 )
 
+/**
+ * GET /api/family/tasks.ics
+ * 匯出未完成 + 有 dueDate 的任務為 ICS 行事曆檔
+ * 家長可下載匯入 Google Calendar / Apple Calendar / Outlook
+ *
+ * 規格參考 RFC 5545、最小可用：BEGIN:VCALENDAR ... VEVENT
+ * UID 用 task ID + domain、DTSTART/DTEND 用 dueDate 整天事件
+ */
+function escapeIcs(text: string): string {
+  return text
+    .replace(/\\/g, "\\\\")
+    .replace(/;/g, "\\;")
+    .replace(/,/g, "\\,")
+    .replace(/\n/g, "\\n")
+    .replace(/\r/g, "")
+}
+
+function formatIcsDate(d: Date): string {
+  const y = d.getUTCFullYear()
+  const m = String(d.getUTCMonth() + 1).padStart(2, "0")
+  const day = String(d.getUTCDate()).padStart(2, "0")
+  return `${y}${m}${day}`
+}
+
+function formatIcsTimestamp(d: Date): string {
+  const y = d.getUTCFullYear()
+  const m = String(d.getUTCMonth() + 1).padStart(2, "0")
+  const day = String(d.getUTCDate()).padStart(2, "0")
+  const h = String(d.getUTCHours()).padStart(2, "0")
+  const mi = String(d.getUTCMinutes()).padStart(2, "0")
+  const s = String(d.getUTCSeconds()).padStart(2, "0")
+  return `${y}${m}${day}T${h}${mi}${s}Z`
+}
+
+router.get(
+  "/api/family/tasks.ics",
+  asyncHandler(async (req, res) => {
+    // 只匯出未完成（pending/submitted）且有 dueDate 的
+    const tasks = await db.execute(sql`
+      SELECT t.id, t.title, t.emoji, t.reward_amount, t.due_date, t.status, t.difficulty,
+             t.notes, k.display_name AS kid_name
+      FROM kids_tasks t
+      LEFT JOIN kids_accounts k ON k.id = t.kid_id
+      WHERE t.due_date IS NOT NULL
+        AND t.status IN ('pending', 'submitted')
+      ORDER BY t.due_date ASC
+    `)
+    const rows = (
+      tasks as unknown as {
+        rows: {
+          id: number
+          title: string
+          emoji: string | null
+          reward_amount: string
+          due_date: string
+          status: string
+          difficulty: string
+          notes: string | null
+          kid_name: string | null
+        }[]
+      }
+    ).rows
+
+    const now = new Date()
+    const dtstamp = formatIcsTimestamp(now)
+
+    const lines: string[] = [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "PRODID:-//homi.cc//Money Family Tasks//ZH-TW",
+      "CALSCALE:GREGORIAN",
+      "METHOD:PUBLISH",
+      "X-WR-CALNAME:家庭任務",
+      "X-WR-TIMEZONE:Asia/Taipei",
+    ]
+    for (const row of rows) {
+      const due = new Date(row.due_date)
+      const dueStart = formatIcsDate(due)
+      // 整天事件 DTEND 是隔天
+      const dayAfter = new Date(due.getTime() + 24 * 60 * 60 * 1000)
+      const dueEnd = formatIcsDate(dayAfter)
+      const stars = row.difficulty === "easy" ? "⭐" : row.difficulty === "hard" ? "⭐⭐⭐" : "⭐⭐"
+      const summary = `${row.emoji ?? "📋"} ${row.title} ${stars} ($${row.reward_amount})`
+      const desc = [
+        `指派給：${row.kid_name ?? "—"}`,
+        `獎勵：$${row.reward_amount}`,
+        `難度：${stars}`,
+        `狀態：${row.status}`,
+        row.notes ? `備註：${row.notes}` : "",
+      ]
+        .filter(Boolean)
+        .join("\\n")
+      lines.push(
+        "BEGIN:VEVENT",
+        `UID:family-task-${row.id}@homi.cc`,
+        `DTSTAMP:${dtstamp}`,
+        `DTSTART;VALUE=DATE:${dueStart}`,
+        `DTEND;VALUE=DATE:${dueEnd}`,
+        `SUMMARY:${escapeIcs(summary)}`,
+        `DESCRIPTION:${escapeIcs(desc)}`,
+        "CATEGORIES:家庭任務",
+        "STATUS:CONFIRMED",
+        "TRANSP:TRANSPARENT",
+        "END:VEVENT"
+      )
+    }
+    lines.push("END:VCALENDAR")
+
+    const body = lines.join("\r\n") + "\r\n"
+    res.setHeader("Content-Type", "text/calendar; charset=utf-8")
+    res.setHeader("Content-Disposition", 'attachment; filename="family-tasks.ics"')
+    res.send(body)
+  })
+)
+
 export default router

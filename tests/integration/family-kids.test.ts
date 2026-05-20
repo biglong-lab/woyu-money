@@ -859,6 +859,38 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(me.approvedCount).toBe(3)
   })
 
+  it("ICS 匯出：未完成 + 有 dueDate 任務轉成行事曆", async () => {
+    await createKid()
+    // 建 3 個任務：有 dueDate / 無 dueDate / approved（不該匯出）
+    const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10)
+    const withDate = await request(app).post("/api/family/tasks").send({
+      kidId,
+      title: "倒垃圾",
+      rewardAmount: 30,
+      dueDate: tomorrow,
+      difficulty: "hard",
+    })
+    await request(app).post("/api/family/tasks").send({ kidId, title: "刷牙", rewardAmount: 10 }) // 無 dueDate
+    const done = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId, title: "已做完", rewardAmount: 20, dueDate: tomorrow })
+    await request(app).post(`/api/family/tasks/${done.body.id}/submit`)
+    await request(app).post(`/api/family/tasks/${done.body.id}/approve`)
+
+    const res = await request(app).get("/api/family/tasks.ics")
+    expect(res.status).toBe(200)
+    expect(res.headers["content-type"]).toContain("text/calendar")
+    expect(res.headers["content-disposition"]).toContain("family-tasks.ics")
+    const ics = res.text
+    expect(ics).toContain("BEGIN:VCALENDAR")
+    expect(ics).toContain("END:VCALENDAR")
+    expect(ics).toContain(`family-task-${withDate.body.id}@homi.cc`)
+    expect(ics).toContain("倒垃圾")
+    expect(ics).toContain("⭐⭐⭐")
+    // 已 approved 不該出現
+    expect(ics).not.toContain(`family-task-${done.body.id}@homi.cc`)
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)
