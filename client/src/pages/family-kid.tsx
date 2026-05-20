@@ -845,6 +845,9 @@ function KidDashboard({
       {/* 成就牆（含未解鎖徽章 + 進度條）*/}
       <AchievementWall kidId={kidId} />
 
+      {/* 全家排行（看自己 vs 兄弟姊妹）*/}
+      <KidLeaderboard kidId={kidId} />
+
       {/* 本月戰績（月報）*/}
       {report && (
         <div className="mb-4">
@@ -1490,6 +1493,93 @@ function WishesSection({
               </button>
             </div>
           ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function KidLeaderboard({ kidId }: { kidId: number }) {
+  const [open, setOpen] = useState(false)
+  interface Entry {
+    kidId: number
+    displayName: string
+    avatar: string
+    color: string
+    approvedCount: number
+    approvedSum: number
+    weightedScore: number
+    hardCount: number
+    rank: number
+    medal: string
+  }
+  const currentMonth = (() => {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
+  })()
+  const { data } = useQuery<{ month: string; leaderboard: Entry[] }>({
+    queryKey: [`/api/family/leaderboard?month=${currentMonth}`],
+    enabled: open,
+  })
+
+  return (
+    <div className="mb-4">
+      <button
+        type="button"
+        onClick={() => setOpen((s) => !s)}
+        className="w-full bg-gradient-to-r from-yellow-100 to-orange-100 border-2 border-orange-300 rounded-xl p-3 flex items-center gap-3 shadow-sm"
+      >
+        <div className="text-3xl">🏆</div>
+        <div className="flex-1 text-left">
+          <div className="text-sm font-bold text-orange-800">本月排行</div>
+          <div className="text-xs text-orange-700">看自己 vs 兄弟姊妹</div>
+        </div>
+        {open ? (
+          <ChevronUp className="h-4 w-4 text-orange-700" />
+        ) : (
+          <ChevronDown className="h-4 w-4 text-orange-700" />
+        )}
+      </button>
+      {open && (
+        <div className="mt-2 space-y-1">
+          {!data ? (
+            <div className="text-center text-xs text-gray-400 py-3">載入中…</div>
+          ) : data.leaderboard.length === 0 ? (
+            <div className="text-center text-xs text-gray-400 py-3 bg-white rounded">
+              本月還沒人完成任務、加油 💪
+            </div>
+          ) : (
+            data.leaderboard.map((e) => {
+              const isMe = e.kidId === kidId
+              return (
+                <motion.div
+                  key={e.kidId}
+                  initial={isMe ? { scale: 0.95 } : false}
+                  animate={isMe ? { scale: 1 } : undefined}
+                  className={`flex items-center gap-2 p-2 rounded border ${
+                    isMe
+                      ? "bg-indigo-100 border-indigo-400 ring-2 ring-indigo-300"
+                      : "bg-white border-gray-200"
+                  }`}
+                >
+                  <span className="text-lg">{e.medal || `${e.rank}.`}</span>
+                  <span className="text-xl">{e.avatar}</span>
+                  <span className="flex-1 text-sm font-medium">
+                    {e.displayName}
+                    {isMe && <span className="ml-1 text-[10px] text-indigo-700">（我）</span>}
+                  </span>
+                  <div className="text-right">
+                    <div className="text-xs font-mono text-amber-700">
+                      {formatMoney(e.approvedSum)}
+                    </div>
+                    <div className="text-[9px] text-gray-400">
+                      📋 {e.approvedCount} · 積分 {e.weightedScore}
+                    </div>
+                  </div>
+                </motion.div>
+              )
+            })
+          )}
         </div>
       )}
     </div>
