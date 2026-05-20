@@ -707,6 +707,49 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     }
   })
 
+  it("給罐子捐贈：recipient + reflection 寫入 + GET 回傳", async () => {
+    const oldEnv = process.env.FAMILY_KIDS_NO_BONUS
+    process.env.FAMILY_KIDS_NO_BONUS = "1"
+    try {
+      await createKid({ spendRatio: 0, saveRatio: 0, giveRatio: 100 })
+      const t = await request(app)
+        .post("/api/family/tasks")
+        .send({ kidId, title: "T", rewardAmount: 100 })
+      await request(app).post(`/api/family/tasks/${t.body.id}/submit`)
+      const ares = await request(app).post(`/api/family/tasks/${t.body.id}/approve`)
+      if (ares.body.mainSystem?.paymentItemId) {
+        await db.execute(
+          sql`DELETE FROM payment_records WHERE payment_item_id = ${ares.body.mainSystem.paymentItemId}`
+        )
+        await db.execute(
+          sql`DELETE FROM payment_items WHERE id = ${ares.body.mainSystem.paymentItemId}`
+        )
+      }
+
+      // 從 give 罐捐 30
+      const sres = await request(app).post("/api/family/spendings").send({
+        kidId,
+        jar: "give",
+        amount: 30,
+        description: "捐獻",
+        recipient: "流浪動物協會",
+        reflection: "想幫助沒家的小動物",
+      })
+      expect(sres.status).toBe(201)
+      expect(sres.body.recipient).toBe("流浪動物協會")
+      expect(sres.body.reflection).toBe("想幫助沒家的小動物")
+
+      // 列表 GET 回傳兩欄位
+      const list = await request(app).get(`/api/family/spendings?kidId=${kidId}`)
+      const found = list.body.find((x: { id: number }) => x.id === sres.body.id)
+      expect(found.recipient).toBe("流浪動物協會")
+      expect(found.reflection).toBe("想幫助沒家的小動物")
+    } finally {
+      if (oldEnv === undefined) delete process.env.FAMILY_KIDS_NO_BONUS
+      else process.env.FAMILY_KIDS_NO_BONUS = oldEnv
+    }
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)

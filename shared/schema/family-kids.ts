@@ -175,6 +175,10 @@ export const kidsSpendings = pgTable(
     description: varchar("description", { length: 100 }).notNull(),
     emoji: varchar("emoji", { length: 8 }).default("💰"),
     spendDate: date("spend_date").notNull(),
+    // 給罐子用：捐給誰（例：流浪動物協會、學校募款）
+    recipient: varchar("recipient", { length: 100 }),
+    // 捐獻反思（培養同理心、月報可回顧）
+    reflection: text("reflection"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (table) => ({

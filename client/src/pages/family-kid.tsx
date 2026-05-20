@@ -114,6 +114,8 @@ interface Spending {
   description: string
   emoji: string | null
   spendDate: string
+  recipient?: string | null
+  reflection?: string | null
 }
 
 interface MonthlyReport {
@@ -638,11 +640,21 @@ function KidDashboard({
               return (
                 <div
                   key={s.id}
-                  className="bg-white rounded-lg p-2.5 flex items-center gap-2 text-sm"
+                  className="bg-white rounded-lg p-2.5 flex items-start gap-2 text-sm"
                 >
                   <span className="text-xl">{s.emoji ?? "💰"}</span>
                   <div className="flex-1 min-w-0">
                     <div className="truncate">{s.description}</div>
+                    {s.jar === "give" && s.recipient && (
+                      <div className="text-[10px] text-sky-700 truncate">
+                        ❤️ 捐給：{s.recipient}
+                      </div>
+                    )}
+                    {s.jar === "give" && s.reflection && (
+                      <div className="text-[10px] text-gray-500 italic truncate">
+                        “{s.reflection}”
+                      </div>
+                    )}
                     <div className="text-[10px] text-gray-400">
                       {s.spendDate} · {jarLabel}
                     </div>
@@ -931,6 +943,9 @@ function SpendDialog({
   const [amount, setAmount] = useState("")
   const [description, setDescription] = useState("")
   const [emoji, setEmoji] = useState("💰")
+  const [recipient, setRecipient] = useState("")
+  const [reflection, setReflection] = useState("")
+  const isGive = whichJar === "give"
 
   const balance = {
     spend: parseFloat(jar.spendBalance),
@@ -947,6 +962,8 @@ function SpendDialog({
         description: description.trim(),
         emoji,
         spendDate: new Date().toISOString().slice(0, 10),
+        recipient: isGive && recipient.trim() ? recipient.trim() : undefined,
+        reflection: isGive && reflection.trim() ? reflection.trim() : undefined,
       }),
     onSuccess: () => {
       toast({ title: "✅ 已記錄" })
@@ -1037,6 +1054,36 @@ function SpendDialog({
               <p className="text-xs text-red-600 mt-1">超過餘額 ${balance.toLocaleString()}</p>
             )}
           </div>
+
+          {/* 給罐子特別欄位：捐給誰 + 為什麼想捐 */}
+          {isGive && (
+            <div className="space-y-2 bg-sky-50 -mx-1 px-3 py-2 rounded-lg border border-sky-200">
+              <div className="flex items-center gap-1 text-xs text-sky-800 font-medium">
+                ❤️ 來說說你的好心捐獻
+              </div>
+              <div>
+                <Label className="text-xs">捐給誰？</Label>
+                <Input
+                  value={recipient}
+                  onChange={(e) => setRecipient(e.target.value)}
+                  placeholder="例：流浪動物協會 / 學校募款"
+                />
+              </div>
+              <div>
+                <Label className="text-xs">為什麼想捐？（選填）</Label>
+                <textarea
+                  value={reflection}
+                  onChange={(e) => setReflection(e.target.value)}
+                  placeholder="寫下你的想法..."
+                  rows={2}
+                  className="w-full text-sm rounded border border-input bg-background px-3 py-2"
+                />
+                <p className="text-[10px] text-gray-400 mt-0.5">
+                  你的好心會被記下、月底回顧你做了哪些善事 🌟
+                </p>
+              </div>
+            </div>
+          )}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>

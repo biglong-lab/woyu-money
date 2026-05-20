@@ -836,6 +836,9 @@ router.post(
       description: String(req.body?.description ?? "").trim(),
       emoji: req.body?.emoji ?? "💰",
       spendDate: req.body?.spendDate ?? new Date().toISOString().slice(0, 10),
+      // give 罐特殊欄位（可選）
+      recipient: req.body?.recipient ? String(req.body.recipient).slice(0, 100) : null,
+      reflection: req.body?.reflection ? String(req.body.reflection).slice(0, 1000) : null,
     }
 
     if (!data.description) throw new AppError(400, "請填寫項目名稱")
