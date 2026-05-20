@@ -9,7 +9,7 @@
  *
  * 設計：手機優先、單手拇指區操作、Bottom Sheet 取代 Dialog（手機）
  */
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { useQuery, useMutation } from "@tanstack/react-query"
 import { Link } from "wouter"
 import { motion } from "framer-motion"
@@ -584,6 +584,9 @@ export default function FamilyPage() {
       {/* 全家儲蓄趨勢比較圖 */}
       {kids.length >= 1 && <FamilyTrendChart />}
 
+      {/* 全家月度總結報 */}
+      {kids.length >= 1 && <FamilyMonthlySummary kids={kids} />}
+
       {/* 全家活動 Timeline（過去 30 天）*/}
       {activityFeed && activityFeed.items.length > 0 && (
         <Card>
@@ -910,6 +913,165 @@ function TaskStatusBadge({ status }: { status: string }) {
   }
   const s = map[status] ?? { label: status, cls: "bg-gray-100 text-gray-700" }
   return <Badge className={`${s.cls} text-[10px]`}>{s.label}</Badge>
+}
+
+function FamilyMonthlySummary({ kids }: { kids: Kid[] }) {
+  const [month, setMonth] = useState(() => {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
+  })
+
+  interface KidSummary {
+    kidId: number
+    displayName: string
+    avatar: string
+    color: string
+    approvedCount: number
+    approvedSum: number
+    rejectedCount: number
+    hardCount: number
+    weightedScore: number
+    totalSpent: number
+    spendJarOut: number
+    saveJarOut: number
+    giveJarOut: number
+    goalCompletedCount: number
+    badgeCount: number
+  }
+  const { data } = useQuery<{
+    month: string
+    kids: KidSummary[]
+    grandTotal: {
+      approvedCount: number
+      approvedSum: number
+      rejectedCount: number
+      hardCount: number
+      weightedScore: number
+      totalSpent: number
+      giveJarOut: number
+      goalCompletedCount: number
+      badgeCount: number
+    }
+  }>({
+    queryKey: [`/api/family/family-monthly-summary?month=${month}`],
+    staleTime: 60_000,
+  })
+
+  // 產 6 個月選項（含本月）
+  const monthOptions = useMemo(() => {
+    const opts: string[] = []
+    const d = new Date()
+    for (let i = 0; i < 6; i++) {
+      const m = new Date(d.getFullYear(), d.getMonth() - i, 1)
+      opts.push(`${m.getFullYear()}-${String(m.getMonth() + 1).padStart(2, "0")}`)
+    }
+    return opts
+  }, [])
+
+  const _ = kids // unused; FamilyTrendChart 共用 kids data
+
+  if (!data) return null
+
+  return (
+    <Card className="border-emerald-200">
+      <CardHeader className="py-3 px-3 sm:px-4">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <CardTitle className="text-base flex items-center gap-2">
+            <span className="text-xl">📊</span>
+            全家月度總結
+          </CardTitle>
+          <Select value={month} onValueChange={setMonth}>
+            <SelectTrigger className="h-8 w-32 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {monthOptions.map((m) => (
+                <SelectItem key={m} value={m} className="text-xs">
+                  {m}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </CardHeader>
+      <CardContent className="py-2 px-3 sm:px-4 space-y-2">
+        {/* Grand totals */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          <div className="bg-emerald-50 border border-emerald-200 rounded p-2 text-center">
+            <div className="text-[10px] text-gray-500">總任務</div>
+            <div className="font-bold text-emerald-700">
+              {data.grandTotal.approvedCount}
+              {data.grandTotal.hardCount > 0 && (
+                <span className="text-[10px] text-rose-500 ml-1">
+                  ⭐⭐⭐×{data.grandTotal.hardCount}
+                </span>
+              )}
+            </div>
+          </div>
+          <div className="bg-amber-50 border border-amber-200 rounded p-2 text-center">
+            <div className="text-[10px] text-gray-500">總給付</div>
+            <div className="font-bold text-amber-700">
+              {formatMoney(data.grandTotal.approvedSum)}
+            </div>
+          </div>
+          <div className="bg-rose-50 border border-rose-200 rounded p-2 text-center">
+            <div className="text-[10px] text-gray-500">捐獻</div>
+            <div className="font-bold text-rose-700">{formatMoney(data.grandTotal.giveJarOut)}</div>
+          </div>
+          <div className="bg-purple-50 border border-purple-200 rounded p-2 text-center">
+            <div className="text-[10px] text-gray-500">達成目標</div>
+            <div className="font-bold text-purple-700">
+              {data.grandTotal.goalCompletedCount}
+              <span className="text-[10px] text-amber-500 ml-1">
+                🏅×{data.grandTotal.badgeCount}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* 各小孩明細 */}
+        {data.kids.length > 0 && (
+          <div className="space-y-1">
+            <div className="text-[11px] text-gray-500 mt-2">各小孩本月戰績（按積分排序）</div>
+            {data.kids.map((k, i) => {
+              const c = COLOR_TOKENS[k.color] ?? COLOR_TOKENS.blue
+              return (
+                <div
+                  key={k.kidId}
+                  className={`flex items-center gap-2 p-2 rounded border ${c.bg} ${c.border} flex-wrap`}
+                >
+                  <span className="text-xl">
+                    {i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : "  "}
+                  </span>
+                  <span className="text-xl">{k.avatar}</span>
+                  <div className="flex-1 min-w-[100px]">
+                    <div className={`text-sm font-bold ${c.text}`}>{k.displayName}</div>
+                    <div className="text-[10px] text-gray-500 flex flex-wrap gap-1">
+                      <span>📋 {k.approvedCount}</span>
+                      {k.hardCount > 0 && (
+                        <span className="text-rose-600">⭐⭐⭐ ×{k.hardCount}</span>
+                      )}
+                      {k.rejectedCount > 0 && (
+                        <span className="text-orange-600">❌ {k.rejectedCount}</span>
+                      )}
+                      {k.goalCompletedCount > 0 && <span>🎯 ×{k.goalCompletedCount}</span>}
+                      {k.badgeCount > 0 && <span>🏅 ×{k.badgeCount}</span>}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className={`font-mono font-bold ${c.text}`}>
+                      {formatMoney(k.approvedSum)}
+                    </div>
+                    <div className="text-[10px] text-rose-600">積分 {k.weightedScore}</div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
 }
 
 function FamilyTrendChart() {

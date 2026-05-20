@@ -1633,6 +1633,142 @@ router.get(
 )
 
 /**
+ * GET /api/family/family-monthly-summary?month=YYYY-MM
+ * 全家本月匯總：每個 active 小孩 + grand totals
+ * 家長一頁看完全家本月戰績
+ */
+router.get(
+  "/api/family/family-monthly-summary",
+  asyncHandler(async (req, res) => {
+    const monthStr = (req.query.month as string | undefined) ?? new Date().toISOString().slice(0, 7)
+    if (!/^\d{4}-\d{2}$/.test(monthStr)) throw new AppError(400, "month 格式 YYYY-MM")
+    const [year, month] = monthStr.split("-").map(Number)
+    const monthStart = `${year}-${String(month).padStart(2, "0")}-01`
+    const endY = month === 12 ? year + 1 : year
+    const endM = month === 12 ? 1 : month + 1
+    const nextMonth = `${endY}-${String(endM).padStart(2, "0")}-01`
+
+    const rows = await db.execute(sql`
+      SELECT
+        k.id AS "kidId",
+        k.display_name AS "displayName",
+        k.avatar,
+        k.color,
+        COALESCE(t.approved_count, 0)::int AS "approvedCount",
+        COALESCE(t.approved_sum, 0)::numeric AS "approvedSum",
+        COALESCE(t.rejected_count, 0)::int AS "rejectedCount",
+        COALESCE(t.hard_count, 0)::int AS "hardCount",
+        COALESCE(t.weighted_score, 0)::int AS "weightedScore",
+        COALESCE(s.total_spent, 0)::numeric AS "totalSpent",
+        COALESCE(s.spend_jar, 0)::numeric AS "spendJarOut",
+        COALESCE(s.save_jar, 0)::numeric AS "saveJarOut",
+        COALESCE(s.give_jar, 0)::numeric AS "giveJarOut",
+        COALESCE(g.completed_count, 0)::int AS "goalCompletedCount",
+        COALESCE(b.badge_count, 0)::int AS "badgeCount"
+      FROM kids_accounts k
+      LEFT JOIN (
+        SELECT kid_id,
+               COUNT(*) FILTER (WHERE status = 'approved') AS approved_count,
+               SUM(reward_amount::numeric) FILTER (WHERE status = 'approved') AS approved_sum,
+               COUNT(*) FILTER (WHERE status = 'rejected') AS rejected_count,
+               COUNT(*) FILTER (WHERE status = 'approved' AND difficulty = 'hard') AS hard_count,
+               SUM(CASE WHEN status = 'approved'
+                        THEN CASE difficulty
+                               WHEN 'hard' THEN 3 WHEN 'medium' THEN 2 ELSE 1
+                             END
+                        ELSE 0 END) AS weighted_score
+        FROM kids_tasks
+        WHERE (approved_at >= ${monthStart}::timestamp AND approved_at < ${nextMonth}::timestamp)
+           OR (status = 'rejected' AND updated_at >= ${monthStart}::timestamp AND updated_at < ${nextMonth}::timestamp)
+        GROUP BY kid_id
+      ) t ON t.kid_id = k.id
+      LEFT JOIN (
+        SELECT kid_id,
+               SUM(amount::numeric) AS total_spent,
+               SUM(amount::numeric) FILTER (WHERE jar = 'spend') AS spend_jar,
+               SUM(amount::numeric) FILTER (WHERE jar = 'save') AS save_jar,
+               SUM(amount::numeric) FILTER (WHERE jar = 'give') AS give_jar
+        FROM kids_spendings
+        WHERE spend_date >= ${monthStart}::date AND spend_date < ${nextMonth}::date
+        GROUP BY kid_id
+      ) s ON s.kid_id = k.id
+      LEFT JOIN (
+        SELECT kid_id, COUNT(*) AS completed_count
+        FROM kids_goals
+        WHERE status = 'completed'
+          AND completed_at >= ${monthStart}::timestamp
+          AND completed_at < ${nextMonth}::timestamp
+        GROUP BY kid_id
+      ) g ON g.kid_id = k.id
+      LEFT JOIN (
+        SELECT kid_id, COUNT(*) AS badge_count
+        FROM kids_badges
+        WHERE earned_at >= ${monthStart}::timestamp AND earned_at < ${nextMonth}::timestamp
+        GROUP BY kid_id
+      ) b ON b.kid_id = k.id
+      WHERE k.is_active = true
+      ORDER BY "weightedScore" DESC, "approvedSum" DESC, k.id
+    `)
+
+    const kidsList = (
+      rows as unknown as {
+        rows: Array<{
+          kidId: number
+          displayName: string
+          avatar: string
+          color: string
+          approvedCount: number
+          approvedSum: string | number
+          rejectedCount: number
+          hardCount: number
+          weightedScore: number
+          totalSpent: string | number
+          spendJarOut: string | number
+          saveJarOut: string | number
+          giveJarOut: string | number
+          goalCompletedCount: number
+          badgeCount: number
+        }>
+      }
+    ).rows.map((r) => ({
+      ...r,
+      approvedSum: parseFloat(String(r.approvedSum)),
+      totalSpent: parseFloat(String(r.totalSpent)),
+      spendJarOut: parseFloat(String(r.spendJarOut)),
+      saveJarOut: parseFloat(String(r.saveJarOut)),
+      giveJarOut: parseFloat(String(r.giveJarOut)),
+    }))
+
+    const grandTotal = kidsList.reduce(
+      (s, k) => ({
+        approvedCount: s.approvedCount + k.approvedCount,
+        approvedSum: s.approvedSum + k.approvedSum,
+        rejectedCount: s.rejectedCount + k.rejectedCount,
+        hardCount: s.hardCount + k.hardCount,
+        weightedScore: s.weightedScore + k.weightedScore,
+        totalSpent: s.totalSpent + k.totalSpent,
+        giveJarOut: s.giveJarOut + k.giveJarOut,
+        goalCompletedCount: s.goalCompletedCount + k.goalCompletedCount,
+        badgeCount: s.badgeCount + k.badgeCount,
+      }),
+      {
+        approvedCount: 0,
+        approvedSum: 0,
+        rejectedCount: 0,
+        hardCount: 0,
+        weightedScore: 0,
+        totalSpent: 0,
+        giveJarOut: 0,
+        goalCompletedCount: 0,
+        badgeCount: 0,
+      }
+    )
+
+    res.json({ month: monthStr, kids: kidsList, grandTotal })
+  })
+)
+
+/**
  * 任務評論串
  *   GET  /api/family/tasks/:id/comments      列出該任務所有評論
  *   POST /api/family/tasks/:id/comments      新增（author: 'parent' / 'kid'、message）

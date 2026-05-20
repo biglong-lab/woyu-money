@@ -1337,6 +1337,35 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(noTask.status).toBe(404)
   })
 
+  it("全家月度總結：所有 active 小孩匯總 + grandTotal", async () => {
+    await createKid({ displayName: "甲", spendRatio: 100, saveRatio: 0, giveRatio: 0 })
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId, title: "T1", rewardAmount: 100, difficulty: "hard" })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`)
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`)
+
+    const now = new Date()
+    const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
+    const res = await request(app).get(`/api/family/family-monthly-summary?month=${month}`)
+    expect(res.status).toBe(200)
+    expect(res.body.month).toBe(month)
+    expect(Array.isArray(res.body.kids)).toBe(true)
+    const me = res.body.kids.find((k: { kidId: number }) => k.kidId === kidId)
+    expect(me).toBeTruthy()
+    expect(me.approvedCount).toBe(1)
+    expect(me.hardCount).toBe(1)
+    expect(me.weightedScore).toBe(3) // hard=3
+    expect(me.approvedSum).toBeGreaterThanOrEqual(100)
+    // grand total
+    expect(res.body.grandTotal.approvedCount).toBeGreaterThanOrEqual(1)
+    expect(res.body.grandTotal.hardCount).toBeGreaterThanOrEqual(1)
+
+    // 不合法 month 400
+    const bad = await request(app).get("/api/family/family-monthly-summary?month=invalid")
+    expect(bad.status).toBe(400)
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)
