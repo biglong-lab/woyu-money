@@ -45,6 +45,7 @@ import {
   Target,
   ExternalLink,
   Zap,
+  Trophy,
 } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { useToast } from "@/hooks/use-toast"
@@ -83,6 +84,19 @@ interface Jar {
   giveBalance: string
   totalReceived: string
   totalSpent: string
+}
+
+interface LeaderboardEntry {
+  kidId: number
+  displayName: string
+  avatar: string
+  color: string
+  approvedCount: number
+  approvedSum: number
+  completedGoalsCount: number
+  badgeCount: number
+  rank: number
+  medal: string
 }
 
 interface FamilyDashboard {
@@ -132,6 +146,17 @@ export default function FamilyPage() {
 
   const { data: allTasks = [] } = useQuery<Task[]>({
     queryKey: ["/api/family/tasks"],
+  })
+
+  const currentMonth = (() => {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
+  })()
+  const { data: leaderboard } = useQuery<{
+    month: string
+    leaderboard: LeaderboardEntry[]
+  }>({
+    queryKey: [`/api/family/leaderboard?month=${currentMonth}`],
   })
 
   const invalidateAll = () => {
@@ -361,6 +386,56 @@ export default function FamilyPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* 本月排行榜 */}
+      {leaderboard && leaderboard.leaderboard.length > 0 && (
+        <Card className="border-yellow-300 bg-gradient-to-br from-yellow-50 to-amber-50">
+          <CardHeader className="py-3 px-3 sm:px-4">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Trophy className="h-5 w-5 text-yellow-600" />
+              本月排行榜（{leaderboard.month}）
+            </CardTitle>
+            <CardDescription>賺最多 / 完成任務最多的孩子優先</CardDescription>
+          </CardHeader>
+          <CardContent className="py-2 px-3 sm:px-4 space-y-2">
+            {leaderboard.leaderboard.map((entry) => (
+              <motion.div
+                key={entry.kidId}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: entry.rank * 0.05 }}
+                className={`flex items-center gap-2 p-2 rounded-lg ${
+                  entry.rank === 1
+                    ? "bg-yellow-100 border-2 border-yellow-400"
+                    : entry.rank === 2
+                      ? "bg-gray-100 border border-gray-300"
+                      : entry.rank === 3
+                        ? "bg-orange-100 border border-orange-300"
+                        : "bg-white"
+                }`}
+              >
+                <div className="text-2xl w-8 text-center">{entry.medal || `#${entry.rank}`}</div>
+                <div className="text-3xl">{entry.avatar}</div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-bold">{entry.displayName}</div>
+                  <div className="text-[10px] text-gray-500 flex gap-2 flex-wrap">
+                    <span>📋 {entry.approvedCount} 個任務</span>
+                    {entry.completedGoalsCount > 0 && (
+                      <span>🎯 達標 {entry.completedGoalsCount}</span>
+                    )}
+                    {entry.badgeCount > 0 && <span>🏅 +{entry.badgeCount} 徽章</span>}
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="font-mono font-bold text-amber-700">
+                    {formatMoney(entry.approvedSum)}
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       {/* 最近任務 */}
       {allTasks.length > 0 && (

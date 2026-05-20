@@ -417,6 +417,49 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(done.isOverdue).toBe(false)
   })
 
+  it("leaderboard 本月排行：approved sum 降序、含 medal/rank", async () => {
+    const oldEnv = process.env.FAMILY_KIDS_NO_BONUS
+    process.env.FAMILY_KIDS_NO_BONUS = "1"
+    try {
+      await createKid({ displayName: "測試小孩排行" })
+
+      // 派 2 個任務 + approve → 共 250
+      for (const amt of [100, 150]) {
+        const t = await request(app)
+          .post("/api/family/tasks")
+          .send({ kidId, title: `T${amt}`, rewardAmount: amt })
+        await request(app).post(`/api/family/tasks/${t.body.id}/submit`)
+        const ares = await request(app).post(`/api/family/tasks/${t.body.id}/approve`)
+        if (ares.body.mainSystem?.paymentItemId) {
+          await db.execute(
+            sql`DELETE FROM payment_records WHERE payment_item_id = ${ares.body.mainSystem.paymentItemId}`
+          )
+          await db.execute(
+            sql`DELETE FROM payment_items WHERE id = ${ares.body.mainSystem.paymentItemId}`
+          )
+        }
+      }
+
+      const month = new Date().toISOString().slice(0, 7)
+      const res = await request(app).get(`/api/family/leaderboard?month=${month}`)
+      expect(res.status).toBe(200)
+      expect(res.body.month).toBe(month)
+      expect(Array.isArray(res.body.leaderboard)).toBe(true)
+
+      const me = res.body.leaderboard.find((e: { kidId: number }) => e.kidId === kidId)
+      expect(me).toBeTruthy()
+      expect(me.approvedCount).toBe(2)
+      expect(me.approvedSum).toBe(250)
+      expect(typeof me.rank).toBe("number")
+      // 排名 1 應有金牌
+      const top = res.body.leaderboard[0]
+      expect(top.medal).toBe("🥇")
+    } finally {
+      if (oldEnv === undefined) delete process.env.FAMILY_KIDS_NO_BONUS
+      else process.env.FAMILY_KIDS_NO_BONUS = oldEnv
+    }
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)

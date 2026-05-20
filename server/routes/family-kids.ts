@@ -787,4 +787,82 @@ router.get(
   })
 )
 
+/**
+ * GET /api/family/leaderboard?month=YYYY-MM
+ * 本月排行榜：每個小孩的任務完成數 / 入帳金額 / 徽章數 / 達成目標數
+ * 排序：approved sum DESC（賺最多的優先）
+ */
+router.get(
+  "/api/family/leaderboard",
+  asyncHandler(async (req, res) => {
+    const monthStr = (req.query.month as string | undefined) ?? new Date().toISOString().slice(0, 7)
+    if (!/^\d{4}-\d{2}$/.test(monthStr)) throw new AppError(400, "month 格式 YYYY-MM")
+    const [year, month] = monthStr.split("-").map(Number)
+    const monthStart = `${year}-${String(month).padStart(2, "0")}-01`
+    const endY = month === 12 ? year + 1 : year
+    const endM = month === 12 ? 1 : month + 1
+    const nextMonth = `${endY}-${String(endM).padStart(2, "0")}-01`
+
+    const rows = await db.execute(sql`
+      SELECT
+        k.id AS "kidId",
+        k.display_name AS "displayName",
+        k.avatar,
+        k.color,
+        COALESCE(t.approved_count, 0)::int AS "approvedCount",
+        COALESCE(t.approved_sum, 0)::numeric AS "approvedSum",
+        COALESCE(g.completed_count, 0)::int AS "completedGoalsCount",
+        COALESCE(b.badge_count, 0)::int AS "badgeCount"
+      FROM kids_accounts k
+      LEFT JOIN (
+        SELECT kid_id,
+               COUNT(*) AS approved_count,
+               SUM(reward_amount::numeric) AS approved_sum
+        FROM kids_tasks
+        WHERE status = 'approved'
+          AND approved_at >= ${monthStart}::timestamp
+          AND approved_at < ${nextMonth}::timestamp
+        GROUP BY kid_id
+      ) t ON t.kid_id = k.id
+      LEFT JOIN (
+        SELECT kid_id, COUNT(*) AS completed_count
+        FROM kids_goals
+        WHERE status = 'completed'
+          AND completed_at >= ${monthStart}::timestamp
+          AND completed_at < ${nextMonth}::timestamp
+        GROUP BY kid_id
+      ) g ON g.kid_id = k.id
+      LEFT JOIN (
+        SELECT kid_id, COUNT(*) AS badge_count
+        FROM kids_badges
+        WHERE earned_at >= ${monthStart}::timestamp
+          AND earned_at < ${nextMonth}::timestamp
+        GROUP BY kid_id
+      ) b ON b.kid_id = k.id
+      WHERE k.is_active = true
+      ORDER BY approved_sum DESC NULLS LAST, approved_count DESC NULLS LAST, k.id
+    `)
+    const list = (
+      rows as unknown as {
+        rows: {
+          kidId: number
+          displayName: string
+          avatar: string
+          color: string
+          approvedCount: number
+          approvedSum: string | number
+          completedGoalsCount: number
+          badgeCount: number
+        }[]
+      }
+    ).rows.map((r, i) => ({
+      ...r,
+      approvedSum: parseFloat(String(r.approvedSum)),
+      rank: i + 1,
+      medal: i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : "",
+    }))
+    res.json({ month: monthStr, leaderboard: list })
+  })
+)
+
 export default router
