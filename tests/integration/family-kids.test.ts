@@ -1638,6 +1638,44 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(bad.status).toBe(400)
   })
 
+  it("捐贈對象目錄：CRUD + 排序 + 邊界", async () => {
+    // 建 2 個對象
+    const r1 = await request(app)
+      .post("/api/family/recipients")
+      .send({ name: "動物保護協會", emoji: "🐶", sortOrder: 1 })
+    expect(r1.status).toBe(201)
+    expect(r1.body.name).toBe("動物保護協會")
+    const id1 = r1.body.id
+
+    const r2 = await request(app)
+      .post("/api/family/recipients")
+      .send({ name: "學校", emoji: "🏫", sortOrder: 2 })
+    expect(r2.status).toBe(201)
+    const id2 = r2.body.id
+
+    try {
+      // 列表（sortOrder asc）
+      const list = await request(app).get("/api/family/recipients")
+      expect(list.status).toBe(200)
+      expect(list.body.length).toBeGreaterThanOrEqual(2)
+      // 至少 動物保護 在 學校 之前（同 family 內）
+      const animalIdx = list.body.findIndex((x: { id: number }) => x.id === id1)
+      const schoolIdx = list.body.findIndex((x: { id: number }) => x.id === id2)
+      expect(animalIdx).toBeLessThan(schoolIdx)
+
+      // 缺 name 400
+      const bad = await request(app).post("/api/family/recipients").send({ emoji: "❤️" })
+      expect(bad.status).toBe(400)
+
+      // 不存在 404
+      const notFound = await request(app).delete("/api/family/recipients/999999")
+      expect(notFound.status).toBe(404)
+    } finally {
+      await request(app).delete(`/api/family/recipients/${id1}`)
+      await request(app).delete(`/api/family/recipients/${id2}`)
+    }
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)

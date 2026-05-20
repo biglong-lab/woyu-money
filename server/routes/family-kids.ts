@@ -36,6 +36,7 @@ import {
   kidsSpendings,
   kidsDailyMessages,
   familyTaskTemplates,
+  familyRecipients,
   kidsWishes,
   kidsTaskComments,
   insertKidsAccountSchema,
@@ -2809,6 +2810,54 @@ router.post(
       .returning()
 
     res.json({ ok: true, wish: updatedWish, goal })
+  })
+)
+
+/**
+ * 捐贈對象目錄
+ *   GET    /api/family/recipients         列出（按 sortOrder 然後 id）
+ *   POST   /api/family/recipients         新增
+ *   DELETE /api/family/recipients/:id     刪除
+ */
+router.get(
+  "/api/family/recipients",
+  asyncHandler(async (_req, res) => {
+    const rows = await db
+      .select()
+      .from(familyRecipients)
+      .orderBy(familyRecipients.sortOrder, familyRecipients.id)
+    res.json(rows)
+  })
+)
+
+router.post(
+  "/api/family/recipients",
+  asyncHandler(async (req, res) => {
+    const name = String(req.body?.name ?? "").trim()
+    if (!name) throw new AppError(400, "name 必填")
+    if (name.length > 100) throw new AppError(400, "name 過長")
+    const emoji = String(req.body?.emoji ?? "❤️").slice(0, 8)
+    const description = req.body?.description ? String(req.body.description).slice(0, 500) : null
+    const sortOrder = Number.isInteger(req.body?.sortOrder) ? Number(req.body.sortOrder) : 0
+    const [created] = await db
+      .insert(familyRecipients)
+      .values({ name, emoji, description, sortOrder })
+      .returning()
+    res.status(201).json(created)
+  })
+)
+
+router.delete(
+  "/api/family/recipients/:id",
+  asyncHandler(async (req, res) => {
+    const id = Number(req.params.id)
+    if (!Number.isInteger(id) || id < 1) throw new AppError(400, "無效的 ID")
+    const deleted = await db
+      .delete(familyRecipients)
+      .where(eq(familyRecipients.id, id))
+      .returning({ id: familyRecipients.id })
+    if (deleted.length === 0) throw new AppError(404, "對象不存在")
+    res.json({ ok: true, id })
   })
 )
 

@@ -2080,6 +2080,18 @@ function SpendDialog({
   const [reflection, setReflection] = useState("")
   const isGive = whichJar === "give"
 
+  // 家長預設的捐贈對象目錄（小孩快選）
+  interface FamilyRecipient {
+    id: number
+    name: string
+    emoji: string | null
+    description: string | null
+  }
+  const { data: presetRecipients = [] } = useQuery<FamilyRecipient[]>({
+    queryKey: ["/api/family/recipients"],
+    enabled: isGive,
+  })
+
   const balance = {
     spend: parseFloat(jar.spendBalance),
     save: parseFloat(jar.saveBalance),
@@ -2196,10 +2208,31 @@ function SpendDialog({
               </div>
               <div>
                 <Label className="text-xs">捐給誰？</Label>
+                {presetRecipients.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mb-1">
+                    {presetRecipients.map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => setRecipient(p.name)}
+                        className={`text-xs px-2 py-1 rounded-full border ${
+                          recipient === p.name
+                            ? "bg-sky-200 border-sky-400 text-sky-900 font-medium"
+                            : "bg-white border-sky-200 hover:bg-sky-50"
+                        }`}
+                        title={p.description ?? ""}
+                      >
+                        {p.emoji ?? "❤️"} {p.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 <Input
                   value={recipient}
                   onChange={(e) => setRecipient(e.target.value)}
-                  placeholder="例：流浪動物協會 / 學校募款"
+                  placeholder={
+                    presetRecipients.length > 0 ? "或自己輸入..." : "例：流浪動物協會 / 學校募款"
+                  }
                 />
               </div>
               <div>

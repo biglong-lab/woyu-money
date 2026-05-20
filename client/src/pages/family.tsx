@@ -393,6 +393,9 @@ export default function FamilyPage() {
       {/* 任務難度智能建議 */}
       <DifficultyInsights />
 
+      {/* 捐贈對象目錄 */}
+      <RecipientsManager />
+
       {/* 待審核任務 */}
       {pendingTasks.length > 0 && (
         <Card className="border-amber-300 bg-amber-50">
@@ -1104,6 +1107,100 @@ function FamilyYearSummary() {
                 </div>
               )}
             </>
+          )}
+        </CardContent>
+      )}
+    </Card>
+  )
+}
+
+function RecipientsManager() {
+  const [open, setOpen] = useState(false)
+  const { toast } = useToast()
+  interface Recipient {
+    id: number
+    name: string
+    emoji: string | null
+    description: string | null
+    sortOrder: number
+  }
+  const { data: recipients = [] } = useQuery<Recipient[]>({
+    queryKey: ["/api/family/recipients"],
+    enabled: open,
+  })
+  const addMut = useMutation({
+    mutationFn: (vars: { name: string; emoji: string; description?: string }) =>
+      apiRequest("POST", "/api/family/recipients", vars),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/family/recipients"] })
+      toast({ title: "✅ 已新增" })
+    },
+    onError: (e: Error) => toast({ title: "失敗", description: e.message, variant: "destructive" }),
+  })
+  const delMut = useMutation({
+    mutationFn: (id: number) => apiRequest("DELETE", `/api/family/recipients/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/family/recipients"] })
+    },
+  })
+
+  return (
+    <Card className="border-rose-200">
+      <CardHeader className="py-3 px-3 sm:px-4 cursor-pointer" onClick={() => setOpen((s) => !s)}>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base flex items-center gap-2">
+            <span className="text-xl">❤️</span>
+            捐贈對象目錄
+          </CardTitle>
+          <span className="text-xs text-rose-700">{open ? "▲" : "▼"}</span>
+        </div>
+        <CardDescription>家長預設常見對象、小孩 give 罐時直接點選</CardDescription>
+      </CardHeader>
+      {open && (
+        <CardContent className="py-2 px-3 sm:px-4 space-y-2">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="w-full h-8 text-xs"
+            onClick={() => {
+              const name = window.prompt("對象名稱（如「動物保護協會」）：", "")
+              if (!name?.trim()) return
+              const emoji = window.prompt("emoji（如 🐶）：", "❤️") || "❤️"
+              const description = window.prompt("描述（可選）：", "") || undefined
+              addMut.mutate({ name: name.trim(), emoji, description })
+            }}
+          >
+            ➕ 新增捐贈對象
+          </Button>
+          {recipients.length === 0 ? (
+            <div className="text-center text-xs text-gray-400 py-2">還沒有對象、點上方新增</div>
+          ) : (
+            <div className="space-y-1">
+              {recipients.map((r) => (
+                <div
+                  key={r.id}
+                  className="flex items-center gap-2 bg-white border border-rose-200 rounded p-2"
+                >
+                  <span className="text-xl">{r.emoji ?? "❤️"}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium">{r.name}</div>
+                    {r.description && (
+                      <div className="text-[10px] text-gray-500 truncate">{r.description}</div>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (confirm(`刪除「${r.name}」？`)) delMut.mutate(r.id)
+                    }}
+                    className="text-red-400 hover:text-red-600 p-1"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
           )}
         </CardContent>
       )}

@@ -256,6 +256,26 @@ export const kidsWishes = pgTable(
 )
 
 // ============================================================
+// 捐贈對象目錄（家長預設常用對象、小孩 give 時下拉選）
+// 培養理財認知：知道錢的去向、誰需要幫助
+// ============================================================
+export const familyRecipients = pgTable(
+  "family_recipients",
+  {
+    id: serial("id").primaryKey(),
+    familyId: integer("family_id").default(1),
+    name: varchar("name", { length: 100 }).notNull(),
+    emoji: varchar("emoji", { length: 8 }).default("❤️"),
+    description: text("description"),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => ({
+    familyIdx: index("family_recipients_family_idx").on(table.familyId),
+  })
+)
+
+// ============================================================
 // 家長自訂任務範本收藏（每家庭自己的常用任務模板）
 // 跟內建範本 (DAILY_TASK_TEMPLATES / SEASONAL_TASKS) 並存、家長可在 BatchDialog 用
 // ============================================================
@@ -352,5 +372,6 @@ export type KidsSpending = typeof kidsSpendings.$inferSelect
 export type InsertKidsSpending = z.infer<typeof insertKidsSpendingSchema>
 export type KidsDailyMessage = typeof kidsDailyMessages.$inferSelect
 export type FamilyTaskTemplate = typeof familyTaskTemplates.$inferSelect
+export type FamilyRecipient = typeof familyRecipients.$inferSelect
 export type KidsWish = typeof kidsWishes.$inferSelect
 export type KidsTaskComment = typeof kidsTaskComments.$inferSelect
