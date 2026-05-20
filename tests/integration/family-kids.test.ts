@@ -1609,6 +1609,35 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(me.breakdown.easy.rate).toBe(100)
   })
 
+  it("家庭年度回顧：聚合本年所有 task/goal/badge/give", async () => {
+    await createKid({ spendRatio: 0, saveRatio: 100, giveRatio: 0 })
+    // 賺 + 完成
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId, title: "T", rewardAmount: 200 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`)
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`)
+    // goal 達成
+    const g = await request(app)
+      .post("/api/family/goals")
+      .send({ kidId, name: "玩具", targetAmount: 100 })
+    await request(app).post(`/api/family/goals/${g.body.id}/save`).send({ amount: 100 })
+
+    const year = new Date().getFullYear()
+    const res = await request(app).get(`/api/family/year-summary?year=${year}`)
+    expect(res.status).toBe(200)
+    expect(res.body.year).toBe(year)
+    expect(Array.isArray(res.body.kids)).toBe(true)
+    expect(res.body.kids.length).toBeGreaterThanOrEqual(1)
+    expect(res.body.grandTotal.tasks).toBeGreaterThanOrEqual(1)
+    expect(res.body.grandTotal.goalsCompleted).toBeGreaterThanOrEqual(1)
+    expect(res.body.grandTotal.badgesEarned).toBeGreaterThanOrEqual(2) // first_task + first_goal
+    expect(res.body.monthly.length).toBe(12)
+    // 不合法 year 400
+    const bad = await request(app).get("/api/family/year-summary?year=1999")
+    expect(bad.status).toBe(400)
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)

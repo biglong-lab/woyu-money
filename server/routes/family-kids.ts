@@ -1875,6 +1875,182 @@ router.get(
 )
 
 /**
+ * GET /api/family/year-summary?year=YYYY
+ * 家庭年度回顧、年底儀式感、家長愛看
+ * 統計：總任務 / 總給付 / 各小孩戰績 / 達成目標 / 徽章 / 最長 streak / 捐贈
+ */
+router.get(
+  "/api/family/year-summary",
+  asyncHandler(async (req, res) => {
+    const year = Number(req.query.year ?? new Date().getFullYear())
+    if (!Number.isInteger(year) || year < 2020 || year > 2100) {
+      throw new AppError(400, "year 不合法")
+    }
+    const yearStart = `${year}-01-01`
+    const nextYear = `${year + 1}-01-01`
+
+    // 1) 各小孩戰績
+    const kidStats = await db.execute(sql`
+      SELECT
+        k.id AS "kidId",
+        k.display_name AS "displayName",
+        k.avatar,
+        k.color,
+        COUNT(t.id) FILTER (WHERE t.status = 'approved')::int AS "approvedCount",
+        COALESCE(SUM(t.reward_amount::numeric) FILTER (WHERE t.status = 'approved'), 0)::numeric AS "approvedSum",
+        COUNT(*) FILTER (WHERE t.status = 'approved' AND t.difficulty = 'hard')::int AS "hardCount"
+      FROM kids_accounts k
+      LEFT JOIN kids_tasks t ON t.kid_id = k.id
+        AND t.approved_at >= ${yearStart}::timestamp
+        AND t.approved_at < ${nextYear}::timestamp
+      WHERE k.is_active = true
+      GROUP BY k.id, k.display_name, k.avatar, k.color
+      ORDER BY "approvedSum" DESC, "approvedCount" DESC
+    `)
+
+    // 2) 達成目標
+    const goalRows = await db.execute(sql`
+      SELECT g.name, g.emoji, g.target_amount::numeric AS target,
+             g.completed_at, k.display_name AS kid_name, k.avatar
+      FROM kids_goals g
+      LEFT JOIN kids_accounts k ON k.id = g.kid_id
+      WHERE g.status = 'completed'
+        AND g.completed_at >= ${yearStart}::timestamp
+        AND g.completed_at < ${nextYear}::timestamp
+      ORDER BY g.completed_at DESC
+    `)
+
+    // 3) 徽章
+    const badgeRows = await db.execute(sql`
+      SELECT b.badge_type, b.title, b.emoji, b.earned_at,
+             k.display_name AS kid_name, k.avatar
+      FROM kids_badges b
+      LEFT JOIN kids_accounts k ON k.id = b.kid_id
+      WHERE b.earned_at >= ${yearStart}::timestamp
+        AND b.earned_at < ${nextYear}::timestamp
+      ORDER BY b.earned_at DESC
+    `)
+
+    // 4) 捐贈紀錄
+    const giveRows = await db.execute(sql`
+      SELECT
+        COALESCE(SUM(s.amount::numeric), 0)::numeric AS total_given,
+        COUNT(DISTINCT s.recipient) FILTER (WHERE s.recipient IS NOT NULL)::int AS recipient_count,
+        COUNT(*)::int AS donation_count
+      FROM kids_spendings s
+      WHERE s.jar = 'give'
+        AND s.spend_date >= ${yearStart}::date
+        AND s.spend_date < ${nextYear}::date
+    `)
+    const giveStats = (
+      giveRows as unknown as {
+        rows: Array<{
+          total_given: string | number
+          recipient_count: number
+          donation_count: number
+        }>
+      }
+    ).rows[0]
+
+    // 5) 月度給付分布（12 月一字排開）
+    const monthRows = await db.execute(sql`
+      SELECT
+        EXTRACT(MONTH FROM approved_at)::int AS month,
+        COALESCE(SUM(reward_amount::numeric), 0)::numeric AS total
+      FROM kids_tasks
+      WHERE status = 'approved'
+        AND approved_at >= ${yearStart}::timestamp
+        AND approved_at < ${nextYear}::timestamp
+      GROUP BY EXTRACT(MONTH FROM approved_at)
+      ORDER BY month
+    `)
+    const monthlyMap: Record<number, number> = {}
+    ;(monthRows as unknown as { rows: { month: number; total: string | number }[] }).rows.forEach(
+      (r) => {
+        monthlyMap[r.month] = parseFloat(String(r.total))
+      }
+    )
+    const monthly = Array.from({ length: 12 }, (_, i) => ({
+      month: i + 1,
+      total: monthlyMap[i + 1] ?? 0,
+    }))
+
+    const kids = (
+      kidStats as unknown as {
+        rows: Array<{
+          kidId: number
+          displayName: string
+          avatar: string
+          color: string
+          approvedCount: number
+          approvedSum: string | number
+          hardCount: number
+        }>
+      }
+    ).rows.map((r) => ({
+      ...r,
+      approvedSum: parseFloat(String(r.approvedSum)),
+    }))
+
+    const grandTotal = {
+      tasks: kids.reduce((s, k) => s + k.approvedCount, 0),
+      reward: kids.reduce((s, k) => s + k.approvedSum, 0),
+      hardCount: kids.reduce((s, k) => s + k.hardCount, 0),
+      goalsCompleted: (goalRows as unknown as { rows: unknown[] }).rows.length,
+      badgesEarned: (badgeRows as unknown as { rows: unknown[] }).rows.length,
+      totalGiven: parseFloat(String(giveStats?.total_given ?? 0)),
+      donationCount: giveStats?.donation_count ?? 0,
+      recipientCount: giveStats?.recipient_count ?? 0,
+    }
+
+    res.json({
+      year,
+      kids,
+      goals: (
+        goalRows as unknown as {
+          rows: Array<{
+            name: string
+            emoji: string | null
+            target: string | number
+            completed_at: string
+            kid_name: string
+            avatar: string
+          }>
+        }
+      ).rows.map((r) => ({
+        name: r.name,
+        emoji: r.emoji,
+        target: parseFloat(String(r.target)),
+        completedAt: r.completed_at,
+        kidName: r.kid_name,
+        avatar: r.avatar,
+      })),
+      badges: (
+        badgeRows as unknown as {
+          rows: Array<{
+            badge_type: string
+            title: string
+            emoji: string
+            earned_at: string
+            kid_name: string
+            avatar: string
+          }>
+        }
+      ).rows.map((r) => ({
+        badgeType: r.badge_type,
+        title: r.title,
+        emoji: r.emoji,
+        earnedAt: r.earned_at,
+        kidName: r.kid_name,
+        avatar: r.avatar,
+      })),
+      monthly,
+      grandTotal,
+    })
+  })
+)
+
+/**
  * GET /api/family/difficulty-insights
  * 看每個 active 小孩過去 90 天 hard/medium/easy 任務的 approved/rejected 比例
  * 自動建議升降難度（讓家長知道任務太簡單或太難）

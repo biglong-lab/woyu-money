@@ -595,6 +595,9 @@ export default function FamilyPage() {
       {/* 全家月度總結報 */}
       {kids.length >= 1 && <FamilyMonthlySummary kids={kids} />}
 
+      {/* 家庭年度回顧 */}
+      {kids.length >= 1 && <FamilyYearSummary />}
+
       {/* 全家活動 Timeline（過去 30 天）*/}
       {activityFeed && activityFeed.items.length > 0 && (
         <Card>
@@ -921,6 +924,191 @@ function TaskStatusBadge({ status }: { status: string }) {
   }
   const s = map[status] ?? { label: status, cls: "bg-gray-100 text-gray-700" }
   return <Badge className={`${s.cls} text-[10px]`}>{s.label}</Badge>
+}
+
+function FamilyYearSummary() {
+  const [open, setOpen] = useState(false)
+  const [year, setYear] = useState(new Date().getFullYear())
+
+  interface YearSummary {
+    year: number
+    kids: Array<{
+      kidId: number
+      displayName: string
+      avatar: string
+      color: string
+      approvedCount: number
+      approvedSum: number
+      hardCount: number
+    }>
+    goals: Array<{
+      name: string
+      emoji: string | null
+      target: number
+      completedAt: string
+      kidName: string
+      avatar: string
+    }>
+    badges: Array<{
+      title: string
+      emoji: string
+      earnedAt: string
+      kidName: string
+    }>
+    monthly: Array<{ month: number; total: number }>
+    grandTotal: {
+      tasks: number
+      reward: number
+      hardCount: number
+      goalsCompleted: number
+      badgesEarned: number
+      totalGiven: number
+      donationCount: number
+      recipientCount: number
+    }
+  }
+  const { data } = useQuery<YearSummary>({
+    queryKey: [`/api/family/year-summary?year=${year}`],
+    enabled: open,
+    staleTime: 5 * 60_000,
+  })
+
+  const yearOptions = useMemo(() => {
+    const cur = new Date().getFullYear()
+    return [cur, cur - 1, cur - 2, cur - 3]
+  }, [])
+
+  return (
+    <Card className="border-fuchsia-200 bg-gradient-to-br from-fuchsia-50 via-purple-50 to-pink-50">
+      <CardHeader className="py-3 px-3 sm:px-4 cursor-pointer" onClick={() => setOpen((s) => !s)}>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base flex items-center gap-2">
+            <span className="text-xl">🎊</span>
+            家庭年度回顧
+          </CardTitle>
+          <span className="text-xs text-fuchsia-700">{open ? "▲ 收起" : "▼ 展開"}</span>
+        </div>
+        <CardDescription>家庭年底儀式、全年戰績一頁看完</CardDescription>
+      </CardHeader>
+      {open && (
+        <CardContent className="py-2 px-3 sm:px-4 space-y-3">
+          <Select value={String(year)} onValueChange={(v) => setYear(Number(v))}>
+            <SelectTrigger className="h-8 w-32 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {yearOptions.map((y) => (
+                <SelectItem key={y} value={String(y)} className="text-xs">
+                  {y} 年
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {!data ? (
+            <div className="text-center text-sm text-gray-400 py-4">載入中…</div>
+          ) : (
+            <>
+              {/* Grand totals */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <div className="bg-white rounded p-2 text-center border border-fuchsia-200">
+                  <div className="text-[10px] text-gray-500">完成任務</div>
+                  <div className="font-bold text-fuchsia-700">{data.grandTotal.tasks}</div>
+                  {data.grandTotal.hardCount > 0 && (
+                    <div className="text-[9px] text-rose-500">
+                      ⭐⭐⭐×{data.grandTotal.hardCount}
+                    </div>
+                  )}
+                </div>
+                <div className="bg-white rounded p-2 text-center border border-fuchsia-200">
+                  <div className="text-[10px] text-gray-500">總給付</div>
+                  <div className="font-bold text-amber-700">
+                    {formatMoney(data.grandTotal.reward)}
+                  </div>
+                </div>
+                <div className="bg-white rounded p-2 text-center border border-fuchsia-200">
+                  <div className="text-[10px] text-gray-500">達成目標</div>
+                  <div className="font-bold text-purple-700">
+                    {data.grandTotal.goalsCompleted}
+                    <span className="text-[10px] text-amber-500 ml-1">
+                      🏅×{data.grandTotal.badgesEarned}
+                    </span>
+                  </div>
+                </div>
+                <div className="bg-white rounded p-2 text-center border border-fuchsia-200">
+                  <div className="text-[10px] text-gray-500">愛心捐獻</div>
+                  <div className="font-bold text-rose-700">
+                    {formatMoney(data.grandTotal.totalGiven)}
+                  </div>
+                  <div className="text-[9px] text-gray-400">{data.grandTotal.donationCount} 筆</div>
+                </div>
+              </div>
+
+              {/* 各小孩戰績 */}
+              {data.kids.length > 0 && (
+                <div>
+                  <div className="text-xs font-bold text-gray-700 mb-1">🏆 小孩戰績排名</div>
+                  <div className="space-y-1">
+                    {data.kids.map((k, i) => (
+                      <div
+                        key={k.kidId}
+                        className="flex items-center gap-2 bg-white rounded p-2 text-sm border border-fuchsia-100"
+                      >
+                        <span>{i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : ""}</span>
+                        <span className="text-xl">{k.avatar}</span>
+                        <span className="font-medium flex-1">{k.displayName}</span>
+                        <span className="text-xs text-gray-500">📋 {k.approvedCount}</span>
+                        <span className="font-mono font-bold text-amber-700">
+                          {formatMoney(k.approvedSum)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 達成目標 */}
+              {data.goals.length > 0 && (
+                <div>
+                  <div className="text-xs font-bold text-gray-700 mb-1">
+                    🎯 達成的目標（{data.goals.length}）
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {data.goals.slice(0, 10).map((g, i) => (
+                      <div
+                        key={i}
+                        className="text-xs bg-white border border-purple-200 px-2 py-0.5 rounded-full"
+                      >
+                        {g.emoji ?? "🎯"} {g.name}
+                        <span className="text-gray-400 ml-1">
+                          ({g.avatar} {formatMoney(g.target)})
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 徽章 */}
+              {data.badges.length > 0 && (
+                <div>
+                  <div className="text-xs font-bold text-gray-700 mb-1">
+                    🏅 解鎖徽章（{data.badges.length}）
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {data.badges.slice(0, 20).map((b, i) => (
+                      <span key={i} title={`${b.kidName} · ${b.title}`} className="text-2xl">
+                        {b.emoji}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </CardContent>
+      )}
+    </Card>
+  )
 }
 
 function DifficultyInsights() {
