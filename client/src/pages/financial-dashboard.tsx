@@ -31,10 +31,13 @@ import {
   Calendar,
   Building2,
   Info,
+  Users,
+  ExternalLink,
 } from "lucide-react"
 import { useDocumentTitle } from "@/hooks/use-document-title"
 import { BackToTop } from "@/components/back-to-top"
 import { formatStatus, isCompletedStatus } from "@/lib/status-labels"
+import { Link } from "wouter"
 import {
   Dialog,
   DialogContent,
@@ -279,6 +282,19 @@ export default function FinancialDashboardPage() {
   }
   const ytdQuery = useQuery<YtdData>({
     queryKey: ["/api/dashboard/ytd"],
+  })
+
+  // 家庭記帳 summary（顯示「N 個待審 / 累計零用金」widget）
+  interface FamilyDashboard {
+    kids: Array<{ id: number; displayName: string; avatar: string }>
+    totalReceived: number
+    totalSaved: number
+    pendingTaskCount: number
+    toApproveCount: number
+  }
+  const { data: familyDash } = useQuery<FamilyDashboard>({
+    queryKey: ["/api/family/dashboard"],
+    staleTime: 30_000,
   })
 
   const ytd: YtdData = ytdQuery.data ?? {
@@ -830,6 +846,71 @@ export default function FinancialDashboardPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* 家庭記帳 widget（小孩模式整合）*/}
+      {familyDash && familyDash.kids && familyDash.kids.length > 0 && (
+        <Card className="border-pink-200 bg-gradient-to-br from-pink-50 to-orange-50">
+          <CardContent className="py-4 px-4">
+            <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <Users className="h-5 w-5 text-pink-600" />
+                <span className="font-semibold text-gray-800">家庭記帳 · 小孩模式</span>
+                <span className="text-xs text-gray-500">{familyDash.kids.length} 位成員</span>
+              </div>
+              <Link href="/family">
+                <a className="text-xs text-pink-700 hover:text-pink-900 font-medium inline-flex items-center gap-1">
+                  進入家庭模組
+                  <ExternalLink className="h-3 w-3" />
+                </a>
+              </Link>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <Link href="/family">
+                <a className="block bg-white rounded-lg border border-pink-200 p-3 hover:border-pink-400 transition">
+                  <div className="text-xs text-gray-500 mb-1">待審任務</div>
+                  <div className="text-2xl font-bold text-pink-700">
+                    {familyDash.toApproveCount}
+                  </div>
+                  <div className="text-xs text-gray-400 mt-1">已 submit 等家長</div>
+                </a>
+              </Link>
+              <div className="bg-white rounded-lg border border-pink-200 p-3">
+                <div className="text-xs text-gray-500 mb-1">進行中任務</div>
+                <div className="text-2xl font-bold text-amber-700">
+                  {Math.max(0, familyDash.pendingTaskCount - familyDash.toApproveCount)}
+                </div>
+                <div className="text-xs text-gray-400 mt-1">已派、等小孩做</div>
+              </div>
+              <div className="bg-white rounded-lg border border-pink-200 p-3">
+                <div className="text-xs text-gray-500 mb-1">累計零用金</div>
+                <div className="text-2xl font-bold text-green-700">
+                  ${Number(familyDash.totalReceived).toLocaleString()}
+                </div>
+                <div className="text-xs text-gray-400 mt-1">所有小孩 total</div>
+              </div>
+              <div className="bg-white rounded-lg border border-pink-200 p-3">
+                <div className="text-xs text-gray-500 mb-1">儲蓄罐合計</div>
+                <div className="text-2xl font-bold text-blue-700">
+                  ${Number(familyDash.totalSaved).toLocaleString()}
+                </div>
+                <div className="text-xs text-gray-400 mt-1">save jar 累積</div>
+              </div>
+            </div>
+
+            <div className="mt-3 flex flex-wrap gap-2">
+              {familyDash.kids.map((k) => (
+                <Link key={k.id} href={`/family/kid/${k.id}`}>
+                  <a className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-white border border-pink-200 text-xs hover:border-pink-400 transition">
+                    <span className="text-base">{k.avatar}</span>
+                    <span className="text-gray-700">{k.displayName}</span>
+                  </a>
+                </Link>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* 資料來源狀態 */}
       <Card>
