@@ -342,6 +342,7 @@ function KidDashboard({
   const [showSpend, setShowSpend] = useState(false)
   const [showPropose, setShowPropose] = useState(false)
   const [showReport, setShowReport] = useState(false)
+  const [showTransfer, setShowTransfer] = useState(false)
 
   const invalidate = () => {
     queryClient.invalidateQueries({
@@ -485,20 +486,25 @@ function KidDashboard({
         />
       </div>
 
-      {/* 兩個大按鈕：花錢 + 主動提任務 */}
-      <div className="mb-4 grid grid-cols-2 gap-2">
+      {/* 三個大按鈕：花錢 + 提任務 + 送禮 */}
+      <div className="mb-4 grid grid-cols-3 gap-2">
         <Button
           onClick={() => setShowSpend(true)}
-          className="h-14 text-sm bg-gradient-to-r from-amber-500 to-pink-500 hover:from-amber-600 hover:to-pink-600 shadow-lg"
+          className="h-14 text-xs sm:text-sm bg-gradient-to-r from-amber-500 to-pink-500 hover:from-amber-600 hover:to-pink-600 shadow-lg"
         >
-          <ShoppingBag className="h-5 w-5 mr-1" />
-          💸 我花錢了
+          💸 花錢了
         </Button>
         <Button
           onClick={() => setShowPropose(true)}
-          className="h-14 text-sm bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 shadow-lg"
+          className="h-14 text-xs sm:text-sm bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 shadow-lg"
         >
-          <Sparkles className="h-5 w-5 mr-1" />✋ 我想做家事
+          ✋ 做家事
+        </Button>
+        <Button
+          onClick={() => setShowTransfer(true)}
+          className="h-14 text-xs sm:text-sm bg-gradient-to-r from-rose-500 to-red-500 hover:from-rose-600 hover:to-red-600 shadow-lg"
+        >
+          💝 送禮
         </Button>
       </div>
 
@@ -973,7 +979,148 @@ function KidDashboard({
           toast={toast}
         />
       )}
+
+      {showTransfer && (
+        <TransferDialog
+          fromKidId={kidId}
+          jar={jar}
+          onClose={() => setShowTransfer(false)}
+          onSuccess={() => {
+            invalidate()
+            setShowTransfer(false)
+          }}
+          toast={toast}
+        />
+      )}
     </div>
+  )
+}
+
+function TransferDialog({
+  fromKidId,
+  jar,
+  onClose,
+  onSuccess,
+  toast,
+}: {
+  fromKidId: number
+  jar: Jar
+  onClose: () => void
+  onSuccess: () => void
+  toast: (opts: {
+    title: string
+    description?: string
+    variant?: "default" | "destructive"
+  }) => void
+}) {
+  const [toKidId, setToKidId] = useState<string>("")
+  const [amount, setAmount] = useState("10")
+  const [message, setMessage] = useState("")
+
+  const { data: kids = [] } = useQuery<Kid[]>({ queryKey: ["/api/family/kids"] })
+  const siblings = kids.filter((k) => k.id !== fromKidId)
+
+  const mut = useMutation({
+    mutationFn: () =>
+      apiRequest<{ ok: true; to: string; amount: number }>("POST", "/api/family/jars/transfer", {
+        fromKidId,
+        toKidId: parseInt(toKidId),
+        amount: parseFloat(amount),
+        jar: "spend",
+        message: message.trim() || null,
+      }),
+    onSuccess: (r) => {
+      toast({
+        title: `💝 已送禮 ${formatMoney(r.amount)} 給 ${r.to}`,
+        description: "感謝你的愛心！",
+      })
+      vibrate([50, 80, 50])
+      confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 } })
+      onSuccess()
+    },
+    onError: (e: Error) =>
+      toast({ title: "送禮失敗", description: e.message, variant: "destructive" }),
+  })
+
+  const spend = parseFloat(jar.spendBalance)
+  const canSubmit = toKidId && parseFloat(amount) > 0 && parseFloat(amount) <= spend
+
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent className="w-[95vw] max-w-md">
+        <DialogHeader>
+          <DialogTitle>💝 送禮給兄弟姊妹</DialogTitle>
+          <DialogDescription>
+            從你的花錢罐 ({formatMoney(spend)}) 送一些給家人、培養互助
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3 text-sm">
+          {siblings.length === 0 ? (
+            <div className="text-center text-gray-500 py-4">
+              還沒有兄弟姊妹、請家長新增其他小孩 👨‍👩‍👧‍👦
+            </div>
+          ) : (
+            <>
+              <div>
+                <Label>送給誰</Label>
+                <div className="grid grid-cols-2 gap-2 mt-1">
+                  {siblings.map((k) => (
+                    <button
+                      key={k.id}
+                      type="button"
+                      onClick={() => setToKidId(String(k.id))}
+                      className={`p-3 rounded-lg border-2 text-left ${
+                        toKidId === String(k.id)
+                          ? "border-rose-400 bg-rose-50"
+                          : "border-gray-200 bg-white hover:bg-gray-50"
+                      }`}
+                    >
+                      <div className="text-3xl">{k.avatar}</div>
+                      <div className="font-medium">{k.displayName}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <Label>金額</Label>
+                <Input
+                  type="number"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  placeholder="10"
+                  min="1"
+                  max={spend}
+                />
+                <div className="text-[10px] text-gray-400 mt-1">
+                  你的花錢罐目前 {formatMoney(spend)}
+                </div>
+              </div>
+              <div>
+                <Label>祝福訊息（可選）</Label>
+                <Input
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  placeholder="生日快樂！"
+                  maxLength={200}
+                />
+              </div>
+            </>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            取消
+          </Button>
+          <Button
+            disabled={!canSubmit || mut.isPending}
+            onClick={() => mut.mutate()}
+            className="bg-rose-500 hover:bg-rose-600"
+          >
+            💝 送出
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 

@@ -290,6 +290,14 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
       )
     }
 
+    // 先抓 spending 前餘額（bonus 可能讓 reward 從 100 變 150）
+    const beforeRow = (
+      await db.execute(
+        sql`SELECT spend_balance::numeric AS s FROM kids_jars WHERE kid_id = ${kidId}`
+      )
+    ).rows as unknown as { s: number }[]
+    const before = Number(beforeRow[0].s)
+
     // 花 30
     const sres = await request(app).post("/api/family/spendings").send({
       kidId,
@@ -299,13 +307,13 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     })
     expect(sres.status).toBe(201)
 
-    // 驗 spend_balance = 70
+    // 驗 spend_balance 減少 30（相對檢查、抗 bonus random）
     const jar = (
       await db.execute(
         sql`SELECT spend_balance::numeric AS s FROM kids_jars WHERE kid_id = ${kidId}`
       )
     ).rows as unknown as { s: number }[]
-    expect(Number(jar[0].s)).toBe(70)
+    expect(before - Number(jar[0].s)).toBe(30)
 
     // 列表應該有
     const list = await request(app).get(`/api/family/spendings?kidId=${kidId}`)
@@ -932,6 +940,89 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
       expect(new Date(timestamps[i]).getTime()).toBeGreaterThanOrEqual(
         new Date(timestamps[i + 1]).getTime()
       )
+    }
+  })
+
+  it("兄弟姊妹互贈：spend 罐扣 + 對方 spend 罐 + totalReceived 增加 + 送方建 spending 紀錄", async () => {
+    // 建兩個小孩
+    await createKid({ displayName: "哥哥", spendRatio: 100, saveRatio: 0, giveRatio: 0 })
+    const elderId = kidId
+    // 先賺 100
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId: elderId, title: "T", rewardAmount: 100 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`)
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`)
+
+    // 建妹妹（重設 kidId 避免 afterEach 清掉哥哥）
+    kidId = 0
+    const sis = await request(app).post("/api/family/kids").send({
+      displayName: "妹妹",
+      avatar: "👧",
+      color: "pink",
+      pin: "8721",
+      spendRatio: 70,
+      saveRatio: 20,
+      giveRatio: 10,
+    })
+    const youngerId = sis.body.id
+
+    try {
+      // 先抓 transfer 前餘額（bonus 可能讓 reward 變 150、不依賴絕對值）
+      const beforeJar = await db.execute(
+        sql`SELECT spend_balance::numeric AS s FROM kids_jars WHERE kid_id = ${elderId}`
+      )
+      const beforeSpend = Number((beforeJar as unknown as { rows: { s: string }[] }).rows[0].s)
+
+      const transfer = await request(app).post("/api/family/jars/transfer").send({
+        fromKidId: elderId,
+        toKidId: youngerId,
+        amount: 30,
+        jar: "spend",
+        message: "妹妹生日快樂",
+      })
+      expect(transfer.status).toBe(200)
+      expect(transfer.body.ok).toBe(true)
+      expect(transfer.body.amount).toBe(30)
+      expect(transfer.body.from).toBe("哥哥")
+      expect(transfer.body.to).toBe("妹妹")
+
+      // 哥哥 spend 罐：減少 30（相對檢查、抗 bonus random）
+      const elderJar = await db.execute(
+        sql`SELECT spend_balance::numeric AS s FROM kids_jars WHERE kid_id = ${elderId}`
+      )
+      const afterSpend = Number((elderJar as unknown as { rows: { s: string }[] }).rows[0].s)
+      expect(beforeSpend - afterSpend).toBe(30)
+
+      // 妹妹 spend 罐：0 + 30 = 30、totalReceived = 30
+      const sisJar = await db.execute(
+        sql`SELECT spend_balance::numeric AS s, total_received::numeric AS t FROM kids_jars WHERE kid_id = ${youngerId}`
+      )
+      const row = (sisJar as unknown as { rows: { s: string; t: string }[] }).rows[0]
+      expect(Number(row.s)).toBe(30)
+      expect(Number(row.t)).toBe(30)
+
+      // 哥哥 spendings 紀錄
+      const sp = await request(app).get(`/api/family/spendings?kidId=${elderId}`)
+      expect(
+        sp.body.some((x: { description: string }) => x.description.includes("送禮給 妹妹"))
+      ).toBe(true)
+
+      // 餘額不足拒絕
+      const fail = await request(app)
+        .post("/api/family/jars/transfer")
+        .send({ fromKidId: elderId, toKidId: youngerId, amount: 999 })
+      expect(fail.status).toBe(400)
+
+      // 送給自己拒絕
+      const self = await request(app)
+        .post("/api/family/jars/transfer")
+        .send({ fromKidId: elderId, toKidId: elderId, amount: 10 })
+      expect(self.status).toBe(400)
+    } finally {
+      await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${youngerId}`)
+      // 確保 afterEach 清哥哥
+      kidId = elderId
     }
   })
 

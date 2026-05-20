@@ -1055,6 +1055,105 @@ router.post(
   })
 )
 
+/**
+ * POST /api/family/jars/transfer
+ * 兄弟姊妹互贈零用金
+ * Body: { fromKidId, toKidId, amount, jar?, message? }
+ *
+ * 流程：
+ *  1. 從 fromKid 對應 jar 扣（預設 spend 罐）
+ *  2. 加到 toKid 的 spend 罐 + totalReceived
+ *  3. 兩邊各建一筆 kids_spendings 紀錄（培養同理心 + 受贈紀錄）
+ *
+ * 培養同理心、家庭互助
+ */
+router.post(
+  "/api/family/jars/transfer",
+  asyncHandler(async (req, res) => {
+    const fromKidId = Number(req.body?.fromKidId)
+    const toKidId = Number(req.body?.toKidId)
+    const amount = Number(req.body?.amount)
+    const fromJar = String(req.body?.jar ?? "spend") as "spend" | "save" | "give"
+    const message = req.body?.message ? String(req.body.message).slice(0, 200) : null
+
+    if (!fromKidId || !toKidId) throw new AppError(400, "fromKidId / toKidId 必填")
+    if (fromKidId === toKidId) throw new AppError(400, "不能送禮給自己")
+    if (!(amount > 0)) throw new AppError(400, "金額需為正數")
+    if (!["spend", "save", "give"].includes(fromJar)) {
+      throw new AppError(400, "jar 須為 spend / save / give")
+    }
+
+    const [fromKid] = await db
+      .select()
+      .from(kidsAccounts)
+      .where(eq(kidsAccounts.id, fromKidId))
+      .limit(1)
+    const [toKid] = await db
+      .select()
+      .from(kidsAccounts)
+      .where(eq(kidsAccounts.id, toKidId))
+      .limit(1)
+    if (!fromKid || !toKid) throw new AppError(404, "找不到指定小孩")
+
+    await ensureJarsRow(fromKidId)
+    await ensureJarsRow(toKidId)
+    const [fromJarRow] = await db
+      .select()
+      .from(kidsJars)
+      .where(eq(kidsJars.kidId, fromKidId))
+      .limit(1)
+    const balMap = {
+      spend: parseFloat(fromJarRow.spendBalance),
+      save: parseFloat(fromJarRow.saveBalance),
+      give: parseFloat(fromJarRow.giveBalance),
+    }
+    if (balMap[fromJar] < amount) {
+      throw new AppError(400, `${fromJar} 罐餘額 $${balMap[fromJar]} 不足 $${amount}`)
+    }
+
+    // 扣 from 罐
+    const fromCol = `${fromJar}_balance`
+    await db.execute(sql`
+      UPDATE kids_jars
+      SET ${sql.raw(fromCol)} = ${sql.raw(fromCol)} - ${amount.toFixed(2)}::numeric,
+          total_spent = total_spent + ${amount.toFixed(2)}::numeric,
+          updated_at = NOW()
+      WHERE kid_id = ${fromKidId}
+    `)
+    // 加到 to 的 spend 罐（受贈方可自由運用）+ totalReceived
+    await db.execute(sql`
+      UPDATE kids_jars
+      SET spend_balance = spend_balance + ${amount.toFixed(2)}::numeric,
+          total_received = total_received + ${amount.toFixed(2)}::numeric,
+          updated_at = NOW()
+      WHERE kid_id = ${toKidId}
+    `)
+
+    const today = new Date().toISOString().slice(0, 10)
+    // from 紀錄（jar=give、recipient=toKid 名字）
+    // to 方靠 jars.total_received 累計、不另建負值紀錄
+    await db.insert(kidsSpendings).values({
+      kidId: fromKidId,
+      jar: "give",
+      amount: amount.toFixed(2),
+      description: `送禮給 ${toKid.displayName}`,
+      emoji: "💝",
+      spendDate: today,
+      recipient: toKid.displayName,
+      reflection: message,
+    })
+
+    res.json({
+      ok: true,
+      from: fromKid.displayName,
+      to: toKid.displayName,
+      amount,
+      fromJar,
+      message,
+    })
+  })
+)
+
 router.delete(
   "/api/family/spendings/:id",
   asyncHandler(async (req, res) => {
