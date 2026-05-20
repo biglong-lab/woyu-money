@@ -226,6 +226,111 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(Array.isArray(kid.body.badges)).toBe(true)
   })
 
+  it("任務範本 + batch 一鍵派", async () => {
+    await createKid()
+    const tpls = await request(app).get("/api/family/task-templates")
+    expect(tpls.status).toBe(200)
+    expect(Array.isArray(tpls.body)).toBe(true)
+    expect(tpls.body.length).toBeGreaterThanOrEqual(5)
+
+    const batch = await request(app)
+      .post("/api/family/tasks/batch")
+      .send({
+        kidIds: [kidId],
+        tasks: [
+          { title: "洗碗", emoji: "🍽️", rewardAmount: 50 },
+          { title: "倒垃圾", emoji: "🗑️", rewardAmount: 30 },
+        ],
+      })
+    expect(batch.status).toBe(201)
+    expect(batch.body.count).toBe(2)
+  })
+
+  it("approve 任務同時寫進主系統 payment_records", async () => {
+    await createKid()
+    const t = await request(app).post("/api/family/tasks").send({
+      kidId,
+      title: "測試入帳",
+      rewardAmount: 80,
+    })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`)
+    const ares = await request(app).post(`/api/family/tasks/${t.body.id}/approve`)
+    expect(ares.status).toBe(200)
+    expect(ares.body.mainSystem).toBeTruthy()
+    expect(ares.body.mainSystem.synced).toBe(true)
+    expect(ares.body.mainSystem.paymentItemId).toBeGreaterThan(0)
+    expect(ares.body.mainSystem.paymentRecordId).toBeGreaterThan(0)
+
+    // 清理測試寫入的 payment_items
+    if (ares.body.mainSystem.paymentItemId) {
+      await db.execute(
+        sql`DELETE FROM payment_records WHERE payment_item_id = ${ares.body.mainSystem.paymentItemId}`
+      )
+      await db.execute(
+        sql`DELETE FROM payment_items WHERE id = ${ares.body.mainSystem.paymentItemId}`
+      )
+    }
+  })
+
+  it("花錢紀錄 CRUD + 餘額扣除 / 退回", async () => {
+    await createKid({ spendRatio: 100, saveRatio: 0, giveRatio: 0 })
+    // 先派任務入 100 進 spend 罐
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId, title: "test", rewardAmount: 100 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`)
+    const ares = await request(app).post(`/api/family/tasks/${t.body.id}/approve`)
+    // 清掉主系統測試資料
+    if (ares.body.mainSystem?.paymentItemId) {
+      await db.execute(
+        sql`DELETE FROM payment_records WHERE payment_item_id = ${ares.body.mainSystem.paymentItemId}`
+      )
+      await db.execute(
+        sql`DELETE FROM payment_items WHERE id = ${ares.body.mainSystem.paymentItemId}`
+      )
+    }
+
+    // 花 30
+    const sres = await request(app).post("/api/family/spendings").send({
+      kidId,
+      jar: "spend",
+      amount: 30,
+      description: "買飲料",
+    })
+    expect(sres.status).toBe(201)
+
+    // 驗 spend_balance = 70
+    const jar = (
+      await db.execute(
+        sql`SELECT spend_balance::numeric AS s FROM kids_jars WHERE kid_id = ${kidId}`
+      )
+    ).rows as unknown as { s: number }[]
+    expect(Number(jar[0].s)).toBe(70)
+
+    // 列表應該有
+    const list = await request(app).get(`/api/family/spendings?kidId=${kidId}`)
+    expect(list.status).toBe(200)
+    expect(list.body.find((x: { id: number }) => x.id === sres.body.id)).toBeTruthy()
+
+    // 餘額不足拒絕
+    const overspend = await request(app).post("/api/family/spendings").send({
+      kidId,
+      jar: "spend",
+      amount: 999,
+      description: "貴的",
+    })
+    expect(overspend.status).toBe(400)
+
+    // 刪除 → 退回
+    await request(app).delete(`/api/family/spendings/${sres.body.id}`)
+    const jar2 = (
+      await db.execute(
+        sql`SELECT spend_balance::numeric AS s FROM kids_jars WHERE kid_id = ${kidId}`
+      )
+    ).rows as unknown as { s: number }[]
+    expect(Number(jar2[0].s)).toBe(100)
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)

@@ -44,7 +44,9 @@ import {
   PiggyBank,
   Target,
   ExternalLink,
+  Zap,
 } from "lucide-react"
+import { Checkbox } from "@/components/ui/checkbox"
 import { useToast } from "@/hooks/use-toast"
 import { apiRequest, queryClient } from "@/lib/queryClient"
 import { useDocumentTitle } from "@/hooks/use-document-title"
@@ -112,6 +114,7 @@ export default function FamilyPage() {
   const [showAddKid, setShowAddKid] = useState(false)
   const [editKid, setEditKid] = useState<Kid | null>(null)
   const [showAddTask, setShowAddTask] = useState(false)
+  const [showBatchTask, setShowBatchTask] = useState(false)
 
   const { data: dashboard } = useQuery<FamilyDashboard>({
     queryKey: ["/api/family/dashboard"],
@@ -188,14 +191,24 @@ export default function FamilyPage() {
           </h1>
           <p className="text-sm text-gray-500 mt-1">派任務、入帳、三罐分配、養成小朋友財務習慣</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          <Button
+            size="sm"
+            onClick={() => setShowBatchTask(true)}
+            className="bg-indigo-600 hover:bg-indigo-700"
+            disabled={kids.length === 0}
+          >
+            <Zap className="h-4 w-4 mr-1" />
+            一鍵派
+          </Button>
           <Button
             size="sm"
             onClick={() => setShowAddTask(true)}
             className="bg-amber-600 hover:bg-amber-700"
+            disabled={kids.length === 0}
           >
             <Plus className="h-4 w-4 mr-1" />
-            派任務
+            自訂
           </Button>
           <Button size="sm" variant="outline" onClick={() => setShowAddKid(true)}>
             <Plus className="h-4 w-4 mr-1" />
@@ -391,6 +404,17 @@ export default function FamilyPage() {
           onSuccess={() => {
             invalidateAll()
             setShowAddTask(false)
+          }}
+        />
+      )}
+
+      {showBatchTask && (
+        <BatchTaskDialog
+          kids={kids}
+          onClose={() => setShowBatchTask(false)}
+          onSuccess={() => {
+            invalidateAll()
+            setShowBatchTask(false)
           }}
         />
       )}
@@ -746,6 +770,143 @@ function TaskDialog({
           >
             <Sparkles className="h-4 w-4 mr-1" />
             派任務
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+interface Template {
+  title: string
+  emoji: string
+  rewardAmount: number
+}
+
+function BatchTaskDialog({
+  kids,
+  onClose,
+  onSuccess,
+}: {
+  kids: Kid[]
+  onClose: () => void
+  onSuccess: () => void
+}) {
+  const { toast } = useToast()
+  const { data: templates = [] } = useQuery<Template[]>({
+    queryKey: ["/api/family/task-templates"],
+  })
+  const [selectedTpls, setSelectedTpls] = useState<Set<string>>(new Set())
+  const [selectedKids, setSelectedKids] = useState<Set<number>>(new Set(kids.map((k) => k.id)))
+
+  const toggleTpl = (title: string) => {
+    setSelectedTpls((s) => {
+      const next = new Set(s)
+      if (next.has(title)) next.delete(title)
+      else next.add(title)
+      return next
+    })
+  }
+  const toggleKid = (id: number) => {
+    setSelectedKids((s) => {
+      const next = new Set(s)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const mut = useMutation({
+    mutationFn: () =>
+      apiRequest<{ count: number }>("POST", "/api/family/tasks/batch", {
+        kidIds: Array.from(selectedKids),
+        tasks: templates.filter((t) => selectedTpls.has(t.title)),
+      }),
+    onSuccess: (r) => {
+      toast({ title: `✅ 派出 ${r.count} 個任務` })
+      confetti({ particleCount: 50, spread: 60, origin: { y: 0.7 } })
+      onSuccess()
+    },
+    onError: (e: Error) => toast({ title: "失敗", description: e.message, variant: "destructive" }),
+  })
+
+  const totalTasks = selectedKids.size * selectedTpls.size
+  const totalAmount =
+    Array.from(selectedTpls).reduce((s, title) => {
+      const t = templates.find((x) => x.title === title)
+      return s + (t?.rewardAmount ?? 0)
+    }, 0) * selectedKids.size
+
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent className="w-[95vw] max-w-md max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>一鍵派任務</DialogTitle>
+          <DialogDescription>選範本 + 選小孩、一次派完所有組合</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3 text-sm">
+          <div>
+            <Label className="font-bold">📋 選任務範本（複選）</Label>
+            <div className="space-y-1 mt-1 max-h-64 overflow-y-auto">
+              {templates.map((t) => (
+                <button
+                  key={t.title}
+                  type="button"
+                  onClick={() => toggleTpl(t.title)}
+                  className={`w-full text-left flex items-center gap-2 p-2 rounded border ${
+                    selectedTpls.has(t.title) ? "border-indigo-500 bg-indigo-50" : "border-gray-200"
+                  }`}
+                >
+                  <span className="text-xl">{t.emoji}</span>
+                  <span className="flex-1">{t.title}</span>
+                  <span className="text-xs font-mono text-gray-500">${t.rewardAmount}</span>
+                  {selectedTpls.has(t.title) && (
+                    <CheckCircle2 className="h-4 w-4 text-indigo-600" />
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <Label className="font-bold">👨‍👩‍👧 派給</Label>
+            <div className="flex flex-wrap gap-2 mt-1">
+              {kids.map((k) => (
+                <button
+                  key={k.id}
+                  type="button"
+                  onClick={() => toggleKid(k.id)}
+                  className={`flex items-center gap-1 px-3 py-1.5 rounded-full border-2 ${
+                    selectedKids.has(k.id) ? "border-indigo-500 bg-indigo-50" : "border-gray-200"
+                  }`}
+                >
+                  <span className="text-lg">{k.avatar}</span>
+                  <span className="text-sm">{k.displayName}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {totalTasks > 0 && (
+            <div className="bg-amber-50 border border-amber-200 rounded p-2 text-xs">
+              將派出 <b>{totalTasks}</b> 個任務（{selectedKids.size} 小孩 × {selectedTpls.size}{" "}
+              範本）、
+              <br />
+              若全部完成獎勵總額 <b>${totalAmount.toLocaleString()}</b>
+            </div>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            取消
+          </Button>
+          <Button
+            onClick={() => mut.mutate()}
+            disabled={totalTasks === 0 || mut.isPending}
+            className="bg-indigo-600 hover:bg-indigo-700"
+          >
+            <Zap className="h-4 w-4 mr-1" />
+            派出 {totalTasks} 個任務
           </Button>
         </DialogFooter>
       </DialogContent>

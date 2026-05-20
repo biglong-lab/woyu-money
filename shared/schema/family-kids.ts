@@ -154,6 +154,28 @@ export const kidsBadges = pgTable(
 )
 
 // ============================================================
+// 花錢紀錄（小孩自己記）
+// ============================================================
+export const kidsSpendings = pgTable(
+  "kids_spendings",
+  {
+    id: serial("id").primaryKey(),
+    kidId: integer("kid_id")
+      .notNull()
+      .references(() => kidsAccounts.id, { onDelete: "cascade" }),
+    jar: varchar("jar", { length: 8 }).notNull(), // 'spend' / 'save' / 'give'
+    amount: decimal("amount", { precision: 8, scale: 2 }).notNull(),
+    description: varchar("description", { length: 100 }).notNull(),
+    emoji: varchar("emoji", { length: 8 }).default("💰"),
+    spendDate: date("spend_date").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => ({
+    kidDateIdx: index("kids_spendings_kid_date_idx").on(table.kidId, table.spendDate),
+  })
+)
+
+// ============================================================
 // Zod schema for validation
 // ============================================================
 export const insertKidsAccountSchema = createInsertSchema(kidsAccounts, {
@@ -178,6 +200,11 @@ export const insertKidsGoalSchema = createInsertSchema(kidsGoals, {
   targetAmount: z.union([z.string(), z.number()]).transform((v) => String(v)),
 }).omit({ id: true, completedAt: true, createdAt: true, updatedAt: true, currentAmount: true })
 
+export const insertKidsSpendingSchema = createInsertSchema(kidsSpendings, {
+  amount: z.union([z.string(), z.number()]).transform((v) => String(v)),
+  jar: z.enum(["spend", "save", "give"]),
+}).omit({ id: true, createdAt: true })
+
 // Types
 export type KidsAccount = typeof kidsAccounts.$inferSelect
 export type InsertKidsAccount = z.infer<typeof insertKidsAccountSchema>
@@ -187,3 +214,5 @@ export type InsertKidsTask = z.infer<typeof insertKidsTaskSchema>
 export type KidsGoal = typeof kidsGoals.$inferSelect
 export type InsertKidsGoal = z.infer<typeof insertKidsGoalSchema>
 export type KidsBadge = typeof kidsBadges.$inferSelect
+export type KidsSpending = typeof kidsSpendings.$inferSelect
+export type InsertKidsSpending = z.infer<typeof insertKidsSpendingSchema>

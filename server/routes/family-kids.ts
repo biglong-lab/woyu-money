@@ -33,9 +33,13 @@ import {
   kidsTasks,
   kidsGoals,
   kidsBadges,
+  kidsSpendings,
   insertKidsAccountSchema,
   insertKidsTaskSchema,
   insertKidsGoalSchema,
+  insertKidsSpendingSchema,
+  paymentItems,
+  paymentRecords,
 } from "@shared/schema"
 
 const router = Router()
@@ -210,6 +214,66 @@ router.post(
 )
 
 // ============================================================
+// 任務範本（內建、不存 DB）
+// ============================================================
+const TASK_TEMPLATES = [
+  { title: "洗碗", emoji: "🍽️", rewardAmount: 50 },
+  { title: "倒垃圾", emoji: "🗑️", rewardAmount: 30 },
+  { title: "整理房間", emoji: "🛏️", rewardAmount: 100 },
+  { title: "完成作業", emoji: "📚", rewardAmount: 50 },
+  { title: "幫忙做家務", emoji: "🧹", rewardAmount: 30 },
+  { title: "餵寵物", emoji: "🐕", rewardAmount: 20 },
+  { title: "曬衣服 / 摺衣服", emoji: "👕", rewardAmount: 40 },
+  { title: "練琴 / 練樂器", emoji: "🎵", rewardAmount: 50 },
+  { title: "閱讀 30 分鐘", emoji: "📖", rewardAmount: 30 },
+  { title: "幫忙買東西", emoji: "🛒", rewardAmount: 50 },
+]
+
+router.get(
+  "/api/family/task-templates",
+  asyncHandler(async (_req, res) => {
+    res.json(TASK_TEMPLATES)
+  })
+)
+
+/**
+ * POST /api/family/tasks/batch
+ * Body: { kidIds: number[], tasks: Array<{ title, emoji, rewardAmount }> }
+ * 批量派任務給多個小孩（家長最常用）
+ */
+router.post(
+  "/api/family/tasks/batch",
+  asyncHandler(async (req, res) => {
+    const kidIds = (req.body?.kidIds ?? []) as number[]
+    const tasks = (req.body?.tasks ?? []) as Array<{
+      title: string
+      emoji?: string
+      rewardAmount: number | string
+    }>
+    if (!Array.isArray(kidIds) || kidIds.length === 0) throw new AppError(400, "kidIds 必填")
+    if (!Array.isArray(tasks) || tasks.length === 0) throw new AppError(400, "tasks 必填")
+
+    const created: number[] = []
+    for (const kid of kidIds) {
+      for (const t of tasks) {
+        const [row] = await db
+          .insert(kidsTasks)
+          .values({
+            kidId: kid,
+            title: t.title,
+            emoji: t.emoji ?? "📋",
+            rewardAmount: String(t.rewardAmount),
+            status: "pending",
+          })
+          .returning({ id: kidsTasks.id })
+        created.push(row.id)
+      }
+    }
+    res.status(201).json({ count: created.length, taskIds: created })
+  })
+)
+
+// ============================================================
 // 2. 任務
 // ============================================================
 router.get(
@@ -336,10 +400,54 @@ router.post(
       WHERE kid_id = ${kid.id}
     `)
 
-    // 更新 task
+    // 串入主系統：寫一筆 payment_item + payment_record 進主系統
+    // → 在 /cost-overview「一般單項」會看到、/financial-dashboard 也會算進總支出
+    let mainPaymentItemId: number | null = null
+    let mainPaymentRecordId: number | null = null
+    try {
+      const today = new Date().toISOString().slice(0, 10)
+      const [pi] = await db
+        .insert(paymentItems)
+        .values({
+          itemName: `🎁 ${kid.displayName} 零用金：${task.title}`,
+          totalAmount: reward.toFixed(2),
+          paidAmount: reward.toFixed(2),
+          itemType: "home",
+          paymentType: "single",
+          status: "paid",
+          startDate: today,
+          source: "manual",
+          notes: `家庭記帳「小孩模式」自動入帳\n小孩：${kid.displayName}（id=${kid.id}）\n任務：${task.title}\n三罐分配：花用 $${spendAdd} / 儲蓄 $${saveAdd} / 捐獻 $${giveAdd}`,
+          tags: "kids,allowance",
+        })
+        .returning({ id: paymentItems.id })
+      mainPaymentItemId = pi.id
+
+      const [pr] = await db
+        .insert(paymentRecords)
+        .values({
+          itemId: pi.id,
+          amountPaid: reward.toFixed(2),
+          paymentDate: today,
+          paymentMethod: "現金",
+          notes: `家庭記帳：${kid.displayName} 完成「${task.title}」`,
+        })
+        .returning({ id: paymentRecords.id })
+      mainPaymentRecordId = pr.id
+    } catch (err) {
+      // 串接主系統失敗不阻斷任務 approve（雙保險）
+      console.warn("[family-kids] 寫入 payment_records 失敗：", err)
+    }
+
+    // 更新 task（含主系統 record id）
     const [updated] = await db
       .update(kidsTasks)
-      .set({ status: "approved", approvedAt: new Date(), updatedAt: new Date() })
+      .set({
+        status: "approved",
+        approvedAt: new Date(),
+        paymentRecordId: mainPaymentRecordId,
+        updatedAt: new Date(),
+      })
       .where(eq(kidsTasks.id, id))
       .returning()
 
@@ -350,6 +458,11 @@ router.post(
       task: updated,
       jars: { spendAdd, saveAdd, giveAdd, total: reward },
       newBadges: awarded,
+      mainSystem: {
+        paymentItemId: mainPaymentItemId,
+        paymentRecordId: mainPaymentRecordId,
+        synced: mainPaymentItemId !== null,
+      },
     })
   })
 )
@@ -522,6 +635,102 @@ router.get(
       .orderBy(desc(kidsBadges.earnedAt))
 
     res.json({ scope: "kid", kid, jar, tasks, goals, badges })
+  })
+)
+
+// ============================================================
+// 5. 花錢紀錄（小孩自己記）
+// ============================================================
+router.get(
+  "/api/family/spendings",
+  asyncHandler(async (req, res) => {
+    const kidIdQ = req.query.kidId ? Number(req.query.kidId) : undefined
+    if (!kidIdQ) throw new AppError(400, "需傳 kidId")
+    const limit = Math.min(parseInt((req.query.limit as string) || "50", 10), 200)
+    const rows = await db
+      .select()
+      .from(kidsSpendings)
+      .where(eq(kidsSpendings.kidId, kidIdQ))
+      .orderBy(desc(kidsSpendings.spendDate), desc(kidsSpendings.id))
+      .limit(limit)
+    res.json(rows)
+  })
+)
+
+/**
+ * POST /api/family/spendings
+ * Body: { kidId, jar('spend'|'save'|'give'), amount, description, emoji?, spendDate? }
+ * 小孩花錢：從對應罐扣餘額、寫紀錄
+ */
+router.post(
+  "/api/family/spendings",
+  asyncHandler(async (req, res) => {
+    const data = {
+      kidId: Number(req.body?.kidId),
+      jar: String(req.body?.jar ?? ""),
+      amount: req.body?.amount,
+      description: String(req.body?.description ?? "").trim(),
+      emoji: req.body?.emoji ?? "💰",
+      spendDate: req.body?.spendDate ?? new Date().toISOString().slice(0, 10),
+    }
+
+    if (!data.description) throw new AppError(400, "請填寫項目名稱")
+    const parsed = insertKidsSpendingSchema.safeParse(data)
+    if (!parsed.success) {
+      throw new AppError(
+        400,
+        "資料格式錯誤：" + parsed.error.errors.map((e) => e.message).join(", ")
+      )
+    }
+    const amt = parseFloat(parsed.data.amount)
+    if (!(amt > 0)) throw new AppError(400, "金額需為正數")
+
+    // 檢查餘額
+    const [jar] = await db.select().from(kidsJars).where(eq(kidsJars.kidId, data.kidId)).limit(1)
+    if (!jar) throw new AppError(404, "小孩罐子不存在")
+    const balanceMap = {
+      spend: parseFloat(jar.spendBalance),
+      save: parseFloat(jar.saveBalance),
+      give: parseFloat(jar.giveBalance),
+    } as const
+    const current = balanceMap[parsed.data.jar as keyof typeof balanceMap]
+    if (current < amt) {
+      throw new AppError(400, `${parsed.data.jar} 罐餘額 $${current} 不足 $${amt}`)
+    }
+
+    // 扣餘額（用 SQL 避免 race）
+    const col = `${parsed.data.jar}_balance`
+    await db.execute(sql`
+      UPDATE kids_jars
+      SET ${sql.raw(col)} = ${sql.raw(col)} - ${amt.toFixed(2)}::numeric,
+          total_spent = total_spent + ${amt.toFixed(2)}::numeric,
+          updated_at = NOW()
+      WHERE kid_id = ${data.kidId}
+    `)
+
+    const [created] = await db.insert(kidsSpendings).values(parsed.data).returning()
+    res.status(201).json(created)
+  })
+)
+
+router.delete(
+  "/api/family/spendings/:id",
+  asyncHandler(async (req, res) => {
+    const id = Number(req.params.id)
+    const [sp] = await db.select().from(kidsSpendings).where(eq(kidsSpendings.id, id)).limit(1)
+    if (!sp) throw new AppError(404, "紀錄不存在")
+    const amt = parseFloat(sp.amount)
+    const col = `${sp.jar}_balance`
+    // 退回餘額
+    await db.execute(sql`
+      UPDATE kids_jars
+      SET ${sql.raw(col)} = ${sql.raw(col)} + ${amt.toFixed(2)}::numeric,
+          total_spent = GREATEST(0, total_spent - ${amt.toFixed(2)}::numeric),
+          updated_at = NOW()
+      WHERE kid_id = ${sp.kidId}
+    `)
+    await db.delete(kidsSpendings).where(eq(kidsSpendings.id, id))
+    res.json({ ok: true })
   })
 )
 

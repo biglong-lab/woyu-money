@@ -27,7 +27,23 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { ArrowLeft, CheckCircle2, Sparkles, Plus, Target, Award } from "lucide-react"
+import {
+  ArrowLeft,
+  CheckCircle2,
+  Sparkles,
+  Plus,
+  Target,
+  Award,
+  ShoppingBag,
+  Trash2,
+} from "lucide-react"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
 import { apiRequest, queryClient } from "@/lib/queryClient"
 import { useDocumentTitle } from "@/hooks/use-document-title"
@@ -75,6 +91,15 @@ interface Badge {
   title: string
   emoji: string
   earnedAt: string
+}
+
+interface Spending {
+  id: number
+  jar: "spend" | "save" | "give"
+  amount: string
+  description: string
+  emoji: string | null
+  spendDate: string
 }
 
 interface KidDashboard {
@@ -237,6 +262,10 @@ function KidDashboard({
   const { data } = useQuery<KidDashboard>({
     queryKey: [`/api/family/dashboard?kidId=${kidId}`],
   })
+  const { data: spendings = [] } = useQuery<Spending[]>({
+    queryKey: [`/api/family/spendings?kidId=${kidId}`],
+  })
+  const [showSpend, setShowSpend] = useState(false)
 
   const invalidate = () => {
     queryClient.invalidateQueries({
@@ -253,6 +282,14 @@ function KidDashboard({
       invalidate()
     },
     onError: (e: Error) => toast({ title: "失敗", description: e.message, variant: "destructive" }),
+  })
+
+  const deleteSpendingMut = useMutation({
+    mutationFn: (id: number) => apiRequest("DELETE", `/api/family/spendings/${id}`),
+    onSuccess: () => {
+      toast({ title: "✅ 已刪除、退回餘額" })
+      invalidate()
+    },
   })
 
   const saveToGoalMut = useMutation({
@@ -331,6 +368,17 @@ function KidDashboard({
           bg="bg-sky-100"
           text="text-sky-700"
         />
+      </div>
+
+      {/* 「我花錢了」大按鈕（手機優先、單手可達）*/}
+      <div className="mb-4">
+        <Button
+          onClick={() => setShowSpend(true)}
+          className="w-full h-14 text-base bg-gradient-to-r from-amber-500 to-pink-500 hover:from-amber-600 hover:to-pink-600 shadow-lg"
+        >
+          <ShoppingBag className="h-5 w-5 mr-2" />
+          我花錢了 💸 記一筆
+        </Button>
       </div>
 
       {/* 總計小卡 */}
@@ -452,6 +500,53 @@ function KidDashboard({
         )}
       </div>
 
+      {/* 花錢紀錄 */}
+      {spendings.length > 0 && (
+        <div className="mb-4">
+          <h2 className="font-bold mb-2 flex items-center gap-2">
+            <ShoppingBag className="h-4 w-4 text-amber-600" />
+            最近花錢紀錄（{spendings.length}）
+          </h2>
+          <div className="space-y-1.5">
+            {spendings.slice(0, 10).map((s) => {
+              const jarColor =
+                s.jar === "spend"
+                  ? "text-rose-600"
+                  : s.jar === "save"
+                    ? "text-emerald-600"
+                    : "text-sky-600"
+              const jarLabel = s.jar === "spend" ? "💸" : s.jar === "save" ? "🐷" : "❤️"
+              return (
+                <div
+                  key={s.id}
+                  className="bg-white rounded-lg p-2.5 flex items-center gap-2 text-sm"
+                >
+                  <span className="text-xl">{s.emoji ?? "💰"}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="truncate">{s.description}</div>
+                    <div className="text-[10px] text-gray-400">
+                      {s.spendDate} · {jarLabel}
+                    </div>
+                  </div>
+                  <span className={`font-mono font-bold ${jarColor}`}>
+                    -{formatMoney(s.amount)}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (confirm("刪除這筆？（餘額會退回）")) deleteSpendingMut.mutate(s.id)
+                    }}
+                    className="text-red-400 hover:bg-red-50 rounded p-1"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
       {/* 徽章 */}
       {badges.length > 0 && (
         <div>
@@ -485,6 +580,18 @@ function KidDashboard({
           }}
         />
       )}
+
+      {showSpend && (
+        <SpendDialog
+          kidId={kidId}
+          jar={jar}
+          onClose={() => setShowSpend(false)}
+          onSuccess={() => {
+            invalidate()
+            setShowSpend(false)
+          }}
+        />
+      )}
     </div>
   )
 }
@@ -511,6 +618,149 @@ function JarCard({
       <div className={`text-lg sm:text-xl font-bold ${text}`}>{formatMoney(balance)}</div>
       <div className="text-[10px] text-gray-500">收入 {ratio}% 進這罐</div>
     </motion.div>
+  )
+}
+
+const SPEND_EMOJI = ["💰", "🍔", "🍦", "🥤", "🎮", "📚", "🎁", "🛍️", "🚌", "✏️", "🐶", "🎨"]
+
+function SpendDialog({
+  kidId,
+  jar,
+  onClose,
+  onSuccess,
+}: {
+  kidId: number
+  jar: Jar
+  onClose: () => void
+  onSuccess: () => void
+}) {
+  const { toast } = useToast()
+  const [whichJar, setWhichJar] = useState<"spend" | "save" | "give">("spend")
+  const [amount, setAmount] = useState("")
+  const [description, setDescription] = useState("")
+  const [emoji, setEmoji] = useState("💰")
+
+  const balance = {
+    spend: parseFloat(jar.spendBalance),
+    save: parseFloat(jar.saveBalance),
+    give: parseFloat(jar.giveBalance),
+  }[whichJar]
+
+  const mut = useMutation({
+    mutationFn: () =>
+      apiRequest("POST", "/api/family/spendings", {
+        kidId,
+        jar: whichJar,
+        amount: parseFloat(amount),
+        description: description.trim(),
+        emoji,
+        spendDate: new Date().toISOString().slice(0, 10),
+      }),
+    onSuccess: () => {
+      toast({ title: "✅ 已記錄" })
+      confetti({ particleCount: 50, spread: 60, origin: { y: 0.8 } })
+      vibrate(40)
+      onSuccess()
+    },
+    onError: (e: Error) => toast({ title: "失敗", description: e.message, variant: "destructive" }),
+  })
+
+  const amt = parseFloat(amount)
+  const canSubmit = description.trim() && Number.isFinite(amt) && amt > 0 && amt <= balance
+
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent className="w-[95vw] max-w-sm">
+        <DialogHeader>
+          <DialogTitle>記一筆花錢</DialogTitle>
+          <DialogDescription>從哪個罐子？花在什麼？</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3 text-sm">
+          <div>
+            <Label>從哪個罐子扣？</Label>
+            <div className="grid grid-cols-3 gap-2 mt-1">
+              {(["spend", "save", "give"] as const).map((j) => {
+                const label = { spend: "💸 花用", save: "🐷 存錢", give: "❤️ 捐獻" }[j]
+                const bal = {
+                  spend: jar.spendBalance,
+                  save: jar.saveBalance,
+                  give: jar.giveBalance,
+                }[j]
+                const active = whichJar === j
+                return (
+                  <button
+                    key={j}
+                    type="button"
+                    onClick={() => setWhichJar(j)}
+                    className={`p-2 rounded-lg border-2 text-center ${
+                      active ? "border-indigo-500 bg-indigo-50" : "border-gray-200"
+                    }`}
+                  >
+                    <div className="text-sm">{label}</div>
+                    <div className="text-xs text-gray-500 font-mono">
+                      ${parseFloat(bal).toLocaleString()}
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+            <p className="text-[10px] text-gray-400 mt-1">餘額 ${balance.toLocaleString()}</p>
+          </div>
+
+          <div>
+            <Label>花在什麼？</Label>
+            <Input
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="例：買飲料 / 漫畫 / 文具"
+            />
+          </div>
+          <div>
+            <Label>圖示</Label>
+            <div className="grid grid-cols-6 gap-1 mt-1">
+              {SPEND_EMOJI.map((e) => (
+                <button
+                  key={e}
+                  type="button"
+                  onClick={() => setEmoji(e)}
+                  className={`text-xl p-1 rounded ${
+                    emoji === e ? "bg-amber-100 ring-2 ring-amber-500" : "hover:bg-gray-100"
+                  }`}
+                >
+                  {e}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <Label>多少錢？</Label>
+            <Input
+              type="number"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder="例：50"
+              inputMode="numeric"
+            />
+            {amt > balance && (
+              <p className="text-xs text-red-600 mt-1">超過餘額 ${balance.toLocaleString()}</p>
+            )}
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            取消
+          </Button>
+          <Button
+            onClick={() => mut.mutate()}
+            disabled={!canSubmit || mut.isPending}
+            className="bg-amber-600 hover:bg-amber-700"
+          >
+            <ShoppingBag className="h-4 w-4 mr-1" />
+            記錄
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 
