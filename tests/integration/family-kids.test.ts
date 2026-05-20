@@ -417,6 +417,56 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(done.isOverdue).toBe(false)
   })
 
+  it("monthly-report：本月戰績聚合（任務/花錢/目標/徽章/淨值）", async () => {
+    const oldEnv = process.env.FAMILY_KIDS_NO_BONUS
+    process.env.FAMILY_KIDS_NO_BONUS = "1"
+    try {
+      await createKid({ spendRatio: 100, saveRatio: 0, giveRatio: 0 })
+      // 派並 approve 1 個任務 200
+      const t = await request(app)
+        .post("/api/family/tasks")
+        .send({ kidId, title: "T", rewardAmount: 200 })
+      await request(app).post(`/api/family/tasks/${t.body.id}/submit`)
+      const ares = await request(app).post(`/api/family/tasks/${t.body.id}/approve`)
+      if (ares.body.mainSystem?.paymentItemId) {
+        await db.execute(
+          sql`DELETE FROM payment_records WHERE payment_item_id = ${ares.body.mainSystem.paymentItemId}`
+        )
+        await db.execute(
+          sql`DELETE FROM payment_items WHERE id = ${ares.body.mainSystem.paymentItemId}`
+        )
+      }
+      // 花 50 從 spend 罐
+      await request(app).post("/api/family/spendings").send({
+        kidId,
+        jar: "spend",
+        amount: 50,
+        description: "買飲料",
+      })
+
+      const month = new Date().toISOString().slice(0, 7)
+      const res = await request(app).get(`/api/family/monthly-report?kidId=${kidId}&month=${month}`)
+      expect(res.status).toBe(200)
+      expect(res.body.kidId).toBe(kidId)
+      expect(res.body.month).toBe(month)
+      expect(res.body.tasks.approvedCount).toBe(1)
+      expect(res.body.tasks.approvedSum).toBe(200)
+      expect(res.body.tasks.avgReward).toBe(200)
+      expect(res.body.spendings.count).toBe(1)
+      expect(res.body.spendings.totalSpent).toBe(50)
+      expect(res.body.netGain).toBe(150) // 200 - 50
+      expect(Array.isArray(res.body.completedGoals)).toBe(true)
+      expect(Array.isArray(res.body.badges)).toBe(true)
+      // 應有 first_task 徽章
+      expect(res.body.badges.some((b: { badgeType: string }) => b.badgeType === "first_task")).toBe(
+        true
+      )
+    } finally {
+      if (oldEnv === undefined) delete process.env.FAMILY_KIDS_NO_BONUS
+      else process.env.FAMILY_KIDS_NO_BONUS = oldEnv
+    }
+  })
+
   it("leaderboard 本月排行：approved sum 降序、含 medal/rank", async () => {
     const oldEnv = process.env.FAMILY_KIDS_NO_BONUS
     process.env.FAMILY_KIDS_NO_BONUS = "1"

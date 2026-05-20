@@ -788,6 +788,133 @@ router.get(
 )
 
 /**
+ * GET /api/family/monthly-report?kidId=&month=YYYY-MM
+ * 個別小孩本月戰績：任務 / 入帳 / 三罐增量 / 花錢 / 目標 / 徽章
+ */
+router.get(
+  "/api/family/monthly-report",
+  asyncHandler(async (req, res) => {
+    const kidId = Number(req.query.kidId)
+    if (!Number.isInteger(kidId) || kidId < 1) throw new AppError(400, "需傳 kidId")
+    const monthStr = (req.query.month as string | undefined) ?? new Date().toISOString().slice(0, 7)
+    if (!/^\d{4}-\d{2}$/.test(monthStr)) throw new AppError(400, "month 格式 YYYY-MM")
+    const [year, month] = monthStr.split("-").map(Number)
+    const monthStart = `${year}-${String(month).padStart(2, "0")}-01`
+    const endY = month === 12 ? year + 1 : year
+    const endM = month === 12 ? 1 : month + 1
+    const nextMonth = `${endY}-${String(endM).padStart(2, "0")}-01`
+
+    // 任務統計
+    const taskAgg = await db.execute(sql`
+      SELECT
+        COUNT(*) FILTER (WHERE status = 'approved')::int AS approved_count,
+        COALESCE(SUM(reward_amount::numeric) FILTER (WHERE status = 'approved'), 0)::numeric AS approved_sum,
+        COUNT(*) FILTER (WHERE status = 'rejected')::int AS rejected_count,
+        COUNT(*) FILTER (WHERE status IN ('pending', 'submitted'))::int AS pending_count
+      FROM kids_tasks
+      WHERE kid_id = ${kidId}
+        AND (approved_at >= ${monthStart}::timestamp AND approved_at < ${nextMonth}::timestamp
+             OR created_at >= ${monthStart}::timestamp AND created_at < ${nextMonth}::timestamp)
+    `)
+    const taskStats = (
+      taskAgg as unknown as {
+        rows: {
+          approved_count: number
+          approved_sum: string
+          rejected_count: number
+          pending_count: number
+        }[]
+      }
+    ).rows[0] ?? { approved_count: 0, approved_sum: "0", rejected_count: 0, pending_count: 0 }
+
+    // 花錢列表
+    const spendingsRows = await db.execute(sql`
+      SELECT id, jar, amount::numeric AS amount, description, emoji, spend_date AS "spendDate"
+      FROM kids_spendings
+      WHERE kid_id = ${kidId}
+        AND spend_date >= ${monthStart}::date AND spend_date < ${nextMonth}::date
+      ORDER BY spend_date DESC, id DESC
+    `)
+    const spendings = (
+      spendingsRows as unknown as {
+        rows: {
+          id: number
+          jar: string
+          amount: string
+          description: string
+          emoji: string | null
+          spendDate: string
+        }[]
+      }
+    ).rows.map((s) => ({ ...s, amount: parseFloat(s.amount) }))
+    const totalSpent = spendings.reduce((sum, s) => sum + s.amount, 0)
+
+    // 完成目標
+    const goalsRows = await db.execute(sql`
+      SELECT id, name, emoji, target_amount::numeric AS "targetAmount", completed_at AS "completedAt"
+      FROM kids_goals
+      WHERE kid_id = ${kidId} AND status = 'completed'
+        AND completed_at >= ${monthStart}::timestamp AND completed_at < ${nextMonth}::timestamp
+      ORDER BY completed_at DESC
+    `)
+    const completedGoals = (
+      goalsRows as unknown as {
+        rows: {
+          id: number
+          name: string
+          emoji: string | null
+          targetAmount: string
+          completedAt: string
+        }[]
+      }
+    ).rows.map((g) => ({ ...g, targetAmount: parseFloat(g.targetAmount) }))
+
+    // 解鎖徽章
+    const badgesRows = await db.execute(sql`
+      SELECT id, badge_type AS "badgeType", title, emoji, earned_at AS "earnedAt"
+      FROM kids_badges
+      WHERE kid_id = ${kidId}
+        AND earned_at >= ${monthStart}::timestamp AND earned_at < ${nextMonth}::timestamp
+      ORDER BY earned_at DESC
+    `)
+    const badges = (
+      badgesRows as unknown as {
+        rows: {
+          id: number
+          badgeType: string
+          title: string
+          emoji: string
+          earnedAt: string
+        }[]
+      }
+    ).rows
+
+    const approvedSum = parseFloat(taskStats.approved_sum)
+
+    res.json({
+      kidId,
+      month: monthStr,
+      tasks: {
+        approvedCount: taskStats.approved_count,
+        approvedSum,
+        rejectedCount: taskStats.rejected_count,
+        pendingCount: taskStats.pending_count,
+        avgReward:
+          taskStats.approved_count > 0 ? Math.round(approvedSum / taskStats.approved_count) : 0,
+      },
+      spendings: {
+        count: spendings.length,
+        totalSpent,
+        items: spendings,
+      },
+      completedGoals,
+      badges,
+      netGain: approvedSum - totalSpent,
+    })
+  })
+)
+
+/**
  * GET /api/family/leaderboard?month=YYYY-MM
  * 本月排行榜：每個小孩的任務完成數 / 入帳金額 / 徽章數 / 達成目標數
  * 排序：approved sum DESC（賺最多的優先）

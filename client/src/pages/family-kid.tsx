@@ -36,6 +36,9 @@ import {
   Award,
   ShoppingBag,
   Trash2,
+  BarChart3,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react"
 import {
   Select,
@@ -100,6 +103,45 @@ interface Spending {
   description: string
   emoji: string | null
   spendDate: string
+}
+
+interface MonthlyReport {
+  kidId: number
+  month: string
+  tasks: {
+    approvedCount: number
+    approvedSum: number
+    rejectedCount: number
+    pendingCount: number
+    avgReward: number
+  }
+  spendings: {
+    count: number
+    totalSpent: number
+    items: Array<{
+      id: number
+      jar: string
+      amount: number
+      description: string
+      emoji: string | null
+      spendDate: string
+    }>
+  }
+  completedGoals: Array<{
+    id: number
+    name: string
+    emoji: string | null
+    targetAmount: number
+    completedAt: string
+  }>
+  badges: Array<{
+    id: number
+    badgeType: string
+    title: string
+    emoji: string
+    earnedAt: string
+  }>
+  netGain: number
 }
 
 interface KidDashboard {
@@ -265,7 +307,15 @@ function KidDashboard({
   const { data: spendings = [] } = useQuery<Spending[]>({
     queryKey: [`/api/family/spendings?kidId=${kidId}`],
   })
+  const currentMonth = (() => {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
+  })()
+  const { data: report } = useQuery<MonthlyReport>({
+    queryKey: [`/api/family/monthly-report?kidId=${kidId}&month=${currentMonth}`],
+  })
   const [showSpend, setShowSpend] = useState(false)
+  const [showReport, setShowReport] = useState(false)
 
   const invalidate = () => {
     queryClient.invalidateQueries({
@@ -567,6 +617,124 @@ function KidDashboard({
               </motion.div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* 本月戰績（月報）*/}
+      {report && (
+        <div className="mb-4">
+          <button
+            type="button"
+            onClick={() => setShowReport((s) => !s)}
+            className="w-full bg-gradient-to-r from-purple-100 to-pink-100 rounded-lg p-3 flex items-center justify-between shadow-sm"
+          >
+            <span className="font-bold flex items-center gap-2">
+              <BarChart3 className="h-4 w-4 text-purple-600" />
+              📊 本月戰績（{report.month}）
+            </span>
+            {showReport ? (
+              <ChevronUp className="h-4 w-4 text-gray-500" />
+            ) : (
+              <ChevronDown className="h-4 w-4 text-gray-500" />
+            )}
+          </button>
+          {showReport && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-white rounded-lg p-3 mt-2 space-y-3 text-sm shadow-sm"
+            >
+              {/* 三大數字 */}
+              <div className="grid grid-cols-3 gap-2">
+                <div className="text-center bg-amber-50 rounded p-2">
+                  <div className="text-2xl">📋</div>
+                  <div className="text-lg font-bold text-amber-700">
+                    {report.tasks.approvedCount}
+                  </div>
+                  <div className="text-[10px] text-gray-500">完成任務</div>
+                </div>
+                <div className="text-center bg-green-50 rounded p-2">
+                  <div className="text-2xl">💰</div>
+                  <div className="text-lg font-bold text-green-700">
+                    {formatMoney(report.tasks.approvedSum)}
+                  </div>
+                  <div className="text-[10px] text-gray-500">入帳金額</div>
+                </div>
+                <div className="text-center bg-rose-50 rounded p-2">
+                  <div className="text-2xl">💸</div>
+                  <div className="text-lg font-bold text-rose-700">
+                    {formatMoney(report.spendings.totalSpent)}
+                  </div>
+                  <div className="text-[10px] text-gray-500">花了</div>
+                </div>
+              </div>
+
+              {/* 淨增加 */}
+              <div
+                className={`rounded p-2 text-center ${
+                  report.netGain >= 0 ? "bg-blue-50" : "bg-orange-50"
+                }`}
+              >
+                <div className="text-xs text-gray-500">
+                  本月淨{report.netGain >= 0 ? "賺" : "花超"}
+                </div>
+                <div
+                  className={`text-xl font-bold ${
+                    report.netGain >= 0 ? "text-blue-700" : "text-orange-700"
+                  }`}
+                >
+                  {report.netGain >= 0 ? "+" : ""}
+                  {formatMoney(report.netGain)}
+                </div>
+                {report.tasks.avgReward > 0 && (
+                  <div className="text-[10px] text-gray-400 mt-0.5">
+                    平均每個任務 ${report.tasks.avgReward}
+                  </div>
+                )}
+              </div>
+
+              {/* 達成目標 */}
+              {report.completedGoals.length > 0 && (
+                <div>
+                  <div className="font-bold text-xs mb-1">
+                    🎯 本月達成目標（{report.completedGoals.length}）
+                  </div>
+                  <div className="space-y-1">
+                    {report.completedGoals.map((g) => (
+                      <div
+                        key={g.id}
+                        className="flex items-center gap-2 text-xs bg-purple-50 rounded p-1.5"
+                      >
+                        <span className="text-lg">{g.emoji ?? "🎯"}</span>
+                        <span className="flex-1">{g.name}</span>
+                        <span className="font-mono">{formatMoney(g.targetAmount)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 解鎖徽章 */}
+              {report.badges.length > 0 && (
+                <div>
+                  <div className="font-bold text-xs mb-1">
+                    🏅 本月解鎖徽章（{report.badges.length}）
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {report.badges.map((b) => (
+                      <div
+                        key={b.id}
+                        className="bg-yellow-50 rounded px-2 py-1 text-xs flex items-center gap-1"
+                      >
+                        <span className="text-base">{b.emoji}</span>
+                        <span>{b.title}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          )}
         </div>
       )}
 
