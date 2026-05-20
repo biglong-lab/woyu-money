@@ -58,6 +58,12 @@
       "short_name": "拍單據",
       "description": "拍照上傳收據",
       "url": "/document-inbox"
+    },
+    {
+      "name": "家庭記帳",
+      "short_name": "家庭",
+      "description": "小孩三罐 + 任務派發 + 排行榜",
+      "url": "/family"
     }
   ]
 }
