@@ -1166,6 +1166,59 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     }
   })
 
+  it("願望清單：CRUD + promote 升級成 goal", async () => {
+    await createKid()
+
+    // 建願望
+    const r1 = await request(app).post("/api/family/wishes").send({
+      kidId,
+      title: "Switch 遊戲",
+      emoji: "🎮",
+      estimatedPrice: 1500,
+      priority: 3,
+    })
+    expect(r1.status).toBe(201)
+    expect(r1.body.title).toBe("Switch 遊戲")
+    expect(r1.body.priority).toBe(3)
+    expect(r1.body.status).toBe("wished")
+    const wishId = r1.body.id
+
+    // 列表
+    const list = await request(app).get(`/api/family/wishes?kidId=${kidId}`)
+    expect(list.status).toBe(200)
+    expect(list.body.length).toBeGreaterThanOrEqual(1)
+    // 高優先序排前面
+    expect(list.body[0].id).toBe(wishId)
+
+    // 更新 priority
+    const upd = await request(app).put(`/api/family/wishes/${wishId}`).send({ priority: 1 })
+    expect(upd.status).toBe(200)
+    expect(upd.body.priority).toBe(1)
+
+    // 不合法 status 400
+    const badStatus = await request(app)
+      .put(`/api/family/wishes/${wishId}`)
+      .send({ status: "invalid" })
+    expect(badStatus.status).toBe(400)
+
+    // promote 升級成 goal
+    const promote = await request(app).post(`/api/family/wishes/${wishId}/promote`)
+    expect(promote.status).toBe(200)
+    expect(promote.body.ok).toBe(true)
+    expect(promote.body.wish.status).toBe("promoted_to_goal")
+    expect(promote.body.wish.promotedGoalId).toBe(promote.body.goal.id)
+    expect(promote.body.goal.name).toBe("Switch 遊戲")
+    expect(Number(promote.body.goal.targetAmount)).toBe(1500)
+
+    // 已 promote 不能再 promote
+    const promoteAgain = await request(app).post(`/api/family/wishes/${wishId}/promote`)
+    expect(promoteAgain.status).toBe(400)
+
+    // 刪除
+    const del = await request(app).delete(`/api/family/wishes/${wishId}`)
+    expect(del.status).toBe(200)
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)

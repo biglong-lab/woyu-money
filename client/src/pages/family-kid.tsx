@@ -634,6 +634,9 @@ function KidDashboard({
         </div>
       )}
 
+      {/* 願望清單（想要、未必有錢、培養理財決策力）*/}
+      <WishesSection kidId={kidId} toast={toast} onAfterPromote={invalidate} />
+
       {/* 存錢目標 */}
       <div className="mb-4">
         <h2 className="font-bold mb-2 flex items-center justify-between">
@@ -1149,6 +1152,158 @@ function TransferDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  )
+}
+
+interface Wish {
+  id: number
+  title: string
+  emoji: string | null
+  estimatedPrice: string | null
+  priority: number
+  status: "wished" | "promoted_to_goal" | "abandoned"
+  promotedGoalId: number | null
+}
+
+function WishesSection({
+  kidId,
+  toast,
+  onAfterPromote,
+}: {
+  kidId: number
+  toast: (opts: {
+    title: string
+    description?: string
+    variant?: "default" | "destructive"
+  }) => void
+  onAfterPromote: () => void
+}) {
+  const { data: wishes = [] } = useQuery<Wish[]>({
+    queryKey: [`/api/family/wishes?kidId=${kidId}`],
+  })
+  const active = wishes.filter((w) => w.status === "wished")
+
+  const addMut = useMutation({
+    mutationFn: (vars: {
+      title: string
+      emoji: string
+      estimatedPrice?: number
+      priority: number
+    }) => apiRequest("POST", "/api/family/wishes", { kidId, ...vars }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/family/wishes?kidId=${kidId}`] })
+    },
+  })
+
+  const deleteMut = useMutation({
+    mutationFn: (id: number) => apiRequest("DELETE", `/api/family/wishes/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/family/wishes?kidId=${kidId}`] })
+    },
+  })
+
+  const promoteMut = useMutation({
+    mutationFn: (vars: { id: number; targetAmount?: number }) =>
+      apiRequest("POST", `/api/family/wishes/${vars.id}/promote`, {
+        targetAmount: vars.targetAmount,
+      }),
+    onSuccess: () => {
+      toast({ title: "🎯 已升級成存錢目標！" })
+      confetti({ particleCount: 60, spread: 70, origin: { y: 0.6 } })
+      queryClient.invalidateQueries({ queryKey: [`/api/family/wishes?kidId=${kidId}`] })
+      queryClient.invalidateQueries({ queryKey: [`/api/family/dashboard?kidId=${kidId}`] })
+      onAfterPromote()
+    },
+    onError: (e: Error) =>
+      toast({ title: "升級失敗", description: e.message, variant: "destructive" }),
+  })
+
+  const handleAdd = () => {
+    const title = window.prompt("想要什麼？", "")
+    if (!title?.trim()) return
+    const emoji = window.prompt("emoji（可選）", "✨") || "✨"
+    const p = window.prompt("價格（可空、不確定先寫 0）", "0")
+    const price = parseFloat(p ?? "0")
+    const pr = window.prompt("有多想要？1=低 / 2=中 / 3=高", "2")
+    const priority = Math.max(1, Math.min(3, parseInt(pr ?? "2", 10) || 2))
+    addMut.mutate({
+      title: title.trim(),
+      emoji,
+      estimatedPrice: price > 0 ? price : undefined,
+      priority,
+    })
+  }
+
+  const handlePromote = (w: Wish) => {
+    let target = w.estimatedPrice ? parseFloat(w.estimatedPrice) : 0
+    if (!(target > 0)) {
+      const r = window.prompt(`目標金額？（要存多少才買「${w.title}」）`, "100")
+      target = parseFloat(r ?? "0")
+      if (!(target > 0)) {
+        toast({ title: "需要金額才能升級", variant: "destructive" })
+        return
+      }
+    }
+    promoteMut.mutate({ id: w.id, targetAmount: target })
+  }
+
+  return (
+    <div className="mb-4">
+      <h2 className="font-bold mb-2 flex items-center justify-between">
+        <span className="flex items-center gap-2">
+          <span className="text-amber-500">✨</span>
+          我想要的（{active.length}）
+        </span>
+        <Button size="sm" variant="outline" onClick={handleAdd}>
+          <Plus className="h-3.5 w-3.5 mr-1" />
+          加願望
+        </Button>
+      </h2>
+      {active.length === 0 ? (
+        <div className="text-center text-xs text-gray-400 py-3 bg-white rounded-lg">
+          看到喜歡的東西先放這、想清楚再升級成存錢目標 ✨
+        </div>
+      ) : (
+        <div className="space-y-1.5">
+          {active.map((w) => (
+            <div key={w.id} className="bg-white rounded-lg p-2.5 flex items-center gap-2 shadow-sm">
+              <div className="text-2xl">{w.emoji ?? "✨"}</div>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium truncate">
+                  {w.title}
+                  <span className="ml-1.5 text-xs text-amber-500">{"⭐".repeat(w.priority)}</span>
+                </div>
+                {w.estimatedPrice && (
+                  <div className="text-[10px] text-gray-500">
+                    估價 {formatMoney(w.estimatedPrice)}
+                  </div>
+                )}
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 px-2 text-[11px] text-purple-700"
+                onClick={() => handlePromote(w)}
+                disabled={promoteMut.isPending}
+                title="升級成存錢目標、開始存錢"
+              >
+                🎯 升級
+              </Button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (confirm(`刪除「${w.title}」？`)) deleteMut.mutate(w.id)
+                }}
+                className="text-red-400 hover:text-red-600 p-1"
+                title="刪除"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }
 

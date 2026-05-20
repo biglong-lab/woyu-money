@@ -200,6 +200,34 @@ export const kidsSpendings = pgTable(
 )
 
 // ============================================================
+// 小孩願望清單（想買的東西、未必有錢、跟存錢目標區隔）
+// 培養「想要 vs 需要」判斷力：先放清單冷靜思考、確定要再 promote 成 goal
+// ============================================================
+export const kidsWishes = pgTable(
+  "kids_wishes",
+  {
+    id: serial("id").primaryKey(),
+    familyId: integer("family_id").default(1),
+    kidId: integer("kid_id")
+      .notNull()
+      .references(() => kidsAccounts.id, { onDelete: "cascade" }),
+    title: varchar("title", { length: 100 }).notNull(),
+    emoji: varchar("emoji", { length: 8 }).default("✨"),
+    estimatedPrice: decimal("estimated_price", { precision: 10, scale: 2 }),
+    // 優先序：1=低 / 2=中 / 3=高（不嚴格、給小孩自己分類）
+    priority: integer("priority").notNull().default(2),
+    status: varchar("status", { length: 16 }).notNull().default("wished"),
+    // wished / promoted_to_goal / abandoned
+    promotedGoalId: integer("promoted_goal_id"), // 升級後對應的 kids_goals.id
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (table) => ({
+    kidIdx: index("kids_wishes_kid_idx").on(table.kidId, table.status),
+  })
+)
+
+// ============================================================
 // 家長自訂任務範本收藏（每家庭自己的常用任務模板）
 // 跟內建範本 (DAILY_TASK_TEMPLATES / SEASONAL_TASKS) 並存、家長可在 BatchDialog 用
 // ============================================================
@@ -292,3 +320,4 @@ export type KidsSpending = typeof kidsSpendings.$inferSelect
 export type InsertKidsSpending = z.infer<typeof insertKidsSpendingSchema>
 export type KidsDailyMessage = typeof kidsDailyMessages.$inferSelect
 export type FamilyTaskTemplate = typeof familyTaskTemplates.$inferSelect
+export type KidsWish = typeof kidsWishes.$inferSelect

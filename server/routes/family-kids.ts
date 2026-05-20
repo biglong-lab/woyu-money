@@ -36,6 +36,7 @@ import {
   kidsSpendings,
   kidsDailyMessages,
   familyTaskTemplates,
+  kidsWishes,
   insertKidsAccountSchema,
   insertKidsTaskSchema,
   insertKidsGoalSchema,
@@ -1627,6 +1628,145 @@ router.get(
       .where(and(eq(kidsDailyMessages.kidId, kidIdN), eq(kidsDailyMessages.messageDate, date)))
       .limit(1)
     res.json({ kidId: kidIdN, date, message: row ?? null })
+  })
+)
+
+/**
+ * 小孩願望清單
+ *   GET    /api/family/wishes?kidId=          列出（按 priority desc 然後 createdAt desc）
+ *   POST   /api/family/wishes                 新增（kidId + title 必填）
+ *   PUT    /api/family/wishes/:id             更新（status / priority / title 等）
+ *   DELETE /api/family/wishes/:id             刪除
+ *   POST   /api/family/wishes/:id/promote     升級成存錢目標（建 kids_goals + status=promoted_to_goal）
+ */
+router.get(
+  "/api/family/wishes",
+  asyncHandler(async (req, res) => {
+    const kidIdQ = Number(req.query.kidId)
+    if (!Number.isInteger(kidIdQ) || kidIdQ < 1) throw new AppError(400, "需傳 kidId")
+    const rows = await db
+      .select()
+      .from(kidsWishes)
+      .where(eq(kidsWishes.kidId, kidIdQ))
+      .orderBy(desc(kidsWishes.priority), desc(kidsWishes.id))
+    res.json(rows)
+  })
+)
+
+router.post(
+  "/api/family/wishes",
+  asyncHandler(async (req, res) => {
+    const kidIdN = Number(req.body?.kidId)
+    const title = String(req.body?.title ?? "").trim()
+    if (!kidIdN) throw new AppError(400, "kidId 必填")
+    if (!title) throw new AppError(400, "title 必填")
+    if (title.length > 100) throw new AppError(400, "title 過長")
+    const emoji = String(req.body?.emoji ?? "✨").slice(0, 8)
+    const priority = Math.max(1, Math.min(3, Number(req.body?.priority ?? 2)))
+    const estimatedPrice =
+      req.body?.estimatedPrice != null && Number(req.body.estimatedPrice) > 0
+        ? Number(req.body.estimatedPrice).toFixed(2)
+        : null
+
+    const [created] = await db
+      .insert(kidsWishes)
+      .values({
+        kidId: kidIdN,
+        title,
+        emoji,
+        priority,
+        estimatedPrice,
+      })
+      .returning()
+    res.status(201).json(created)
+  })
+)
+
+router.put(
+  "/api/family/wishes/:id",
+  asyncHandler(async (req, res) => {
+    const id = Number(req.params.id)
+    if (!Number.isInteger(id) || id < 1) throw new AppError(400, "無效的 ID")
+    const body: Record<string, unknown> = {}
+    if (req.body?.title) body.title = String(req.body.title).slice(0, 100)
+    if (req.body?.emoji) body.emoji = String(req.body.emoji).slice(0, 8)
+    if (req.body?.priority != null) {
+      body.priority = Math.max(1, Math.min(3, Number(req.body.priority)))
+    }
+    if (req.body?.status) {
+      const s = String(req.body.status)
+      if (!["wished", "promoted_to_goal", "abandoned"].includes(s)) {
+        throw new AppError(400, "status 不合法")
+      }
+      body.status = s
+    }
+    if (req.body?.estimatedPrice != null) {
+      const v = Number(req.body.estimatedPrice)
+      body.estimatedPrice = v > 0 ? v.toFixed(2) : null
+    }
+    body.updatedAt = new Date()
+    const [updated] = await db.update(kidsWishes).set(body).where(eq(kidsWishes.id, id)).returning()
+    if (!updated) throw new AppError(404, "願望不存在")
+    res.json(updated)
+  })
+)
+
+router.delete(
+  "/api/family/wishes/:id",
+  asyncHandler(async (req, res) => {
+    const id = Number(req.params.id)
+    if (!Number.isInteger(id) || id < 1) throw new AppError(400, "無效的 ID")
+    const deleted = await db
+      .delete(kidsWishes)
+      .where(eq(kidsWishes.id, id))
+      .returning({ id: kidsWishes.id })
+    if (deleted.length === 0) throw new AppError(404, "願望不存在")
+    res.json({ ok: true, id })
+  })
+)
+
+router.post(
+  "/api/family/wishes/:id/promote",
+  asyncHandler(async (req, res) => {
+    const id = Number(req.params.id)
+    if (!Number.isInteger(id) || id < 1) throw new AppError(400, "無效的 ID")
+    const [wish] = await db.select().from(kidsWishes).where(eq(kidsWishes.id, id)).limit(1)
+    if (!wish) throw new AppError(404, "願望不存在")
+    if (wish.status !== "wished") throw new AppError(400, "願望非可升級狀態")
+
+    // 允許 body 覆寫 targetAmount（如果 wish 沒寫 estimatedPrice）
+    const targetAmount =
+      req.body?.targetAmount != null
+        ? Number(req.body.targetAmount)
+        : wish.estimatedPrice
+          ? parseFloat(wish.estimatedPrice)
+          : 0
+    if (!(targetAmount > 0)) throw new AppError(400, "需提供 targetAmount 或 wish.estimatedPrice")
+
+    // 建 goal
+    const [goal] = await db
+      .insert(kidsGoals)
+      .values({
+        kidId: wish.kidId,
+        name: wish.title,
+        emoji: wish.emoji,
+        targetAmount: targetAmount.toFixed(2),
+        reflection: `從願望清單升級（想要程度：${"⭐".repeat(wish.priority)}）`,
+      })
+      .returning()
+
+    // 更新 wish status + 連結
+    const [updatedWish] = await db
+      .update(kidsWishes)
+      .set({
+        status: "promoted_to_goal",
+        promotedGoalId: goal.id,
+        updatedAt: new Date(),
+      })
+      .where(eq(kidsWishes.id, id))
+      .returning()
+
+    res.json({ ok: true, wish: updatedWish, goal })
   })
 )
 
