@@ -1523,6 +1523,33 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     await db.execute(sql`DELETE FROM payment_items WHERE tags = 'kids,allowance,monthly'`)
   })
 
+  it("AI 任務建議：無 API key 回 503、空 goal 回 400", async () => {
+    // 沒設 GEMINI_API_KEY → 503
+    const origKey1 = process.env.GEMINI_API_KEY
+    const origKey2 = process.env.AI_INTEGRATIONS_GEMINI_API_KEY
+    delete process.env.GEMINI_API_KEY
+    delete process.env.AI_INTEGRATIONS_GEMINI_API_KEY
+    try {
+      const r1 = await request(app)
+        .post("/api/family/ai-suggest-tasks")
+        .send({ learningGoal: "培養理財" })
+      expect(r1.status).toBe(503)
+    } finally {
+      if (origKey1) process.env.GEMINI_API_KEY = origKey1
+      if (origKey2) process.env.AI_INTEGRATIONS_GEMINI_API_KEY = origKey2
+    }
+
+    // 空 goal → 400（先設個假 key 確保不會 short-circuit 到 503）
+    const hadKey = !!origKey1
+    if (!hadKey) process.env.GEMINI_API_KEY = "test-key-not-real"
+    try {
+      const r2 = await request(app).post("/api/family/ai-suggest-tasks").send({ learningGoal: "" })
+      expect(r2.status).toBe(400)
+    } finally {
+      if (!hadKey) delete process.env.GEMINI_API_KEY
+    }
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)

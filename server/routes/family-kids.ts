@@ -1857,6 +1857,95 @@ router.get(
 )
 
 /**
+ * POST /api/family/ai-suggest-tasks
+ * Body: { ageRange?: string, learningGoal: string, count?: number }
+ * 用 Gemini 生成適齡家事任務 + 建議獎勵金額
+ * 失敗或無 API key 回 503、UI 自行 fallback
+ */
+router.post(
+  "/api/family/ai-suggest-tasks",
+  asyncHandler(async (req, res) => {
+    const ageRange = String(req.body?.ageRange ?? "6-12 歲").slice(0, 30)
+    const learningGoal = String(req.body?.learningGoal ?? "").trim()
+    const count = Math.min(Math.max(Number(req.body?.count ?? 5), 1), 10)
+    if (!learningGoal) throw new AppError(400, "learningGoal 必填")
+    if (learningGoal.length > 200) throw new AppError(400, "learningGoal 過長")
+
+    if (!process.env.AI_INTEGRATIONS_GEMINI_API_KEY && !process.env.GEMINI_API_KEY) {
+      throw new AppError(503, "AI 服務未設定、請聯絡管理員設定 GEMINI_API_KEY")
+    }
+
+    const { GoogleGenAI, Type } = await import("@google/genai")
+    const apiKey = process.env.AI_INTEGRATIONS_GEMINI_API_KEY || process.env.GEMINI_API_KEY || ""
+    const customBaseUrl = process.env.AI_INTEGRATIONS_GEMINI_BASE_URL
+    const ai = new GoogleGenAI({
+      apiKey,
+      ...(customBaseUrl ? { httpOptions: { apiVersion: "", baseUrl: customBaseUrl } } : {}),
+    })
+
+    const prompt = `你是家庭教育專家、幫家長為 ${ageRange} 小孩設計家事任務。
+家長學習目標：${learningGoal}
+
+請生成 ${count} 個具體任務、每個含：
+- title：簡短中文（不超過 15 字）、動詞開頭
+- emoji：1 個適合的 emoji
+- rewardAmount：建議獎勵新台幣（5-100、由小到大、考慮任務難度）
+- difficulty：easy / medium / hard
+
+要求：
+- 任務貼近實際家事 / 自我照顧 / 學習 / 同理心
+- 動詞用 6-12 歲小孩能懂的詞
+- 獎勵 reasonable 不浮誇
+- 不重複`
+
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            tasks: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  title: { type: Type.STRING },
+                  emoji: { type: Type.STRING },
+                  rewardAmount: { type: Type.NUMBER },
+                  difficulty: {
+                    type: Type.STRING,
+                    enum: ["easy", "medium", "hard"],
+                  },
+                },
+                required: ["title", "emoji", "rewardAmount", "difficulty"],
+              },
+            },
+          },
+          required: ["tasks"],
+        },
+      },
+    })
+
+    let parsed: { tasks?: Array<unknown> }
+    try {
+      parsed = JSON.parse(response.text || "{}")
+    } catch {
+      throw new AppError(502, "AI 回應格式錯誤、請稍後再試")
+    }
+    if (!Array.isArray(parsed.tasks) || parsed.tasks.length === 0) {
+      throw new AppError(502, "AI 未生成任務、請改用更明確的目標")
+    }
+    res.json({
+      ageRange,
+      learningGoal,
+      tasks: parsed.tasks,
+    })
+  })
+)
+
+/**
  * GET /api/family/parent-reminders
  * 家長提醒中心：一頁聚合該關注的事
  *   - 待審任務（submitted 等家長 approve）

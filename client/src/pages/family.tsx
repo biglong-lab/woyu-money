@@ -1790,7 +1790,30 @@ function BatchTaskDialog({
   onSuccess: () => void
 }) {
   const { toast } = useToast()
-  const [activeTab, setActiveTab] = useState<"daily" | "seasonal" | "custom">("daily")
+  const [activeTab, setActiveTab] = useState<"daily" | "seasonal" | "custom" | "ai">("daily")
+  const [aiGoal, setAiGoal] = useState("")
+  const [aiAge, setAiAge] = useState("6-12 歲")
+  const [aiSuggestions, setAiSuggestions] = useState<Template[]>([])
+  const aiMut = useMutation({
+    mutationFn: () =>
+      apiRequest<{ tasks: Array<{ title: string; emoji: string; rewardAmount: number }> }>(
+        "POST",
+        "/api/family/ai-suggest-tasks",
+        { learningGoal: aiGoal, ageRange: aiAge, count: 5 }
+      ),
+    onSuccess: (r) => {
+      const tpls: Template[] = r.tasks.map((t) => ({
+        title: t.title,
+        emoji: t.emoji,
+        rewardAmount: t.rewardAmount,
+      }))
+      setAiSuggestions(tpls)
+      setSelectedTpls(new Set(tpls.map((t) => t.title)))
+      toast({ title: `🤖 AI 已建議 ${tpls.length} 個任務` })
+    },
+    onError: (e: Error) =>
+      toast({ title: "AI 建議失敗", description: e.message, variant: "destructive" }),
+  })
   const { data: templates = [] } = useQuery<Template[]>({
     queryKey: ["/api/family/task-templates"],
   })
@@ -1845,7 +1868,9 @@ function BatchTaskDialog({
       ? (seasonal?.tasks ?? [])
       : activeTab === "custom"
         ? customAsTemplates
-        : templates
+        : activeTab === "ai"
+          ? aiSuggestions
+          : templates
   const [selectedTpls, setSelectedTpls] = useState<Set<string>>(new Set())
   const [selectedKids, setSelectedKids] = useState<Set<number>>(new Set(kids.map((k) => k.id)))
 
@@ -1933,7 +1958,49 @@ function BatchTaskDialog({
               >
                 💖 自訂
               </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab("ai")
+                  setSelectedTpls(new Set())
+                }}
+                className={`flex-1 py-1.5 rounded text-sm font-medium border-2 ${
+                  activeTab === "ai" ? "border-cyan-500 bg-cyan-50" : "border-gray-200"
+                }`}
+              >
+                🤖 AI
+              </button>
             </div>
+            {activeTab === "ai" && (
+              <div className="mb-2 bg-cyan-50 border border-cyan-200 rounded p-2 space-y-1">
+                <div className="text-[11px] text-cyan-700">
+                  告訴 AI 想培養什麼、它幫你出 5 個適齡任務
+                </div>
+                <div className="flex gap-1">
+                  <Input
+                    value={aiAge}
+                    onChange={(e) => setAiAge(e.target.value)}
+                    placeholder="6-12 歲"
+                    className="w-24 h-7 text-xs"
+                  />
+                  <Input
+                    value={aiGoal}
+                    onChange={(e) => setAiGoal(e.target.value)}
+                    placeholder="例：培養理財觀念 / 學會做家事 / 練字"
+                    className="flex-1 h-7 text-xs"
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={!aiGoal.trim() || aiMut.isPending}
+                    onClick={() => aiMut.mutate()}
+                    className="h-7 text-xs bg-cyan-600 hover:bg-cyan-700"
+                  >
+                    {aiMut.isPending ? "..." : "🤖 建議"}
+                  </Button>
+                </div>
+              </div>
+            )}
             {activeTab === "custom" && (
               <div className="mb-2 bg-rose-50 border border-rose-200 rounded p-2 space-y-1">
                 <div className="text-[11px] text-rose-700">
