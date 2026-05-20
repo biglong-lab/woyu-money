@@ -891,6 +891,50 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(ics).not.toContain(`family-task-${done.body.id}@homi.cc`)
   })
 
+  it("活動 Timeline：past N 天 task/spending/goal/badge 全部匯總按時序", async () => {
+    await createKid({ spendRatio: 0, saveRatio: 100, giveRatio: 0 })
+
+    // 1) task approved（給 200 元、全進 save 罐）
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId, title: "洗碗", rewardAmount: 200 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`)
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`)
+
+    // 2) goal completed（target 100）
+    const g = await request(app)
+      .post("/api/family/goals")
+      .send({ kidId, name: "玩具車", targetAmount: 100 })
+    await request(app).post(`/api/family/goals/${g.body.id}/save`).send({ amount: 100 })
+
+    // 3) spending（從 save 罐扣 20、剩 80）
+    await request(app)
+      .post("/api/family/spendings")
+      .send({
+        kidId,
+        jar: "save",
+        amount: 20,
+        description: "買貼紙",
+        spendDate: new Date().toISOString().slice(0, 10),
+      })
+
+    const feed = await request(app).get("/api/family/activity-feed?days=30")
+    expect(feed.status).toBe(200)
+    expect(Array.isArray(feed.body.items)).toBe(true)
+    const types = feed.body.items.map((x: { eventType: string }) => x.eventType)
+    expect(types).toContain("task_approved")
+    expect(types).toContain("goal_completed")
+    expect(types).toContain("spending")
+    expect(types).toContain("badge_earned") // first_task / first_goal
+    // 時序倒序：第一個是最新
+    const timestamps = feed.body.items.map((x: { ts: string }) => x.ts)
+    for (let i = 0; i < timestamps.length - 1; i++) {
+      expect(new Date(timestamps[i]).getTime()).toBeGreaterThanOrEqual(
+        new Date(timestamps[i + 1]).getTime()
+      )
+    }
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)

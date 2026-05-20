@@ -1379,6 +1379,136 @@ router.get(
 )
 
 /**
+ * GET /api/family/activity-feed?days=30
+ * 全家活動 Timeline：過去 N 天的所有事件
+ *   - tasks（approved / rejected）
+ *   - spendings
+ *   - goals（completed）
+ *   - badges
+ * 按時間倒序、家長首頁一頁看完
+ */
+router.get(
+  "/api/family/activity-feed",
+  asyncHandler(async (req, res) => {
+    const days = Math.max(1, Math.min(365, Number(req.query.days ?? 30)))
+    const sinceIso = new Date(Date.now() - days * 86400000).toISOString()
+
+    const rows = await db.execute(sql`
+      SELECT * FROM (
+        SELECT
+          'task_approved' AS event_type,
+          t.id AS ref_id,
+          t.kid_id,
+          k.display_name AS kid_name,
+          k.avatar AS kid_avatar,
+          t.title AS detail,
+          t.emoji AS emoji,
+          t.reward_amount::numeric AS amount,
+          t.approved_at AS ts
+        FROM kids_tasks t
+        JOIN kids_accounts k ON k.id = t.kid_id
+        WHERE t.status = 'approved'
+          AND t.approved_at IS NOT NULL
+          AND t.approved_at >= ${sinceIso}::timestamp
+
+        UNION ALL
+        SELECT
+          'task_rejected' AS event_type,
+          t.id AS ref_id,
+          t.kid_id,
+          k.display_name AS kid_name,
+          k.avatar AS kid_avatar,
+          t.title AS detail,
+          t.emoji AS emoji,
+          NULL::numeric AS amount,
+          t.updated_at AS ts
+        FROM kids_tasks t
+        JOIN kids_accounts k ON k.id = t.kid_id
+        WHERE t.status = 'rejected'
+          AND t.updated_at >= ${sinceIso}::timestamp
+
+        UNION ALL
+        SELECT
+          'spending' AS event_type,
+          s.id AS ref_id,
+          s.kid_id,
+          k.display_name AS kid_name,
+          k.avatar AS kid_avatar,
+          s.description AS detail,
+          s.emoji AS emoji,
+          s.amount::numeric AS amount,
+          s.created_at AS ts
+        FROM kids_spendings s
+        JOIN kids_accounts k ON k.id = s.kid_id
+        WHERE s.created_at >= ${sinceIso}::timestamp
+
+        UNION ALL
+        SELECT
+          'goal_completed' AS event_type,
+          g.id AS ref_id,
+          g.kid_id,
+          k.display_name AS kid_name,
+          k.avatar AS kid_avatar,
+          g.name AS detail,
+          g.emoji AS emoji,
+          g.target_amount::numeric AS amount,
+          g.completed_at AS ts
+        FROM kids_goals g
+        JOIN kids_accounts k ON k.id = g.kid_id
+        WHERE g.status = 'completed'
+          AND g.completed_at IS NOT NULL
+          AND g.completed_at >= ${sinceIso}::timestamp
+
+        UNION ALL
+        SELECT
+          'badge_earned' AS event_type,
+          b.id AS ref_id,
+          b.kid_id,
+          k.display_name AS kid_name,
+          k.avatar AS kid_avatar,
+          b.title AS detail,
+          b.emoji AS emoji,
+          NULL::numeric AS amount,
+          b.earned_at AS ts
+        FROM kids_badges b
+        JOIN kids_accounts k ON k.id = b.kid_id
+        WHERE b.earned_at >= ${sinceIso}::timestamp
+      ) feed
+      ORDER BY ts DESC
+      LIMIT 100
+    `)
+
+    const items = (
+      rows as unknown as {
+        rows: {
+          event_type: string
+          ref_id: number
+          kid_id: number
+          kid_name: string
+          kid_avatar: string
+          detail: string
+          emoji: string | null
+          amount: string | number | null
+          ts: string
+        }[]
+      }
+    ).rows.map((r) => ({
+      eventType: r.event_type,
+      refId: r.ref_id,
+      kidId: r.kid_id,
+      kidName: r.kid_name,
+      kidAvatar: r.kid_avatar,
+      detail: r.detail,
+      emoji: r.emoji,
+      amount: r.amount === null ? null : parseFloat(String(r.amount)),
+      ts: r.ts,
+    }))
+
+    res.json({ days, items })
+  })
+)
+
+/**
  * GET /api/family/tasks.ics
  * 匯出未完成 + 有 dueDate 的任務為 ICS 行事曆檔
  * 家長可下載匯入 Google Calendar / Apple Calendar / Outlook
