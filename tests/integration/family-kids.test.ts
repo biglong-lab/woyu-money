@@ -598,6 +598,43 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     }
   })
 
+  it("jars-trend：過去 N 天每天三罐餘額", async () => {
+    const oldEnv = process.env.FAMILY_KIDS_NO_BONUS
+    process.env.FAMILY_KIDS_NO_BONUS = "1"
+    try {
+      await createKid({ spendRatio: 70, saveRatio: 20, giveRatio: 10 })
+      const t = await request(app)
+        .post("/api/family/tasks")
+        .send({ kidId, title: "T", rewardAmount: 100 })
+      await request(app).post(`/api/family/tasks/${t.body.id}/submit`)
+      const ares = await request(app).post(`/api/family/tasks/${t.body.id}/approve`)
+      if (ares.body.mainSystem?.paymentItemId) {
+        await db.execute(
+          sql`DELETE FROM payment_records WHERE payment_item_id = ${ares.body.mainSystem.paymentItemId}`
+        )
+        await db.execute(
+          sql`DELETE FROM payment_items WHERE id = ${ares.body.mainSystem.paymentItemId}`
+        )
+      }
+
+      const res = await request(app).get(`/api/family/jars-trend?kidId=${kidId}&days=7`)
+      expect(res.status).toBe(200)
+      expect(res.body.kidId).toBe(kidId)
+      expect(res.body.days).toBe(7)
+      expect(Array.isArray(res.body.trend)).toBe(true)
+      expect(res.body.trend.length).toBe(7) // 7 天
+
+      // 最後一天（今天）三罐應有值 = 100 × ratio
+      const last = res.body.trend[res.body.trend.length - 1]
+      expect(last.spend).toBe(70)
+      expect(last.save).toBe(20)
+      expect(last.give).toBe(10)
+    } finally {
+      if (oldEnv === undefined) delete process.env.FAMILY_KIDS_NO_BONUS
+      else process.env.FAMILY_KIDS_NO_BONUS = oldEnv
+    }
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)

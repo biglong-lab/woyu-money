@@ -47,6 +47,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip as RTooltip,
+  ResponsiveContainer,
+  Legend,
+} from "recharts"
 import { useToast } from "@/hooks/use-toast"
 import { apiRequest, queryClient } from "@/lib/queryClient"
 import { useDocumentTitle } from "@/hooks/use-document-title"
@@ -313,6 +323,11 @@ function KidDashboard({
   })()
   const { data: report } = useQuery<MonthlyReport>({
     queryKey: [`/api/family/monthly-report?kidId=${kidId}&month=${currentMonth}`],
+  })
+  const { data: trend } = useQuery<{
+    trend: Array<{ date: string; spend: number; save: number; give: number }>
+  }>({
+    queryKey: [`/api/family/jars-trend?kidId=${kidId}&days=30`],
   })
   const [showSpend, setShowSpend] = useState(false)
   const [showReport, setShowReport] = useState(false)
@@ -735,6 +750,61 @@ function KidDashboard({
               )}
             </motion.div>
           )}
+        </div>
+      )}
+
+      {/* 三罐趨勢圖（過去 30 天）*/}
+      {trend && trend.trend.length > 0 && (
+        <div className="mb-4">
+          <h2 className="font-bold mb-2 flex items-center gap-2">
+            <BarChart3 className="h-4 w-4 text-indigo-600" />
+            📈 過去 30 天三罐趨勢
+          </h2>
+          <div className="bg-white rounded-lg p-2 shadow-sm" style={{ height: 200 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={trend.trend} margin={{ top: 5, right: 5, left: 0, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <XAxis
+                  dataKey="date"
+                  tick={{ fontSize: 9 }}
+                  tickFormatter={(v: string) => v.slice(5)}
+                />
+                <YAxis tick={{ fontSize: 9 }} />
+                <RTooltip
+                  contentStyle={{ fontSize: 11, borderRadius: 6 }}
+                  formatter={(v: number) => "$" + Math.round(v).toLocaleString()}
+                />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                <Line
+                  type="monotone"
+                  dataKey="spend"
+                  name="💸 花用"
+                  stroke="#f43f5e"
+                  strokeWidth={2}
+                  dot={false}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="save"
+                  name="🐷 存錢"
+                  stroke="#10b981"
+                  strokeWidth={2}
+                  dot={false}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="give"
+                  name="❤️ 捐獻"
+                  stroke="#0ea5e9"
+                  strokeWidth={2}
+                  dot={false}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+          <p className="text-[10px] text-gray-400 mt-1 text-center">
+            紅 = 花用、綠 = 存錢、藍 = 捐獻
+          </p>
         </div>
       )}
 

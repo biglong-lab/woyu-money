@@ -823,6 +823,79 @@ router.get(
 )
 
 /**
+ * GET /api/family/jars-trend?kidId=&days=30
+ * 過去 N 天每天的三罐餘額趨勢（累積收 - 累積花）
+ * 給小孩看自己存錢進步、培養儲蓄成就感
+ */
+router.get(
+  "/api/family/jars-trend",
+  asyncHandler(async (req, res) => {
+    const kidIdQ = Number(req.query.kidId)
+    if (!Number.isInteger(kidIdQ) || kidIdQ < 1) throw new AppError(400, "需傳 kidId")
+    const days = Math.min(Math.max(parseInt((req.query.days as string) || "30", 10), 7), 90)
+
+    // 取小孩比例
+    const [kid] = await db.select().from(kidsAccounts).where(eq(kidsAccounts.id, kidIdQ)).limit(1)
+    if (!kid) throw new AppError(404, "小孩不存在")
+
+    // 對每一天計算「累積至當天」的三罐餘額
+    // 收入面：approved tasks WHERE approved_at <= day（按比例分配）
+    // 支出面：spendings WHERE spend_date <= day（按 jar 扣）
+    const rows = await db.execute(sql`
+      WITH RECURSIVE day_series AS (
+        SELECT (CURRENT_DATE - INTERVAL '${sql.raw(String(days - 1))} days')::date AS d
+        UNION ALL
+        SELECT (d + INTERVAL '1 day')::date FROM day_series WHERE d < CURRENT_DATE
+      ),
+      received AS (
+        SELECT
+          ds.d,
+          COALESCE(SUM(t.reward_amount::numeric), 0)::numeric AS total
+        FROM day_series ds
+        LEFT JOIN kids_tasks t ON t.kid_id = ${kidIdQ}
+          AND t.status = 'approved'
+          AND t.approved_at::date <= ds.d
+        GROUP BY ds.d
+      ),
+      spent AS (
+        SELECT
+          ds.d,
+          COALESCE(SUM(s.amount::numeric) FILTER (WHERE s.jar = 'spend'), 0)::numeric AS spend_out,
+          COALESCE(SUM(s.amount::numeric) FILTER (WHERE s.jar = 'save'), 0)::numeric AS save_out,
+          COALESCE(SUM(s.amount::numeric) FILTER (WHERE s.jar = 'give'), 0)::numeric AS give_out
+        FROM day_series ds
+        LEFT JOIN kids_spendings s ON s.kid_id = ${kidIdQ} AND s.spend_date <= ds.d
+        GROUP BY ds.d
+      )
+      SELECT
+        to_char(r.d, 'YYYY-MM-DD') AS date,
+        ROUND(r.total * ${kid.spendRatio} / 100 - sp.spend_out, 2)::numeric AS "spendBalance",
+        ROUND(r.total * ${kid.saveRatio}  / 100 - sp.save_out,  2)::numeric AS "saveBalance",
+        ROUND(r.total * ${kid.giveRatio}  / 100 - sp.give_out,  2)::numeric AS "giveBalance"
+      FROM received r
+      JOIN spent sp ON sp.d = r.d
+      ORDER BY r.d
+    `)
+    const trend = (
+      rows as unknown as {
+        rows: {
+          date: string
+          spendBalance: string
+          saveBalance: string
+          giveBalance: string
+        }[]
+      }
+    ).rows.map((r) => ({
+      date: r.date,
+      spend: parseFloat(r.spendBalance),
+      save: parseFloat(r.saveBalance),
+      give: parseFloat(r.giveBalance),
+    }))
+    res.json({ kidId: kidIdQ, days, trend })
+  })
+)
+
+/**
  * GET /api/family/monthly-report?kidId=&month=YYYY-MM
  * 個別小孩本月戰績：任務 / 入帳 / 三罐增量 / 花錢 / 目標 / 徽章
  */
