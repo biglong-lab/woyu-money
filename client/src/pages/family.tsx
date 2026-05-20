@@ -80,7 +80,10 @@ interface Task {
   proposedByKid?: boolean
   submissionNote?: string | null
   parentFeedback?: string | null
+  difficulty?: "easy" | "medium" | "hard"
 }
+
+const difficultyStars = (d?: string) => (d === "easy" ? "⭐" : d === "hard" ? "⭐⭐⭐" : "⭐⭐")
 
 interface Jar {
   kidId: number
@@ -98,6 +101,8 @@ interface LeaderboardEntry {
   color: string
   approvedCount: number
   approvedSum: number
+  weightedScore: number
+  hardCount: number
   completedGoalsCount: number
   badgeCount: number
   rank: number
@@ -361,7 +366,12 @@ export default function FamilyPage() {
                   <div className="flex items-center gap-2 bg-white p-2 rounded border border-amber-200 flex-wrap">
                     <div className="text-2xl">{t.emoji ?? "📋"}</div>
                     <div className="flex-1 min-w-[140px]">
-                      <div className="text-sm font-medium">{t.title}</div>
+                      <div className="text-sm font-medium flex items-center gap-1.5">
+                        {t.title}
+                        <span className="text-[10px] text-amber-500">
+                          {difficultyStars(t.difficulty)}
+                        </span>
+                      </div>
                       <div className="text-xs text-gray-500">
                         {kid?.displayName ?? "—"} · {formatMoney(t.rewardAmount)}
                       </div>
@@ -493,6 +503,9 @@ export default function FamilyPage() {
                   <div className="font-bold">{entry.displayName}</div>
                   <div className="text-[10px] text-gray-500 flex gap-2 flex-wrap">
                     <span>📋 {entry.approvedCount} 個任務</span>
+                    {entry.hardCount > 0 && (
+                      <span className="text-rose-600">⭐⭐⭐ ×{entry.hardCount}</span>
+                    )}
                     {entry.completedGoalsCount > 0 && (
                       <span>🎯 達標 {entry.completedGoalsCount}</span>
                     )}
@@ -502,6 +515,9 @@ export default function FamilyPage() {
                 <div className="text-right">
                   <div className="font-mono font-bold text-amber-700">
                     {formatMoney(entry.approvedSum)}
+                  </div>
+                  <div className="text-[10px] text-rose-600 font-medium">
+                    積分 {entry.weightedScore}
                   </div>
                 </div>
               </motion.div>
@@ -882,6 +898,7 @@ function TaskDialog({
   const [notes, setNotes] = useState("")
   const [dueDate, setDueDate] = useState("")
   const [recurringInterval, setRecurringInterval] = useState<"none" | "weekly" | "monthly">("none")
+  const [difficulty, setDifficulty] = useState<"easy" | "medium" | "hard">("medium")
 
   const mut = useMutation({
     mutationFn: () =>
@@ -893,6 +910,7 @@ function TaskDialog({
         notes: notes.trim() || null,
         dueDate: dueDate || null,
         recurringInterval: recurringInterval === "none" ? null : recurringInterval,
+        difficulty,
       }),
     onSuccess: () => {
       toast({ title: "✅ 已派任務" })
@@ -944,6 +962,42 @@ function TaskDialog({
               onChange={(e) => setRewardAmount(e.target.value)}
               placeholder="50"
             />
+          </div>
+          <div>
+            <Label>難度</Label>
+            <div className="grid grid-cols-3 gap-1 mt-1">
+              {[
+                {
+                  v: "easy" as const,
+                  label: "⭐ 簡單",
+                  active: "bg-green-100 border-green-400 text-green-700 font-medium",
+                },
+                {
+                  v: "medium" as const,
+                  label: "⭐⭐ 普通",
+                  active: "bg-amber-100 border-amber-400 text-amber-700 font-medium",
+                },
+                {
+                  v: "hard" as const,
+                  label: "⭐⭐⭐ 挑戰",
+                  active: "bg-rose-100 border-rose-400 text-rose-700 font-medium",
+                },
+              ].map((d) => (
+                <button
+                  key={d.v}
+                  type="button"
+                  onClick={() => setDifficulty(d.v)}
+                  className={`text-xs py-1.5 rounded border ${
+                    difficulty === d.v ? d.active : "bg-white border-gray-200 hover:bg-gray-50"
+                  }`}
+                >
+                  {d.label}
+                </button>
+              ))}
+            </div>
+            <div className="text-[10px] text-gray-400 mt-1">
+              排行榜按難度加權積分：簡單 ×1、普通 ×2、挑戰 ×3
+            </div>
           </div>
           <div>
             <Label>指派給 *</Label>

@@ -90,7 +90,10 @@ interface Task {
   proposedByKid?: boolean
   submissionNote?: string | null
   parentFeedback?: string | null
+  difficulty?: "easy" | "medium" | "hard"
 }
+
+const difficultyStars = (d?: string) => (d === "easy" ? "⭐" : d === "hard" ? "⭐⭐⭐" : "⭐⭐")
 
 interface Goal {
   id: number
@@ -535,7 +538,10 @@ function KidDashboard({
               >
                 <div className="text-3xl">{t.emoji ?? "📋"}</div>
                 <div className="flex-1">
-                  <div className="font-medium">{t.title}</div>
+                  <div className="font-medium flex items-center gap-1.5">
+                    {t.title}
+                    <span className="text-xs text-amber-500">{difficultyStars(t.difficulty)}</span>
+                  </div>
                   <div className="text-xs text-gray-500">
                     完成可得 {formatMoney(t.rewardAmount)}
                   </div>

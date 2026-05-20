@@ -1314,13 +1314,21 @@ router.get(
         k.color,
         COALESCE(t.approved_count, 0)::int AS "approvedCount",
         COALESCE(t.approved_sum, 0)::numeric AS "approvedSum",
+        COALESCE(t.weighted_score, 0)::int AS "weightedScore",
+        COALESCE(t.hard_count, 0)::int AS "hardCount",
         COALESCE(g.completed_count, 0)::int AS "completedGoalsCount",
         COALESCE(b.badge_count, 0)::int AS "badgeCount"
       FROM kids_accounts k
       LEFT JOIN (
         SELECT kid_id,
                COUNT(*) AS approved_count,
-               SUM(reward_amount::numeric) AS approved_sum
+               SUM(reward_amount::numeric) AS approved_sum,
+               SUM(CASE difficulty
+                     WHEN 'hard' THEN 3
+                     WHEN 'medium' THEN 2
+                     ELSE 1
+                   END) AS weighted_score,
+               COUNT(*) FILTER (WHERE difficulty = 'hard')::int AS hard_count
         FROM kids_tasks
         WHERE status = 'approved'
           AND approved_at >= ${monthStart}::timestamp
@@ -1343,7 +1351,7 @@ router.get(
         GROUP BY kid_id
       ) b ON b.kid_id = k.id
       WHERE k.is_active = true
-      ORDER BY approved_sum DESC NULLS LAST, approved_count DESC NULLS LAST, k.id
+      ORDER BY weighted_score DESC NULLS LAST, approved_sum DESC NULLS LAST, approved_count DESC NULLS LAST, k.id
     `)
     const list = (
       rows as unknown as {
@@ -1354,6 +1362,8 @@ router.get(
           color: string
           approvedCount: number
           approvedSum: string | number
+          weightedScore: number
+          hardCount: number
           completedGoalsCount: number
           badgeCount: number
         }[]

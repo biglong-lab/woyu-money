@@ -825,6 +825,40 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(rres.body.status).toBe("rejected")
   })
 
+  it("任務難度：default medium、可設 easy/hard、排行榜 weightedScore 加權 1/2/3", async () => {
+    await createKid()
+    // 建 3 個不同難度任務
+    const easy = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId, title: "刷牙", rewardAmount: 10, difficulty: "easy" })
+    expect(easy.body.difficulty).toBe("easy")
+
+    const med = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId, title: "洗碗", rewardAmount: 20 })
+    expect(med.body.difficulty).toBe("medium") // default
+
+    const hard = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId, title: "全屋打掃", rewardAmount: 100, difficulty: "hard" })
+    expect(hard.body.difficulty).toBe("hard")
+
+    // 通通 submit + approve
+    for (const t of [easy, med, hard]) {
+      await request(app).post(`/api/family/tasks/${t.body.id}/submit`)
+      await request(app).post(`/api/family/tasks/${t.body.id}/approve`)
+    }
+
+    // 排行榜：weightedScore = 1 + 2 + 3 = 6
+    const now = new Date()
+    const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
+    const lb = await request(app).get(`/api/family/leaderboard?month=${month}`)
+    const me = lb.body.leaderboard.find((x: { kidId: number }) => x.kidId === kidId)
+    expect(me.weightedScore).toBe(6)
+    expect(me.hardCount).toBe(1)
+    expect(me.approvedCount).toBe(3)
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)
