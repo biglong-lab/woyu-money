@@ -727,11 +727,42 @@ router.post(
     await ensureJarsRow(kid.id)
 
     const baseReward = parseFloat(task.rewardAmount)
-    // 驚喜獎勵：15% 機率觸發 +50% bonus（小孩有期待感、培養正向回饋）
-    // 環境變數 FAMILY_KIDS_NO_BONUS=1 可關閉（測試 / 不想要的人）
+    // 驚喜獎勵：15% 機率觸發隨機 bonus + emoji（小孩有期待感）
+    // FAMILY_KIDS_NO_BONUS=1 可關閉
+    // 5 種倍率（機率依稀有度遞減）、對應不同 emoji 與標題
+    const BONUS_TIERS: Array<{
+      multiplier: number
+      emoji: string
+      label: string
+      weight: number
+    }> = [
+      { multiplier: 0.2, emoji: "🎁", label: "小驚喜", weight: 40 }, // +20%
+      { multiplier: 0.5, emoji: "🎉", label: "驚喜獎勵", weight: 30 }, // +50%
+      { multiplier: 1.0, emoji: "🌟", label: "閃亮獎勵", weight: 15 }, // +100%
+      { multiplier: 1.5, emoji: "💥", label: "超級獎勵", weight: 10 }, // +150%
+      { multiplier: 2.0, emoji: "🌈", label: "彩虹大禮", weight: 5 }, // +200%
+    ]
     const bonusEnabled = process.env.FAMILY_KIDS_NO_BONUS !== "1"
     const surpriseTriggered = bonusEnabled && Math.random() < 0.15
-    const bonusAmount = surpriseTriggered ? Math.round(baseReward * 0.5) : 0
+    let bonusAmount = 0
+    let bonusEmoji = ""
+    let bonusLabel = ""
+    if (surpriseTriggered) {
+      // 加權隨機抽 tier
+      const totalWeight = BONUS_TIERS.reduce((s, t) => s + t.weight, 0)
+      let pick = Math.random() * totalWeight
+      let chosen = BONUS_TIERS[0]
+      for (const t of BONUS_TIERS) {
+        pick -= t.weight
+        if (pick <= 0) {
+          chosen = t
+          break
+        }
+      }
+      bonusAmount = Math.round(baseReward * chosen.multiplier)
+      bonusEmoji = chosen.emoji
+      bonusLabel = chosen.label
+    }
     const reward = baseReward + bonusAmount
     const spendAdd = (reward * kid.spendRatio) / 100
     const saveAdd = (reward * kid.saveRatio) / 100
@@ -856,6 +887,8 @@ router.post(
         baseAmount: baseReward,
         bonusAmount,
         totalAmount: reward,
+        emoji: bonusEmoji,
+        label: bonusLabel,
       },
       mainSystem: {
         paymentItemId: mainPaymentItemId,

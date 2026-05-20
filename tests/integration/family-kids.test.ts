@@ -1851,6 +1851,19 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(types).toContain("goals_10")
   })
 
+  it("驚喜獎勵 emoji + label：bonus 結構含新欄位", async () => {
+    await createKid()
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId, title: "T", rewardAmount: 100 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`)
+    const ares = await request(app).post(`/api/family/tasks/${t.body.id}/approve`)
+    expect(ares.status).toBe(200)
+    expect(ares.body.bonus).toBeDefined()
+    expect("emoji" in ares.body.bonus).toBe(true)
+    expect("label" in ares.body.bonus).toBe(true)
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)

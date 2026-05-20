@@ -256,6 +256,8 @@ export default function FamilyPage() {
           baseAmount: number
           bonusAmount: number
           totalAmount: number
+          emoji?: string
+          label?: string
         }
       }>("POST", `/api/family/tasks/${vars.id}/approve`, {
         parentFeedback: vars.parentFeedback,
@@ -263,12 +265,13 @@ export default function FamilyPage() {
     onSuccess: (r) => {
       const bonus = r.bonus
       if (bonus?.triggered) {
+        const pct = Math.round((bonus.bonusAmount / bonus.baseAmount) * 100)
         toast({
-          title: `🎁✨ 驚喜獎勵！ ${formatMoney(bonus.baseAmount)} +${formatMoney(bonus.bonusAmount)} = ${formatMoney(bonus.totalAmount)}`,
+          title: `${bonus.emoji ?? "🎁"} ${bonus.label ?? "驚喜獎勵"}！ ${formatMoney(bonus.baseAmount)} +${formatMoney(bonus.bonusAmount)} = ${formatMoney(bonus.totalAmount)}`,
           description:
             r.newBadges.length > 0
               ? `🎉 解鎖徽章：${r.newBadges.join(", ")}`
-              : "小孩好棒、額外給 +50%",
+              : `小孩超棒、額外 +${pct}%`,
         })
         // 大撒花、震動
         confetti({ particleCount: 200, spread: 120, origin: { y: 0.5 }, ticks: 300 })
