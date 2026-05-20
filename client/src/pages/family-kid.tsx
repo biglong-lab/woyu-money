@@ -345,6 +345,7 @@ function KidDashboard({
   const [showPropose, setShowPropose] = useState(false)
   const [showReport, setShowReport] = useState(false)
   const [showTransfer, setShowTransfer] = useState(false)
+  const [commentTask, setCommentTask] = useState<{ id: number; title: string } | null>(null)
 
   const invalidate = () => {
     queryClient.invalidateQueries({
@@ -557,6 +558,15 @@ function KidDashboard({
                     完成可得 {formatMoney(t.rewardAmount)}
                   </div>
                 </div>
+                {/* 💬 跟大人聊聊 */}
+                <button
+                  type="button"
+                  onClick={() => setCommentTask({ id: t.id, title: t.title })}
+                  className="bg-gray-100 hover:bg-gray-200 rounded p-2 text-base"
+                  title="跟大人討論這個任務"
+                >
+                  💬
+                </button>
                 {/* 拍照 + 完成 */}
                 <label className="cursor-pointer bg-gray-100 hover:bg-gray-200 rounded p-2 inline-flex">
                   <input
@@ -616,7 +626,7 @@ function KidDashboard({
               >
                 <div className="flex items-center gap-2 mb-1">
                   <span className="text-base">{t.emoji ?? "📋"}</span>
-                  <span className="font-medium">{t.title}</span>
+                  <span className="font-medium flex-1">{t.title}</span>
                   <span
                     className={`text-xs px-1.5 py-0.5 rounded ${
                       t.status === "approved"
@@ -626,6 +636,14 @@ function KidDashboard({
                   >
                     {t.status === "approved" ? "✅ 通過" : "🙅 駁回"}
                   </span>
+                  <button
+                    type="button"
+                    onClick={() => setCommentTask({ id: t.id, title: t.title })}
+                    className="text-base hover:bg-white/50 rounded p-1"
+                    title="繼續討論"
+                  >
+                    💬
+                  </button>
                 </div>
                 <div className="text-gray-700">「{t.parentFeedback}」</div>
               </div>
@@ -1026,6 +1044,14 @@ function KidDashboard({
           toast={toast}
         />
       )}
+
+      {commentTask && (
+        <CommentDialog
+          taskId={commentTask.id}
+          taskTitle={commentTask.title}
+          onClose={() => setCommentTask(null)}
+        />
+      )}
     </div>
   )
 }
@@ -1307,6 +1333,116 @@ function WishesSection({
         </div>
       )}
     </div>
+  )
+}
+
+function CommentDialog({
+  taskId,
+  taskTitle,
+  onClose,
+}: {
+  taskId: number
+  taskTitle: string
+  onClose: () => void
+}) {
+  const { toast } = useToast()
+  const [message, setMessage] = useState("")
+
+  interface Comment {
+    id: number
+    taskId: number
+    author: "parent" | "kid"
+    message: string
+    emoji: string
+    createdAt: string
+  }
+  const { data: comments = [] } = useQuery<Comment[]>({
+    queryKey: [`/api/family/tasks/${taskId}/comments`],
+  })
+
+  const sendMut = useMutation({
+    mutationFn: () =>
+      apiRequest("POST", `/api/family/tasks/${taskId}/comments`, {
+        author: "kid",
+        message: message.trim(),
+      }),
+    onSuccess: () => {
+      setMessage("")
+      vibrate(30)
+      queryClient.invalidateQueries({
+        queryKey: [`/api/family/tasks/${taskId}/comments`],
+      })
+    },
+    onError: (e: Error) => toast({ title: "失敗", description: e.message, variant: "destructive" }),
+  })
+
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent className="w-[95vw] max-w-md">
+        <DialogHeader>
+          <DialogTitle>💬 跟大人聊聊</DialogTitle>
+          <DialogDescription>任務：{taskTitle}</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+          {comments.length === 0 ? (
+            <div className="text-center text-sm text-gray-400 py-6">
+              還沒有人留言、來開始討論吧 💬
+            </div>
+          ) : (
+            comments.map((c) => {
+              const mine = c.author === "kid"
+              return (
+                <div key={c.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
+                  <div
+                    className={`max-w-[80%] rounded-lg px-3 py-1.5 text-sm ${
+                      mine ? "bg-pink-500 text-white" : "bg-amber-100 text-amber-900"
+                    }`}
+                  >
+                    <div className="text-[10px] opacity-75 mb-0.5">
+                      {c.author === "parent" ? "👨‍👩 大人" : "🧒 我"} ·{" "}
+                      {new Date(c.createdAt).toLocaleString("zh-TW", {
+                        month: "numeric",
+                        day: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </div>
+                    <div>{c.message}</div>
+                  </div>
+                </div>
+              )
+            })
+          )}
+        </div>
+        <div className="flex gap-2 items-end">
+          <Input
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            placeholder="輸入訊息..."
+            maxLength={500}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey && message.trim()) {
+                e.preventDefault()
+                sendMut.mutate()
+              }
+            }}
+            className="flex-1"
+          />
+          <Button
+            disabled={!message.trim() || sendMut.isPending}
+            onClick={() => sendMut.mutate()}
+            className="bg-pink-600 hover:bg-pink-700"
+          >
+            送出
+          </Button>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            關閉
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 
