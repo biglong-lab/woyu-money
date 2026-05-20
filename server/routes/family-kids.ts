@@ -487,6 +487,37 @@ router.post(
     // 觸發徽章
     const awarded = await checkTaskBadges(kid.id)
 
+    // Recurring：若任務設定週期重複、自動產生下一筆相同任務
+    let nextRecurringTaskId: number | null = null
+    if (task.recurringInterval === "weekly" || task.recurringInterval === "monthly") {
+      const intervalDays = task.recurringInterval === "weekly" ? 7 : 30
+      // 計算下次到期日（從原本 dueDate 算起、無則從今天算）
+      const baseDate = task.dueDate ? new Date(task.dueDate) : new Date()
+      const nextDue = new Date(baseDate.getTime() + intervalDays * 86400000)
+      const nextDueStr = nextDue.toISOString().slice(0, 10)
+      try {
+        const [next] = await db
+          .insert(kidsTasks)
+          .values({
+            familyId: task.familyId,
+            kidId: task.kidId,
+            title: task.title,
+            emoji: task.emoji,
+            rewardAmount: task.rewardAmount,
+            status: "pending",
+            notes: task.notes,
+            dueDate: nextDueStr,
+            recurringInterval: task.recurringInterval,
+            // 同 chain 的 parentId 沿用、不存在則自己當 root
+            recurringParentId: task.recurringParentId ?? task.id,
+          })
+          .returning({ id: kidsTasks.id })
+        nextRecurringTaskId = next?.id ?? null
+      } catch (err) {
+        console.warn("[family-kids] 產生 recurring 下一筆失敗：", err)
+      }
+    }
+
     res.json({
       task: updated,
       jars: { spendAdd, saveAdd, giveAdd, total: reward },
@@ -501,6 +532,10 @@ router.post(
         paymentItemId: mainPaymentItemId,
         paymentRecordId: mainPaymentRecordId,
         synced: mainPaymentItemId !== null,
+      },
+      recurring: {
+        interval: task.recurringInterval,
+        nextTaskId: nextRecurringTaskId,
       },
     })
   })

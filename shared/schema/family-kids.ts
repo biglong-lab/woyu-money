@@ -95,6 +95,11 @@ export const kidsTasks = pgTable(
     completedAt: timestamp("completed_at"),
     approvedAt: timestamp("approved_at"),
     paymentRecordId: integer("payment_record_id"), // 入帳後對應的 payment_records.id
+    // recurring：'weekly' / 'monthly' / null（單次）
+    // approve 時若有此值、自動產生下一筆相同任務（dueDate += interval）
+    recurringInterval: varchar("recurring_interval", { length: 12 }),
+    // 追溯來源：第一個 recurring 任務的 id（同一條 chain）
+    recurringParentId: integer("recurring_parent_id"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },

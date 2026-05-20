@@ -788,6 +788,7 @@ function TaskDialog({
   const [kidId, setKidId] = useState<string>(kids[0]?.id?.toString() ?? "")
   const [notes, setNotes] = useState("")
   const [dueDate, setDueDate] = useState("")
+  const [recurringInterval, setRecurringInterval] = useState<"none" | "weekly" | "monthly">("none")
 
   const mut = useMutation({
     mutationFn: () =>
@@ -798,6 +799,7 @@ function TaskDialog({
         kidId: kidId ? parseInt(kidId) : null,
         notes: notes.trim() || null,
         dueDate: dueDate || null,
+        recurringInterval: recurringInterval === "none" ? null : recurringInterval,
       }),
     onSuccess: () => {
       toast({ title: "✅ 已派任務" })
@@ -869,6 +871,32 @@ function TaskDialog({
             <Label>截止日</Label>
             <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
             <p className="text-[10px] text-gray-400 mt-0.5">逾期會標紅、自動排前面</p>
+          </div>
+          <div>
+            <Label>重複</Label>
+            <div className="grid grid-cols-3 gap-1 mt-1">
+              {(["none", "weekly", "monthly"] as const).map((v) => {
+                const label = { none: "🔄 不重複", weekly: "📅 每週", monthly: "📆 每月" }[v]
+                const active = recurringInterval === v
+                return (
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() => setRecurringInterval(v)}
+                    className={`p-2 rounded border-2 text-xs ${
+                      active ? "border-indigo-500 bg-indigo-50" : "border-gray-200"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                )
+              })}
+            </div>
+            <p className="text-[10px] text-gray-400 mt-0.5">
+              {recurringInterval === "none"
+                ? "approve 後不會再產出新任務"
+                : `approve 後自動產出下一筆（${recurringInterval === "weekly" ? "7" : "30"} 天後）`}
+            </p>
           </div>
           <div>
             <Label>備註</Label>

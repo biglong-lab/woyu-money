@@ -510,6 +510,94 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     }
   })
 
+  it("recurring 任務：approve 後自動產生下一筆（+7 天）", async () => {
+    const oldEnv = process.env.FAMILY_KIDS_NO_BONUS
+    process.env.FAMILY_KIDS_NO_BONUS = "1"
+    try {
+      await createKid()
+      const today = new Date().toISOString().slice(0, 10)
+      const tres = await request(app).post("/api/family/tasks").send({
+        kidId,
+        title: "每週洗碗",
+        emoji: "🍽️",
+        rewardAmount: 50,
+        dueDate: today,
+        recurringInterval: "weekly",
+      })
+      expect(tres.status).toBe(201)
+      await request(app).post(`/api/family/tasks/${tres.body.id}/submit`)
+      const ares = await request(app).post(`/api/family/tasks/${tres.body.id}/approve`)
+      expect(ares.status).toBe(200)
+      expect(ares.body.recurring).toBeTruthy()
+      expect(ares.body.recurring.interval).toBe("weekly")
+      expect(ares.body.recurring.nextTaskId).toBeGreaterThan(0)
+
+      // 清主系統
+      if (ares.body.mainSystem?.paymentItemId) {
+        await db.execute(
+          sql`DELETE FROM payment_records WHERE payment_item_id = ${ares.body.mainSystem.paymentItemId}`
+        )
+        await db.execute(
+          sql`DELETE FROM payment_items WHERE id = ${ares.body.mainSystem.paymentItemId}`
+        )
+      }
+
+      // 下一筆任務存在、dueDate = today + 7
+      const next = await db.execute(
+        sql`SELECT title, due_date::text AS d, status, recurring_interval AS interval,
+                  recurring_parent_id AS parent
+            FROM kids_tasks WHERE id = ${ares.body.recurring.nextTaskId}`
+      )
+      const r = (
+        next as unknown as {
+          rows: {
+            title: string
+            d: string
+            status: string
+            interval: string
+            parent: number
+          }[]
+        }
+      ).rows[0]
+      expect(r.title).toBe("每週洗碗")
+      expect(r.status).toBe("pending")
+      expect(r.interval).toBe("weekly")
+      expect(r.parent).toBe(tres.body.id) // 第一筆變 parent
+      // dueDate = today + 7 天
+      const expected = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10)
+      expect(r.d).toBe(expected)
+    } finally {
+      if (oldEnv === undefined) delete process.env.FAMILY_KIDS_NO_BONUS
+      else process.env.FAMILY_KIDS_NO_BONUS = oldEnv
+    }
+  })
+
+  it("非 recurring 任務 approve 不會產出下一筆", async () => {
+    const oldEnv = process.env.FAMILY_KIDS_NO_BONUS
+    process.env.FAMILY_KIDS_NO_BONUS = "1"
+    try {
+      await createKid()
+      const t = await request(app)
+        .post("/api/family/tasks")
+        .send({ kidId, title: "單次", rewardAmount: 30 })
+      await request(app).post(`/api/family/tasks/${t.body.id}/submit`)
+      const ares = await request(app).post(`/api/family/tasks/${t.body.id}/approve`)
+      expect(ares.body.recurring.nextTaskId).toBeNull()
+
+      if (ares.body.mainSystem?.paymentItemId) {
+        await db.execute(
+          sql`DELETE FROM payment_records WHERE payment_item_id = ${ares.body.mainSystem.paymentItemId}`
+        )
+        await db.execute(
+          sql`DELETE FROM payment_items WHERE id = ${ares.body.mainSystem.paymentItemId}`
+        )
+      }
+    } finally {
+      if (oldEnv === undefined) delete process.env.FAMILY_KIDS_NO_BONUS
+      else process.env.FAMILY_KIDS_NO_BONUS = oldEnv
+    }
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)
