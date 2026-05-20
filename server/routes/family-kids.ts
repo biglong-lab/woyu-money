@@ -2530,6 +2530,41 @@ router.get(
 )
 
 /**
+ * 小孩自己改 PIN
+ * POST /api/family/kids/:id/change-pin
+ * Body: { oldPin, newPin }
+ * 必須驗證舊 PIN、newPin 規格 4 位數字、不可同舊
+ */
+router.post(
+  "/api/family/kids/:id/change-pin",
+  asyncHandler(async (req, res) => {
+    const id = Number(req.params.id)
+    if (!Number.isInteger(id) || id < 1) throw new AppError(400, "無效的 ID")
+    const oldPin = String(req.body?.oldPin ?? "").trim()
+    const newPin = String(req.body?.newPin ?? "").trim()
+    if (!/^\d{4}$/.test(newPin)) throw new AppError(400, "新 PIN 需為 4 位數字")
+    if (oldPin === newPin) throw new AppError(400, "新 PIN 不可與舊 PIN 相同")
+    const [kid] = await db.select().from(kidsAccounts).where(eq(kidsAccounts.id, id)).limit(1)
+    if (!kid) throw new AppError(404, "小孩不存在")
+    if (kid.pin !== oldPin) throw new AppError(401, "舊 PIN 不正確")
+    // 檢查同家其他小孩 PIN 不撞
+    const conflict = await db
+      .select({ id: kidsAccounts.id })
+      .from(kidsAccounts)
+      .where(and(eq(kidsAccounts.pin, newPin), eq(kidsAccounts.isActive, true)))
+      .limit(1)
+    if (conflict.length > 0 && conflict[0].id !== id) {
+      throw new AppError(400, "新 PIN 已被其他小孩使用、請換一個")
+    }
+    await db
+      .update(kidsAccounts)
+      .set({ pin: newPin, updatedAt: new Date() })
+      .where(eq(kidsAccounts.id, id))
+    res.json({ ok: true })
+  })
+)
+
+/**
  * 小孩自訂頭像 / 顏色（不需家長 PIN）
  * PUT /api/family/kids/:id/personalize
  * 限定欄位：avatar, color（不能改 pin / ratios / displayName）

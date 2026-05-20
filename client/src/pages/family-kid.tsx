@@ -1204,6 +1204,7 @@ function PersonalizeDialog({
               {kid.displayName}
             </span>
           </div>
+          <ChangePinSection kidId={kid.id} toast={toast} />
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>
@@ -1219,6 +1220,105 @@ function PersonalizeDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  )
+}
+
+function ChangePinSection({
+  kidId,
+  toast,
+}: {
+  kidId: number
+  toast: (opts: {
+    title: string
+    description?: string
+    variant?: "default" | "destructive"
+  }) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [oldPin, setOldPin] = useState("")
+  const [newPin, setNewPin] = useState("")
+  const [confirmPin, setConfirmPin] = useState("")
+
+  const mut = useMutation({
+    mutationFn: () =>
+      apiRequest("POST", `/api/family/kids/${kidId}/change-pin`, { oldPin, newPin }),
+    onSuccess: () => {
+      toast({ title: "🔐 PIN 修改成功" })
+      vibrate(40)
+      setOpen(false)
+      setOldPin("")
+      setNewPin("")
+      setConfirmPin("")
+    },
+    onError: (e: Error) => toast({ title: "失敗", description: e.message, variant: "destructive" }),
+  })
+
+  const valid =
+    /^\d{4}$/.test(oldPin) && /^\d{4}$/.test(newPin) && newPin === confirmPin && oldPin !== newPin
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="w-full text-xs text-indigo-700 hover:bg-indigo-50 rounded py-1.5 border border-indigo-200 mt-2"
+      >
+        🔐 修改 PIN
+      </button>
+    )
+  }
+  return (
+    <div className="mt-2 border-t pt-3 space-y-2 bg-indigo-50 -mx-1 px-3 pb-2 rounded-lg">
+      <div className="text-xs font-medium text-indigo-700">🔐 修改 PIN</div>
+      <Input
+        type="password"
+        inputMode="numeric"
+        pattern="\d{4}"
+        maxLength={4}
+        placeholder="舊 PIN（4 位數）"
+        value={oldPin}
+        onChange={(e) => setOldPin(e.target.value.replace(/\D/g, ""))}
+      />
+      <Input
+        type="password"
+        inputMode="numeric"
+        pattern="\d{4}"
+        maxLength={4}
+        placeholder="新 PIN（4 位數）"
+        value={newPin}
+        onChange={(e) => setNewPin(e.target.value.replace(/\D/g, ""))}
+      />
+      <Input
+        type="password"
+        inputMode="numeric"
+        pattern="\d{4}"
+        maxLength={4}
+        placeholder="再輸入一次新 PIN"
+        value={confirmPin}
+        onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, ""))}
+      />
+      {newPin && confirmPin && newPin !== confirmPin && (
+        <div className="text-[10px] text-rose-600">兩次輸入不一致</div>
+      )}
+      <div className="flex gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setOpen(false)}
+          className="flex-1 h-8 text-xs"
+        >
+          取消
+        </Button>
+        <Button
+          size="sm"
+          disabled={!valid || mut.isPending}
+          onClick={() => mut.mutate()}
+          className="flex-1 h-8 text-xs bg-indigo-600 hover:bg-indigo-700"
+        >
+          確認修改
+        </Button>
+      </div>
+    </div>
   )
 }
 

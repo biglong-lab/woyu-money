@@ -1714,6 +1714,44 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(me.avgScore).toBe(4.5)
   })
 
+  it("小孩改 PIN：舊 PIN 驗證 + 新 PIN 規格 + 不撞別人", async () => {
+    await createKid()
+    // 錯誤舊 PIN
+    const r1 = await request(app)
+      .post(`/api/family/kids/${kidId}/change-pin`)
+      .send({ oldPin: "0000", newPin: "5566" })
+    expect(r1.status).toBe(401)
+
+    // 不合法新 PIN（5 位）
+    const r2 = await request(app)
+      .post(`/api/family/kids/${kidId}/change-pin`)
+      .send({ oldPin: "9871", newPin: "12345" })
+    expect(r2.status).toBe(400)
+
+    // 新舊一樣
+    const r3 = await request(app)
+      .post(`/api/family/kids/${kidId}/change-pin`)
+      .send({ oldPin: "9871", newPin: "9871" })
+    expect(r3.status).toBe(400)
+
+    // 成功
+    const r4 = await request(app)
+      .post(`/api/family/kids/${kidId}/change-pin`)
+      .send({ oldPin: "9871", newPin: "5566" })
+    expect(r4.status).toBe(200)
+    expect(r4.body.ok).toBe(true)
+
+    // 用新 PIN 登入
+    const login = await request(app).post("/api/family/kids/pin-login").send({ pin: "5566" })
+    expect(login.status).toBe(200)
+    expect(login.body.id).toBe(kidId)
+
+    // 還原給 afterEach 清（用新 PIN 改回原 TEST_PIN 9871）
+    await request(app)
+      .post(`/api/family/kids/${kidId}/change-pin`)
+      .send({ oldPin: "5566", newPin: "9871" })
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)
