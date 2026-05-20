@@ -1269,6 +1269,90 @@ router.get(
 )
 
 /**
+ * GET /api/family/jars-trend-multi?days=30
+ * 全家所有 active 小孩的「總餘額」每日趨勢（spend+save+give）
+ * 給家長一目了然看誰存錢進步、誰花得多
+ * Response: { days, dates: string[], series: [{ kidId, displayName, avatar, color, values: number[] }] }
+ */
+router.get(
+  "/api/family/jars-trend-multi",
+  asyncHandler(async (req, res) => {
+    const days = Math.min(Math.max(parseInt((req.query.days as string) || "30", 10), 7), 90)
+    const kids = await db.select().from(kidsAccounts).where(eq(kidsAccounts.isActive, true))
+    if (kids.length === 0) {
+      res.json({ days, dates: [], series: [] })
+      return
+    }
+
+    // 一次 query：對每個 kid 算每天的「總餘額」
+    // total = received - all spendings（不分罐、簡化視圖）
+    const rows = await db.execute(sql`
+      WITH RECURSIVE day_series AS (
+        SELECT (CURRENT_DATE - INTERVAL '${sql.raw(String(days - 1))} days')::date AS d
+        UNION ALL
+        SELECT (d + INTERVAL '1 day')::date FROM day_series WHERE d < CURRENT_DATE
+      ),
+      kid_day AS (
+        SELECT k.id AS kid_id, ds.d
+        FROM kids_accounts k
+        CROSS JOIN day_series ds
+        WHERE k.is_active = true
+      ),
+      received AS (
+        SELECT
+          kd.kid_id, kd.d,
+          COALESCE(SUM(t.reward_amount::numeric), 0)::numeric AS total_received
+        FROM kid_day kd
+        LEFT JOIN kids_tasks t ON t.kid_id = kd.kid_id
+          AND t.status = 'approved'
+          AND t.approved_at::date <= kd.d
+        GROUP BY kd.kid_id, kd.d
+      ),
+      spent AS (
+        SELECT
+          kd.kid_id, kd.d,
+          COALESCE(SUM(s.amount::numeric), 0)::numeric AS total_spent
+        FROM kid_day kd
+        LEFT JOIN kids_spendings s ON s.kid_id = kd.kid_id AND s.spend_date <= kd.d
+        GROUP BY kd.kid_id, kd.d
+      )
+      SELECT
+        r.kid_id AS "kidId",
+        to_char(r.d, 'YYYY-MM-DD') AS date,
+        ROUND(r.total_received - sp.total_spent, 2)::numeric AS balance
+      FROM received r
+      JOIN spent sp ON sp.kid_id = r.kid_id AND sp.d = r.d
+      ORDER BY r.d, r.kid_id
+    `)
+    const rs = (
+      rows as unknown as {
+        rows: { kidId: number; date: string; balance: string | number }[]
+      }
+    ).rows
+
+    // 組 dates 陣列 + 每個 kid 的 values 陣列（按 dates 對齊）
+    const datesSet = new Set<string>()
+    rs.forEach((r) => datesSet.add(r.date))
+    const dates = Array.from(datesSet).sort()
+    const byKid = new Map<number, Record<string, number>>()
+    rs.forEach((r) => {
+      if (!byKid.has(r.kidId)) byKid.set(r.kidId, {})
+      byKid.get(r.kidId)![r.date] = parseFloat(String(r.balance))
+    })
+
+    const series = kids.map((k) => ({
+      kidId: k.id,
+      displayName: k.displayName,
+      avatar: k.avatar,
+      color: k.color,
+      values: dates.map((d) => byKid.get(k.id)?.[d] ?? 0),
+    }))
+
+    res.json({ days, dates, series })
+  })
+)
+
+/**
  * GET /api/family/monthly-report?kidId=&month=YYYY-MM
  * 個別小孩本月戰績：任務 / 入帳 / 三罐增量 / 花錢 / 目標 / 徽章
  */

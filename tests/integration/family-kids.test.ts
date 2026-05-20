@@ -1089,6 +1089,32 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(save.body.goal.reflection).toBe("因為我表現好、想送自己禮物") // 原 reflection 保留
   })
 
+  it("jars-trend-multi：所有 active 小孩每日總餘額並列、dates 對齊", async () => {
+    await createKid({ displayName: "Alpha" })
+    // 賺 100
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId, title: "T1", rewardAmount: 100 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`)
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`)
+
+    const res = await request(app).get("/api/family/jars-trend-multi?days=7")
+    expect(res.status).toBe(200)
+    expect(Array.isArray(res.body.dates)).toBe(true)
+    expect(res.body.dates.length).toBe(7)
+    expect(Array.isArray(res.body.series)).toBe(true)
+    // 找到 Alpha 的 series
+    const me = res.body.series.find((s: { kidId: number }) => s.kidId === kidId)
+    expect(me).toBeTruthy()
+    expect(me.values.length).toBe(7)
+    // 最後一天（今天）餘額 >= 100（bonus 可能更多）
+    expect(me.values[me.values.length - 1]).toBeGreaterThanOrEqual(100)
+    // 每個 series 的 values 長度應對齊 dates
+    res.body.series.forEach((s: { values: number[] }) => {
+      expect(s.values.length).toBe(res.body.dates.length)
+    })
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)

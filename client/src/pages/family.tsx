@@ -53,6 +53,16 @@ import { useToast } from "@/hooks/use-toast"
 import { apiRequest, queryClient } from "@/lib/queryClient"
 import { useDocumentTitle } from "@/hooks/use-document-title"
 import { BackToTop } from "@/components/back-to-top"
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip as RTooltip,
+  ResponsiveContainer,
+  Legend,
+} from "recharts"
 
 interface Kid {
   id: number
@@ -561,6 +571,9 @@ export default function FamilyPage() {
         </Card>
       )}
 
+      {/* 全家儲蓄趨勢比較圖 */}
+      {kids.length >= 1 && <FamilyTrendChart />}
+
       {/* 全家活動 Timeline（過去 30 天）*/}
       {activityFeed && activityFeed.items.length > 0 && (
         <Card>
@@ -765,6 +778,79 @@ function TaskStatusBadge({ status }: { status: string }) {
   }
   const s = map[status] ?? { label: status, cls: "bg-gray-100 text-gray-700" }
   return <Badge className={`${s.cls} text-[10px]`}>{s.label}</Badge>
+}
+
+function FamilyTrendChart() {
+  interface TrendSeries {
+    kidId: number
+    displayName: string
+    avatar: string
+    color: string
+    values: number[]
+  }
+  const { data } = useQuery<{ days: number; dates: string[]; series: TrendSeries[] }>({
+    queryKey: ["/api/family/jars-trend-multi?days=30"],
+    staleTime: 60_000,
+  })
+  if (!data || data.series.length === 0) return null
+
+  // 組 recharts data：每個 date 一個 row、含每個 kid 的 column
+  const chartData = data.dates.map((date, i) => {
+    const row: Record<string, string | number> = { date: date.slice(5) } // MM-DD
+    data.series.forEach((s) => {
+      row[s.displayName] = s.values[i]
+    })
+    return row
+  })
+
+  const LINE_COLORS: Record<string, string> = {
+    blue: "#3b82f6",
+    pink: "#ec4899",
+    green: "#10b981",
+    amber: "#f59e0b",
+    purple: "#a855f7",
+    cyan: "#06b6d4",
+  }
+
+  return (
+    <Card className="border-indigo-200">
+      <CardHeader className="py-3 px-3 sm:px-4">
+        <CardTitle className="text-base flex items-center gap-2">
+          <span className="text-xl">📈</span>
+          全家儲蓄趨勢
+        </CardTitle>
+        <CardDescription>過去 {data.days} 天每天的總餘額（收入 - 花費）</CardDescription>
+      </CardHeader>
+      <CardContent className="py-2 px-1 sm:px-2 h-64">
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={chartData}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
+            <XAxis
+              dataKey="date"
+              tick={{ fontSize: 10 }}
+              interval={Math.floor(data.dates.length / 6)}
+            />
+            <YAxis tick={{ fontSize: 10 }} width={48} />
+            <RTooltip
+              formatter={(v: number) => "$" + Number(v).toLocaleString()}
+              contentStyle={{ fontSize: "12px" }}
+            />
+            <Legend wrapperStyle={{ fontSize: "11px" }} />
+            {data.series.map((s) => (
+              <Line
+                key={s.kidId}
+                type="monotone"
+                dataKey={s.displayName}
+                stroke={LINE_COLORS[s.color] ?? "#6b7280"}
+                strokeWidth={2}
+                dot={false}
+              />
+            ))}
+          </LineChart>
+        </ResponsiveContainer>
+      </CardContent>
+    </Card>
+  )
 }
 
 function KidCard({
