@@ -104,6 +104,10 @@ export const kidsTasks = pgTable(
     proofImageUrl: varchar("proof_image_url", { length: 500 }),
     // 小孩自提任務（家長 approve 才入帳）培養主動性
     proposedByKid: boolean("proposed_by_kid").notNull().default(false),
+    // 小孩 submit 時的描述（「我洗了 2 個碗 + 拖了客廳」）
+    submissionNote: text("submission_note"),
+    // 家長 approve / reject 時的回饋訊息（「做得很棒 👍」「下次記得擦乾」）
+    parentFeedback: text("parent_feedback"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },

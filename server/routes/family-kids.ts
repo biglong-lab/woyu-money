@@ -592,6 +592,10 @@ router.post(
     const proofImageUrl = req.body?.proofImageUrl
       ? String(req.body.proofImageUrl).slice(0, 500)
       : null
+    // 可選：submissionNote（小孩描述「我做了什麼」）
+    const submissionNote = req.body?.submissionNote
+      ? String(req.body.submissionNote).slice(0, 500)
+      : null
     const [updated] = await db
       .update(kidsTasks)
       .set({
@@ -599,6 +603,7 @@ router.post(
         completedAt: new Date(),
         updatedAt: new Date(),
         ...(proofImageUrl ? { proofImageUrl } : {}),
+        ...(submissionNote ? { submissionNote } : {}),
       })
       .where(eq(kidsTasks.id, id))
       .returning()
@@ -613,9 +618,17 @@ router.post(
     const [task] = await db.select().from(kidsTasks).where(eq(kidsTasks.id, id)).limit(1)
     if (!task) throw new AppError(404, "任務不存在")
     if (task.status !== "submitted") throw new AppError(400, "只可駁回已標完成的任務")
+    const parentFeedback = req.body?.parentFeedback
+      ? String(req.body.parentFeedback).slice(0, 500)
+      : null
     const [updated] = await db
       .update(kidsTasks)
-      .set({ status: "rejected", updatedAt: new Date(), notes: req.body?.notes ?? task.notes })
+      .set({
+        status: "rejected",
+        updatedAt: new Date(),
+        notes: req.body?.notes ?? task.notes,
+        ...(parentFeedback ? { parentFeedback } : {}),
+      })
       .where(eq(kidsTasks.id, id))
       .returning()
     res.json(updated)
@@ -716,7 +729,10 @@ router.post(
       console.warn("[family-kids] 寫入 payment_records 失敗：", err)
     }
 
-    // 更新 task（含主系統 record id）
+    // 更新 task（含主系統 record id + 可選家長回饋）
+    const parentFeedback = req.body?.parentFeedback
+      ? String(req.body.parentFeedback).slice(0, 500)
+      : null
     const [updated] = await db
       .update(kidsTasks)
       .set({
@@ -724,6 +740,7 @@ router.post(
         approvedAt: new Date(),
         paymentRecordId: mainPaymentRecordId,
         updatedAt: new Date(),
+        ...(parentFeedback ? { parentFeedback } : {}),
       })
       .where(eq(kidsTasks.id, id))
       .returning()

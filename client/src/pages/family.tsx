@@ -78,6 +78,8 @@ interface Task {
   overdueDays?: number
   proofImageUrl?: string | null
   proposedByKid?: boolean
+  submissionNote?: string | null
+  parentFeedback?: string | null
 }
 
 interface Jar {
@@ -195,7 +197,7 @@ export default function FamilyPage() {
   }
 
   const approveTaskMutation = useMutation({
-    mutationFn: (id: number) =>
+    mutationFn: (vars: { id: number; parentFeedback?: string }) =>
       apiRequest<{
         task: Task
         jars: { total: number }
@@ -206,7 +208,9 @@ export default function FamilyPage() {
           bonusAmount: number
           totalAmount: number
         }
-      }>("POST", `/api/family/tasks/${id}/approve`),
+      }>("POST", `/api/family/tasks/${vars.id}/approve`, {
+        parentFeedback: vars.parentFeedback,
+      }),
     onSuccess: (r) => {
       const bonus = r.bonus
       if (bonus?.triggered) {
@@ -234,7 +238,10 @@ export default function FamilyPage() {
   })
 
   const rejectTaskMutation = useMutation({
-    mutationFn: (id: number) => apiRequest("POST", `/api/family/tasks/${id}/reject`),
+    mutationFn: (vars: { id: number; parentFeedback?: string }) =>
+      apiRequest("POST", `/api/family/tasks/${vars.id}/reject`, {
+        parentFeedback: vars.parentFeedback,
+      }),
     onSuccess: () => {
       toast({ title: "已駁回" })
       invalidateAll()
@@ -350,47 +357,71 @@ export default function FamilyPage() {
             {pendingTasks.map((t) => {
               const kid = kids.find((k) => k.id === t.kidId)
               return (
-                <div
-                  key={t.id}
-                  className="flex items-center gap-2 bg-white p-2 rounded border border-amber-200 flex-wrap"
-                >
-                  <div className="text-2xl">{t.emoji ?? "📋"}</div>
-                  <div className="flex-1 min-w-[140px]">
-                    <div className="text-sm font-medium">{t.title}</div>
-                    <div className="text-xs text-gray-500">
-                      {kid?.displayName ?? "—"} · {formatMoney(t.rewardAmount)}
+                <div key={t.id} className="space-y-1">
+                  <div className="flex items-center gap-2 bg-white p-2 rounded border border-amber-200 flex-wrap">
+                    <div className="text-2xl">{t.emoji ?? "📋"}</div>
+                    <div className="flex-1 min-w-[140px]">
+                      <div className="text-sm font-medium">{t.title}</div>
+                      <div className="text-xs text-gray-500">
+                        {kid?.displayName ?? "—"} · {formatMoney(t.rewardAmount)}
+                      </div>
+                    </div>
+                    {t.proofImageUrl && (
+                      <a
+                        href={t.proofImageUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="border rounded overflow-hidden"
+                        title="點看大圖"
+                      >
+                        <img src={t.proofImageUrl} alt="證明" className="w-12 h-12 object-cover" />
+                      </a>
+                    )}
+                    <div className="flex gap-1">
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          const fb = window.prompt(
+                            `回饋給孩子（可跳過、會顯示在小孩端）：\n任務：${t.title}`,
+                            ""
+                          )
+                          approveTaskMutation.mutate({
+                            id: t.id,
+                            parentFeedback: fb?.trim() || undefined,
+                          })
+                        }}
+                        disabled={approveTaskMutation.isPending}
+                        className="bg-green-600 hover:bg-green-700"
+                      >
+                        <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
+                        確認
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          const fb = window.prompt(
+                            `駁回原因（會顯示在小孩端）：\n任務：${t.title}`,
+                            ""
+                          )
+                          rejectTaskMutation.mutate({
+                            id: t.id,
+                            parentFeedback: fb?.trim() || undefined,
+                          })
+                        }}
+                        disabled={rejectTaskMutation.isPending}
+                      >
+                        <XCircle className="h-3.5 w-3.5" />
+                      </Button>
                     </div>
                   </div>
-                  {t.proofImageUrl && (
-                    <a
-                      href={t.proofImageUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="border rounded overflow-hidden"
-                      title="點看大圖"
-                    >
-                      <img src={t.proofImageUrl} alt="證明" className="w-12 h-12 object-cover" />
-                    </a>
+                  {/* 小孩 submissionNote（如果有寫）顯示給家長看 */}
+                  {t.submissionNote && (
+                    <div className="bg-amber-50 border border-amber-200 rounded p-2 ml-12 text-xs text-gray-700">
+                      <span className="text-amber-600 font-medium">💬 小孩：</span>
+                      {t.submissionNote}
+                    </div>
                   )}
-                  <div className="flex gap-1">
-                    <Button
-                      size="sm"
-                      onClick={() => approveTaskMutation.mutate(t.id)}
-                      disabled={approveTaskMutation.isPending}
-                      className="bg-green-600 hover:bg-green-700"
-                    >
-                      <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
-                      確認
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => rejectTaskMutation.mutate(t.id)}
-                      disabled={rejectTaskMutation.isPending}
-                    >
-                      <XCircle className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
                 </div>
               )
             })}

@@ -88,6 +88,8 @@ interface Task {
   status: "pending" | "submitted" | "approved" | "rejected"
   proofImageUrl?: string | null
   proposedByKid?: boolean
+  submissionNote?: string | null
+  parentFeedback?: string | null
 }
 
 interface Goal {
@@ -345,9 +347,10 @@ function KidDashboard({
   }
 
   const submitMut = useMutation({
-    mutationFn: (vars: { taskId: number; proofImageUrl?: string }) =>
+    mutationFn: (vars: { taskId: number; proofImageUrl?: string; submissionNote?: string }) =>
       apiRequest("POST", `/api/family/tasks/${vars.taskId}/submit`, {
         proofImageUrl: vars.proofImageUrl,
+        submissionNote: vars.submissionNote,
       }),
     onSuccess: () => {
       toast({ title: "✅ 已標完成、等大人確認" })
@@ -416,6 +419,10 @@ function KidDashboard({
   const pendingTasks = tasks.filter((t) => t.status === "pending")
   const activeGoals = goals.filter((g) => g.status === "active")
   const recentApprovedCount = tasks.filter((t) => t.status === "approved").length
+  // 家長有寫回饋的最近 3 筆（approved 或 rejected）
+  const recentFeedback = tasks
+    .filter((t) => t.parentFeedback && (t.status === "approved" || t.status === "rejected"))
+    .slice(0, 3)
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-indigo-50 to-pink-50 p-3 sm:p-6 pb-20">
@@ -554,7 +561,14 @@ function KidDashboard({
                 <Button
                   size="sm"
                   className="bg-green-600 hover:bg-green-700"
-                  onClick={() => submitMut.mutate({ taskId: t.id })}
+                  onClick={() => {
+                    // 輕量 prompt：可寫描述（跳過直接送）
+                    const note = window.prompt("跟大人說你做了什麼？（可跳過）", "")
+                    submitMut.mutate({
+                      taskId: t.id,
+                      submissionNote: note?.trim() || undefined,
+                    })
+                  }}
                   disabled={submitMut.isPending}
                 >
                   <CheckCircle2 className="h-4 w-4 mr-1" />
@@ -565,6 +579,43 @@ function KidDashboard({
           </div>
         )}
       </div>
+
+      {/* 家長最近回饋（有寫才顯示）*/}
+      {recentFeedback.length > 0 && (
+        <div className="mb-4">
+          <h2 className="font-bold mb-2 flex items-center gap-2">
+            <span className="text-amber-500">💬</span>
+            大人的話
+          </h2>
+          <div className="space-y-2">
+            {recentFeedback.map((t) => (
+              <div
+                key={t.id}
+                className={`rounded-lg p-3 text-sm border ${
+                  t.status === "approved"
+                    ? "bg-green-50 border-green-200"
+                    : "bg-orange-50 border-orange-200"
+                }`}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-base">{t.emoji ?? "📋"}</span>
+                  <span className="font-medium">{t.title}</span>
+                  <span
+                    className={`text-xs px-1.5 py-0.5 rounded ${
+                      t.status === "approved"
+                        ? "bg-green-100 text-green-700"
+                        : "bg-orange-100 text-orange-700"
+                    }`}
+                  >
+                    {t.status === "approved" ? "✅ 通過" : "🙅 駁回"}
+                  </span>
+                </div>
+                <div className="text-gray-700">「{t.parentFeedback}」</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* 存錢目標 */}
       <div className="mb-4">

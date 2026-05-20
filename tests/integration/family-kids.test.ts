@@ -785,6 +785,46 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(bad.status).toBe(400)
   })
 
+  it("親子文字交流：submit submissionNote + approve parentFeedback 雙向紀錄", async () => {
+    await createKid()
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId, title: "洗碗", rewardAmount: 30 })
+
+    // 小孩 submit 時加描述
+    const note = "我洗了 5 個碗、還順便擦了流理台"
+    const sres = await request(app)
+      .post(`/api/family/tasks/${t.body.id}/submit`)
+      .send({ submissionNote: note })
+    expect(sres.status).toBe(200)
+    expect(sres.body.submissionNote).toBe(note)
+
+    // 家長 approve 時回饋
+    const feedback = "做得超棒！👍 媽媽很欣慰"
+    const ares = await request(app)
+      .post(`/api/family/tasks/${t.body.id}/approve`)
+      .send({ parentFeedback: feedback })
+    expect(ares.status).toBe(200)
+    expect(ares.body.task.parentFeedback).toBe(feedback)
+    expect(ares.body.task.submissionNote).toBe(note)
+  })
+
+  it("reject 時也可附 parentFeedback", async () => {
+    await createKid()
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId, title: "倒垃圾", rewardAmount: 20 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`)
+
+    const feedback = "垃圾分類沒分好、請重新整理"
+    const rres = await request(app)
+      .post(`/api/family/tasks/${t.body.id}/reject`)
+      .send({ parentFeedback: feedback })
+    expect(rres.status).toBe(200)
+    expect(rres.body.parentFeedback).toBe(feedback)
+    expect(rres.body.status).toBe("rejected")
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)
