@@ -213,6 +213,37 @@ router.post(
   })
 )
 
+/**
+ * 家長 PIN 驗證
+ * env FAMILY_PARENT_PIN 設定家長 PIN（4-8 位）、未設 = 關閉功能 (enabled=false)
+ * 驗證成功小孩端 sessionStorage 記住 30 分鐘
+ */
+router.get(
+  "/api/family/parent-pin/status",
+  asyncHandler(async (_req, res) => {
+    const pin = process.env.FAMILY_PARENT_PIN ?? ""
+    res.json({ enabled: pin.length >= 4 })
+  })
+)
+
+router.post(
+  "/api/family/parent-pin/verify",
+  asyncHandler(async (req, res) => {
+    const expected = process.env.FAMILY_PARENT_PIN ?? ""
+    if (expected.length < 4) {
+      // 未設定 PIN → 視為通過（向後相容、不阻斷既有流程）
+      res.json({ ok: true, enabled: false })
+      return
+    }
+    const pin = String(req.body?.pin ?? "")
+    if (pin === expected) {
+      res.json({ ok: true, enabled: true })
+    } else {
+      throw new AppError(401, "家長 PIN 不正確")
+    }
+  })
+)
+
 // ============================================================
 // 任務範本（內建、不存 DB）
 // ============================================================

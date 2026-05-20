@@ -652,6 +652,34 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(found.proofImageUrl).toBe(proofUrl)
   })
 
+  it("家長 PIN：未設 env 時 status.enabled=false、verify 通過", async () => {
+    delete process.env.FAMILY_PARENT_PIN
+    const status = await request(app).get("/api/family/parent-pin/status")
+    expect(status.body.enabled).toBe(false)
+    const verify = await request(app).post("/api/family/parent-pin/verify").send({ pin: "" })
+    expect(verify.status).toBe(200)
+    expect(verify.body.ok).toBe(true)
+    expect(verify.body.enabled).toBe(false)
+  })
+
+  it("家長 PIN：env 設定後、錯誤 PIN 401、正確 PIN 通過", async () => {
+    process.env.FAMILY_PARENT_PIN = "8888"
+    try {
+      const status = await request(app).get("/api/family/parent-pin/status")
+      expect(status.body.enabled).toBe(true)
+
+      const wrong = await request(app).post("/api/family/parent-pin/verify").send({ pin: "0000" })
+      expect(wrong.status).toBe(401)
+
+      const right = await request(app).post("/api/family/parent-pin/verify").send({ pin: "8888" })
+      expect(right.status).toBe(200)
+      expect(right.body.ok).toBe(true)
+      expect(right.body.enabled).toBe(true)
+    } finally {
+      delete process.env.FAMILY_PARENT_PIN
+    }
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)

@@ -46,6 +46,7 @@ import {
   ExternalLink,
   Zap,
   Trophy,
+  Lock,
 } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { useToast } from "@/hooks/use-toast"
@@ -125,6 +126,17 @@ function formatMoney(v: string | number) {
   return "$" + Math.round(n).toLocaleString()
 }
 
+// 家長 PIN：sessionStorage 記憶 30 分鐘
+const PIN_KEY = "family.parentPin.verifiedAt"
+const PIN_TTL_MS = 30 * 60 * 1000
+function isPinVerified(): boolean {
+  const ts = parseInt(sessionStorage.getItem(PIN_KEY) || "0", 10)
+  return ts > 0 && Date.now() - ts < PIN_TTL_MS
+}
+function setPinVerified() {
+  sessionStorage.setItem(PIN_KEY, String(Date.now()))
+}
+
 export default function FamilyPage() {
   useDocumentTitle("家庭記帳")
   const { toast } = useToast()
@@ -132,6 +144,21 @@ export default function FamilyPage() {
   const [editKid, setEditKid] = useState<Kid | null>(null)
   const [showAddTask, setShowAddTask] = useState(false)
   const [showBatchTask, setShowBatchTask] = useState(false)
+  const [pinPrompt, setPinPrompt] = useState<null | (() => void)>(null)
+
+  const { data: pinStatus } = useQuery<{ enabled: boolean }>({
+    queryKey: ["/api/family/parent-pin/status"],
+    staleTime: 5 * 60 * 1000,
+  })
+
+  // 包裝危險動作：若 PIN 啟用且未驗證 → 彈出 modal、否則直接執行
+  const requirePin = (action: () => void) => {
+    if (!pinStatus?.enabled || isPinVerified()) {
+      action()
+    } else {
+      setPinPrompt(() => action)
+    }
+  }
 
   const { data: dashboard } = useQuery<FamilyDashboard>({
     queryKey: ["/api/family/dashboard"],
@@ -386,12 +413,14 @@ export default function FamilyPage() {
                 <KidCard
                   key={kid.id}
                   kid={kid}
-                  onEdit={() => setEditKid(kid)}
-                  onDelete={() => {
-                    if (confirm(`停用 ${kid.displayName}？（資料保留、可重新啟用）`)) {
-                      deleteKidMutation.mutate(kid.id)
-                    }
-                  }}
+                  onEdit={() => requirePin(() => setEditKid(kid))}
+                  onDelete={() =>
+                    requirePin(() => {
+                      if (confirm(`停用 ${kid.displayName}？（資料保留、可重新啟用）`)) {
+                        deleteKidMutation.mutate(kid.id)
+                      }
+                    })
+                  }
                 />
               ))}
             </div>
@@ -486,9 +515,11 @@ export default function FamilyPage() {
                   <TaskStatusBadge status={t.status} />
                   <button
                     type="button"
-                    onClick={() => {
-                      if (confirm("刪除此任務？")) deleteTaskMutation.mutate(t.id)
-                    }}
+                    onClick={() =>
+                      requirePin(() => {
+                        if (confirm("刪除此任務？")) deleteTaskMutation.mutate(t.id)
+                      })
+                    }
                     className="text-red-500 hover:bg-red-50 rounded p-1"
                   >
                     <Trash2 className="h-3 w-3" />
@@ -540,6 +571,17 @@ export default function FamilyPage() {
           onSuccess={() => {
             invalidateAll()
             setShowBatchTask(false)
+          }}
+        />
+      )}
+
+      {pinPrompt && (
+        <ParentPinDialog
+          onClose={() => setPinPrompt(null)}
+          onSuccess={() => {
+            const action = pinPrompt
+            setPinPrompt(null)
+            action()
           }}
         />
       )}
@@ -941,6 +983,57 @@ interface Template {
   title: string
   emoji: string
   rewardAmount: number
+}
+
+function ParentPinDialog({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
+  const { toast } = useToast()
+  const [pin, setPin] = useState("")
+  const mut = useMutation({
+    mutationFn: () => apiRequest<{ ok: boolean }>("POST", "/api/family/parent-pin/verify", { pin }),
+    onSuccess: (r) => {
+      if (r.ok) {
+        setPinVerified()
+        onSuccess()
+      }
+    },
+    onError: (e: Error) => {
+      toast({ title: "PIN 不正確", description: e.message, variant: "destructive" })
+      setPin("")
+    },
+  })
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent className="w-[95vw] max-w-xs">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Lock className="h-5 w-5" />
+            家長 PIN
+          </DialogTitle>
+          <DialogDescription>需家長驗證才能執行此動作（30 分鐘有效）</DialogDescription>
+        </DialogHeader>
+        <Input
+          type="password"
+          inputMode="numeric"
+          value={pin}
+          onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 8))}
+          placeholder="4-8 位數字"
+          autoFocus
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && pin.length >= 4) mut.mutate()
+          }}
+        />
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            取消
+          </Button>
+          <Button onClick={() => mut.mutate()} disabled={pin.length < 4 || mut.isPending}>
+            <CheckCircle2 className="h-4 w-4 mr-1" />
+            驗證
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
 }
 
 function BatchTaskDialog({
