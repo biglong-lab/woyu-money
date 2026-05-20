@@ -1697,6 +1697,23 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(bad.status).toBe(400)
   })
 
+  it("家庭心情軌跡：聚合全家 + avgScore", async () => {
+    await createKid()
+    await request(app).post("/api/family/checkins").send({ kidId, mood: "😄 開心" })
+    const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10)
+    await db.execute(
+      sql`INSERT INTO kids_checkins (kid_id, mood, checkin_date) VALUES (${kidId}, '🙂 還好', ${yesterday}::date)`
+    )
+
+    const res = await request(app).get("/api/family/mood-trends?days=30")
+    expect(res.status).toBe(200)
+    const me = res.body.series.find((s: { kidId: number }) => s.kidId === kidId)
+    expect(me).toBeTruthy()
+    expect(me.count).toBeGreaterThanOrEqual(2)
+    // 開心=5、還好=4 → avg=4.5
+    expect(me.avgScore).toBe(4.5)
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)

@@ -2815,6 +2815,65 @@ router.post(
 )
 
 /**
+ * GET /api/family/mood-trends?days=30
+ * 全家所有 active 小孩近 N 天心情軌跡、家長看每個孩子情緒
+ * Response: { days, series: [{ kidId, displayName, avatar, checkins: [{ date, mood }] }] }
+ */
+router.get(
+  "/api/family/mood-trends",
+  asyncHandler(async (req, res) => {
+    const days = Math.min(Math.max(parseInt((req.query.days as string) || "30", 10), 7), 90)
+    const sinceDate = new Date(Date.now() - days * 86400000).toISOString().slice(0, 10)
+
+    const kids = await db.select().from(kidsAccounts).where(eq(kidsAccounts.isActive, true))
+    if (kids.length === 0) {
+      res.json({ days, series: [] })
+      return
+    }
+
+    const rows = await db.execute(sql`
+      SELECT kid_id, mood, checkin_date::text AS checkin_date
+      FROM kids_checkins
+      WHERE checkin_date >= ${sinceDate}
+      ORDER BY checkin_date ASC
+    `)
+    const data = (
+      rows as unknown as { rows: Array<{ kid_id: number; mood: string; checkin_date: string }> }
+    ).rows
+    const byKid = new Map<number, Array<{ date: string; mood: string }>>()
+    data.forEach((r) => {
+      if (!byKid.has(r.kid_id)) byKid.set(r.kid_id, [])
+      byKid.get(r.kid_id)!.push({ date: r.checkin_date, mood: r.mood })
+    })
+
+    // mood 分數對應（給趨勢圖 numeric）
+    const MOOD_SCORE: Record<string, number> = {
+      "😄 開心": 5,
+      "🙂 還好": 4,
+      "😐 普通": 3,
+      "😢 難過": 2,
+      "😡 生氣": 1,
+    }
+
+    const series = kids.map((k) => {
+      const checkins = byKid.get(k.id) ?? []
+      const totalScore = checkins.reduce((s, c) => s + (MOOD_SCORE[c.mood] ?? 3), 0)
+      const avgScore = checkins.length > 0 ? totalScore / checkins.length : 0
+      return {
+        kidId: k.id,
+        displayName: k.displayName,
+        avatar: k.avatar,
+        color: k.color,
+        checkins,
+        avgScore: Math.round(avgScore * 10) / 10,
+        count: checkins.length,
+      }
+    })
+    res.json({ days, series })
+  })
+)
+
+/**
  * 小孩每日心情簽到
  *   POST /api/family/checkins                  寫今日心情（同日 upsert）
  *   GET  /api/family/checkins?kidId=&days=30   查近 N 天心情軌跡

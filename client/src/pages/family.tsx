@@ -393,6 +393,9 @@ export default function FamilyPage() {
       {/* 任務難度智能建議 */}
       <DifficultyInsights />
 
+      {/* 家庭心情軌跡 */}
+      <MoodTrends />
+
       {/* 捐贈對象目錄 */}
       <RecipientsManager />
 
@@ -1110,6 +1113,71 @@ function FamilyYearSummary() {
           )}
         </CardContent>
       )}
+    </Card>
+  )
+}
+
+function MoodTrends() {
+  interface Series {
+    kidId: number
+    displayName: string
+    avatar: string
+    color: string
+    checkins: Array<{ date: string; mood: string }>
+    avgScore: number
+    count: number
+  }
+  const { data } = useQuery<{ days: number; series: Series[] }>({
+    queryKey: ["/api/family/mood-trends?days=14"],
+    staleTime: 60_000,
+  })
+  if (!data || data.series.length === 0) return null
+  const hasAnyCheckin = data.series.some((s) => s.count > 0)
+  if (!hasAnyCheckin) return null
+
+  return (
+    <Card className="border-sky-200 bg-gradient-to-br from-sky-50 to-violet-50">
+      <CardHeader className="py-3 px-3 sm:px-4">
+        <CardTitle className="text-base flex items-center gap-2">
+          <span className="text-xl">💭</span>
+          家庭心情軌跡
+        </CardTitle>
+        <CardDescription>近 {data.days} 天小孩心情、關心情緒變化</CardDescription>
+      </CardHeader>
+      <CardContent className="py-2 px-3 sm:px-4 space-y-2">
+        {data.series
+          .filter((s) => s.count > 0)
+          .map((s) => {
+            const moodLabel =
+              s.avgScore >= 4.5
+                ? "很好 🌞"
+                : s.avgScore >= 3.5
+                  ? "不錯 🙂"
+                  : s.avgScore >= 2.5
+                    ? "普通 😐"
+                    : s.avgScore >= 1.5
+                      ? "不太好 😢"
+                      : "需要關心 ❤️"
+            return (
+              <div key={s.kidId} className="bg-white rounded p-2 border border-sky-200">
+                <div className="flex items-center gap-2 mb-1.5">
+                  <span className="text-xl">{s.avatar}</span>
+                  <span className="font-medium text-sm flex-1">{s.displayName}</span>
+                  <span className="text-xs text-sky-700 font-medium">
+                    {moodLabel}（{s.count} 天）
+                  </span>
+                </div>
+                <div className="flex gap-0.5 items-center">
+                  {s.checkins.slice(-14).map((c, i) => (
+                    <span key={i} className="text-base" title={`${c.date}：${c.mood}`}>
+                      {c.mood.slice(0, 2)}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )
+          })}
+      </CardContent>
     </Card>
   )
 }
