@@ -102,6 +102,8 @@ export const kidsTasks = pgTable(
     recurringParentId: integer("recurring_parent_id"),
     // 小孩 submit 時可附上照片證明（URL）
     proofImageUrl: varchar("proof_image_url", { length: 500 }),
+    // 小孩自提任務（家長 approve 才入帳）培養主動性
+    proposedByKid: boolean("proposed_by_kid").notNull().default(false),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },

@@ -750,6 +750,23 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     }
   })
 
+  it("小孩自提任務：propose endpoint + proposedByKid=true", async () => {
+    await createKid()
+    const res = await request(app).post("/api/family/tasks/propose").send({
+      kidId,
+      title: "幫忙澆花",
+      emoji: "🌱",
+      rewardAmount: 25,
+    })
+    expect(res.status).toBe(201)
+    expect(res.body.proposedByKid).toBe(true)
+    expect(res.body.status).toBe("pending")
+
+    const list = await request(app).get(`/api/family/tasks?kidId=${kidId}`)
+    const found = list.body.find((x: { id: number }) => x.id === res.body.id)
+    expect(found.proposedByKid).toBe(true)
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)

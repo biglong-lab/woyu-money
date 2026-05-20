@@ -376,6 +376,7 @@ router.get(
         approvedAt: kidsTasks.approvedAt,
         paymentRecordId: kidsTasks.paymentRecordId,
         proofImageUrl: kidsTasks.proofImageUrl,
+        proposedByKid: kidsTasks.proposedByKid,
         createdAt: kidsTasks.createdAt,
       })
       .from(kidsTasks)
@@ -418,6 +419,32 @@ router.post(
         "資料格式錯誤：" + parsed.error.errors.map((e) => e.message).join(", ")
       )
     }
+    const [created] = await db.insert(kidsTasks).values(parsed.data).returning()
+    res.status(201).json(created)
+  })
+)
+
+/**
+ * POST /api/family/tasks/propose
+ * 小孩自提任務（家長 approve 才入帳）
+ * Body: { kidId, title, emoji?, rewardAmount, notes? }
+ * 設 proposedByKid=true、status=pending
+ */
+router.post(
+  "/api/family/tasks/propose",
+  asyncHandler(async (req, res) => {
+    const parsed = insertKidsTaskSchema.safeParse({
+      ...req.body,
+      status: "pending",
+      proposedByKid: true,
+    })
+    if (!parsed.success) {
+      throw new AppError(
+        400,
+        "資料格式錯誤：" + parsed.error.errors.map((e) => e.message).join(", ")
+      )
+    }
+    if (!parsed.data.kidId) throw new AppError(400, "需指定 kidId")
     const [created] = await db.insert(kidsTasks).values(parsed.data).returning()
     res.status(201).json(created)
   })

@@ -77,6 +77,7 @@ interface Task {
   isOverdue?: boolean
   overdueDays?: number
   proofImageUrl?: string | null
+  proposedByKid?: boolean
 }
 
 interface Jar {
@@ -497,7 +498,14 @@ export default function FamilyPage() {
                 >
                   <span className="text-lg">{t.emoji ?? "📋"}</span>
                   <div className="flex-1 min-w-0">
-                    <div className="truncate">{t.title}</div>
+                    <div className="truncate">
+                      {t.title}
+                      {t.proposedByKid && (
+                        <span className="ml-1 text-[10px] text-purple-700 bg-purple-100 rounded px-1 py-0.5">
+                          ✋ 自提
+                        </span>
+                      )}
+                    </div>
                     {t.dueDate && (
                       <div
                         className={`text-[10px] ${

@@ -87,6 +87,7 @@ interface Task {
   rewardAmount: string
   status: "pending" | "submitted" | "approved" | "rejected"
   proofImageUrl?: string | null
+  proposedByKid?: boolean
 }
 
 interface Goal {
@@ -334,6 +335,7 @@ function KidDashboard({
     queryKey: [`/api/family/jars-trend?kidId=${kidId}&days=30`],
   })
   const [showSpend, setShowSpend] = useState(false)
+  const [showPropose, setShowPropose] = useState(false)
   const [showReport, setShowReport] = useState(false)
 
   const invalidate = () => {
@@ -473,14 +475,20 @@ function KidDashboard({
         />
       </div>
 
-      {/* 「我花錢了」大按鈕（手機優先、單手可達）*/}
-      <div className="mb-4">
+      {/* 兩個大按鈕：花錢 + 主動提任務 */}
+      <div className="mb-4 grid grid-cols-2 gap-2">
         <Button
           onClick={() => setShowSpend(true)}
-          className="w-full h-14 text-base bg-gradient-to-r from-amber-500 to-pink-500 hover:from-amber-600 hover:to-pink-600 shadow-lg"
+          className="h-14 text-sm bg-gradient-to-r from-amber-500 to-pink-500 hover:from-amber-600 hover:to-pink-600 shadow-lg"
         >
-          <ShoppingBag className="h-5 w-5 mr-2" />
-          我花錢了 💸 記一筆
+          <ShoppingBag className="h-5 w-5 mr-1" />
+          💸 我花錢了
+        </Button>
+        <Button
+          onClick={() => setShowPropose(true)}
+          className="h-14 text-sm bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 shadow-lg"
+        >
+          <Sparkles className="h-5 w-5 mr-1" />✋ 我想做家事
         </Button>
       </div>
 
@@ -896,6 +904,18 @@ function KidDashboard({
           }}
         />
       )}
+
+      {showPropose && (
+        <ProposeTaskDialog
+          kidId={kidId}
+          onClose={() => setShowPropose(false)}
+          onSuccess={() => {
+            invalidate()
+            setShowPropose(false)
+          }}
+          toast={toast}
+        />
+      )}
     </div>
   )
 }
@@ -922,6 +942,121 @@ function JarCard({
       <div className={`text-lg sm:text-xl font-bold ${text}`}>{formatMoney(balance)}</div>
       <div className="text-[10px] text-gray-500">收入 {ratio}% 進這罐</div>
     </motion.div>
+  )
+}
+
+const PROPOSE_EMOJI = ["🧹", "🍽️", "🛏️", "📚", "🐕", "👕", "🛒", "🌱", "♻️", "💡", "🎵", "📖"]
+
+function ProposeTaskDialog({
+  kidId,
+  onClose,
+  onSuccess,
+  toast,
+}: {
+  kidId: number
+  onClose: () => void
+  onSuccess: () => void
+  toast: (opts: {
+    title: string
+    description?: string
+    variant?: "default" | "destructive"
+  }) => void
+}) {
+  const [title, setTitle] = useState("")
+  const [emoji, setEmoji] = useState("🧹")
+  const [rewardAmount, setRewardAmount] = useState("30")
+  const [notes, setNotes] = useState("")
+
+  const mut = useMutation({
+    mutationFn: () =>
+      apiRequest("POST", "/api/family/tasks/propose", {
+        kidId,
+        title: title.trim(),
+        emoji,
+        rewardAmount: parseFloat(rewardAmount),
+        notes: notes.trim() || null,
+      }),
+    onSuccess: () => {
+      toast({ title: "✋ 已提出、等大人同意" })
+      confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 } })
+      vibrate(50)
+      onSuccess()
+    },
+    onError: (e: Error) => toast({ title: "失敗", description: e.message, variant: "destructive" }),
+  })
+
+  const canSubmit = title.trim() && parseFloat(rewardAmount) > 0
+
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent className="w-[95vw] max-w-sm">
+        <DialogHeader>
+          <DialogTitle>✋ 我想做家事</DialogTitle>
+          <DialogDescription>
+            主動提出想做的家事、大人同意後可以做、做完可以拿到獎勵
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3 text-sm">
+          <div>
+            <Label>想做什麼？</Label>
+            <Input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="例：幫忙摺衣服 / 澆花"
+            />
+          </div>
+          <div>
+            <Label>圖示</Label>
+            <div className="grid grid-cols-6 gap-1 mt-1">
+              {PROPOSE_EMOJI.map((e) => (
+                <button
+                  key={e}
+                  type="button"
+                  onClick={() => setEmoji(e)}
+                  className={`text-xl p-1 rounded ${
+                    emoji === e ? "bg-purple-100 ring-2 ring-purple-500" : "hover:bg-gray-100"
+                  }`}
+                >
+                  {e}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <Label>建議獎勵</Label>
+            <Input
+              type="number"
+              value={rewardAmount}
+              onChange={(e) => setRewardAmount(e.target.value)}
+              placeholder="30"
+              inputMode="numeric"
+            />
+            <p className="text-[10px] text-gray-400 mt-0.5">最終金額由大人決定喔</p>
+          </div>
+          <div>
+            <Label>說明（選填）</Label>
+            <Input
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="（為什麼想做？）"
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            取消
+          </Button>
+          <Button
+            onClick={() => mut.mutate()}
+            disabled={!canSubmit || mut.isPending}
+            className="bg-purple-600 hover:bg-purple-700"
+          >
+            <Sparkles className="h-4 w-4 mr-1" />
+            提交
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 
