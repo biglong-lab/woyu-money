@@ -1346,7 +1346,7 @@ function BatchTaskDialog({
   onSuccess: () => void
 }) {
   const { toast } = useToast()
-  const [activeTab, setActiveTab] = useState<"daily" | "seasonal">("daily")
+  const [activeTab, setActiveTab] = useState<"daily" | "seasonal" | "custom">("daily")
   const { data: templates = [] } = useQuery<Template[]>({
     queryKey: ["/api/family/task-templates"],
   })
@@ -1359,7 +1359,49 @@ function BatchTaskDialog({
   }>({
     queryKey: [`/api/family/task-templates/seasonal?month=${currentMonth}`],
   })
-  const displayTemplates = activeTab === "seasonal" ? (seasonal?.tasks ?? []) : templates
+  // 家長自訂範本
+  interface CustomTpl {
+    id: number
+    title: string
+    emoji: string | null
+    defaultReward: string
+    defaultDifficulty: string
+  }
+  const { data: customTpls = [] } = useQuery<CustomTpl[]>({
+    queryKey: ["/api/family/custom-templates"],
+  })
+  const customAsTemplates: Template[] = customTpls.map((c) => ({
+    title: c.title,
+    emoji: c.emoji ?? "📋",
+    rewardAmount: parseFloat(c.defaultReward),
+  }))
+  const deleteCustomMut = useMutation({
+    mutationFn: (id: number) => apiRequest("DELETE", `/api/family/custom-templates/${id}`),
+    onSuccess: () => {
+      toast({ title: "已刪除自訂範本" })
+      queryClient.invalidateQueries({ queryKey: ["/api/family/custom-templates"] })
+    },
+  })
+  const addCustomMut = useMutation({
+    mutationFn: (vars: { title: string; emoji: string; reward: number }) =>
+      apiRequest("POST", "/api/family/custom-templates", {
+        title: vars.title,
+        emoji: vars.emoji,
+        defaultReward: vars.reward,
+      }),
+    onSuccess: () => {
+      toast({ title: "✅ 已加入自訂範本" })
+      queryClient.invalidateQueries({ queryKey: ["/api/family/custom-templates"] })
+    },
+    onError: (e: Error) => toast({ title: "失敗", description: e.message, variant: "destructive" }),
+  })
+
+  const displayTemplates =
+    activeTab === "seasonal"
+      ? (seasonal?.tasks ?? [])
+      : activeTab === "custom"
+        ? customAsTemplates
+        : templates
   const [selectedTpls, setSelectedTpls] = useState<Set<string>>(new Set())
   const [selectedKids, setSelectedKids] = useState<Set<number>>(new Set(kids.map((k) => k.id)))
 
@@ -1435,7 +1477,46 @@ function BatchTaskDialog({
               >
                 {seasonal?.emoji ?? "🎉"} 節慶
               </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab("custom")
+                  setSelectedTpls(new Set())
+                }}
+                className={`flex-1 py-1.5 rounded text-sm font-medium border-2 ${
+                  activeTab === "custom" ? "border-rose-500 bg-rose-50" : "border-gray-200"
+                }`}
+              >
+                💖 自訂
+              </button>
             </div>
+            {activeTab === "custom" && (
+              <div className="mb-2 bg-rose-50 border border-rose-200 rounded p-2 space-y-1">
+                <div className="text-[11px] text-rose-700">
+                  我家常用任務、點下方加入收藏（最常用的擺前面）
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="w-full h-7 text-xs"
+                  onClick={() => {
+                    const title = window.prompt("自訂任務名稱（如「掃地」）：", "")
+                    if (!title?.trim()) return
+                    const emoji = window.prompt("圖示 emoji（如 🧹）：", "📋") || "📋"
+                    const r = window.prompt("預設獎勵金額：", "20")
+                    const reward = parseFloat(r ?? "0")
+                    if (!(reward > 0)) {
+                      toast({ title: "請輸入有效金額", variant: "destructive" })
+                      return
+                    }
+                    addCustomMut.mutate({ title: title.trim(), emoji, reward })
+                  }}
+                >
+                  ➕ 新增自訂範本
+                </Button>
+              </div>
+            )}
             {activeTab === "seasonal" && seasonal && (
               <div className="text-xs bg-amber-50 border border-amber-200 rounded px-2 py-1.5 mb-2">
                 <b>
@@ -1447,27 +1528,54 @@ function BatchTaskDialog({
             <Label className="font-bold">選任務範本（複選）</Label>
             <div className="space-y-1 mt-1 max-h-64 overflow-y-auto">
               {displayTemplates.length === 0 ? (
-                <div className="text-center text-sm text-gray-400 py-3">本月無節慶任務</div>
+                <div className="text-center text-sm text-gray-400 py-3">
+                  {activeTab === "custom"
+                    ? "還沒有自訂範本、點上方「新增自訂範本」開始"
+                    : "本月無節慶任務"}
+                </div>
               ) : (
-                displayTemplates.map((t) => (
-                  <button
-                    key={t.title}
-                    type="button"
-                    onClick={() => toggleTpl(t.title)}
-                    className={`w-full text-left flex items-center gap-2 p-2 rounded border ${
-                      selectedTpls.has(t.title)
-                        ? "border-indigo-500 bg-indigo-50"
-                        : "border-gray-200"
-                    }`}
-                  >
-                    <span className="text-xl">{t.emoji}</span>
-                    <span className="flex-1">{t.title}</span>
-                    <span className="text-xs font-mono text-gray-500">${t.rewardAmount}</span>
-                    {selectedTpls.has(t.title) && (
-                      <CheckCircle2 className="h-4 w-4 text-indigo-600" />
-                    )}
-                  </button>
-                ))
+                displayTemplates.map((t) => {
+                  // 自訂 tab 找對應 id（刪除用）
+                  const customMatch =
+                    activeTab === "custom" ? customTpls.find((c) => c.title === t.title) : null
+                  return (
+                    <div
+                      key={t.title}
+                      className={`flex items-center gap-1 ${activeTab === "custom" ? "" : ""}`}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => toggleTpl(t.title)}
+                        className={`flex-1 text-left flex items-center gap-2 p-2 rounded border ${
+                          selectedTpls.has(t.title)
+                            ? "border-indigo-500 bg-indigo-50"
+                            : "border-gray-200"
+                        }`}
+                      >
+                        <span className="text-xl">{t.emoji}</span>
+                        <span className="flex-1">{t.title}</span>
+                        <span className="text-xs font-mono text-gray-500">${t.rewardAmount}</span>
+                        {selectedTpls.has(t.title) && (
+                          <CheckCircle2 className="h-4 w-4 text-indigo-600" />
+                        )}
+                      </button>
+                      {customMatch && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (confirm(`刪除自訂範本「${customMatch.title}」？`)) {
+                              deleteCustomMut.mutate(customMatch.id)
+                            }
+                          }}
+                          className="text-red-400 hover:text-red-600 px-1.5 py-1"
+                          title="刪除自訂範本"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  )
+                })
               )}
             </div>
           </div>

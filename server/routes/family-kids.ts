@@ -35,6 +35,7 @@ import {
   kidsBadges,
   kidsSpendings,
   kidsDailyMessages,
+  familyTaskTemplates,
   insertKidsAccountSchema,
   insertKidsTaskSchema,
   insertKidsGoalSchema,
@@ -1626,6 +1627,66 @@ router.get(
       .where(and(eq(kidsDailyMessages.kidId, kidIdN), eq(kidsDailyMessages.messageDate, date)))
       .limit(1)
     res.json({ kidId: kidIdN, date, message: row ?? null })
+  })
+)
+
+/**
+ * 家長自訂任務範本收藏
+ *   GET    /api/family/custom-templates       列出
+ *   POST   /api/family/custom-templates       新增（title, emoji?, defaultReward, defaultDifficulty?）
+ *   DELETE /api/family/custom-templates/:id   刪除
+ */
+router.get(
+  "/api/family/custom-templates",
+  asyncHandler(async (_req, res) => {
+    const rows = await db
+      .select()
+      .from(familyTaskTemplates)
+      .orderBy(familyTaskTemplates.sortOrder, familyTaskTemplates.id)
+    res.json(rows)
+  })
+)
+
+router.post(
+  "/api/family/custom-templates",
+  asyncHandler(async (req, res) => {
+    const title = String(req.body?.title ?? "").trim()
+    if (!title) throw new AppError(400, "title 必填")
+    if (title.length > 100) throw new AppError(400, "title 過長")
+    const emoji = String(req.body?.emoji ?? "📋").slice(0, 8)
+    const defaultReward = Number(req.body?.defaultReward ?? 0)
+    if (!(defaultReward > 0)) throw new AppError(400, "defaultReward 需為正數")
+    const defaultDifficulty = String(req.body?.defaultDifficulty ?? "medium")
+    if (!["easy", "medium", "hard"].includes(defaultDifficulty)) {
+      throw new AppError(400, "難度需為 easy / medium / hard")
+    }
+    const sortOrder = Number.isInteger(req.body?.sortOrder) ? Number(req.body.sortOrder) : 0
+
+    const [created] = await db
+      .insert(familyTaskTemplates)
+      .values({
+        title,
+        emoji,
+        defaultReward: defaultReward.toFixed(2),
+        defaultDifficulty,
+        sortOrder,
+      })
+      .returning()
+    res.status(201).json(created)
+  })
+)
+
+router.delete(
+  "/api/family/custom-templates/:id",
+  asyncHandler(async (req, res) => {
+    const id = Number(req.params.id)
+    if (!Number.isInteger(id) || id < 1) throw new AppError(400, "無效的 ID")
+    const deleted = await db
+      .delete(familyTaskTemplates)
+      .where(eq(familyTaskTemplates.id, id))
+      .returning({ id: familyTaskTemplates.id })
+    if (deleted.length === 0) throw new AppError(404, "範本不存在")
+    res.json({ ok: true, id })
   })
 )
 

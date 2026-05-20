@@ -200,6 +200,27 @@ export const kidsSpendings = pgTable(
 )
 
 // ============================================================
+// 家長自訂任務範本收藏（每家庭自己的常用任務模板）
+// 跟內建範本 (DAILY_TASK_TEMPLATES / SEASONAL_TASKS) 並存、家長可在 BatchDialog 用
+// ============================================================
+export const familyTaskTemplates = pgTable(
+  "family_task_templates",
+  {
+    id: serial("id").primaryKey(),
+    familyId: integer("family_id").default(1),
+    title: varchar("title", { length: 100 }).notNull(),
+    emoji: varchar("emoji", { length: 8 }).default("📋"),
+    defaultReward: decimal("default_reward", { precision: 8, scale: 2 }).notNull(),
+    defaultDifficulty: varchar("default_difficulty", { length: 8 }).notNull().default("medium"),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => ({
+    familyIdx: index("family_task_templates_family_idx").on(table.familyId),
+  })
+)
+
+// ============================================================
 // 家長每日鼓勵卡（每天最多 1 則 per kid）
 // 培養情感連結、小孩首頁醒目顯示
 // ============================================================
@@ -270,3 +291,4 @@ export type KidsBadge = typeof kidsBadges.$inferSelect
 export type KidsSpending = typeof kidsSpendings.$inferSelect
 export type InsertKidsSpending = z.infer<typeof insertKidsSpendingSchema>
 export type KidsDailyMessage = typeof kidsDailyMessages.$inferSelect
+export type FamilyTaskTemplate = typeof familyTaskTemplates.$inferSelect

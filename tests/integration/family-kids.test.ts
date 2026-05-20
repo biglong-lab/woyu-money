@@ -1115,6 +1115,57 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     })
   })
 
+  it("自訂任務範本：POST 建 / GET 列 / DELETE 刪 + 驗證 difficulty 防呆", async () => {
+    // 建一個
+    const r1 = await request(app).post("/api/family/custom-templates").send({
+      title: "倒垃圾",
+      emoji: "🗑️",
+      defaultReward: 25,
+      defaultDifficulty: "easy",
+    })
+    expect(r1.status).toBe(201)
+    expect(r1.body.title).toBe("倒垃圾")
+    expect(r1.body.emoji).toBe("🗑️")
+    expect(Number(r1.body.defaultReward)).toBe(25)
+    expect(r1.body.defaultDifficulty).toBe("easy")
+    const tplId = r1.body.id
+
+    try {
+      // 列表應含
+      const list = await request(app).get("/api/family/custom-templates")
+      expect(list.status).toBe(200)
+      expect(list.body.find((x: { id: number }) => x.id === tplId)).toBeTruthy()
+
+      // 缺 title 400
+      const bad = await request(app).post("/api/family/custom-templates").send({
+        emoji: "📋",
+        defaultReward: 10,
+      })
+      expect(bad.status).toBe(400)
+
+      // 負值 reward 400
+      const negReward = await request(app)
+        .post("/api/family/custom-templates")
+        .send({ title: "X", defaultReward: -10 })
+      expect(negReward.status).toBe(400)
+
+      // 不合法 difficulty 400
+      const badDiff = await request(app)
+        .post("/api/family/custom-templates")
+        .send({ title: "X", defaultReward: 10, defaultDifficulty: "extreme" })
+      expect(badDiff.status).toBe(400)
+    } finally {
+      // 刪除
+      const del = await request(app).delete(`/api/family/custom-templates/${tplId}`)
+      expect(del.status).toBe(200)
+      expect(del.body.ok).toBe(true)
+
+      // 重複刪 404
+      const del2 = await request(app).delete(`/api/family/custom-templates/${tplId}`)
+      expect(del2.status).toBe(404)
+    }
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)
