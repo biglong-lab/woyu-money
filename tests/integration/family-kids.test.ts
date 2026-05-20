@@ -1590,6 +1590,25 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(nextWeekT.isDueSoon).toBe(false)
   })
 
+  it("難度智能建議：easy 全過 → 建議升 medium", async () => {
+    await createKid()
+    for (let i = 0; i < 5; i++) {
+      const t = await request(app)
+        .post("/api/family/tasks")
+        .send({ kidId, title: `easy${i}`, rewardAmount: 10, difficulty: "easy" })
+      await request(app).post(`/api/family/tasks/${t.body.id}/submit`)
+      await request(app).post(`/api/family/tasks/${t.body.id}/approve`)
+    }
+
+    const res = await request(app).get("/api/family/difficulty-insights")
+    expect(res.status).toBe(200)
+    const me = res.body.insights.find((i: { kidId: number }) => i.kidId === kidId)
+    expect(me).toBeTruthy()
+    expect(me.suggestions.length).toBeGreaterThan(0)
+    expect(me.suggestions.join("|")).toContain("普通")
+    expect(me.breakdown.easy.rate).toBe(100)
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)

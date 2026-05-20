@@ -1875,6 +1875,95 @@ router.get(
 )
 
 /**
+ * GET /api/family/difficulty-insights
+ * 看每個 active 小孩過去 90 天 hard/medium/easy 任務的 approved/rejected 比例
+ * 自動建議升降難度（讓家長知道任務太簡單或太難）
+ */
+router.get(
+  "/api/family/difficulty-insights",
+  asyncHandler(async (_req, res) => {
+    const rows = await db.execute(sql`
+      SELECT
+        k.id AS "kidId",
+        k.display_name AS "displayName",
+        k.avatar,
+        t.difficulty,
+        COUNT(*) FILTER (WHERE t.status = 'approved')::int AS approved_count,
+        COUNT(*) FILTER (WHERE t.status = 'rejected')::int AS rejected_count,
+        COUNT(*)::int AS total_count
+      FROM kids_accounts k
+      LEFT JOIN kids_tasks t ON t.kid_id = k.id
+        AND t.created_at >= (NOW() - INTERVAL '90 days')
+        AND t.status IN ('approved', 'rejected')
+      WHERE k.is_active = true
+      GROUP BY k.id, k.display_name, k.avatar, t.difficulty
+    `)
+
+    type Row = {
+      kidId: number
+      displayName: string
+      avatar: string
+      difficulty: string | null
+      approved_count: number
+      rejected_count: number
+      total_count: number
+    }
+    const data = (rows as unknown as { rows: Row[] }).rows
+
+    const byKid = new Map<
+      number,
+      {
+        kidId: number
+        displayName: string
+        avatar: string
+        breakdown: Record<string, { approved: number; rejected: number; rate: number }>
+      }
+    >()
+    data.forEach((r) => {
+      if (!r.difficulty) return
+      if (!byKid.has(r.kidId)) {
+        byKid.set(r.kidId, {
+          kidId: r.kidId,
+          displayName: r.displayName,
+          avatar: r.avatar,
+          breakdown: {},
+        })
+      }
+      const total = r.total_count || 1
+      byKid.get(r.kidId)!.breakdown[r.difficulty] = {
+        approved: r.approved_count,
+        rejected: r.rejected_count,
+        rate: Math.round((r.approved_count / total) * 100),
+      }
+    })
+
+    const insights = Array.from(byKid.values()).map((k) => {
+      const easy = k.breakdown.easy
+      const medium = k.breakdown.medium
+      const hard = k.breakdown.hard
+      const suggestions: string[] = []
+
+      if (easy && easy.approved + easy.rejected >= 5 && easy.rate >= 90) {
+        suggestions.push("簡單任務通過率高、可挑戰更多 ⭐⭐ 普通難度")
+      }
+      if (medium && medium.approved + medium.rejected >= 5 && medium.rate >= 90) {
+        suggestions.push("普通任務輕鬆完成、可派 ⭐⭐⭐ 挑戰任務")
+      }
+      if (hard && hard.approved + hard.rejected >= 3 && hard.rate < 50) {
+        suggestions.push("挑戰任務通過率低、考慮先給 ⭐⭐ 普通讓他建立信心")
+      }
+      if (!hard && medium && medium.rate >= 80) {
+        suggestions.push("可嘗試派第一個 ⭐⭐⭐ 挑戰任務")
+      }
+
+      return { ...k, suggestions }
+    })
+
+    res.json({ insights: insights.filter((i) => i.suggestions.length > 0) })
+  })
+)
+
+/**
  * POST /api/family/ai-suggest-tasks
  * Body: { ageRange?: string, learningGoal: string, count?: number }
  * 用 Gemini 生成適齡家事任務 + 建議獎勵金額

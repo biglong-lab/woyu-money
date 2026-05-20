@@ -390,6 +390,9 @@ export default function FamilyPage() {
       {/* 家長提醒中心 */}
       <ParentReminders />
 
+      {/* 任務難度智能建議 */}
+      <DifficultyInsights />
+
       {/* 待審核任務 */}
       {pendingTasks.length > 0 && (
         <Card className="border-amber-300 bg-amber-50">
@@ -918,6 +921,67 @@ function TaskStatusBadge({ status }: { status: string }) {
   }
   const s = map[status] ?? { label: status, cls: "bg-gray-100 text-gray-700" }
   return <Badge className={`${s.cls} text-[10px]`}>{s.label}</Badge>
+}
+
+function DifficultyInsights() {
+  interface Insight {
+    kidId: number
+    displayName: string
+    avatar: string
+    breakdown: Record<string, { approved: number; rejected: number; rate: number }>
+    suggestions: string[]
+  }
+  const { data } = useQuery<{ insights: Insight[] }>({
+    queryKey: ["/api/family/difficulty-insights"],
+    staleTime: 5 * 60_000,
+  })
+  if (!data || data.insights.length === 0) return null
+
+  return (
+    <Card className="border-cyan-200 bg-cyan-50">
+      <CardHeader className="py-3 px-3 sm:px-4">
+        <CardTitle className="text-base flex items-center gap-2">
+          <span className="text-xl">🧠</span>
+          難度智能建議
+        </CardTitle>
+        <CardDescription>過去 90 天通過率分析、自動建議調整任務難度</CardDescription>
+      </CardHeader>
+      <CardContent className="py-2 px-3 sm:px-4 space-y-2">
+        {data.insights.map((i) => (
+          <div key={i.kidId} className="bg-white rounded p-2 border border-cyan-200">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-lg">{i.avatar}</span>
+              <span className="font-medium text-sm">{i.displayName}</span>
+              <div className="ml-auto flex gap-1 text-[10px]">
+                {(["easy", "medium", "hard"] as const).map((d) =>
+                  i.breakdown[d] ? (
+                    <span
+                      key={d}
+                      className={`px-1.5 py-0.5 rounded ${
+                        d === "easy"
+                          ? "bg-green-100 text-green-700"
+                          : d === "medium"
+                            ? "bg-amber-100 text-amber-700"
+                            : "bg-rose-100 text-rose-700"
+                      }`}
+                    >
+                      {d === "easy" ? "⭐" : d === "medium" ? "⭐⭐" : "⭐⭐⭐"}{" "}
+                      {i.breakdown[d].rate}%
+                    </span>
+                  ) : null
+                )}
+              </div>
+            </div>
+            {i.suggestions.map((s, idx) => (
+              <div key={idx} className="text-xs text-cyan-700 pl-7 leading-relaxed">
+                💡 {s}
+              </div>
+            ))}
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  )
 }
 
 function ParentReminders() {
