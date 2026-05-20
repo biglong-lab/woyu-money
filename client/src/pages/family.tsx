@@ -411,6 +411,9 @@ export default function FamilyPage() {
       {/* 任務分類分布 */}
       <CategoryStats />
 
+      {/* 任務月曆視圖 */}
+      <TaskCalendar tasks={allTasks} kids={kids} />
+
       {/* 捐贈對象目錄 */}
       <RecipientsManager />
 
@@ -1128,6 +1131,165 @@ function FamilyYearSummary() {
                 </div>
               )}
             </>
+          )}
+        </CardContent>
+      )}
+    </Card>
+  )
+}
+
+function TaskCalendar({ tasks, kids }: { tasks: Task[]; kids: Kid[] }) {
+  const [open, setOpen] = useState(false)
+  const [viewMonth, setViewMonth] = useState(() => {
+    const d = new Date()
+    return { year: d.getFullYear(), month: d.getMonth() }
+  })
+  const [selectedDate, setSelectedDate] = useState<string | null>(null)
+
+  // 只看有 dueDate 的任務
+  const tasksByDate = useMemo(() => {
+    const map = new Map<string, Task[]>()
+    tasks.forEach((t) => {
+      if (!t.dueDate) return
+      const date = String(t.dueDate).slice(0, 10)
+      if (!map.has(date)) map.set(date, [])
+      map.get(date)!.push(t)
+    })
+    return map
+  }, [tasks])
+
+  // 算月曆格子
+  const grid = useMemo(() => {
+    const firstDay = new Date(viewMonth.year, viewMonth.month, 1)
+    const startWeekday = firstDay.getDay() // 0=日
+    const daysInMonth = new Date(viewMonth.year, viewMonth.month + 1, 0).getDate()
+    const cells: Array<{ date: string | null; day: number | null }> = []
+    for (let i = 0; i < startWeekday; i++) cells.push({ date: null, day: null })
+    for (let d = 1; d <= daysInMonth; d++) {
+      const date = `${viewMonth.year}-${String(viewMonth.month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`
+      cells.push({ date, day: d })
+    }
+    return cells
+  }, [viewMonth])
+
+  const monthLabel = `${viewMonth.year}-${String(viewMonth.month + 1).padStart(2, "0")}`
+  const today = new Date().toISOString().slice(0, 10)
+  const totalThisMonth = grid.reduce(
+    (s, c) => s + (c.date ? (tasksByDate.get(c.date)?.length ?? 0) : 0),
+    0
+  )
+
+  const goPrev = () =>
+    setViewMonth((s) => ({
+      year: s.month === 0 ? s.year - 1 : s.year,
+      month: s.month === 0 ? 11 : s.month - 1,
+    }))
+  const goNext = () =>
+    setViewMonth((s) => ({
+      year: s.month === 11 ? s.year + 1 : s.year,
+      month: s.month === 11 ? 0 : s.month + 1,
+    }))
+
+  const selectedTasks = selectedDate ? (tasksByDate.get(selectedDate) ?? []) : []
+
+  if (totalThisMonth === 0 && !open) return null
+
+  return (
+    <Card className="border-violet-200 bg-violet-50">
+      <CardHeader className="py-3 px-3 sm:px-4 cursor-pointer" onClick={() => setOpen((s) => !s)}>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base flex items-center gap-2">
+            <span className="text-xl">📆</span>
+            任務月曆
+          </CardTitle>
+          <span className="text-xs text-violet-700">
+            {open ? "▲" : "▼"} ({totalThisMonth} 個截止)
+          </span>
+        </div>
+        <CardDescription>看哪天小孩要做什麼、避免擠在同一天</CardDescription>
+      </CardHeader>
+      {open && (
+        <CardContent className="py-2 px-3 sm:px-4">
+          <div className="flex items-center justify-between mb-2">
+            <button
+              type="button"
+              onClick={goPrev}
+              className="px-2 py-0.5 text-xs hover:bg-white rounded"
+            >
+              ◀
+            </button>
+            <span className="text-sm font-medium">{monthLabel}</span>
+            <button
+              type="button"
+              onClick={goNext}
+              className="px-2 py-0.5 text-xs hover:bg-white rounded"
+            >
+              ▶
+            </button>
+          </div>
+          <div className="grid grid-cols-7 gap-0.5 text-[10px]">
+            {["日", "一", "二", "三", "四", "五", "六"].map((w) => (
+              <div key={w} className="text-center text-gray-500 font-medium py-1">
+                {w}
+              </div>
+            ))}
+            {grid.map((c, i) => {
+              if (!c.date) return <div key={i} className="aspect-square bg-transparent" />
+              const dayTasks = tasksByDate.get(c.date) ?? []
+              const isToday = c.date === today
+              const isSelected = c.date === selectedDate
+              const hasTask = dayTasks.length > 0
+              return (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => setSelectedDate(isSelected ? null : c.date)}
+                  className={`aspect-square rounded text-xs flex flex-col items-center justify-center transition relative ${
+                    isSelected
+                      ? "bg-violet-500 text-white"
+                      : isToday
+                        ? "bg-violet-200 font-bold"
+                        : hasTask
+                          ? "bg-white hover:bg-violet-100"
+                          : "bg-gray-50 text-gray-400 hover:bg-gray-100"
+                  }`}
+                >
+                  <span>{c.day}</span>
+                  {hasTask && (
+                    <span
+                      className={`text-[8px] leading-none mt-0.5 ${
+                        isSelected ? "text-white" : "text-violet-700"
+                      }`}
+                    >
+                      {dayTasks.length}
+                    </span>
+                  )}
+                </button>
+              )
+            })}
+          </div>
+          {selectedDate && selectedTasks.length > 0 && (
+            <div className="mt-3 pt-2 border-t border-violet-200 space-y-1">
+              <div className="text-xs font-medium text-violet-700">
+                📌 {selectedDate} 的任務（{selectedTasks.length}）
+              </div>
+              {selectedTasks.map((t) => {
+                const kid = kids.find((k) => k.id === t.kidId)
+                return (
+                  <div
+                    key={t.id}
+                    className="bg-white rounded p-2 text-xs flex items-center gap-2 border border-violet-200"
+                  >
+                    <span className="text-base">{t.emoji ?? "📋"}</span>
+                    <span className="flex-1">{t.title}</span>
+                    <span className="text-gray-500">
+                      {kid?.avatar} {kid?.displayName}
+                    </span>
+                    <TaskStatusBadge status={t.status} />
+                  </div>
+                )
+              })}
+            </div>
           )}
         </CardContent>
       )}
