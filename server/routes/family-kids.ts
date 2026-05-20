@@ -404,7 +404,13 @@ router.post(
     if (!kid) throw new AppError(404, "小孩帳戶不存在")
     await ensureJarsRow(kid.id)
 
-    const reward = parseFloat(task.rewardAmount)
+    const baseReward = parseFloat(task.rewardAmount)
+    // 驚喜獎勵：15% 機率觸發 +50% bonus（小孩有期待感、培養正向回饋）
+    // 環境變數 FAMILY_KIDS_NO_BONUS=1 可關閉（測試 / 不想要的人）
+    const bonusEnabled = process.env.FAMILY_KIDS_NO_BONUS !== "1"
+    const surpriseTriggered = bonusEnabled && Math.random() < 0.15
+    const bonusAmount = surpriseTriggered ? Math.round(baseReward * 0.5) : 0
+    const reward = baseReward + bonusAmount
     const spendAdd = (reward * kid.spendRatio) / 100
     const saveAdd = (reward * kid.saveRatio) / 100
     const giveAdd = (reward * kid.giveRatio) / 100
@@ -429,7 +435,9 @@ router.post(
       const [pi] = await db
         .insert(paymentItems)
         .values({
-          itemName: `🎁 ${kid.displayName} 零用金：${task.title}`,
+          itemName: surpriseTriggered
+            ? `🎁✨ ${kid.displayName} 零用金（含驚喜）：${task.title}`
+            : `🎁 ${kid.displayName} 零用金：${task.title}`,
           totalAmount: reward.toFixed(2),
           paidAmount: reward.toFixed(2),
           itemType: "home",
@@ -437,7 +445,12 @@ router.post(
           status: "paid",
           startDate: today,
           source: "manual",
-          notes: `家庭記帳「小孩模式」自動入帳\n小孩：${kid.displayName}（id=${kid.id}）\n任務：${task.title}\n三罐分配：花用 $${spendAdd} / 儲蓄 $${saveAdd} / 捐獻 $${giveAdd}`,
+          notes:
+            `家庭記帳「小孩模式」自動入帳\n小孩：${kid.displayName}（id=${kid.id}）\n任務：${task.title}\n` +
+            (surpriseTriggered
+              ? `基本 $${baseReward} + 驚喜 +$${bonusAmount} = $${reward}\n`
+              : "") +
+            `三罐分配：花用 $${spendAdd} / 儲蓄 $${saveAdd} / 捐獻 $${giveAdd}`,
           tags: "kids,allowance",
         })
         .returning({ id: paymentItems.id })
@@ -478,6 +491,12 @@ router.post(
       task: updated,
       jars: { spendAdd, saveAdd, giveAdd, total: reward },
       newBadges: awarded,
+      bonus: {
+        triggered: surpriseTriggered,
+        baseAmount: baseReward,
+        bonusAmount,
+        totalAmount: reward,
+      },
       mainSystem: {
         paymentItemId: mainPaymentItemId,
         paymentRecordId: mainPaymentRecordId,

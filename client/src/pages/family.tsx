@@ -142,17 +142,38 @@ export default function FamilyPage() {
 
   const approveTaskMutation = useMutation({
     mutationFn: (id: number) =>
-      apiRequest<{ task: Task; jars: { total: number }; newBadges: string[] }>(
-        "POST",
-        `/api/family/tasks/${id}/approve`
-      ),
+      apiRequest<{
+        task: Task
+        jars: { total: number }
+        newBadges: string[]
+        bonus: {
+          triggered: boolean
+          baseAmount: number
+          bonusAmount: number
+          totalAmount: number
+        }
+      }>("POST", `/api/family/tasks/${id}/approve`),
     onSuccess: (r) => {
-      toast({
-        title: `✅ 任務通過、入帳 ${formatMoney(r.jars.total)}`,
-        description:
-          r.newBadges.length > 0 ? `🎉 解鎖徽章：${r.newBadges.join(", ")}` : "已自動三罐分配",
-      })
-      confetti({ particleCount: 60, spread: 70, origin: { y: 0.7 } })
+      const bonus = r.bonus
+      if (bonus?.triggered) {
+        toast({
+          title: `🎁✨ 驚喜獎勵！ ${formatMoney(bonus.baseAmount)} +${formatMoney(bonus.bonusAmount)} = ${formatMoney(bonus.totalAmount)}`,
+          description:
+            r.newBadges.length > 0
+              ? `🎉 解鎖徽章：${r.newBadges.join(", ")}`
+              : "小孩好棒、額外給 +50%",
+        })
+        // 大撒花、震動
+        confetti({ particleCount: 200, spread: 120, origin: { y: 0.5 }, ticks: 300 })
+        setTimeout(() => confetti({ particleCount: 100, spread: 90, origin: { y: 0.7 } }), 250)
+      } else {
+        toast({
+          title: `✅ 任務通過、入帳 ${formatMoney(r.jars.total)}`,
+          description:
+            r.newBadges.length > 0 ? `🎉 解鎖徽章：${r.newBadges.join(", ")}` : "已自動三罐分配",
+        })
+        confetti({ particleCount: 60, spread: 70, origin: { y: 0.7 } })
+      }
       invalidateAll()
     },
     onError: (e: Error) => toast({ title: "失敗", description: e.message, variant: "destructive" }),

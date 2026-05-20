@@ -331,6 +331,39 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(Number(jar2[0].s)).toBe(100)
   })
 
+  it("approve 任務時 bonus 欄位永遠存在（triggered 隨機）", async () => {
+    // 設 env 關 bonus 確保不會 random fail
+    const oldEnv = process.env.FAMILY_KIDS_NO_BONUS
+    process.env.FAMILY_KIDS_NO_BONUS = "1"
+    try {
+      await createKid()
+      const t = await request(app)
+        .post("/api/family/tasks")
+        .send({ kidId, title: "T", rewardAmount: 100 })
+      await request(app).post(`/api/family/tasks/${t.body.id}/submit`)
+      const ares = await request(app).post(`/api/family/tasks/${t.body.id}/approve`)
+      expect(ares.status).toBe(200)
+      expect(ares.body.bonus).toBeTruthy()
+      expect(ares.body.bonus.triggered).toBe(false) // env 強制關
+      expect(ares.body.bonus.baseAmount).toBe(100)
+      expect(ares.body.bonus.bonusAmount).toBe(0)
+      expect(ares.body.bonus.totalAmount).toBe(100)
+
+      // 清主系統測試資料
+      if (ares.body.mainSystem?.paymentItemId) {
+        await db.execute(
+          sql`DELETE FROM payment_records WHERE payment_item_id = ${ares.body.mainSystem.paymentItemId}`
+        )
+        await db.execute(
+          sql`DELETE FROM payment_items WHERE id = ${ares.body.mainSystem.paymentItemId}`
+        )
+      }
+    } finally {
+      if (oldEnv === undefined) delete process.env.FAMILY_KIDS_NO_BONUS
+      else process.env.FAMILY_KIDS_NO_BONUS = oldEnv
+    }
+  })
+
   it("逾期任務自動標 isOverdue + overdueDays + 排前面", async () => {
     await createKid()
     // 建一個 5 天前到期的任務
