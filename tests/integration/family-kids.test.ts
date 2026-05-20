@@ -767,6 +767,24 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(found.proposedByKid).toBe(true)
   })
 
+  it("節慶任務範本：按月份回傳對應節慶 + tasks 陣列", async () => {
+    // 5 月 = 母親節
+    const may = await request(app).get("/api/family/task-templates/seasonal?month=5")
+    expect(may.status).toBe(200)
+    expect(may.body.month).toBe(5)
+    expect(may.body.festival).toContain("母親節")
+    expect(Array.isArray(may.body.tasks)).toBe(true)
+    expect(may.body.tasks.length).toBeGreaterThan(0)
+
+    // 12 月 = 聖誕
+    const dec = await request(app).get("/api/family/task-templates/seasonal?month=12")
+    expect(dec.body.festival).toContain("聖誕")
+
+    // 無效 month
+    const bad = await request(app).get("/api/family/task-templates/seasonal?month=13")
+    expect(bad.status).toBe(400)
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)

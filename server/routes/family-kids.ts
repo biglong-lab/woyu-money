@@ -312,6 +312,137 @@ router.get(
   })
 )
 
+// ============================================================
+// 節慶任務範本（按月份顯示對應節慶）
+// ============================================================
+interface SeasonalTask {
+  title: string
+  emoji: string
+  rewardAmount: number
+}
+const SEASONAL_TASKS: Record<number, { festival: string; emoji: string; tasks: SeasonalTask[] }> = {
+  1: {
+    festival: "新年 / 春節",
+    emoji: "🧧",
+    tasks: [
+      { title: "幫忙大掃除", emoji: "🧹", rewardAmount: 200 },
+      { title: "寫春聯 / 福字", emoji: "🖌️", rewardAmount: 100 },
+      { title: "幫忙包紅包袋", emoji: "🧧", rewardAmount: 50 },
+      { title: "向長輩拜年", emoji: "🙇", rewardAmount: 100 },
+    ],
+  },
+  2: {
+    festival: "元宵 / 情人節",
+    emoji: "🏮",
+    tasks: [
+      { title: "搓元宵 / 包湯圓", emoji: "🍡", rewardAmount: 80 },
+      { title: "做花燈", emoji: "🏮", rewardAmount: 100 },
+      { title: "幫家人寫祝福卡", emoji: "💝", rewardAmount: 50 },
+    ],
+  },
+  3: {
+    festival: "婦女節 / 春耕",
+    emoji: "🌸",
+    tasks: [
+      { title: "幫媽媽做家事", emoji: "🌷", rewardAmount: 100 },
+      { title: "種小盆栽", emoji: "🌱", rewardAmount: 80 },
+    ],
+  },
+  4: {
+    festival: "兒童節 / 清明",
+    emoji: "🌿",
+    tasks: [
+      { title: "清明掃墓幫忙", emoji: "🌿", rewardAmount: 200 },
+      { title: "做潤餅", emoji: "🥬", rewardAmount: 80 },
+    ],
+  },
+  5: {
+    festival: "母親節",
+    emoji: "💐",
+    tasks: [
+      { title: "幫媽媽做早餐", emoji: "🍳", rewardAmount: 100 },
+      { title: "寫感謝卡給媽媽", emoji: "💌", rewardAmount: 80 },
+      { title: "做家事讓媽媽休息", emoji: "🛋️", rewardAmount: 150 },
+      { title: "畫媽媽肖像", emoji: "🎨", rewardAmount: 80 },
+    ],
+  },
+  6: {
+    festival: "端午節",
+    emoji: "🐉",
+    tasks: [
+      { title: "幫忙包粽子", emoji: "🍡", rewardAmount: 100 },
+      { title: "做香包", emoji: "👜", rewardAmount: 80 },
+      { title: "立蛋競賽（成功才有獎）", emoji: "🥚", rewardAmount: 50 },
+    ],
+  },
+  7: {
+    festival: "暑假開始",
+    emoji: "☀️",
+    tasks: [
+      { title: "每天閱讀 30 分鐘", emoji: "📖", rewardAmount: 30 },
+      { title: "幫忙曬棉被", emoji: "☀️", rewardAmount: 50 },
+      { title: "整理玩具箱", emoji: "🧸", rewardAmount: 100 },
+    ],
+  },
+  8: {
+    festival: "七夕 / 父親節",
+    emoji: "👔",
+    tasks: [
+      { title: "做卡片給爸爸", emoji: "💌", rewardAmount: 80 },
+      { title: "幫爸爸按摩 10 分鐘", emoji: "💆", rewardAmount: 50 },
+      { title: "幫爸爸擦皮鞋", emoji: "👞", rewardAmount: 80 },
+    ],
+  },
+  9: {
+    festival: "中秋節",
+    emoji: "🌕",
+    tasks: [
+      { title: "幫忙烤肉準備", emoji: "🍖", rewardAmount: 100 },
+      { title: "幫家人切月餅 / 柚子", emoji: "🥮", rewardAmount: 50 },
+      { title: "教爺爺奶奶用手機賞月", emoji: "📱", rewardAmount: 100 },
+    ],
+  },
+  10: {
+    festival: "雙十國慶 / 萬聖節",
+    emoji: "🎃",
+    tasks: [
+      { title: "做萬聖節裝飾", emoji: "👻", rewardAmount: 80 },
+      { title: "雕南瓜燈", emoji: "🎃", rewardAmount: 150 },
+      { title: "做變裝服裝", emoji: "🧙", rewardAmount: 100 },
+    ],
+  },
+  11: {
+    festival: "感恩節",
+    emoji: "🦃",
+    tasks: [
+      { title: "寫感恩日記一週", emoji: "📓", rewardAmount: 100 },
+      { title: "幫家人按摩感謝", emoji: "💆", rewardAmount: 50 },
+    ],
+  },
+  12: {
+    festival: "聖誕節 / 跨年",
+    emoji: "🎄",
+    tasks: [
+      { title: "佈置聖誕樹", emoji: "🎄", rewardAmount: 150 },
+      { title: "做聖誕卡給朋友", emoji: "🎁", rewardAmount: 80 },
+      { title: "幫忙包聖誕禮物", emoji: "🎀", rewardAmount: 80 },
+      { title: "年末大掃除", emoji: "🧹", rewardAmount: 200 },
+    ],
+  },
+}
+
+router.get(
+  "/api/family/task-templates/seasonal",
+  asyncHandler(async (req, res) => {
+    const monthQ = req.query.month ? Number(req.query.month) : new Date().getMonth() + 1
+    if (!Number.isInteger(monthQ) || monthQ < 1 || monthQ > 12) {
+      throw new AppError(400, "month 需為 1-12")
+    }
+    const data = SEASONAL_TASKS[monthQ]
+    res.json({ month: monthQ, ...data })
+  })
+)
+
 /**
  * POST /api/family/tasks/batch
  * Body: { kidIds: number[], tasks: Array<{ title, emoji, rewardAmount }> }

@@ -1054,9 +1054,20 @@ function BatchTaskDialog({
   onSuccess: () => void
 }) {
   const { toast } = useToast()
+  const [activeTab, setActiveTab] = useState<"daily" | "seasonal">("daily")
   const { data: templates = [] } = useQuery<Template[]>({
     queryKey: ["/api/family/task-templates"],
   })
+  const currentMonth = new Date().getMonth() + 1
+  const { data: seasonal } = useQuery<{
+    month: number
+    festival: string
+    emoji: string
+    tasks: Template[]
+  }>({
+    queryKey: [`/api/family/task-templates/seasonal?month=${currentMonth}`],
+  })
+  const displayTemplates = activeTab === "seasonal" ? (seasonal?.tasks ?? []) : templates
   const [selectedTpls, setSelectedTpls] = useState<Set<string>>(new Set())
   const [selectedKids, setSelectedKids] = useState<Set<number>>(new Set(kids.map((k) => k.id)))
 
@@ -1081,7 +1092,7 @@ function BatchTaskDialog({
     mutationFn: () =>
       apiRequest<{ count: number }>("POST", "/api/family/tasks/batch", {
         kidIds: Array.from(selectedKids),
-        tasks: templates.filter((t) => selectedTpls.has(t.title)),
+        tasks: displayTemplates.filter((t) => selectedTpls.has(t.title)),
       }),
     onSuccess: (r) => {
       toast({ title: `✅ 派出 ${r.count} 個任務` })
@@ -1094,7 +1105,7 @@ function BatchTaskDialog({
   const totalTasks = selectedKids.size * selectedTpls.size
   const totalAmount =
     Array.from(selectedTpls).reduce((s, title) => {
-      const t = templates.find((x) => x.title === title)
+      const t = displayTemplates.find((x) => x.title === title)
       return s + (t?.rewardAmount ?? 0)
     }, 0) * selectedKids.size
 
@@ -1107,25 +1118,65 @@ function BatchTaskDialog({
         </DialogHeader>
         <div className="space-y-3 text-sm">
           <div>
-            <Label className="font-bold">📋 選任務範本（複選）</Label>
+            <div className="flex gap-1 mb-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab("daily")
+                  setSelectedTpls(new Set())
+                }}
+                className={`flex-1 py-1.5 rounded text-sm font-medium border-2 ${
+                  activeTab === "daily" ? "border-indigo-500 bg-indigo-50" : "border-gray-200"
+                }`}
+              >
+                📋 日常任務
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab("seasonal")
+                  setSelectedTpls(new Set())
+                }}
+                className={`flex-1 py-1.5 rounded text-sm font-medium border-2 ${
+                  activeTab === "seasonal" ? "border-amber-500 bg-amber-50" : "border-gray-200"
+                }`}
+              >
+                {seasonal?.emoji ?? "🎉"} 節慶
+              </button>
+            </div>
+            {activeTab === "seasonal" && seasonal && (
+              <div className="text-xs bg-amber-50 border border-amber-200 rounded px-2 py-1.5 mb-2">
+                <b>
+                  {seasonal.emoji} {seasonal.festival}
+                </b>
+                （{seasonal.month} 月）
+              </div>
+            )}
+            <Label className="font-bold">選任務範本（複選）</Label>
             <div className="space-y-1 mt-1 max-h-64 overflow-y-auto">
-              {templates.map((t) => (
-                <button
-                  key={t.title}
-                  type="button"
-                  onClick={() => toggleTpl(t.title)}
-                  className={`w-full text-left flex items-center gap-2 p-2 rounded border ${
-                    selectedTpls.has(t.title) ? "border-indigo-500 bg-indigo-50" : "border-gray-200"
-                  }`}
-                >
-                  <span className="text-xl">{t.emoji}</span>
-                  <span className="flex-1">{t.title}</span>
-                  <span className="text-xs font-mono text-gray-500">${t.rewardAmount}</span>
-                  {selectedTpls.has(t.title) && (
-                    <CheckCircle2 className="h-4 w-4 text-indigo-600" />
-                  )}
-                </button>
-              ))}
+              {displayTemplates.length === 0 ? (
+                <div className="text-center text-sm text-gray-400 py-3">本月無節慶任務</div>
+              ) : (
+                displayTemplates.map((t) => (
+                  <button
+                    key={t.title}
+                    type="button"
+                    onClick={() => toggleTpl(t.title)}
+                    className={`w-full text-left flex items-center gap-2 p-2 rounded border ${
+                      selectedTpls.has(t.title)
+                        ? "border-indigo-500 bg-indigo-50"
+                        : "border-gray-200"
+                    }`}
+                  >
+                    <span className="text-xl">{t.emoji}</span>
+                    <span className="flex-1">{t.title}</span>
+                    <span className="text-xs font-mono text-gray-500">${t.rewardAmount}</span>
+                    {selectedTpls.has(t.title) && (
+                      <CheckCircle2 className="h-4 w-4 text-indigo-600" />
+                    )}
+                  </button>
+                ))
+              )}
             </div>
           </div>
 
