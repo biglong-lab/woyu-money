@@ -103,6 +103,8 @@ interface Goal {
   currentAmount: string
   status: "active" | "completed" | "abandoned"
   deadline: string | null
+  reflection: string | null
+  completedReflection: string | null
 }
 
 interface Badge {
@@ -393,11 +395,11 @@ function KidDashboard({
   })
 
   const saveToGoalMut = useMutation({
-    mutationFn: (vars: { goalId: number; amount: number }) =>
+    mutationFn: (vars: { goalId: number; amount: number; completedReflection?: string }) =>
       apiRequest<{ reached: boolean; newBadges: string[] }>(
         "POST",
         `/api/family/goals/${vars.goalId}/save`,
-        { amount: vars.amount }
+        { amount: vars.amount, completedReflection: vars.completedReflection }
       ),
     onSuccess: (r) => {
       toast({
@@ -666,6 +668,11 @@ function KidDashboard({
                       </div>
                     </div>
                   </div>
+                  {g.reflection && (
+                    <div className="text-[11px] text-purple-700 bg-purple-50 rounded px-2 py-1 mb-1.5 italic">
+                      💭 「{g.reflection}」
+                    </div>
+                  )}
                   <div className="h-3 rounded-full bg-gray-100 overflow-hidden mb-2">
                     <motion.div
                       initial={{ width: 0 }}
@@ -681,7 +688,25 @@ function KidDashboard({
                         size="sm"
                         variant="outline"
                         disabled={saveBal < amt || saveToGoalMut.isPending}
-                        onClick={() => saveToGoalMut.mutate({ goalId: g.id, amount: amt })}
+                        onClick={() => {
+                          // 預判是否達成、達成則跳「達成感言」prompt
+                          const current = parseFloat(g.currentAmount)
+                          const target = parseFloat(g.targetAmount)
+                          const willReach = current + amt >= target
+                          let completedReflection: string | undefined
+                          if (willReach) {
+                            const r = window.prompt(
+                              `🎉 即將達成「${g.name}」！\n寫下達成的感言（鼓勵自己、可跳過）：`,
+                              ""
+                            )
+                            completedReflection = r?.trim() || undefined
+                          }
+                          saveToGoalMut.mutate({
+                            goalId: g.id,
+                            amount: amt,
+                            completedReflection,
+                          })
+                        }}
                         className="flex-1 text-xs h-8"
                       >
                         存 ${amt}
@@ -1488,6 +1513,7 @@ function GoalDialog({
   const [emoji, setEmoji] = useState("🎯")
   const [amount, setAmount] = useState("")
   const [deadline, setDeadline] = useState("")
+  const [reflection, setReflection] = useState("")
 
   const mut = useMutation({
     mutationFn: () =>
@@ -1497,6 +1523,7 @@ function GoalDialog({
         emoji,
         targetAmount: parseFloat(amount),
         deadline: deadline || null,
+        reflection: reflection.trim() || null,
       }),
     onSuccess: () => {
       toast({ title: "✅ 新目標已建立、加油！" })
@@ -1552,6 +1579,16 @@ function GoalDialog({
           <div>
             <Label>期限（選填）</Label>
             <Input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} />
+          </div>
+          <div>
+            <Label>為什麼想存錢買這個？</Label>
+            <Input
+              value={reflection}
+              onChange={(e) => setReflection(e.target.value)}
+              placeholder="想擁有的理由（可選、未來達成時回看）"
+              maxLength={500}
+            />
+            <div className="text-[10px] text-gray-400 mt-1">寫下原因、達成時回看會很有感</div>
           </div>
         </div>
         <DialogFooter>

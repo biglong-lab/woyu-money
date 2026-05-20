@@ -1061,6 +1061,34 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(r5.status).toBe(400)
   })
 
+  it("目標反思：建立時可寫 reflection、達成時可寫 completedReflection", async () => {
+    await createKid({ spendRatio: 0, saveRatio: 100, giveRatio: 0 })
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId, title: "T", rewardAmount: 200 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`)
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`)
+
+    // 建目標、附「為什麼存錢」reflection
+    const g = await request(app).post("/api/family/goals").send({
+      kidId,
+      name: "樂高",
+      targetAmount: 100,
+      reflection: "因為我表現好、想送自己禮物",
+    })
+    expect(g.status).toBe(201)
+    expect(g.body.reflection).toBe("因為我表現好、想送自己禮物")
+
+    // save 達成、附「達成感言」
+    const save = await request(app)
+      .post(`/api/family/goals/${g.body.id}/save`)
+      .send({ amount: 100, completedReflection: "我做到了！下次目標訂更大" })
+    expect(save.status).toBe(200)
+    expect(save.body.reached).toBe(true)
+    expect(save.body.goal.completedReflection).toBe("我做到了！下次目標訂更大")
+    expect(save.body.goal.reflection).toBe("因為我表現好、想送自己禮物") // 原 reflection 保留
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)

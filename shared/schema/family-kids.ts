@@ -138,6 +138,10 @@ export const kidsGoals = pgTable(
     status: varchar("status", { length: 20 }).notNull().default("active"),
     // active / completed / abandoned
     completedAt: timestamp("completed_at"),
+    // 建立時：「為什麼想存錢買這個？」（培養理財意識）
+    reflection: text("reflection"),
+    // 達成時：「達成感言」（鼓勵記錄努力過程）
+    completedReflection: text("completed_reflection"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },
@@ -240,7 +244,14 @@ export const insertKidsTaskSchema = createInsertSchema(kidsTasks, {
 
 export const insertKidsGoalSchema = createInsertSchema(kidsGoals, {
   targetAmount: z.union([z.string(), z.number()]).transform((v) => String(v)),
-}).omit({ id: true, completedAt: true, createdAt: true, updatedAt: true, currentAmount: true })
+}).omit({
+  id: true,
+  completedAt: true,
+  createdAt: true,
+  updatedAt: true,
+  currentAmount: true,
+  completedReflection: true, // 只在 save 達成時寫
+})
 
 export const insertKidsSpendingSchema = createInsertSchema(kidsSpendings, {
   amount: z.union([z.string(), z.number()]).transform((v) => String(v)),

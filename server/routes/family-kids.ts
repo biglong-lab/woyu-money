@@ -879,6 +879,10 @@ router.post(
                             updated_at = NOW()
       WHERE kid_id = ${goal.kidId}
     `)
+    // 達成時可附「達成感言」（completedReflection）
+    const completedReflection = req.body?.completedReflection
+      ? String(req.body.completedReflection).slice(0, 500)
+      : null
     const [updated] = await db
       .update(kidsGoals)
       .set({
@@ -886,6 +890,7 @@ router.post(
         status: reached ? "completed" : "active",
         completedAt: reached ? new Date() : null,
         updatedAt: new Date(),
+        ...(reached && completedReflection ? { completedReflection } : {}),
       })
       .where(eq(kidsGoals.id, id))
       .returning()
