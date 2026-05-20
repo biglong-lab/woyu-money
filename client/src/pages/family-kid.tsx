@@ -458,6 +458,9 @@ function KidDashboard({
         )}
       </div>
 
+      {/* 家長每日鼓勵卡（有寫才顯示）*/}
+      <DailyMessageBanner kidId={kidId} />
+
       {/* 三罐（最大、最顯眼） */}
       <div className="grid grid-cols-3 gap-2 mb-4">
         <JarCard
@@ -1121,6 +1124,33 @@ function TransferDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  )
+}
+
+function DailyMessageBanner({ kidId }: { kidId: number }) {
+  const { data } = useQuery<{
+    message: { id: number; message: string; mood: string; messageDate: string } | null
+  }>({
+    queryKey: [`/api/family/daily-message?kidId=${kidId}`],
+    staleTime: 60_000,
+  })
+  if (!data?.message) return null
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -8 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="mb-3 rounded-xl bg-gradient-to-r from-pink-100 via-rose-100 to-amber-100 border-2 border-pink-300 p-3 shadow-sm"
+    >
+      <div className="flex items-start gap-2">
+        <div className="text-3xl shrink-0">{data.message.mood || "❤️"}</div>
+        <div className="flex-1">
+          <div className="text-[10px] text-pink-700 font-medium mb-0.5">大人今天說：</div>
+          <div className="text-sm font-medium text-gray-800 leading-snug">
+            「{data.message.message}」
+          </div>
+        </div>
+      </div>
+    </motion.div>
   )
 }
 

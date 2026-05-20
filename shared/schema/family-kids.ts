@@ -196,6 +196,28 @@ export const kidsSpendings = pgTable(
 )
 
 // ============================================================
+// 家長每日鼓勵卡（每天最多 1 則 per kid）
+// 培養情感連結、小孩首頁醒目顯示
+// ============================================================
+export const kidsDailyMessages = pgTable(
+  "kids_daily_messages",
+  {
+    id: serial("id").primaryKey(),
+    familyId: integer("family_id").default(1),
+    kidId: integer("kid_id")
+      .notNull()
+      .references(() => kidsAccounts.id, { onDelete: "cascade" }),
+    message: text("message").notNull(),
+    mood: varchar("mood", { length: 8 }).default("❤️"), // ❤️ / 🌟 / 💪 / 🤗 / 🎉
+    messageDate: date("message_date").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => ({
+    kidDateIdx: index("kids_daily_messages_kid_date_idx").on(table.kidId, table.messageDate),
+  })
+)
+
+// ============================================================
 // Zod schema for validation
 // ============================================================
 export const insertKidsAccountSchema = createInsertSchema(kidsAccounts, {
@@ -236,3 +258,4 @@ export type InsertKidsGoal = z.infer<typeof insertKidsGoalSchema>
 export type KidsBadge = typeof kidsBadges.$inferSelect
 export type KidsSpending = typeof kidsSpendings.$inferSelect
 export type InsertKidsSpending = z.infer<typeof insertKidsSpendingSchema>
+export type KidsDailyMessage = typeof kidsDailyMessages.$inferSelect

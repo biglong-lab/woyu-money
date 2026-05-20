@@ -1026,6 +1026,41 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     }
   })
 
+  it("家長每日鼓勵卡：POST 建 / 同日 PUT 覆蓋 / GET 查回", async () => {
+    await createKid()
+
+    // 第一次寫
+    const r1 = await request(app)
+      .post("/api/family/daily-message")
+      .send({ kidId, message: "你今天很棒！", mood: "❤️" })
+    expect(r1.status).toBe(201)
+    expect(r1.body.ok).toBe(true)
+    expect(r1.body.updated).toBe(false)
+    expect(r1.body.message.message).toBe("你今天很棒！")
+
+    // 同日再寫應覆蓋
+    const r2 = await request(app)
+      .post("/api/family/daily-message")
+      .send({ kidId, message: "Day 2 加油", mood: "💪" })
+    expect(r2.status).toBe(200)
+    expect(r2.body.updated).toBe(true)
+    expect(r2.body.message.message).toBe("Day 2 加油")
+    expect(r2.body.message.mood).toBe("💪")
+
+    // GET 應回當日訊息
+    const r3 = await request(app).get(`/api/family/daily-message?kidId=${kidId}`)
+    expect(r3.status).toBe(200)
+    expect(r3.body.message.message).toBe("Day 2 加油")
+
+    // GET 不同日期應回 null
+    const r4 = await request(app).get(`/api/family/daily-message?kidId=${kidId}&date=2020-01-01`)
+    expect(r4.body.message).toBeNull()
+
+    // 空訊息應拒絕
+    const r5 = await request(app).post("/api/family/daily-message").send({ kidId, message: "" })
+    expect(r5.status).toBe(400)
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)

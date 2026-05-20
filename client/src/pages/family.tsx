@@ -258,6 +258,16 @@ export default function FamilyPage() {
     onError: (e: Error) => toast({ title: "失敗", description: e.message, variant: "destructive" }),
   })
 
+  const dailyMessageMutation = useMutation({
+    mutationFn: (vars: { kidId: number; message: string; mood?: string }) =>
+      apiRequest("POST", "/api/family/daily-message", vars),
+    onSuccess: () => {
+      toast({ title: "💌 已送出鼓勵卡、小孩首頁會看到" })
+      confetti({ particleCount: 60, spread: 70, origin: { y: 0.6 } })
+    },
+    onError: (e: Error) => toast({ title: "失敗", description: e.message, variant: "destructive" }),
+  })
+
   const rejectTaskMutation = useMutation({
     mutationFn: (vars: { id: number; parentFeedback?: string }) =>
       apiRequest("POST", `/api/family/tasks/${vars.id}/reject`, {
@@ -479,6 +489,15 @@ export default function FamilyPage() {
                       }
                     })
                   }
+                  onEncourage={() => {
+                    const msg = window.prompt(
+                      `寫一句今天給 ${kid.displayName} 的鼓勵（會顯示在小孩首頁）：`,
+                      ""
+                    )
+                    if (msg?.trim()) {
+                      dailyMessageMutation.mutate({ kidId: kid.id, message: msg.trim() })
+                    }
+                  }}
                 />
               ))}
             </div>
@@ -752,10 +771,12 @@ function KidCard({
   kid,
   onEdit,
   onDelete,
+  onEncourage,
 }: {
   kid: Kid
   onEdit: () => void
   onDelete: () => void
+  onEncourage: () => void
 }) {
   const c = COLOR_TOKENS[kid.color] ?? COLOR_TOKENS.blue
   const { data: dashboardData } = useQuery<{ jar: Jar }>({
@@ -792,7 +813,16 @@ function KidCard({
               )}
             </div>
           </div>
-          <div className="flex gap-1 mt-2 justify-end">
+          <div className="flex gap-1 mt-2 justify-end flex-wrap">
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 px-2 text-xs text-pink-700 hover:bg-pink-50"
+              onClick={onEncourage}
+              title="寫一句鼓勵的話"
+            >
+              💌 鼓勵
+            </Button>
             <Link href={`/family/kid/${kid.id}`}>
               <Button size="sm" variant="ghost" className="h-7 px-2 text-xs">
                 <PiggyBank className="h-3 w-3 mr-1" />

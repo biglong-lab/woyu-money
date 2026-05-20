@@ -34,6 +34,7 @@ import {
   kidsGoals,
   kidsBadges,
   kidsSpendings,
+  kidsDailyMessages,
   insertKidsAccountSchema,
   insertKidsTaskSchema,
   insertKidsGoalSchema,
@@ -1474,6 +1475,68 @@ router.get(
       medal: i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : "",
     }))
     res.json({ month: monthStr, leaderboard: list })
+  })
+)
+
+/**
+ * 家長每日鼓勵卡
+ *   POST /api/family/daily-message  → 寫鼓勵卡（每天每個小孩最多 1 則、覆蓋舊的）
+ *   GET  /api/family/daily-message?kidId=&date= → 查當日鼓勵（沒寫回 null）
+ */
+router.post(
+  "/api/family/daily-message",
+  asyncHandler(async (req, res) => {
+    const kidIdN = Number(req.body?.kidId)
+    const message = String(req.body?.message ?? "").trim()
+    const mood = String(req.body?.mood ?? "❤️").slice(0, 8)
+    if (!kidIdN) throw new AppError(400, "kidId 必填")
+    if (!message) throw new AppError(400, "message 必填")
+    if (message.length > 500) throw new AppError(400, "訊息過長（500 字以內）")
+
+    const today = new Date().toISOString().slice(0, 10)
+    // Upsert by (kidId, messageDate)
+    const existing = await db.execute(sql`
+      SELECT id FROM kids_daily_messages
+      WHERE kid_id = ${kidIdN} AND message_date = ${today}
+      LIMIT 1
+    `)
+    const existingId = (existing as unknown as { rows: { id: number }[] }).rows[0]?.id
+
+    if (existingId) {
+      await db.execute(sql`
+        UPDATE kids_daily_messages
+        SET message = ${message}, mood = ${mood}
+        WHERE id = ${existingId}
+      `)
+      const [updated] = await db
+        .select()
+        .from(kidsDailyMessages)
+        .where(eq(kidsDailyMessages.id, existingId))
+        .limit(1)
+      res.json({ ok: true, message: updated, updated: true })
+    } else {
+      const [created] = await db
+        .insert(kidsDailyMessages)
+        .values({ kidId: kidIdN, message, mood, messageDate: today })
+        .returning()
+      res.status(201).json({ ok: true, message: created, updated: false })
+    }
+  })
+)
+
+router.get(
+  "/api/family/daily-message",
+  asyncHandler(async (req, res) => {
+    const kidIdN = Number(req.query?.kidId)
+    if (!kidIdN) throw new AppError(400, "kidId 必填")
+    const date = (req.query?.date as string) ?? new Date().toISOString().slice(0, 10)
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new AppError(400, "date 格式 YYYY-MM-DD")
+    const [row] = await db
+      .select()
+      .from(kidsDailyMessages)
+      .where(and(eq(kidsDailyMessages.kidId, kidIdN), eq(kidsDailyMessages.messageDate, date)))
+      .limit(1)
+    res.json({ kidId: kidIdN, date, message: row ?? null })
   })
 )
 
