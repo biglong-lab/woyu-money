@@ -72,6 +72,8 @@ interface Task {
   notes: string | null
   dueDate: string | null
   createdAt: string
+  isOverdue?: boolean
+  overdueDays?: number
 }
 
 interface Jar {
@@ -352,10 +354,25 @@ export default function FamilyPage() {
               return (
                 <div
                   key={t.id}
-                  className="flex items-center gap-2 text-sm py-1.5 border-b last:border-0"
+                  className={`flex items-center gap-2 text-sm py-1.5 border-b last:border-0 ${
+                    t.isOverdue ? "bg-red-50 -mx-2 px-2 rounded" : ""
+                  }`}
                 >
                   <span className="text-lg">{t.emoji ?? "📋"}</span>
-                  <span className="flex-1 truncate">{t.title}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="truncate">{t.title}</div>
+                    {t.dueDate && (
+                      <div
+                        className={`text-[10px] ${
+                          t.isOverdue ? "text-red-600 font-semibold" : "text-gray-400"
+                        }`}
+                      >
+                        {t.isOverdue
+                          ? `🚨 逾期 ${t.overdueDays} 天（${t.dueDate}）`
+                          : `⏰ 截止 ${t.dueDate}`}
+                      </div>
+                    )}
+                  </div>
                   <span className="text-xs text-gray-500">{kid?.displayName ?? "—"}</span>
                   <span className="text-xs font-mono">{formatMoney(t.rewardAmount)}</span>
                   <TaskStatusBadge status={t.status} />
@@ -674,6 +691,7 @@ function TaskDialog({
   const [rewardAmount, setRewardAmount] = useState("50")
   const [kidId, setKidId] = useState<string>(kids[0]?.id?.toString() ?? "")
   const [notes, setNotes] = useState("")
+  const [dueDate, setDueDate] = useState("")
 
   const mut = useMutation({
     mutationFn: () =>
@@ -683,6 +701,7 @@ function TaskDialog({
         rewardAmount: parseFloat(rewardAmount),
         kidId: kidId ? parseInt(kidId) : null,
         notes: notes.trim() || null,
+        dueDate: dueDate || null,
       }),
     onSuccess: () => {
       toast({ title: "✅ 已派任務" })
@@ -749,6 +768,11 @@ function TaskDialog({
                 ))}
               </SelectContent>
             </Select>
+          </div>
+          <div>
+            <Label>截止日</Label>
+            <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+            <p className="text-[10px] text-gray-400 mt-0.5">逾期會標紅、自動排前面</p>
           </div>
           <div>
             <Label>備註</Label>

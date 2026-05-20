@@ -331,6 +331,59 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(Number(jar2[0].s)).toBe(100)
   })
 
+  it("逾期任務自動標 isOverdue + overdueDays + 排前面", async () => {
+    await createKid()
+    // 建一個 5 天前到期的任務
+    const past = new Date(Date.now() - 5 * 86400000).toISOString().slice(0, 10)
+    await request(app).post("/api/family/tasks").send({
+      kidId,
+      title: "已逾期任務",
+      rewardAmount: 50,
+      dueDate: past,
+    })
+    // 建一個未來才到期的任務
+    const future = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10)
+    await request(app).post("/api/family/tasks").send({
+      kidId,
+      title: "未來任務",
+      rewardAmount: 50,
+      dueDate: future,
+    })
+    const list = await request(app).get(`/api/family/tasks?kidId=${kidId}`)
+    expect(list.status).toBe(200)
+    const overdue = list.body.find((t: { title: string }) => t.title === "已逾期任務")
+    const futureT = list.body.find((t: { title: string }) => t.title === "未來任務")
+    expect(overdue.isOverdue).toBe(true)
+    expect(overdue.overdueDays).toBe(5)
+    expect(futureT.isOverdue).toBe(false)
+    // 逾期應排前面
+    const idxOverdue = list.body.findIndex((t: { title: string }) => t.title === "已逾期任務")
+    const idxFuture = list.body.findIndex((t: { title: string }) => t.title === "未來任務")
+    expect(idxOverdue).toBeLessThan(idxFuture)
+  })
+
+  it("已 approve 的逾期任務不算 isOverdue", async () => {
+    await createKid()
+    const past = new Date(Date.now() - 3 * 86400000).toISOString().slice(0, 10)
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId, title: "已完成", rewardAmount: 30, dueDate: past })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`)
+    const ares = await request(app).post(`/api/family/tasks/${t.body.id}/approve`)
+    // 清測試
+    if (ares.body.mainSystem?.paymentItemId) {
+      await db.execute(
+        sql`DELETE FROM payment_records WHERE payment_item_id = ${ares.body.mainSystem.paymentItemId}`
+      )
+      await db.execute(
+        sql`DELETE FROM payment_items WHERE id = ${ares.body.mainSystem.paymentItemId}`
+      )
+    }
+    const list = await request(app).get(`/api/family/tasks?kidId=${kidId}`)
+    const done = list.body.find((t: { title: string }) => t.title === "已完成")
+    expect(done.isOverdue).toBe(false)
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)

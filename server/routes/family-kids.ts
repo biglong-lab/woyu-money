@@ -304,7 +304,27 @@ router.get(
       .from(kidsTasks)
       .where(conds.length > 0 ? and(...conds) : undefined)
       .orderBy(desc(kidsTasks.createdAt))
-    res.json(rows)
+
+    // 計算逾期狀態（dueDate 已過 + 仍 pending/submitted 算逾期）
+    const today = new Date().toISOString().slice(0, 10)
+    const enhanced = rows.map((r) => {
+      const isPending = r.status === "pending" || r.status === "submitted"
+      const isOverdue = !!(r.dueDate && r.dueDate < today && isPending)
+      const overdueDays =
+        isOverdue && r.dueDate
+          ? Math.floor((new Date(today).getTime() - new Date(r.dueDate).getTime()) / 86400000)
+          : 0
+      return { ...r, isOverdue, overdueDays }
+    })
+    // 逾期排前面、再按 createdAt 倒序
+    enhanced.sort((a, b) => {
+      if (a.isOverdue !== b.isOverdue) return a.isOverdue ? -1 : 1
+      return (
+        new Date(b.createdAt as unknown as string).getTime() -
+        new Date(a.createdAt as unknown as string).getTime()
+      )
+    })
+    res.json(enhanced)
   })
 )
 
