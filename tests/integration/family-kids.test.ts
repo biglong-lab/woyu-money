@@ -1775,6 +1775,34 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(found.category).toBe("study")
   })
 
+  it("category-stats：各小孩 5 種類別計數 + grandTotal", async () => {
+    await createKid()
+    // 派 + 完成 3 個 study + 1 個 housework
+    for (let i = 0; i < 3; i++) {
+      const t = await request(app)
+        .post("/api/family/tasks")
+        .send({ kidId, title: `study${i}`, rewardAmount: 10, category: "study" })
+      await request(app).post(`/api/family/tasks/${t.body.id}/submit`)
+      await request(app).post(`/api/family/tasks/${t.body.id}/approve`)
+    }
+    const h = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId, title: "倒垃圾", rewardAmount: 20, category: "housework" })
+    await request(app).post(`/api/family/tasks/${h.body.id}/submit`)
+    await request(app).post(`/api/family/tasks/${h.body.id}/approve`)
+
+    const res = await request(app).get("/api/family/category-stats?days=30")
+    expect(res.status).toBe(200)
+    const me = res.body.kids.find((x: { kidId: number }) => x.kidId === kidId)
+    expect(me).toBeTruthy()
+    expect(me.categories.study.count).toBe(3)
+    expect(me.categories.housework.count).toBe(1)
+    expect(me.categories.kindness.count).toBe(0) // 沒做
+    expect(me.total).toBeGreaterThanOrEqual(4)
+    // grandTotal 累計
+    expect(res.body.grandTotal.study.count).toBeGreaterThanOrEqual(3)
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)

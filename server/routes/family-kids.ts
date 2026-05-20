@@ -2038,6 +2038,108 @@ router.get(
 )
 
 /**
+ * GET /api/family/category-stats?days=30
+ * 各 active 小孩近 N 天 5 大 category approved 任務數 + 全家總計
+ * 家長看小孩偏好 / 缺什麼類別任務
+ */
+router.get(
+  "/api/family/category-stats",
+  asyncHandler(async (req, res) => {
+    const days = Math.min(Math.max(parseInt((req.query.days as string) || "30", 10), 7), 365)
+    const sinceIso = new Date(Date.now() - days * 86400000).toISOString()
+
+    const rows = await db.execute(sql`
+      SELECT
+        k.id AS "kidId",
+        k.display_name AS "displayName",
+        k.avatar,
+        k.color,
+        t.category,
+        COUNT(*)::int AS count,
+        SUM(t.reward_amount::numeric)::numeric AS reward_sum
+      FROM kids_accounts k
+      LEFT JOIN kids_tasks t ON t.kid_id = k.id
+        AND t.status = 'approved'
+        AND t.approved_at >= ${sinceIso}::timestamp
+      WHERE k.is_active = true
+      GROUP BY k.id, k.display_name, k.avatar, k.color, t.category
+    `)
+
+    type Row = {
+      kidId: number
+      displayName: string
+      avatar: string
+      color: string
+      category: string | null
+      count: number
+      reward_sum: string | number | null
+    }
+    const data = (rows as unknown as { rows: Row[] }).rows
+
+    const CATEGORIES = ["housework", "study", "self_care", "kindness", "other"] as const
+    const byKid = new Map<
+      number,
+      {
+        kidId: number
+        displayName: string
+        avatar: string
+        color: string
+        categories: Record<string, { count: number; rewardSum: number }>
+        total: number
+      }
+    >()
+    data.forEach((r) => {
+      if (!byKid.has(r.kidId)) {
+        byKid.set(r.kidId, {
+          kidId: r.kidId,
+          displayName: r.displayName,
+          avatar: r.avatar,
+          color: r.color,
+          categories: {},
+          total: 0,
+        })
+      }
+      if (r.category) {
+        const k = byKid.get(r.kidId)!
+        k.categories[r.category] = {
+          count: r.count,
+          rewardSum: parseFloat(String(r.reward_sum ?? 0)),
+        }
+        k.total += r.count
+      }
+    })
+
+    const kids = Array.from(byKid.values()).map((k) => ({
+      ...k,
+      categories: CATEGORIES.reduce(
+        (acc, c) => {
+          acc[c] = k.categories[c] ?? { count: 0, rewardSum: 0 }
+          return acc
+        },
+        {} as Record<string, { count: number; rewardSum: number }>
+      ),
+    }))
+
+    // grand total
+    const grandTotal = CATEGORIES.reduce(
+      (acc, c) => {
+        acc[c] = { count: 0, rewardSum: 0 }
+        return acc
+      },
+      {} as Record<string, { count: number; rewardSum: number }>
+    )
+    kids.forEach((k) => {
+      CATEGORIES.forEach((c) => {
+        grandTotal[c].count += k.categories[c].count
+        grandTotal[c].rewardSum += k.categories[c].rewardSum
+      })
+    })
+
+    res.json({ days, kids, grandTotal })
+  })
+)
+
+/**
  * GET /api/family/difficulty-insights
  * 看每個 active 小孩過去 90 天 hard/medium/easy 任務的 approved/rejected 比例
  * 自動建議升降難度（讓家長知道任務太簡單或太難）

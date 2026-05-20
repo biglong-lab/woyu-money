@@ -408,6 +408,9 @@ export default function FamilyPage() {
       {/* 家庭心情軌跡 */}
       <MoodTrends />
 
+      {/* 任務分類分布 */}
+      <CategoryStats />
+
       {/* 捐贈對象目錄 */}
       <RecipientsManager />
 
@@ -1128,6 +1131,86 @@ function FamilyYearSummary() {
           )}
         </CardContent>
       )}
+    </Card>
+  )
+}
+
+function CategoryStats() {
+  interface KidStat {
+    kidId: number
+    displayName: string
+    avatar: string
+    color: string
+    categories: Record<string, { count: number; rewardSum: number }>
+    total: number
+  }
+  const { data } = useQuery<{
+    days: number
+    kids: KidStat[]
+    grandTotal: Record<string, { count: number; rewardSum: number }>
+  }>({
+    queryKey: ["/api/family/category-stats?days=30"],
+    staleTime: 60_000,
+  })
+  if (!data) return null
+  const totalCount = Object.values(data.grandTotal).reduce((s, c) => s + c.count, 0)
+  if (totalCount === 0) return null
+
+  const CATEGORIES = [
+    { key: "housework", label: "🧹 家事", color: "bg-blue-400" },
+    { key: "study", label: "📚 學習", color: "bg-purple-400" },
+    { key: "self_care", label: "🪥 照顧", color: "bg-amber-400" },
+    { key: "kindness", label: "❤️ 善行", color: "bg-rose-400" },
+    { key: "other", label: "📋 其他", color: "bg-gray-400" },
+  ] as const
+
+  return (
+    <Card className="border-indigo-200 bg-indigo-50">
+      <CardHeader className="py-3 px-3 sm:px-4">
+        <CardTitle className="text-base flex items-center gap-2">
+          <span className="text-xl">📊</span>
+          任務分類分布
+        </CardTitle>
+        <CardDescription>過去 {data.days} 天各小孩做哪些類別、發現偏好或缺什麼</CardDescription>
+      </CardHeader>
+      <CardContent className="py-2 px-3 sm:px-4 space-y-2">
+        {/* 各小孩 stack bar */}
+        {data.kids
+          .filter((k) => k.total > 0)
+          .map((k) => (
+            <div key={k.kidId} className="bg-white rounded p-2 border border-indigo-200">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-lg">{k.avatar}</span>
+                <span className="font-medium text-sm flex-1">{k.displayName}</span>
+                <span className="text-xs text-gray-500">{k.total} 個任務</span>
+              </div>
+              <div className="flex h-4 rounded overflow-hidden bg-gray-100">
+                {CATEGORIES.map((c) => {
+                  const pct = (k.categories[c.key].count / k.total) * 100
+                  if (pct === 0) return null
+                  return (
+                    <div
+                      key={c.key}
+                      className={c.color}
+                      style={{ width: `${pct}%` }}
+                      title={`${c.label}：${k.categories[c.key].count} 個`}
+                    />
+                  )
+                })}
+              </div>
+              <div className="flex flex-wrap gap-1 mt-1 text-[10px]">
+                {CATEGORIES.map((c) => {
+                  if (k.categories[c.key].count === 0) return null
+                  return (
+                    <span key={c.key} className="text-gray-700">
+                      {c.label} {k.categories[c.key].count}
+                    </span>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
+      </CardContent>
     </Card>
   )
 }
