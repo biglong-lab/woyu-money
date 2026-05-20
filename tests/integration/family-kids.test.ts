@@ -1404,6 +1404,57 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(notFound.status).toBe(404)
   })
 
+  it("成就牆目錄：含 10 個徽章 + 進度條 + 累積捐款觸發 give_100 / give_500", async () => {
+    await createKid({ spendRatio: 0, saveRatio: 0, giveRatio: 100 })
+    // 賺 1000 全進 give 罐
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId, title: "T", rewardAmount: 1000 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`)
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`)
+
+    // 捐 100 → 應拿 give_100 徽章
+    const give1 = await request(app).post("/api/family/spendings").send({
+      kidId,
+      jar: "give",
+      amount: 100,
+      description: "捐 100",
+    })
+    expect(give1.body.newBadges).toContain("give_100")
+    expect(give1.body.newBadges).not.toContain("give_500")
+
+    // 再捐 400（累積 500） → 應拿 give_500
+    const give2 = await request(app).post("/api/family/spendings").send({
+      kidId,
+      jar: "give",
+      amount: 400,
+      description: "再捐",
+    })
+    expect(give2.body.newBadges).toContain("give_500")
+
+    // 成就牆目錄
+    const catalog = await request(app).get(`/api/family/badges-catalog?kidId=${kidId}`)
+    expect(catalog.status).toBe(200)
+    expect(catalog.body.badges.length).toBe(10)
+    const give100 = catalog.body.badges.find(
+      (b: { badgeType: string }) => b.badgeType === "give_100"
+    )
+    expect(give100.earned).toBe(true)
+    expect(give100.progress).toBe(100)
+    const give500 = catalog.body.badges.find(
+      (b: { badgeType: string }) => b.badgeType === "give_500"
+    )
+    expect(give500.earned).toBe(true)
+    // streak_100 / tasks_50 未達成
+    const tasks50 = catalog.body.badges.find(
+      (b: { badgeType: string }) => b.badgeType === "tasks_50"
+    )
+    expect(tasks50.earned).toBe(false)
+    expect(tasks50.progress).toBeLessThan(100)
+    // totalEarned 計數
+    expect(catalog.body.totalEarned).toBeGreaterThanOrEqual(2) // give_100 + give_500
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)

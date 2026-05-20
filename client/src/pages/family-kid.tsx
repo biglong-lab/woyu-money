@@ -809,28 +809,8 @@ function KidDashboard({
         </div>
       )}
 
-      {/* 徽章 */}
-      {badges.length > 0 && (
-        <div>
-          <h2 className="font-bold mb-2 flex items-center gap-2">
-            <Award className="h-4 w-4 text-yellow-500" />
-            我的徽章（{badges.length}）
-          </h2>
-          <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
-            {badges.map((b) => (
-              <motion.div
-                key={b.id}
-                whileHover={{ scale: 1.1, rotate: 5 }}
-                className="bg-white rounded-lg p-2 text-center shadow-sm"
-                title={b.title}
-              >
-                <div className="text-3xl">{b.emoji}</div>
-                <div className="text-[10px] mt-0.5 text-gray-700 line-clamp-2">{b.title}</div>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* 成就牆（含未解鎖徽章 + 進度條）*/}
+      <AchievementWall kidId={kidId} />
 
       {/* 本月戰績（月報）*/}
       {report && (
@@ -1479,6 +1459,91 @@ function WishesSection({
           ))}
         </div>
       )}
+    </div>
+  )
+}
+
+function AchievementWall({ kidId }: { kidId: number }) {
+  interface CatalogBadge {
+    badgeType: string
+    title: string
+    emoji: string
+    target: number
+    current: number
+    unit: string
+    progress: number
+    earned: boolean
+    earnedAt: string | null
+  }
+  const { data } = useQuery<{
+    totalEarned: number
+    totalCatalog: number
+    badges: CatalogBadge[]
+  }>({
+    queryKey: [`/api/family/badges-catalog?kidId=${kidId}`],
+  })
+  if (!data) return null
+
+  const unitLabel = (u: string) =>
+    u === "tasks" ? "個任務" : u === "goals" ? "個目標" : u === "days" ? "天" : "$"
+
+  return (
+    <div className="mb-4">
+      <h2 className="font-bold mb-2 flex items-center gap-2">
+        <Award className="h-4 w-4 text-yellow-500" />
+        成就牆（{data.totalEarned} / {data.totalCatalog}）
+      </h2>
+      <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+        {data.badges.map((b) => {
+          const remaining = b.target - b.current
+          return (
+            <motion.div
+              key={b.badgeType}
+              whileHover={b.earned ? { scale: 1.05, rotate: 3 } : undefined}
+              className={`rounded-lg p-2 text-center shadow-sm relative overflow-hidden ${
+                b.earned
+                  ? "bg-white border border-yellow-300"
+                  : "bg-gray-100 border border-gray-200"
+              }`}
+              title={
+                b.earned
+                  ? `${b.title}\n獲得於 ${b.earnedAt?.slice(0, 10)}`
+                  : `${b.title}\n還差 ${
+                      b.unit === "dollars" ? "$" + remaining : remaining + unitLabel(b.unit)
+                    }`
+              }
+            >
+              <div className={`text-2xl ${b.earned ? "" : "grayscale opacity-40"} leading-none`}>
+                {b.emoji}
+              </div>
+              <div
+                className={`text-[10px] mt-1 line-clamp-2 ${
+                  b.earned ? "text-gray-800" : "text-gray-500"
+                }`}
+              >
+                {b.title}
+              </div>
+              {!b.earned && (
+                <>
+                  <div className="text-[9px] text-gray-400 mt-0.5">
+                    {b.current}/{b.target}
+                  </div>
+                  {/* progress bar */}
+                  <div
+                    className="absolute bottom-0 left-0 h-1 bg-gradient-to-r from-yellow-300 to-amber-500"
+                    style={{ width: `${b.progress}%` }}
+                  />
+                </>
+              )}
+              {b.earned && (
+                <div className="absolute top-0 right-0 text-[10px] bg-yellow-400 text-yellow-900 px-1 rounded-bl font-bold">
+                  ✓
+                </div>
+              )}
+            </motion.div>
+          )
+        })}
+      </div>
     </div>
   )
 }

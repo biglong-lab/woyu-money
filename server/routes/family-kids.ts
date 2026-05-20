@@ -1060,7 +1060,23 @@ router.post(
     `)
 
     const [created] = await db.insert(kidsSpendings).values(parsed.data).returning()
-    res.status(201).json(created)
+
+    // 給罐子（捐獻）→ 檢查累計徽章
+    const newBadges: string[] = []
+    if (parsed.data.jar === "give") {
+      const totalRow = await db.execute(sql`
+        SELECT COALESCE(SUM(amount::numeric), 0)::numeric AS s FROM kids_spendings
+        WHERE kid_id = ${data.kidId} AND jar = 'give'
+      `)
+      const totalGiven = parseFloat(
+        String((totalRow as unknown as { rows: { s: string | number }[] }).rows[0]?.s ?? "0")
+      )
+      if (totalGiven >= 100 && (await awardBadgeIfNew(data.kidId, "give_100", "捐 $100", "❤️")))
+        newBadges.push("give_100")
+      if (totalGiven >= 500 && (await awardBadgeIfNew(data.kidId, "give_500", "捐 $500", "💝")))
+        newBadges.push("give_500")
+    }
+    res.status(201).json({ ...created, newBadges })
   })
 )
 
@@ -1765,6 +1781,156 @@ router.get(
     )
 
     res.json({ month: monthStr, kids: kidsList, grandTotal })
+  })
+)
+
+/**
+ * GET /api/family/badges-catalog?kidId=
+ * 所有可達徽章的目錄 + 該小孩進度（含未解鎖）
+ * 培養目標感：「再做 N 個就解鎖」激勵
+ */
+router.get(
+  "/api/family/badges-catalog",
+  asyncHandler(async (req, res) => {
+    const kidIdQ = Number(req.query.kidId)
+    if (!Number.isInteger(kidIdQ) || kidIdQ < 1) throw new AppError(400, "需傳 kidId")
+
+    // 該小孩統計
+    const taskStats = await db.execute(sql`
+      SELECT COUNT(*)::int AS n FROM kids_tasks
+      WHERE kid_id = ${kidIdQ} AND status = 'approved'
+    `)
+    const totalApproved = (taskStats as unknown as { rows: { n: number }[] }).rows[0]?.n ?? 0
+
+    const goalStats = await db.execute(sql`
+      SELECT COUNT(*)::int AS n FROM kids_goals
+      WHERE kid_id = ${kidIdQ} AND status = 'completed'
+    `)
+    const totalGoals = (goalStats as unknown as { rows: { n: number }[] }).rows[0]?.n ?? 0
+
+    const giveStats = await db.execute(sql`
+      SELECT COALESCE(SUM(amount::numeric), 0)::numeric AS s FROM kids_spendings
+      WHERE kid_id = ${kidIdQ} AND jar = 'give'
+    `)
+    const totalGiven = parseFloat(
+      String((giveStats as unknown as { rows: { s: string | number }[] }).rows[0]?.s ?? "0")
+    )
+
+    const streak = await calcStreak(kidIdQ)
+
+    const earned = await db
+      .select({ badgeType: kidsBadges.badgeType, earnedAt: kidsBadges.earnedAt })
+      .from(kidsBadges)
+      .where(eq(kidsBadges.kidId, kidIdQ))
+    const earnedMap = new Map(earned.map((b) => [b.badgeType, b.earnedAt]))
+
+    // 徽章目錄定義（中央化）
+    const CATALOG = [
+      {
+        type: "first_task",
+        title: "完成第一個任務",
+        emoji: "🌟",
+        target: 1,
+        current: totalApproved,
+        unit: "tasks",
+      },
+      {
+        type: "tasks_10",
+        title: "完成 10 個任務",
+        emoji: "💪",
+        target: 10,
+        current: totalApproved,
+        unit: "tasks",
+      },
+      {
+        type: "tasks_50",
+        title: "完成 50 個任務",
+        emoji: "🏆",
+        target: 50,
+        current: totalApproved,
+        unit: "tasks",
+      },
+      {
+        type: "first_goal",
+        title: "完成第一個存錢目標",
+        emoji: "🎯",
+        target: 1,
+        current: totalGoals,
+        unit: "goals",
+      },
+      {
+        type: "goals_5",
+        title: "完成 5 個目標",
+        emoji: "🌈",
+        target: 5,
+        current: totalGoals,
+        unit: "goals",
+      },
+      {
+        type: "streak_7",
+        title: "連續打卡 7 天",
+        emoji: "🔥",
+        target: 7,
+        current: streak,
+        unit: "days",
+      },
+      {
+        type: "streak_30",
+        title: "連續打卡 30 天",
+        emoji: "🌟",
+        target: 30,
+        current: streak,
+        unit: "days",
+      },
+      {
+        type: "streak_100",
+        title: "連續打卡 100 天",
+        emoji: "👑",
+        target: 100,
+        current: streak,
+        unit: "days",
+      },
+      {
+        type: "give_100",
+        title: "捐 $100",
+        emoji: "❤️",
+        target: 100,
+        current: totalGiven,
+        unit: "dollars",
+      },
+      {
+        type: "give_500",
+        title: "捐 $500",
+        emoji: "💝",
+        target: 500,
+        current: totalGiven,
+        unit: "dollars",
+      },
+    ]
+
+    const list = CATALOG.map((b) => {
+      const earnedAt = earnedMap.get(b.type)
+      const progress = Math.min(100, Math.round((b.current / b.target) * 100))
+      return {
+        badgeType: b.type,
+        title: b.title,
+        emoji: b.emoji,
+        target: b.target,
+        current: Math.min(b.current, b.target),
+        unit: b.unit,
+        progress,
+        earned: !!earnedAt,
+        earnedAt: earnedAt ?? null,
+      }
+    })
+
+    const totalEarned = list.filter((b) => b.earned).length
+    res.json({
+      kidId: kidIdQ,
+      totalEarned,
+      totalCatalog: CATALOG.length,
+      badges: list,
+    })
   })
 )
 
