@@ -256,6 +256,28 @@ export const kidsWishes = pgTable(
 )
 
 // ============================================================
+// 小孩每日心情簽到（培養情緒覺察、家長看孩子情緒軌跡）
+// ============================================================
+export const kidsCheckins = pgTable(
+  "kids_checkins",
+  {
+    id: serial("id").primaryKey(),
+    familyId: integer("family_id").default(1),
+    kidId: integer("kid_id")
+      .notNull()
+      .references(() => kidsAccounts.id, { onDelete: "cascade" }),
+    // mood: '😄 開心' / '🙂 還好' / '😐 普通' / '😢 難過' / '😡 生氣'
+    mood: varchar("mood", { length: 12 }).notNull(),
+    note: text("note"),
+    checkinDate: date("checkin_date").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => ({
+    kidDateIdx: index("kids_checkins_kid_date_idx").on(table.kidId, table.checkinDate),
+  })
+)
+
+// ============================================================
 // 捐贈對象目錄（家長預設常用對象、小孩 give 時下拉選）
 // 培養理財認知：知道錢的去向、誰需要幫助
 // ============================================================
@@ -373,5 +395,6 @@ export type InsertKidsSpending = z.infer<typeof insertKidsSpendingSchema>
 export type KidsDailyMessage = typeof kidsDailyMessages.$inferSelect
 export type FamilyTaskTemplate = typeof familyTaskTemplates.$inferSelect
 export type FamilyRecipient = typeof familyRecipients.$inferSelect
+export type KidsCheckin = typeof kidsCheckins.$inferSelect
 export type KidsWish = typeof kidsWishes.$inferSelect
 export type KidsTaskComment = typeof kidsTaskComments.$inferSelect

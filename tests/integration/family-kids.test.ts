@@ -1676,6 +1676,27 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     }
   })
 
+  it("心情簽到：POST upsert + GET 近 N 天 + today 標記", async () => {
+    await createKid()
+    const r1 = await request(app)
+      .post("/api/family/checkins")
+      .send({ kidId, mood: "😄 開心", note: "今天玩很開心" })
+    expect(r1.status).toBe(201)
+    expect(r1.body.updated).toBe(false)
+
+    const r2 = await request(app).post("/api/family/checkins").send({ kidId, mood: "😐 普通" })
+    expect(r2.status).toBe(200)
+    expect(r2.body.updated).toBe(true)
+    expect(r2.body.checkin.mood).toBe("😐 普通")
+
+    const r3 = await request(app).get(`/api/family/checkins?kidId=${kidId}&days=7`)
+    expect(r3.status).toBe(200)
+    expect(r3.body.today.mood).toBe("😐 普通")
+
+    const bad = await request(app).post("/api/family/checkins").send({ kidId, mood: "🚀" })
+    expect(bad.status).toBe(400)
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)

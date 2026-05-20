@@ -476,6 +476,9 @@ function KidDashboard({
       {/* 家長每日鼓勵卡（有寫才顯示）*/}
       <DailyMessageBanner kidId={kidId} />
 
+      {/* 心情簽到（今日心情）*/}
+      <CheckinPrompt kidId={kidId} />
+
       {/* 三罐（最大、最顯眼） */}
       <div className="grid grid-cols-3 gap-2 mb-4">
         <JarCard
@@ -1885,6 +1888,77 @@ function DonationsSection({ kidId }: { kidId: number }) {
                 ))}
             </div>
           )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function CheckinPrompt({ kidId }: { kidId: number }) {
+  const MOODS = ["😄 開心", "🙂 還好", "😐 普通", "😢 難過", "😡 生氣"]
+  interface Checkin {
+    id: number
+    mood: string
+    note: string | null
+    checkinDate: string
+  }
+  const { data, refetch } = useQuery<{
+    items: Checkin[]
+    today: Checkin | null
+  }>({
+    queryKey: [`/api/family/checkins?kidId=${kidId}&days=7`],
+  })
+
+  const mut = useMutation({
+    mutationFn: (mood: string) => apiRequest("POST", "/api/family/checkins", { kidId, mood }),
+    onSuccess: () => {
+      vibrate(30)
+      refetch()
+    },
+  })
+
+  if (!data) return null
+
+  return (
+    <div className="mb-3 bg-gradient-to-r from-sky-50 to-violet-50 border border-sky-200 rounded-xl p-3">
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-base">💭</span>
+        <span className="text-xs font-medium text-sky-800">
+          {data.today ? `今天的心情：${data.today.mood}` : "今天心情如何？"}
+        </span>
+      </div>
+      <div className="flex gap-1 justify-between flex-wrap">
+        {MOODS.map((m) => (
+          <button
+            key={m}
+            type="button"
+            onClick={() => mut.mutate(m)}
+            disabled={mut.isPending}
+            className={`text-xl flex-1 min-w-[18%] py-1.5 rounded transition ${
+              data.today?.mood === m
+                ? "bg-sky-200 scale-110 ring-2 ring-sky-400"
+                : "bg-white hover:bg-sky-100"
+            }`}
+          >
+            {m.slice(0, 2)}
+          </button>
+        ))}
+      </div>
+      {/* 近 7 天 mood 軌跡 mini bar */}
+      {data.items.length >= 2 && (
+        <div className="mt-2 flex gap-0.5 items-end h-5">
+          {data.items
+            .slice(0, 7)
+            .reverse()
+            .map((c) => (
+              <div
+                key={c.id}
+                className="flex-1 text-center text-[10px]"
+                title={`${c.checkinDate}：${c.mood}`}
+              >
+                {c.mood.slice(0, 2)}
+              </div>
+            ))}
         </div>
       )}
     </div>

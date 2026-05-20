@@ -39,6 +39,7 @@ import {
   familyRecipients,
   kidsWishes,
   kidsTaskComments,
+  kidsCheckins,
   insertKidsAccountSchema,
   insertKidsTaskSchema,
   insertKidsGoalSchema,
@@ -2810,6 +2811,70 @@ router.post(
       .returning()
 
     res.json({ ok: true, wish: updatedWish, goal })
+  })
+)
+
+/**
+ * 小孩每日心情簽到
+ *   POST /api/family/checkins                  寫今日心情（同日 upsert）
+ *   GET  /api/family/checkins?kidId=&days=30   查近 N 天心情軌跡
+ */
+const VALID_MOODS = ["😄 開心", "🙂 還好", "😐 普通", "😢 難過", "😡 生氣"]
+
+router.post(
+  "/api/family/checkins",
+  asyncHandler(async (req, res) => {
+    const kidIdN = Number(req.body?.kidId)
+    const mood = String(req.body?.mood ?? "").trim()
+    const note = req.body?.note ? String(req.body.note).slice(0, 500) : null
+    if (!kidIdN) throw new AppError(400, "kidId 必填")
+    if (!VALID_MOODS.includes(mood)) throw new AppError(400, "mood 不合法")
+
+    const today = new Date().toISOString().slice(0, 10)
+    const existing = await db.execute(sql`
+      SELECT id FROM kids_checkins
+      WHERE kid_id = ${kidIdN} AND checkin_date = ${today}
+      LIMIT 1
+    `)
+    const existingId = (existing as unknown as { rows: { id: number }[] }).rows[0]?.id
+
+    if (existingId) {
+      await db.execute(sql`
+        UPDATE kids_checkins SET mood = ${mood}, note = ${note}
+        WHERE id = ${existingId}
+      `)
+      const [updated] = await db
+        .select()
+        .from(kidsCheckins)
+        .where(eq(kidsCheckins.id, existingId))
+        .limit(1)
+      res.json({ ok: true, checkin: updated, updated: true })
+    } else {
+      const [created] = await db
+        .insert(kidsCheckins)
+        .values({ kidId: kidIdN, mood, note, checkinDate: today })
+        .returning()
+      res.status(201).json({ ok: true, checkin: created, updated: false })
+    }
+  })
+)
+
+router.get(
+  "/api/family/checkins",
+  asyncHandler(async (req, res) => {
+    const kidIdQ = Number(req.query.kidId)
+    if (!Number.isInteger(kidIdQ) || kidIdQ < 1) throw new AppError(400, "需傳 kidId")
+    const days = Math.min(Math.max(parseInt((req.query.days as string) || "30", 10), 1), 90)
+    const sinceDate = new Date(Date.now() - days * 86400000).toISOString().slice(0, 10)
+    const rows = await db.execute(sql`
+      SELECT * FROM kids_checkins
+      WHERE kid_id = ${kidIdQ} AND checkin_date >= ${sinceDate}
+      ORDER BY checkin_date DESC
+    `)
+    const today = new Date().toISOString().slice(0, 10)
+    const items = (rows as unknown as { rows: Array<{ checkin_date: string }> }).rows
+    const todayCheckin = items.find((x) => x.checkin_date === today) ?? null
+    res.json({ kidId: kidIdQ, days, items, today: todayCheckin })
   })
 )
 
