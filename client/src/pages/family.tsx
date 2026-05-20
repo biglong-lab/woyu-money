@@ -75,6 +75,7 @@ interface Task {
   createdAt: string
   isOverdue?: boolean
   overdueDays?: number
+  proofImageUrl?: string | null
 }
 
 interface Jar {
@@ -332,6 +333,17 @@ export default function FamilyPage() {
                       {kid?.displayName ?? "—"} · {formatMoney(t.rewardAmount)}
                     </div>
                   </div>
+                  {t.proofImageUrl && (
+                    <a
+                      href={t.proofImageUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="border rounded overflow-hidden"
+                      title="點看大圖"
+                    >
+                      <img src={t.proofImageUrl} alt="證明" className="w-12 h-12 object-cover" />
+                    </a>
+                  )}
                   <div className="flex gap-1">
                     <Button
                       size="sm"

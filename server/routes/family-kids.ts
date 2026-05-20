@@ -299,6 +299,7 @@ router.get(
         completedAt: kidsTasks.completedAt,
         approvedAt: kidsTasks.approvedAt,
         paymentRecordId: kidsTasks.paymentRecordId,
+        proofImageUrl: kidsTasks.proofImageUrl,
         createdAt: kidsTasks.createdAt,
       })
       .from(kidsTasks)
@@ -353,9 +354,18 @@ router.post(
     const [task] = await db.select().from(kidsTasks).where(eq(kidsTasks.id, id)).limit(1)
     if (!task) throw new AppError(404, "任務不存在")
     if (task.status !== "pending") throw new AppError(400, "任務狀態不可標完成")
+    // 可選：proofImageUrl（小孩附照片證明）
+    const proofImageUrl = req.body?.proofImageUrl
+      ? String(req.body.proofImageUrl).slice(0, 500)
+      : null
     const [updated] = await db
       .update(kidsTasks)
-      .set({ status: "submitted", completedAt: new Date(), updatedAt: new Date() })
+      .set({
+        status: "submitted",
+        completedAt: new Date(),
+        updatedAt: new Date(),
+        ...(proofImageUrl ? { proofImageUrl } : {}),
+      })
       .where(eq(kidsTasks.id, id))
       .returning()
     res.json(updated)

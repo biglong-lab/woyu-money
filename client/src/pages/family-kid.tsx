@@ -86,6 +86,7 @@ interface Task {
   emoji: string | null
   rewardAmount: string
   status: "pending" | "submitted" | "approved" | "rejected"
+  proofImageUrl?: string | null
 }
 
 interface Goal {
@@ -339,7 +340,10 @@ function KidDashboard({
   }
 
   const submitMut = useMutation({
-    mutationFn: (taskId: number) => apiRequest("POST", `/api/family/tasks/${taskId}/submit`),
+    mutationFn: (vars: { taskId: number; proofImageUrl?: string }) =>
+      apiRequest("POST", `/api/family/tasks/${vars.taskId}/submit`, {
+        proofImageUrl: vars.proofImageUrl,
+      }),
     onSuccess: () => {
       toast({ title: "✅ 已標完成、等大人確認" })
       confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 } })
@@ -348,6 +352,25 @@ function KidDashboard({
     },
     onError: (e: Error) => toast({ title: "失敗", description: e.message, variant: "destructive" }),
   })
+
+  // 拍照上傳：用 FormData / 既有 /api/upload/images endpoint
+  const uploadImage = async (file: File): Promise<string | null> => {
+    try {
+      const fd = new FormData()
+      fd.append("images", file)
+      const resp = await fetch("/api/upload/images", { method: "POST", body: fd })
+      if (!resp.ok) throw new Error("上傳失敗")
+      const data = (await resp.json()) as { imagePaths: string[] }
+      return data.imagePaths?.[0] ?? null
+    } catch (e: unknown) {
+      toast({
+        title: "上傳失敗",
+        description: e instanceof Error ? e.message : "請重試",
+        variant: "destructive",
+      })
+      return null
+    }
+  }
 
   const deleteSpendingMut = useMutation({
     mutationFn: (id: number) => apiRequest("DELETE", `/api/family/spendings/${id}`),
@@ -487,10 +510,28 @@ function KidDashboard({
                     完成可得 {formatMoney(t.rewardAmount)}
                   </div>
                 </div>
+                {/* 拍照 + 完成 */}
+                <label className="cursor-pointer bg-gray-100 hover:bg-gray-200 rounded p-2 inline-flex">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0]
+                      if (!file) return
+                      const url = await uploadImage(file)
+                      if (url) {
+                        submitMut.mutate({ taskId: t.id, proofImageUrl: url })
+                      }
+                    }}
+                  />
+                  📷
+                </label>
                 <Button
                   size="sm"
                   className="bg-green-600 hover:bg-green-700"
-                  onClick={() => submitMut.mutate(t.id)}
+                  onClick={() => submitMut.mutate({ taskId: t.id })}
                   disabled={submitMut.isPending}
                 >
                   <CheckCircle2 className="h-4 w-4 mr-1" />

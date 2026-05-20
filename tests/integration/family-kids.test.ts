@@ -635,6 +635,23 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     }
   })
 
+  it("submit 任務可附 proofImageUrl + tasks list 回傳", async () => {
+    await createKid()
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId, title: "T", rewardAmount: 50 })
+    const proofUrl = "/uploads/receipts/test-proof.jpg"
+    const sres = await request(app)
+      .post(`/api/family/tasks/${t.body.id}/submit`)
+      .send({ proofImageUrl: proofUrl })
+    expect(sres.status).toBe(200)
+    expect(sres.body.proofImageUrl).toBe(proofUrl)
+
+    const list = await request(app).get(`/api/family/tasks?kidId=${kidId}`)
+    const found = list.body.find((x: { id: number }) => x.id === t.body.id)
+    expect(found.proofImageUrl).toBe(proofUrl)
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)

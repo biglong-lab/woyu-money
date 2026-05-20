@@ -100,6 +100,8 @@ export const kidsTasks = pgTable(
     recurringInterval: varchar("recurring_interval", { length: 12 }),
     // 追溯來源：第一個 recurring 任務的 id（同一條 chain）
     recurringParentId: integer("recurring_parent_id"),
+    // 小孩 submit 時可附上照片證明（URL）
+    proofImageUrl: varchar("proof_image_url", { length: 500 }),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },
