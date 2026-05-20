@@ -1769,6 +1769,44 @@ router.get(
 )
 
 /**
+ * 小孩自訂頭像 / 顏色（不需家長 PIN）
+ * PUT /api/family/kids/:id/personalize
+ * 限定欄位：avatar, color（不能改 pin / ratios / displayName）
+ */
+router.put(
+  "/api/family/kids/:id/personalize",
+  asyncHandler(async (req, res) => {
+    const id = Number(req.params.id)
+    if (!Number.isInteger(id) || id < 1) throw new AppError(400, "無效的 ID")
+    const [kid] = await db.select().from(kidsAccounts).where(eq(kidsAccounts.id, id)).limit(1)
+    if (!kid) throw new AppError(404, "小孩不存在")
+
+    const body: Record<string, unknown> = {}
+    if (req.body?.avatar) {
+      const a = String(req.body.avatar).slice(0, 32)
+      if (!a) throw new AppError(400, "avatar 不可空")
+      body.avatar = a
+    }
+    if (req.body?.color) {
+      const c = String(req.body.color)
+      const allowed = ["blue", "pink", "green", "amber", "purple", "cyan"]
+      if (!allowed.includes(c)) throw new AppError(400, "color 不合法")
+      body.color = c
+    }
+    if (Object.keys(body).length === 0) {
+      throw new AppError(400, "至少需提供 avatar 或 color")
+    }
+    body.updatedAt = new Date()
+    const [updated] = await db
+      .update(kidsAccounts)
+      .set(body)
+      .where(eq(kidsAccounts.id, id))
+      .returning()
+    res.json(updated)
+  })
+)
+
+/**
  * 任務評論串
  *   GET  /api/family/tasks/:id/comments      列出該任務所有評論
  *   POST /api/family/tasks/:id/comments      新增（author: 'parent' / 'kid'、message）

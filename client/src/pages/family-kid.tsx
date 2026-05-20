@@ -346,6 +346,7 @@ function KidDashboard({
   const [showReport, setShowReport] = useState(false)
   const [showTransfer, setShowTransfer] = useState(false)
   const [commentTask, setCommentTask] = useState<{ id: number; title: string } | null>(null)
+  const [showPersonalize, setShowPersonalize] = useState(false)
 
   const invalidate = () => {
     queryClient.invalidateQueries({
@@ -440,7 +441,14 @@ function KidDashboard({
             <ArrowLeft className="h-5 w-5" />
           </Button>
         </Link>
-        <div className="text-3xl">{kid.avatar}</div>
+        <button
+          type="button"
+          onClick={() => setShowPersonalize(true)}
+          className="text-3xl hover:scale-110 transition-transform"
+          title="點頭像換造型"
+        >
+          {kid.avatar}
+        </button>
         <div className="flex-1">
           <h1 className="text-xl font-bold">嗨 {kid.displayName}！</h1>
           <p className="text-xs text-gray-500">
@@ -1052,7 +1060,146 @@ function KidDashboard({
           onClose={() => setCommentTask(null)}
         />
       )}
+
+      {showPersonalize && (
+        <PersonalizeDialog
+          kid={kid}
+          onClose={() => setShowPersonalize(false)}
+          onSuccess={() => {
+            invalidate()
+            setShowPersonalize(false)
+            vibrate(40)
+          }}
+          toast={toast}
+        />
+      )}
     </div>
+  )
+}
+
+function PersonalizeDialog({
+  kid,
+  onClose,
+  onSuccess,
+  toast,
+}: {
+  kid: Kid
+  onClose: () => void
+  onSuccess: () => void
+  toast: (opts: {
+    title: string
+    description?: string
+    variant?: "default" | "destructive"
+  }) => void
+}) {
+  const [avatar, setAvatar] = useState(kid.avatar)
+  const [color, setColor] = useState(kid.color)
+
+  const AVATARS = [
+    "🧒",
+    "👧",
+    "👦",
+    "🧑",
+    "👶",
+    "🐱",
+    "🐶",
+    "🐻",
+    "🦊",
+    "🐰",
+    "🐼",
+    "🦁",
+    "🐯",
+    "🦄",
+    "🐸",
+    "🐵",
+  ]
+  const COLORS = [
+    { v: "blue", label: "藍", bg: "bg-blue-500" },
+    { v: "pink", label: "粉", bg: "bg-pink-500" },
+    { v: "green", label: "綠", bg: "bg-green-500" },
+    { v: "amber", label: "黃", bg: "bg-amber-500" },
+    { v: "purple", label: "紫", bg: "bg-purple-500" },
+    { v: "cyan", label: "青", bg: "bg-cyan-500" },
+  ]
+
+  const mut = useMutation({
+    mutationFn: () =>
+      apiRequest("PUT", `/api/family/kids/${kid.id}/personalize`, { avatar, color }),
+    onSuccess: () => {
+      toast({ title: "✨ 變身成功！" })
+      onSuccess()
+    },
+    onError: (e: Error) => toast({ title: "失敗", description: e.message, variant: "destructive" }),
+  })
+
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent className="w-[95vw] max-w-sm">
+        <DialogHeader>
+          <DialogTitle>✨ 我的造型</DialogTitle>
+          <DialogDescription>選你喜歡的頭像和顏色</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3 text-sm">
+          <div>
+            <Label>頭像</Label>
+            <div className="grid grid-cols-8 gap-1 mt-1">
+              {AVATARS.map((a) => (
+                <button
+                  key={a}
+                  type="button"
+                  onClick={() => setAvatar(a)}
+                  className={`text-2xl p-1.5 rounded ${
+                    avatar === a ? "bg-indigo-100 ring-2 ring-indigo-500" : "hover:bg-gray-100"
+                  }`}
+                >
+                  {a}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <Label>顏色</Label>
+            <div className="grid grid-cols-6 gap-1 mt-1">
+              {COLORS.map((c) => (
+                <button
+                  key={c.v}
+                  type="button"
+                  onClick={() => setColor(c.v)}
+                  className={`h-10 rounded flex items-center justify-center text-white font-bold ${c.bg} ${
+                    color === c.v ? "ring-2 ring-offset-2 ring-gray-700" : ""
+                  }`}
+                >
+                  {c.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="bg-gray-50 rounded p-3 flex items-center gap-3 justify-center">
+            <span className="text-xs text-gray-500">預覽：</span>
+            <span className="text-4xl">{avatar}</span>
+            <span
+              className={`px-3 py-1 rounded-full text-white text-sm font-bold ${
+                COLORS.find((c) => c.v === color)?.bg ?? "bg-blue-500"
+              }`}
+            >
+              {kid.displayName}
+            </span>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            取消
+          </Button>
+          <Button
+            disabled={mut.isPending || (avatar === kid.avatar && color === kid.color)}
+            onClick={() => mut.mutate()}
+            className="bg-indigo-600 hover:bg-indigo-700"
+          >
+            ✨ 變身
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 

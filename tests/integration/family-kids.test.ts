@@ -1366,6 +1366,44 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(bad.status).toBe(400)
   })
 
+  it("小孩自訂頭像 + 顏色（不改 pin / ratios）", async () => {
+    await createKid({ displayName: "小明" })
+
+    // 改 avatar + color
+    const r1 = await request(app)
+      .put(`/api/family/kids/${kidId}/personalize`)
+      .send({ avatar: "🐱", color: "pink" })
+    expect(r1.status).toBe(200)
+    expect(r1.body.avatar).toBe("🐱")
+    expect(r1.body.color).toBe("pink")
+    expect(r1.body.displayName).toBe("小明") // 名字不變
+    expect(r1.body.spendRatio).toBe(70) // ratios 不變
+
+    // 只改 color
+    const r2 = await request(app)
+      .put(`/api/family/kids/${kidId}/personalize`)
+      .send({ color: "purple" })
+    expect(r2.status).toBe(200)
+    expect(r2.body.color).toBe("purple")
+    expect(r2.body.avatar).toBe("🐱")
+
+    // 不合法 color 400
+    const bad = await request(app)
+      .put(`/api/family/kids/${kidId}/personalize`)
+      .send({ color: "rainbow" })
+    expect(bad.status).toBe(400)
+
+    // 空 body 400
+    const empty = await request(app).put(`/api/family/kids/${kidId}/personalize`).send({})
+    expect(empty.status).toBe(400)
+
+    // 不存在 404
+    const notFound = await request(app)
+      .put(`/api/family/kids/999999/personalize`)
+      .send({ avatar: "🐶" })
+    expect(notFound.status).toBe(404)
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)
