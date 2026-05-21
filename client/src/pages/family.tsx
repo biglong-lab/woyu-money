@@ -514,6 +514,9 @@ export default function FamilyPage() {
       {/* 家庭收入 vs 花用對比 */}
       <FamilyIncomeVsSpendingCard />
 
+      {/* 家庭周末 vs 工作日 */}
+      <FamilyWeekendVsWeekdayCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3468,6 +3471,53 @@ function ParentTodoList() {
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
       )}
+    </div>
+  )
+}
+
+function FamilyWeekendVsWeekdayCard() {
+  const { data } = useQuery<{
+    days: number
+    weekend: { tasks: number; tasksPerDay: number; spent: number; days: number }
+    weekday: { tasks: number; tasksPerDay: number; spent: number; days: number }
+    pattern: "weekend_warriors" | "weekday_grinders" | "balanced" | "no_data"
+    message: string
+  }>({
+    queryKey: ["/api/family/weekend-vs-weekday?days=60"],
+  })
+  if (!data || data.weekend.tasks + data.weekday.tasks === 0) return null
+
+  const PATTERN_BG: Record<string, string> = {
+    weekend_warriors: "from-violet-50 to-purple-50 border-violet-400",
+    weekday_grinders: "from-blue-50 to-cyan-50 border-blue-400",
+    balanced: "from-emerald-50 to-green-50 border-emerald-300",
+    no_data: "from-gray-50 to-slate-50 border-gray-300",
+  }
+
+  return (
+    <div
+      className={`mb-4 rounded-2xl border-2 bg-gradient-to-br ${PATTERN_BG[data.pattern]} p-3 shadow`}
+    >
+      <h3 className="font-bold mb-2 flex items-center gap-2">📆 週末 vs 平日（60 天）</h3>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-2 text-xs">{data.message}</div>
+
+      <div className="grid grid-cols-2 gap-2">
+        <div className="bg-white rounded-lg p-2">
+          <div className="text-xs text-gray-500 mb-1">🏠 週末</div>
+          <div className="text-lg font-bold">{data.weekend.tasks} 任務</div>
+          <div className="text-[10px] text-gray-500">
+            日均 {data.weekend.tasksPerDay} · 花 ${data.weekend.spent}
+          </div>
+        </div>
+        <div className="bg-white rounded-lg p-2">
+          <div className="text-xs text-gray-500 mb-1">💼 平日</div>
+          <div className="text-lg font-bold">{data.weekday.tasks} 任務</div>
+          <div className="text-[10px] text-gray-500">
+            日均 {data.weekday.tasksPerDay} · 花 ${data.weekday.spent}
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

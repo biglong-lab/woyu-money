@@ -4245,6 +4245,25 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.body.weeks).toBe(52)
   })
 
+  it("周末工作日：基本結構 weekend/weekday/pattern/message", async () => {
+    const res = await request(app).get("/api/family/weekend-vs-weekday")
+    expect(res.status).toBe(200)
+    expect(res.body.weekend).toHaveProperty("tasks")
+    expect(res.body.weekend).toHaveProperty("tasksPerDay")
+    expect(res.body.weekday).toHaveProperty("tasks")
+    expect(["weekend_warriors", "weekday_grinders", "balanced", "no_data"]).toContain(
+      res.body.pattern
+    )
+    expect(res.body.message).toBeTruthy()
+  })
+
+  it("周末工作日：days clamp 14-180", async () => {
+    const r1 = await request(app).get("/api/family/weekend-vs-weekday?days=500")
+    expect(r1.body.days).toBe(180)
+    const r2 = await request(app).get("/api/family/weekend-vs-weekday?days=5")
+    expect(r2.body.days).toBe(14)
+  })
+
   it("收入花用：基本結構 income/spent/balance/ratio/level", async () => {
     const res = await request(app).get("/api/family/income-vs-spending")
     expect(res.status).toBe(200)

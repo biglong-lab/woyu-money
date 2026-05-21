@@ -8602,6 +8602,103 @@ async function bulkApproveOne(
 }
 
 /**
+ * GET /api/family/weekend-vs-weekday?days=60
+ * 全家過去 N 天「週末」vs「工作日」task 完成 + spending 對比
+ * 用 EXTRACT(DOW)：0=Sun 1=Mon ... 6=Sat、週末 = 0/6
+ */
+router.get(
+  "/api/family/weekend-vs-weekday",
+  asyncHandler(async (req, res) => {
+    const days = Math.min(Math.max(Number(req.query.days) || 60, 14), 180)
+
+    const rows = await db.execute(sql`
+      WITH days_set AS (
+        SELECT generate_series(
+          CURRENT_DATE - (${days - 1}::int * INTERVAL '1 day'),
+          CURRENT_DATE,
+          INTERVAL '1 day'
+        )::date AS d
+      ),
+      counts AS (
+        SELECT
+          d.d,
+          EXTRACT(DOW FROM d.d)::int AS dow,
+          (SELECT COUNT(*)::int FROM kids_tasks
+            WHERE status = 'approved' AND DATE(completed_at) = d.d) AS tasks,
+          COALESCE((SELECT SUM(amount::numeric)::numeric FROM kids_spendings
+            WHERE jar IN ('spend', 'give') AND spend_date = d.d), 0) AS spent
+        FROM days_set d
+      )
+      SELECT
+        SUM(CASE WHEN dow IN (0, 6) THEN tasks ELSE 0 END)::int AS weekend_tasks,
+        SUM(CASE WHEN dow NOT IN (0, 6) THEN tasks ELSE 0 END)::int AS weekday_tasks,
+        SUM(CASE WHEN dow IN (0, 6) THEN spent ELSE 0 END)::numeric AS weekend_spent,
+        SUM(CASE WHEN dow NOT IN (0, 6) THEN spent ELSE 0 END)::numeric AS weekday_spent,
+        COUNT(*) FILTER (WHERE dow IN (0, 6))::int AS weekend_days,
+        COUNT(*) FILTER (WHERE dow NOT IN (0, 6))::int AS weekday_days
+      FROM counts
+    `)
+    const row = (
+      rows as unknown as {
+        rows: Array<{
+          weekend_tasks: number
+          weekday_tasks: number
+          weekend_spent: string | number
+          weekday_spent: string | number
+          weekend_days: number
+          weekday_days: number
+        }>
+      }
+    ).rows[0]
+
+    const weekendTasks = row?.weekend_tasks ?? 0
+    const weekdayTasks = row?.weekday_tasks ?? 0
+    const weekendSpent = Number(row?.weekend_spent ?? 0)
+    const weekdaySpent = Number(row?.weekday_spent ?? 0)
+    const weekendDays = row?.weekend_days ?? 0
+    const weekdayDays = row?.weekday_days ?? 0
+
+    const weekendTasksPerDay = weekendDays > 0 ? weekendTasks / weekendDays : 0
+    const weekdayTasksPerDay = weekdayDays > 0 ? weekdayTasks / weekdayDays : 0
+
+    const total = weekendTasks + weekdayTasks
+    let pattern: "weekend_warriors" | "weekday_grinders" | "balanced" | "no_data"
+    let message: string
+    if (total === 0) {
+      pattern = "no_data"
+      message = `過去 ${days} 天還沒任務完成、開始活躍吧 🌱`
+    } else if (weekendTasksPerDay > weekdayTasksPerDay * 1.5) {
+      pattern = "weekend_warriors"
+      message = `🏆 家裡是週末戰士型（週末日均 ${weekendTasksPerDay.toFixed(1)} vs 平日 ${weekdayTasksPerDay.toFixed(1)}）`
+    } else if (weekdayTasksPerDay > weekendTasksPerDay * 1.5) {
+      pattern = "weekday_grinders"
+      message = `💪 家裡平日比較拼（平日日均 ${weekdayTasksPerDay.toFixed(1)} vs 週末 ${weekendTasksPerDay.toFixed(1)}）`
+    } else {
+      pattern = "balanced"
+      message = `⚖️ 家裡天天都活躍（平日 ${weekdayTasksPerDay.toFixed(1)} / 週末 ${weekendTasksPerDay.toFixed(1)}）`
+    }
+
+    res.json({
+      days,
+      weekend: {
+        tasks: weekendTasks,
+        tasksPerDay: Math.round(weekendTasksPerDay * 10) / 10,
+        spent: weekendSpent,
+        days: weekendDays,
+      },
+      weekday: {
+        tasks: weekdayTasks,
+        tasksPerDay: Math.round(weekdayTasksPerDay * 10) / 10,
+        spent: weekdaySpent,
+        days: weekdayDays,
+      },
+      pattern,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/income-vs-spending?days=30
  * 全家過去 N 天收入（task reward）vs 花用（spend + give）對比
  * 含 balance / ratio / 評等 / 動態 message
