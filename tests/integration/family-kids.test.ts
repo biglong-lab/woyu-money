@@ -3407,6 +3407,46 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(r.status).toBe(400)
   })
 
+  it("家長待辦：submitted 任務 + 未打卡小孩 → todos 含 approve_task 與 kid_no_checkin", async () => {
+    // 清乾淨
+    await db.execute(sql`DELETE FROM kids_accounts WHERE pin = ${TEST_PIN}`)
+    await createKid()
+
+    // 1 個 submitted 任務（urgent）
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId, title: "等審核", rewardAmount: 30 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`)
+    // 不 approve、保持 submitted
+
+    const res = await request(app).get("/api/family/parent-todo")
+    expect(res.status).toBe(200)
+    expect(res.body.total).toBeGreaterThanOrEqual(2) // 至少有 approve_task + no_checkin
+
+    const types = res.body.todos.map((t: { type: string }) => t.type)
+    expect(types).toContain("approve_task")
+    expect(types).toContain("kid_no_checkin")
+
+    // urgentCount >= 1
+    expect(res.body.urgentCount).toBeGreaterThanOrEqual(1)
+
+    // 第一筆 priority='urgent'（按優先級排序）
+    expect(res.body.todos[0].priority).toBe("urgent")
+    // 每個 todo 都有 action + icon
+    for (const todo of res.body.todos) {
+      expect(todo.action).toBeTruthy()
+      expect(todo.icon).toBeTruthy()
+    }
+  })
+
+  it("家長待辦：全部已 OK → urgentCount=0、todos 可空", async () => {
+    await db.execute(sql`DELETE FROM kids_accounts WHERE pin = ${TEST_PIN}`)
+
+    const res = await request(app).get("/api/family/parent-todo")
+    expect(res.status).toBe(200)
+    expect(res.body.urgentCount).toBe(0)
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)

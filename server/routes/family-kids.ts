@@ -2875,6 +2875,182 @@ router.get(
 )
 
 /**
+ * GET /api/family/parent-todo
+ * 家長端待辦清單：今日該做什麼 actionable items
+ *
+ * 4 種項目：
+ *   - approve_task: 待審核任務（status='submitted'）
+ *   - kid_no_checkin: 今日缺打卡的小孩
+ *   - goal_deadline_soon: 7 天內到期目標
+ *   - stale_wish: > 14 天未升級的願望
+ *
+ * 每項有 priority（urgent / high / medium / low）+ action 描述
+ */
+router.get(
+  "/api/family/parent-todo",
+  asyncHandler(async (_req, res) => {
+    const [pendingTasks, kidsNoCheckin, goalsSoon, staleWishes] = await Promise.all([
+      db.execute(sql`
+        SELECT kt.id::int AS id, kt.title, ka.display_name AS kid_name, ka.avatar
+        FROM kids_tasks kt
+        JOIN kids_accounts ka ON ka.id = kt.kid_id
+        WHERE kt.status = 'submitted'
+        ORDER BY kt.updated_at DESC
+        LIMIT 20
+      `),
+      db.execute(sql`
+        SELECT ka.id::int AS kid_id, ka.display_name AS kid_name, ka.avatar
+        FROM kids_accounts ka
+        WHERE ka.is_active = true
+          AND NOT EXISTS (
+            SELECT 1 FROM kids_checkins
+            WHERE kid_id = ka.id AND checkin_date = CURRENT_DATE
+          )
+      `),
+      db.execute(sql`
+        SELECT
+          kg.id::int AS id,
+          kg.name AS name,
+          ka.display_name AS kid_name,
+          ka.avatar,
+          kg.deadline,
+          (kg.deadline - CURRENT_DATE)::int AS days_left,
+          kg.current_amount::numeric AS current,
+          kg.target_amount::numeric AS target
+        FROM kids_goals kg
+        JOIN kids_accounts ka ON ka.id = kg.kid_id
+        WHERE kg.status = 'active'
+          AND kg.deadline IS NOT NULL
+          AND kg.deadline <= CURRENT_DATE + INTERVAL '7 days'
+          AND kg.deadline >= CURRENT_DATE
+        ORDER BY kg.deadline ASC
+      `),
+      db.execute(sql`
+        SELECT
+          kw.id::int AS id,
+          kw.title,
+          ka.display_name AS kid_name,
+          ka.avatar,
+          (CURRENT_DATE - DATE(kw.created_at))::int AS days_old
+        FROM kids_wishes kw
+        JOIN kids_accounts ka ON ka.id = kw.kid_id
+        WHERE kw.status = 'wished'
+          AND kw.created_at < NOW() - INTERVAL '14 days'
+        ORDER BY kw.created_at ASC
+        LIMIT 10
+      `),
+    ])
+
+    const todos: Array<{
+      type: string
+      priority: "urgent" | "high" | "medium" | "low"
+      icon: string
+      action: string
+      detail?: string
+      relatedId?: number
+      kidName?: string
+      avatar?: string
+    }> = []
+
+    for (const r of (
+      pendingTasks as unknown as {
+        rows: { id: number; title: string; kid_name: string; avatar: string }[]
+      }
+    ).rows) {
+      todos.push({
+        type: "approve_task",
+        priority: "urgent",
+        icon: "⏳",
+        action: `審核「${r.title}」`,
+        detail: `${r.kid_name} 已完成、等家長確認`,
+        relatedId: r.id,
+        kidName: r.kid_name,
+        avatar: r.avatar,
+      })
+    }
+
+    for (const r of (
+      kidsNoCheckin as unknown as {
+        rows: { kid_id: number; kid_name: string; avatar: string }[]
+      }
+    ).rows) {
+      todos.push({
+        type: "kid_no_checkin",
+        priority: "low",
+        icon: "📅",
+        action: `提醒 ${r.kid_name} 打卡`,
+        detail: "今天還沒寫心情",
+        relatedId: r.kid_id,
+        kidName: r.kid_name,
+        avatar: r.avatar,
+      })
+    }
+
+    for (const r of (
+      goalsSoon as unknown as {
+        rows: {
+          id: number
+          name: string
+          kid_name: string
+          avatar: string
+          deadline: Date
+          days_left: number
+          current: string | number
+          target: string | number
+        }[]
+      }
+    ).rows) {
+      const cur = Number(r.current)
+      const tgt = Number(r.target)
+      const remaining = tgt - cur
+      todos.push({
+        type: "goal_deadline_soon",
+        priority: r.days_left <= 3 ? "urgent" : "high",
+        icon: "🎯",
+        action: `關注「${r.name}」目標`,
+        detail: `${r.kid_name}、還差 $${remaining} / ${r.days_left} 天到期`,
+        relatedId: r.id,
+        kidName: r.kid_name,
+        avatar: r.avatar,
+      })
+    }
+
+    for (const r of (
+      staleWishes as unknown as {
+        rows: {
+          id: number
+          title: string
+          kid_name: string
+          avatar: string
+          days_old: number
+        }[]
+      }
+    ).rows) {
+      todos.push({
+        type: "stale_wish",
+        priority: "medium",
+        icon: "✨",
+        action: `跟 ${r.kid_name} 聊「${r.title}」`,
+        detail: `願望放著 ${r.days_old} 天了、值得升級成目標？`,
+        relatedId: r.id,
+        kidName: r.kid_name,
+        avatar: r.avatar,
+      })
+    }
+
+    // 按 priority 排序
+    const order = { urgent: 0, high: 1, medium: 2, low: 3 }
+    todos.sort((a, b) => order[a.priority] - order[b.priority])
+
+    res.json({
+      total: todos.length,
+      urgentCount: todos.filter((t) => t.priority === "urgent").length,
+      todos,
+    })
+  })
+)
+
+/**
  * GET /api/family/kid-weekly-report?kidId=
  * 小孩本週成績單：本週 vs 上週、4 維度 + 趨勢
  */

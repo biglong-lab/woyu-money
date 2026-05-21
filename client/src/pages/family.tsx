@@ -443,6 +443,9 @@ export default function FamilyPage() {
       {/* 家庭今日重點（最頂部）*/}
       <FamilyTodaySummary />
 
+      {/* 家長待辦清單 */}
+      <ParentTodoList />
+
       {/* 跨域搜尋 */}
       <FamilySearch />
 
@@ -2484,6 +2487,80 @@ function FamilyActivityFeed() {
           className="mt-2 w-full text-center text-sm text-blue-600 hover:text-blue-800"
         >
           {expanded ? "收起" : `看更多 (${acts.length - 6} 筆)`}
+        </button>
+      )}
+    </div>
+  )
+}
+
+function ParentTodoList() {
+  const [collapsed, setCollapsed] = useState(true)
+  const { data } = useQuery<{
+    total: number
+    urgentCount: number
+    todos: Array<{
+      type: string
+      priority: "urgent" | "high" | "medium" | "low"
+      icon: string
+      action: string
+      detail?: string
+      relatedId?: number
+      kidName?: string
+      avatar?: string
+    }>
+  }>({
+    queryKey: ["/api/family/parent-todo"],
+    queryFn: async () => {
+      const res = await fetch("/api/family/parent-todo", { credentials: "include" })
+      return res.json()
+    },
+  })
+  if (!data || data.total === 0) return null
+
+  const PRIORITY_COLOR: Record<string, string> = {
+    urgent: "bg-rose-100 border-rose-300 text-rose-900",
+    high: "bg-amber-100 border-amber-300 text-amber-900",
+    medium: "bg-blue-100 border-blue-300 text-blue-900",
+    low: "bg-gray-100 border-gray-300 text-gray-700",
+  }
+
+  const visible = collapsed ? data.todos.slice(0, 3) : data.todos
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-amber-300 bg-gradient-to-br from-amber-50 to-orange-50 p-4 shadow">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="font-bold text-amber-900 flex items-center gap-2">
+          📋 待辦清單（{data.total}）
+        </h3>
+        {data.urgentCount > 0 && (
+          <span className="text-xs bg-rose-500 text-white px-2 py-0.5 rounded-full font-bold">
+            🔴 {data.urgentCount} 急
+          </span>
+        )}
+      </div>
+
+      <div className="space-y-1.5">
+        {visible.map((t, i) => (
+          <div key={i} className={`rounded-lg p-2 border ${PRIORITY_COLOR[t.priority]}`}>
+            <div className="flex items-center gap-2">
+              <span className="text-xl shrink-0">{t.icon}</span>
+              {t.avatar && <span className="text-lg shrink-0">{t.avatar}</span>}
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium">{t.action}</div>
+                {t.detail && <div className="text-xs opacity-75">{t.detail}</div>}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {data.todos.length > 3 && (
+        <button
+          type="button"
+          onClick={() => setCollapsed((v) => !v)}
+          className="mt-2 w-full text-center text-sm text-amber-700 hover:text-amber-900"
+        >
+          {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
       )}
     </div>
