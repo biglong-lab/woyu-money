@@ -452,6 +452,12 @@ export default function FamilyPage() {
       {/* 熱門任務 TOP 5 */}
       <PopularTasksCard />
 
+      {/* 家庭財富趨勢（6 個月）*/}
+      <FamilyWealthTrend />
+
+      {/* 家庭里程碑紀錄 */}
+      <FamilyMilestonesCard />
+
       {/* 全家活動 feed */}
       <FamilyActivityFeed />
 
@@ -1879,6 +1885,197 @@ function DifficultyInsights() {
         ))}
       </CardContent>
     </Card>
+  )
+}
+
+function FamilyMilestonesCard() {
+  const { data } = useQuery<{
+    totals: { tasks: number; reward: number; given: number; saved: number; checkins: number }
+    milestones: Array<{
+      key: string
+      name: string
+      unit: string
+      total: number
+      reached: Array<{ value: number; emoji: string; label: string }>
+      next: {
+        value: number
+        emoji: string
+        label: string
+        remaining: number
+        progress: number
+      } | null
+      complete: boolean
+    }>
+    summary: { totalReached: number; totalPossible: number }
+  }>({
+    queryKey: ["/api/family/milestones"],
+    queryFn: async () => {
+      const res = await fetch("/api/family/milestones", { credentials: "include" })
+      return res.json()
+    },
+  })
+  if (!data || data.summary.totalReached === 0) return null
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-amber-300 bg-gradient-to-br from-amber-50 to-yellow-50 p-4 shadow">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="font-bold text-amber-900 flex items-center gap-2">🏛️ 家庭里程碑</h3>
+        <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-bold">
+          {data.summary.totalReached} / {data.summary.totalPossible}
+        </span>
+      </div>
+
+      <div className="space-y-2">
+        {data.milestones.map((m) => (
+          <div
+            key={m.key}
+            className={`rounded-lg p-2 ${
+              m.complete ? "bg-emerald-50 border border-emerald-300" : "bg-white"
+            }`}
+          >
+            <div className="flex items-center justify-between mb-1 text-sm">
+              <span className="font-medium">{m.name}</span>
+              <span className="text-xs text-gray-500">
+                {m.total} {m.unit}
+              </span>
+            </div>
+
+            {/* 已達成徽章 */}
+            <div className="flex gap-1 mb-1">
+              {m.reached.map((r) => (
+                <span
+                  key={r.value}
+                  className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full"
+                  title={r.label}
+                >
+                  {r.emoji} {r.label}
+                </span>
+              ))}
+              {m.complete && (
+                <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-bold">
+                  🎊 全達成
+                </span>
+              )}
+            </div>
+
+            {/* 下一個目標 */}
+            {m.next && (
+              <>
+                <div className="text-xs text-gray-600 mb-0.5">
+                  下個：{m.next.emoji} {m.next.label}（還差 {m.next.remaining} {m.unit}）
+                </div>
+                <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-amber-400 to-orange-500"
+                    style={{ width: `${m.next.progress}%` }}
+                  />
+                </div>
+              </>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function FamilyWealthTrend() {
+  const { data } = useQuery<{
+    months: number
+    summary: { totalReward: number; totalSpent: number; totalGiven: number; totalNet: number }
+    trend: Array<{
+      month: string
+      reward: number
+      spent: number
+      given: number
+      net: number
+    }>
+  }>({
+    queryKey: ["/api/family/wealth-trend"],
+    queryFn: async () => {
+      const res = await fetch("/api/family/wealth-trend?months=6", { credentials: "include" })
+      return res.json()
+    },
+  })
+  if (!data || data.summary.totalReward === 0) return null
+
+  // 取最大值給 bar 縮放
+  const peak = Math.max(...data.trend.map((t) => Math.max(t.reward, t.spent, t.given)))
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-teal-300 bg-gradient-to-br from-teal-50 to-cyan-50 p-4 shadow">
+      <h3 className="font-bold text-teal-900 mb-3 flex items-center gap-2">
+        📈 6 個月家庭財富趨勢
+      </h3>
+
+      {/* 4 格 summary */}
+      <div className="grid grid-cols-4 gap-1 mb-3">
+        <div className="bg-white rounded p-2 text-center">
+          <div className="text-xs text-gray-500">總獎勵</div>
+          <div className="text-sm font-bold text-emerald-700">${data.summary.totalReward}</div>
+        </div>
+        <div className="bg-white rounded p-2 text-center">
+          <div className="text-xs text-gray-500">總花費</div>
+          <div className="text-sm font-bold text-rose-700">${data.summary.totalSpent}</div>
+        </div>
+        <div className="bg-white rounded p-2 text-center">
+          <div className="text-xs text-gray-500">總捐贈</div>
+          <div className="text-sm font-bold text-pink-700">${data.summary.totalGiven}</div>
+        </div>
+        <div className="bg-white rounded p-2 text-center">
+          <div className="text-xs text-gray-500">淨累積</div>
+          <div className="text-sm font-bold text-teal-700">${data.summary.totalNet}</div>
+        </div>
+      </div>
+
+      {/* 6 個月直條圖 */}
+      <div className="flex gap-1 items-end h-24">
+        {data.trend.map((t) => {
+          const monthLabel = t.month.slice(5)
+          return (
+            <div key={t.month} className="flex-1 flex flex-col items-center">
+              <div className="flex-1 w-full flex gap-0.5 items-end">
+                {/* reward (emerald) */}
+                <div
+                  className="flex-1 bg-emerald-400 rounded-t"
+                  style={{ height: peak > 0 ? `${(t.reward / peak) * 100}%` : "0%" }}
+                  title={`獎勵 $${t.reward}`}
+                />
+                {/* spent (rose) */}
+                <div
+                  className="flex-1 bg-rose-400 rounded-t"
+                  style={{ height: peak > 0 ? `${(t.spent / peak) * 100}%` : "0%" }}
+                  title={`花費 $${t.spent}`}
+                />
+                {/* given (pink) */}
+                <div
+                  className="flex-1 bg-pink-400 rounded-t"
+                  style={{ height: peak > 0 ? `${(t.given / peak) * 100}%` : "0%" }}
+                  title={`捐贈 $${t.given}`}
+                />
+              </div>
+              <div className="text-xs text-gray-600 mt-1">{monthLabel}</div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* 圖例 */}
+      <div className="flex justify-center gap-3 mt-2 text-xs text-gray-600">
+        <span className="flex items-center gap-1">
+          <span className="w-3 h-3 bg-emerald-400 rounded inline-block" />
+          獎勵
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="w-3 h-3 bg-rose-400 rounded inline-block" />
+          花費
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="w-3 h-3 bg-pink-400 rounded inline-block" />
+          捐贈
+        </span>
+      </div>
+    </div>
   )
 }
 

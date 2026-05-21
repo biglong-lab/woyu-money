@@ -2927,6 +2927,84 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(r.status).toBe(400)
   })
 
+  it("家庭財富趨勢：months=6 → 6 個月 trend + summary", async () => {
+    // 清乾淨避免污染
+    await db.execute(sql`DELETE FROM kids_accounts WHERE pin = ${TEST_PIN}`)
+    await createKid({ spendRatio: 70, saveRatio: 30, giveRatio: 0 })
+
+    // 完成 1 個任務 100 元
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId, title: "T", rewardAmount: 100 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`)
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`)
+
+    const res = await request(app).get("/api/family/wealth-trend?months=6")
+    expect(res.status).toBe(200)
+    expect(res.body.months).toBe(6)
+    expect(res.body.trend.length).toBe(6)
+
+    const months = res.body.trend.map((t: { month: string }) => t.month)
+    expect(months[0]).toMatch(/^\d{4}-\d{2}$/)
+
+    // 本月（最後一筆）reward 應 >= 100
+    const lastMonth = res.body.trend[5]
+    expect(lastMonth.reward).toBeGreaterThanOrEqual(100)
+
+    // summary 含 4 欄位
+    expect(res.body.summary.totalReward).toBeGreaterThanOrEqual(100)
+    expect(res.body.summary.totalSpent).toBe(0)
+    expect(res.body.summary.totalGiven).toBe(0)
+    expect(res.body.summary.totalNet).toBeGreaterThanOrEqual(100)
+  })
+
+  it("家庭財富趨勢：months 超範圍 → clamp 24", async () => {
+    const res = await request(app).get("/api/family/wealth-trend?months=100")
+    expect(res.status).toBe(200)
+    expect(res.body.months).toBe(24)
+    expect(res.body.trend.length).toBe(24)
+  })
+
+  it("家庭財富趨勢：months=1 預設值合法", async () => {
+    const res = await request(app).get("/api/family/wealth-trend?months=1")
+    expect(res.status).toBe(200)
+    expect(res.body.months).toBe(1)
+    expect(res.body.trend.length).toBe(1)
+  })
+
+  it("家庭里程碑：5 tracks × 3 階、含 totals + summary", async () => {
+    const res = await request(app).get("/api/family/milestones")
+    expect(res.status).toBe(200)
+    expect(res.body.totals).toBeDefined()
+    expect(res.body.totals.tasks).toBeGreaterThanOrEqual(0)
+
+    const milestones = res.body.milestones as Array<{
+      key: string
+      total: number
+      reached: Array<{ value: number; label: string }>
+      next: { value: number; remaining: number; progress: number } | null
+      complete: boolean
+    }>
+    expect(milestones.length).toBe(5)
+    expect(milestones.map((m) => m.key)).toEqual(["tasks", "reward", "given", "saved", "checkins"])
+
+    // 每個 milestone 都有 reached + complete bool
+    for (const m of milestones) {
+      expect(Array.isArray(m.reached)).toBe(true)
+      expect(typeof m.complete).toBe("boolean")
+      if (!m.complete) {
+        expect(m.next).toBeTruthy()
+        expect(m.next!.remaining).toBeGreaterThan(0)
+        expect(m.next!.progress).toBeGreaterThanOrEqual(0)
+      }
+    }
+
+    // summary 計數合法
+    expect(res.body.summary.totalPossible).toBe(15) // 5 × 3
+    expect(res.body.summary.totalReached).toBeGreaterThanOrEqual(0)
+    expect(res.body.summary.totalReached).toBeLessThanOrEqual(15)
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)

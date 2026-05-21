@@ -2875,6 +2875,203 @@ router.get(
 )
 
 /**
+ * GET /api/family/milestones
+ * 家庭里程碑紀錄（全家共同達成）
+ * 5 大 tracks × 3 階里程碑、看達成/剩多少
+ */
+router.get(
+  "/api/family/milestones",
+  asyncHandler(async (_req, res) => {
+    const [taskStats, rewardStats, giveStats, saveStats, checkinStats] = await Promise.all([
+      db.execute(sql`SELECT COUNT(*)::int AS n FROM kids_tasks WHERE status = 'approved'`),
+      db.execute(sql`
+        SELECT COALESCE(SUM(reward_amount::numeric), 0)::numeric AS s
+        FROM kids_tasks WHERE status = 'approved'
+      `),
+      db.execute(sql`
+        SELECT COALESCE(SUM(amount::numeric), 0)::numeric AS s
+        FROM kids_spendings WHERE jar = 'give'
+      `),
+      db.execute(sql`
+        SELECT COALESCE(SUM(current_amount::numeric), 0)::numeric AS s
+        FROM kids_goals
+      `),
+      db.execute(sql`SELECT COUNT(DISTINCT checkin_date)::int AS n FROM kids_checkins`),
+    ])
+
+    const totals = {
+      tasks: (taskStats as unknown as { rows: { n: number }[] }).rows[0]?.n ?? 0,
+      reward: Number(
+        String((rewardStats as unknown as { rows: { s: string | number }[] }).rows[0]?.s ?? 0)
+      ),
+      given: Number(
+        String((giveStats as unknown as { rows: { s: string | number }[] }).rows[0]?.s ?? 0)
+      ),
+      saved: Number(
+        String((saveStats as unknown as { rows: { s: string | number }[] }).rows[0]?.s ?? 0)
+      ),
+      checkins: (checkinStats as unknown as { rows: { n: number }[] }).rows[0]?.n ?? 0,
+    }
+
+    type Tier = { value: number; emoji: string; label: string }
+    type Track = { key: string; name: string; total: number; tiers: Tier[]; unit: string }
+    const tracks: Track[] = [
+      {
+        key: "tasks",
+        name: "全家任務",
+        total: totals.tasks,
+        unit: "個",
+        tiers: [
+          { value: 100, emoji: "🌟", label: "百任務達人" },
+          { value: 500, emoji: "🏆", label: "五百任務勇者" },
+          { value: 1000, emoji: "🐉", label: "千任務傳奇" },
+        ],
+      },
+      {
+        key: "reward",
+        name: "總獎勵",
+        total: totals.reward,
+        unit: "元",
+        tiers: [
+          { value: 5000, emoji: "💰", label: "五千賺手" },
+          { value: 20000, emoji: "💎", label: "兩萬大戶" },
+          { value: 50000, emoji: "👑", label: "五萬王者" },
+        ],
+      },
+      {
+        key: "given",
+        name: "全家捐贈",
+        total: totals.given,
+        unit: "元",
+        tiers: [
+          { value: 1000, emoji: "❤️", label: "千元愛心" },
+          { value: 5000, emoji: "🌈", label: "五千慈善" },
+          { value: 10000, emoji: "👼", label: "萬元天使" },
+        ],
+      },
+      {
+        key: "saved",
+        name: "家庭存款",
+        total: totals.saved,
+        unit: "元",
+        tiers: [
+          { value: 5000, emoji: "🐷", label: "五千小金豬" },
+          { value: 20000, emoji: "🪙", label: "兩萬金庫" },
+          { value: 50000, emoji: "🏰", label: "五萬城堡" },
+        ],
+      },
+      {
+        key: "checkins",
+        name: "全家打卡",
+        total: totals.checkins,
+        unit: "天",
+        tiers: [
+          { value: 30, emoji: "📅", label: "30 天打卡" },
+          { value: 100, emoji: "🔥", label: "百日打卡" },
+          { value: 365, emoji: "⚡", label: "一年連續" },
+        ],
+      },
+    ]
+
+    const milestones = tracks.map((tr) => {
+      const reached = tr.tiers.filter((t) => tr.total >= t.value)
+      const next = tr.tiers.find((t) => tr.total < t.value)
+      return {
+        key: tr.key,
+        name: tr.name,
+        unit: tr.unit,
+        total: tr.total,
+        reached,
+        next: next
+          ? {
+              ...next,
+              remaining: next.value - tr.total,
+              progress: Math.round((tr.total / next.value) * 100),
+            }
+          : null,
+        complete: !next,
+      }
+    })
+
+    const totalReached = milestones.reduce((s, m) => s + m.reached.length, 0)
+    const totalPossible = tracks.reduce((s, t) => s + t.tiers.length, 0)
+
+    res.json({
+      totals,
+      milestones,
+      summary: { totalReached, totalPossible },
+    })
+  })
+)
+
+/**
+ * GET /api/family/wealth-trend?months=6
+ * 家庭近 N 月財富趨勢：每月 reward / spent / given / net
+ */
+router.get(
+  "/api/family/wealth-trend",
+  asyncHandler(async (req, res) => {
+    const months = Math.min(Math.max(Number(req.query.months) || 6, 1), 24)
+
+    const result = await db.execute(sql`
+      WITH month_series AS (
+        SELECT generate_series(
+          DATE_TRUNC('month', CURRENT_DATE - (${months - 1}::int || ' months')::interval),
+          DATE_TRUNC('month', CURRENT_DATE),
+          INTERVAL '1 month'
+        )::date AS m
+      )
+      SELECT
+        TO_CHAR(ms.m, 'YYYY-MM') AS month,
+        COALESCE((
+          SELECT SUM(reward_amount::numeric)::numeric FROM kids_tasks
+          WHERE status = 'approved'
+            AND DATE_TRUNC('month', completed_at) = ms.m
+        ), 0) AS reward,
+        COALESCE((
+          SELECT SUM(amount::numeric)::numeric FROM kids_spendings
+          WHERE jar = 'spend'
+            AND DATE_TRUNC('month', spend_date) = ms.m
+        ), 0) AS spent,
+        COALESCE((
+          SELECT SUM(amount::numeric)::numeric FROM kids_spendings
+          WHERE jar = 'give'
+            AND DATE_TRUNC('month', spend_date) = ms.m
+        ), 0) AS given
+      FROM month_series ms
+      ORDER BY ms.m ASC
+    `)
+    const rows = (
+      result as unknown as {
+        rows: {
+          month: string
+          reward: string | number
+          spent: string | number
+          given: string | number
+        }[]
+      }
+    ).rows
+
+    const trend = rows.map((r) => ({
+      month: r.month,
+      reward: Number(r.reward ?? 0),
+      spent: Number(r.spent ?? 0),
+      given: Number(r.given ?? 0),
+      net: Number(r.reward ?? 0) - Number(r.spent ?? 0) - Number(r.given ?? 0),
+    }))
+
+    const summary = {
+      totalReward: trend.reduce((s, t) => s + t.reward, 0),
+      totalSpent: trend.reduce((s, t) => s + t.spent, 0),
+      totalGiven: trend.reduce((s, t) => s + t.given, 0),
+      totalNet: trend.reduce((s, t) => s + t.net, 0),
+    }
+
+    res.json({ months, summary, trend })
+  })
+)
+
+/**
  * GET /api/family/kid-time-of-day?kidId=
  * 小孩任務完成時段分析（看是早起型/午後型/夜貓型）
  *
