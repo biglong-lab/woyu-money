@@ -586,6 +586,9 @@ export default function FamilyPage() {
       {/* 家庭分類熱度趨勢 */}
       <FamilyCategoryHeatTrendCard />
 
+      {/* 家庭目標月度達成 */}
+      <FamilyGoalsMonthlyCompletionCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3540,6 +3543,54 @@ function ParentTodoList() {
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
       )}
+    </div>
+  )
+}
+
+function FamilyGoalsMonthlyCompletionCard() {
+  const { data } = useQuery<{
+    months: Array<{ month: string; goalsCount: number; totalAmount: number }>
+    grandTotalGoals: number
+    grandTotalAmount: number
+    biggestMonth: { month: string; goalsCount: number; totalAmount: number } | null
+    message: string
+  }>({
+    queryKey: ["/api/family/goals-monthly-completion?months=6"],
+  })
+  if (!data || data.grandTotalGoals === 0) return null
+
+  const maxAmount = Math.max(...data.months.map((m) => m.totalAmount), 1)
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-emerald-400 bg-gradient-to-br from-emerald-50 to-teal-50 p-3 shadow">
+      <h3 className="font-bold mb-2 flex items-center gap-2">🎯 目標達成（6 月）</h3>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-2 text-xs">
+        {data.message}
+        <div className="text-gray-600 mt-1">
+          累計 {data.grandTotalGoals} 個目標 / ${data.grandTotalAmount}
+        </div>
+      </div>
+
+      <div className="flex items-end gap-1 h-20 bg-white/40 rounded p-2">
+        {data.months.map((m) => {
+          const h = (m.totalAmount / maxAmount) * 100
+          return (
+            <div
+              key={m.month}
+              className="flex-1 flex flex-col items-center justify-end"
+              title={`${m.month}: ${m.goalsCount} 個 / $${m.totalAmount}`}
+            >
+              <div className="text-[9px] text-gray-600 font-bold">{m.goalsCount}</div>
+              <div
+                className="w-full bg-gradient-to-t from-emerald-400 to-green-500 rounded-t"
+                style={{ height: `${Math.max(h, 2)}%` }}
+              />
+              <div className="text-[9px] text-gray-500 mt-1">{m.month.slice(5)}</div>
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }

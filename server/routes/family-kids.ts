@@ -8602,6 +8602,83 @@ async function bulkApproveOne(
 }
 
 /**
+ * GET /api/family/goals-monthly-completion?months=6
+ * 過去 N 月 completed goals 數 + 達成總額時序
+ */
+router.get(
+  "/api/family/goals-monthly-completion",
+  asyncHandler(async (req, res) => {
+    const months = Math.min(Math.max(Number(req.query.months) || 6, 2), 24)
+
+    const rows = await db.execute(sql`
+      WITH months AS (
+        SELECT generate_series(
+          DATE_TRUNC('month', CURRENT_DATE) - ((${months}::int - 1) * INTERVAL '1 month'),
+          DATE_TRUNC('month', CURRENT_DATE),
+          INTERVAL '1 month'
+        )::date AS m_start
+      )
+      SELECT
+        TO_CHAR(m.m_start, 'YYYY-MM') AS month,
+        COALESCE(COUNT(g.id), 0)::int AS goals_count,
+        COALESCE(SUM(g.target_amount::numeric), 0)::numeric AS total_amount
+      FROM months m
+      LEFT JOIN kids_goals g ON
+        g.status = 'completed'
+        AND g.completed_at >= m.m_start
+        AND g.completed_at < m.m_start + INTERVAL '1 month'
+      GROUP BY m.m_start
+      ORDER BY m.m_start ASC
+    `)
+
+    const monthsArr = (
+      rows as unknown as {
+        rows: Array<{
+          month: string
+          goals_count: number
+          total_amount: string | number
+        }>
+      }
+    ).rows.map((r) => ({
+      month: r.month,
+      goalsCount: r.goals_count,
+      totalAmount: Number(r.total_amount),
+    }))
+
+    const grandTotalGoals = monthsArr.reduce((s, m) => s + m.goalsCount, 0)
+    const grandTotalAmount = monthsArr.reduce((s, m) => s + m.totalAmount, 0)
+    const biggestMonth = monthsArr.reduce(
+      (best, m) => (m.totalAmount > best.totalAmount ? m : best),
+      monthsArr[0]
+    )
+
+    let message: string
+    if (grandTotalGoals === 0) {
+      message = `過去 ${months} 個月還沒目標達成、加油 🎯`
+    } else if (biggestMonth && biggestMonth.totalAmount > 0) {
+      message = `🏆 ${biggestMonth.month} 達成最多（${biggestMonth.goalsCount} 個目標、$${biggestMonth.totalAmount}）`
+    } else {
+      message = `達成 ${grandTotalGoals} 個目標、累計 $${grandTotalAmount}`
+    }
+
+    res.json({
+      months: monthsArr,
+      grandTotalGoals,
+      grandTotalAmount,
+      biggestMonth:
+        biggestMonth && biggestMonth.totalAmount > 0
+          ? {
+              month: biggestMonth.month,
+              goalsCount: biggestMonth.goalsCount,
+              totalAmount: biggestMonth.totalAmount,
+            }
+          : null,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/category-heat-trend?months=6
  * 過去 N 月各 task category 月度變化
  * 5 category: housework / study / self_care / kindness / other

@@ -4245,6 +4245,22 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.body.weeks).toBe(52)
   })
 
+  it("目標月度達成：基本結構 months/grandTotal/message", async () => {
+    const res = await request(app).get("/api/family/goals-monthly-completion")
+    expect(res.status).toBe(200)
+    expect(res.body.months).toHaveLength(6)
+    expect(res.body).toHaveProperty("grandTotalGoals")
+    expect(res.body).toHaveProperty("grandTotalAmount")
+    expect(res.body.message).toBeTruthy()
+  })
+
+  it("目標月度達成：months clamp 2-24", async () => {
+    const r1 = await request(app).get("/api/family/goals-monthly-completion?months=100")
+    expect(r1.body.months).toHaveLength(24)
+    const r2 = await request(app).get("/api/family/goals-monthly-completion?months=1")
+    expect(r2.body.months).toHaveLength(2)
+  })
+
   it("分類熱度趨勢：基本結構 months/totals/topCategory", async () => {
     const res = await request(app).get("/api/family/category-heat-trend")
     expect(res.status).toBe(200)
