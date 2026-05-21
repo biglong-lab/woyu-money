@@ -8602,6 +8602,127 @@ async function bulkApproveOne(
 }
 
 /**
+ * GET /api/family/kid-growth-stage?kidId=
+ * 個別小孩成長階段（綜合資歷 / 任務 / 打卡 / 目標完成）
+ * stage: newbie / learner / regular / veteran / legend
+ */
+router.get(
+  "/api/family/kid-growth-stage",
+  asyncHandler(async (req, res) => {
+    const kidId = Number(req.query.kidId)
+    if (!Number.isInteger(kidId) || kidId < 1) throw new AppError(400, "需傳 kidId")
+
+    const rows = await db.execute(sql`
+      SELECT
+        ka.id::int AS kid_id,
+        ka.display_name AS kid_name,
+        ka.avatar,
+        ka.created_at AS account_created_at,
+        EXTRACT(DAY FROM (NOW() - ka.created_at))::int AS account_age_days,
+        (SELECT COUNT(*)::int FROM kids_tasks WHERE kid_id = ka.id AND status = 'approved') AS tasks_approved,
+        (SELECT COALESCE(SUM(reward_amount::numeric), 0)::numeric FROM kids_tasks WHERE kid_id = ka.id AND status = 'approved') AS lifetime_earned,
+        (SELECT COUNT(DISTINCT checkin_date)::int FROM kids_checkins WHERE kid_id = ka.id) AS checkin_days,
+        (SELECT COUNT(*)::int FROM kids_goals WHERE kid_id = ka.id AND status = 'completed') AS goals_completed,
+        (SELECT COUNT(*)::int FROM kids_badges WHERE kid_id = ka.id) AS badges_earned
+      FROM kids_accounts ka
+      WHERE ka.id = ${kidId} AND ka.is_active = true
+    `)
+    const row = (
+      rows as unknown as {
+        rows: Array<{
+          kid_id: number
+          kid_name: string
+          avatar: string
+          account_age_days: number
+          tasks_approved: number
+          lifetime_earned: string | number
+          checkin_days: number
+          goals_completed: number
+          badges_earned: number
+        }>
+      }
+    ).rows[0]
+    if (!row) throw new AppError(404, "小孩不存在")
+
+    const age = row.account_age_days ?? 0
+    const tasks = row.tasks_approved ?? 0
+    const earned = Number(row.lifetime_earned)
+    const checkins = row.checkin_days ?? 0
+    const goals = row.goals_completed ?? 0
+    const badges = row.badges_earned ?? 0
+
+    const score = tasks * 2 + goals * 5 + checkins * 0.5 + badges * 3 + Math.floor(earned / 100)
+
+    let stage: "newbie" | "learner" | "regular" | "veteran" | "legend"
+    let stageLabel: string
+    let nextThreshold: number
+    let currentThreshold: number
+
+    if (age < 7 || score < 10) {
+      stage = "newbie"
+      stageLabel = "🌱 新手起步"
+      currentThreshold = 0
+      nextThreshold = 10
+    } else if (score < 50) {
+      stage = "learner"
+      stageLabel = "📚 成長學習中"
+      currentThreshold = 10
+      nextThreshold = 50
+    } else if (score < 150) {
+      stage = "regular"
+      stageLabel = "🎯 穩定階段"
+      currentThreshold = 50
+      nextThreshold = 150
+    } else if (score < 400) {
+      stage = "veteran"
+      stageLabel = "⭐ 資深玩家"
+      currentThreshold = 150
+      nextThreshold = 400
+    } else {
+      stage = "legend"
+      stageLabel = "🏆 家庭傳奇"
+      currentThreshold = 400
+      nextThreshold = 400
+    }
+
+    const progressInStage =
+      nextThreshold > currentThreshold
+        ? Math.min(
+            100,
+            Math.round(((score - currentThreshold) / (nextThreshold - currentThreshold)) * 100)
+          )
+        : 100
+
+    let nextMilestone: string
+    if (stage === "legend") {
+      nextMilestone = "🏆 已達最高階段、繼續維持！"
+    } else {
+      const needed = Math.ceil(nextThreshold - score)
+      nextMilestone = `還差 ${needed} 分到下個階段（多做任務 / 打卡 / 完成目標）`
+    }
+
+    res.json({
+      kidId: row.kid_id,
+      kidName: row.kid_name,
+      avatar: row.avatar,
+      metrics: {
+        accountAgeDays: age,
+        tasksApproved: tasks,
+        lifetimeEarned: earned,
+        checkinDays: checkins,
+        goalsCompleted: goals,
+        badgesEarned: badges,
+      },
+      score: Math.round(score),
+      stage,
+      stageLabel,
+      progressInStage,
+      nextMilestone,
+    })
+  })
+)
+
+/**
  * GET /api/family/activity-streak?lookback=90
  * 全家整體 streak（至少有 1 任務通過 或 打卡 或 spending 算當天活躍）
  * 計算：當前 streak（從今天倒推連續活躍天數）+ 歷史最長 + 過去 N 天活躍率

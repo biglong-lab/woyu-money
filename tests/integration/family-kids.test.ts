@@ -4245,6 +4245,46 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.body.weeks).toBe(52)
   })
 
+  it("成長階段：新小孩 → stage=newbie + score=0", async () => {
+    const kidObj = (await createKid()) as { id: number }
+    const myKidId = kidObj.id
+    const res = await request(app).get(`/api/family/kid-growth-stage?kidId=${myKidId}`)
+    expect(res.status).toBe(200)
+    expect(res.body.stage).toBe("newbie")
+    expect(res.body.score).toBe(0)
+    expect(res.body.metrics.tasksApproved).toBe(0)
+    expect(res.body.progressInStage).toBe(0)
+    expect(res.body.nextMilestone).toContain("還差")
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
+  it("成長階段：缺 kidId → 400", async () => {
+    const res = await request(app).get("/api/family/kid-growth-stage")
+    expect(res.status).toBe(400)
+  })
+
+  it("成長階段：不存在 kidId → 404", async () => {
+    const res = await request(app).get("/api/family/kid-growth-stage?kidId=999999")
+    expect(res.status).toBe(404)
+  })
+
+  it("成長階段：完成 5 個任務後 metrics.tasksApproved=5", async () => {
+    const kidObj = (await createKid()) as { id: number }
+    const myKidId = kidObj.id
+    for (let i = 0; i < 5; i++) {
+      const t = await request(app)
+        .post("/api/family/tasks")
+        .send({ kidId: myKidId, title: `階段 ${i}`, rewardAmount: 50 })
+      await request(app).post(`/api/family/tasks/${t.body.id}/submit`).send({})
+      await request(app).post(`/api/family/tasks/${t.body.id}/approve`).send({})
+    }
+    const res = await request(app).get(`/api/family/kid-growth-stage?kidId=${myKidId}`)
+    expect(res.status).toBe(200)
+    expect(res.body.metrics.tasksApproved).toBe(5)
+    expect(res.body.score).toBeGreaterThanOrEqual(10)
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
   it("家庭 streak：基本結構 + currentStreak/longestStreak/level/message", async () => {
     const res = await request(app).get("/api/family/activity-streak")
     expect(res.status).toBe(200)

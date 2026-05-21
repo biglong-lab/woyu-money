@@ -1213,6 +1213,9 @@ function KidDashboard({
       {/* 任務多樣性（過去 30 天）*/}
       <KidTaskVarietyCard kidId={kidId} />
 
+      {/* 成長階段 */}
+      <KidGrowthStageCard kidId={kidId} />
+
       {/* 三罐趨勢圖（過去 30 天）*/}
       {trend && trend.trend.length > 0 && (
         <div className="mb-4">
@@ -1842,6 +1845,87 @@ function WishesSection({
           ))}
         </div>
       )}
+    </div>
+  )
+}
+
+function KidGrowthStageCard({ kidId }: { kidId: number }) {
+  const { data } = useQuery<{
+    metrics: {
+      accountAgeDays: number
+      tasksApproved: number
+      lifetimeEarned: number
+      checkinDays: number
+      goalsCompleted: number
+      badgesEarned: number
+    }
+    score: number
+    stage: "newbie" | "learner" | "regular" | "veteran" | "legend"
+    stageLabel: string
+    progressInStage: number
+    nextMilestone: string
+  }>({
+    queryKey: [`/api/family/kid-growth-stage?kidId=${kidId}`],
+  })
+  if (!data) return null
+
+  const STAGE_BG: Record<string, string> = {
+    newbie: "from-gray-50 to-slate-50 border-gray-300",
+    learner: "from-sky-50 to-blue-50 border-sky-300",
+    regular: "from-emerald-50 to-green-50 border-emerald-300",
+    veteran: "from-amber-50 to-orange-50 border-amber-400",
+    legend: "from-purple-50 to-pink-50 border-purple-500",
+  }
+
+  return (
+    <div
+      className={`mb-4 rounded-2xl border-2 bg-gradient-to-br ${STAGE_BG[data.stage]} p-3 shadow`}
+    >
+      <h2 className="font-bold mb-2 flex items-center gap-2">📈 我的成長階段</h2>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-2 text-center">
+        <div className="text-2xl font-bold mb-1">{data.stageLabel}</div>
+        <div className="text-xs text-gray-600">綜合分數 {data.score} 分</div>
+      </div>
+
+      {data.stage !== "legend" && (
+        <div className="mb-2">
+          <div className="h-2 bg-white rounded overflow-hidden">
+            <div
+              className="h-full bg-gradient-to-r from-blue-400 to-purple-500"
+              style={{ width: `${data.progressInStage}%` }}
+            />
+          </div>
+          <div className="text-[10px] text-gray-600 text-center mt-1">{data.nextMilestone}</div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-3 gap-1.5">
+        <div className="bg-white rounded p-1.5 text-center">
+          <div className="text-sm font-bold">{data.metrics.accountAgeDays}</div>
+          <div className="text-[9px] text-gray-500">天</div>
+        </div>
+        <div className="bg-white rounded p-1.5 text-center">
+          <div className="text-sm font-bold">{data.metrics.tasksApproved}</div>
+          <div className="text-[9px] text-gray-500">任務</div>
+        </div>
+        <div className="bg-white rounded p-1.5 text-center">
+          <div className="text-sm font-bold">{data.metrics.checkinDays}</div>
+          <div className="text-[9px] text-gray-500">打卡</div>
+        </div>
+        <div className="bg-white rounded p-1.5 text-center">
+          <div className="text-sm font-bold">{data.metrics.goalsCompleted}</div>
+          <div className="text-[9px] text-gray-500">目標</div>
+        </div>
+        <div className="bg-white rounded p-1.5 text-center">
+          <div className="text-sm font-bold">{data.metrics.badgesEarned}</div>
+          <div className="text-[9px] text-gray-500">徽章</div>
+        </div>
+        <div className="bg-white rounded p-1.5 text-center">
+          <div className="text-sm font-bold">${data.metrics.lifetimeEarned}</div>
+          <div className="text-[9px] text-gray-500">累計</div>
+        </div>
+      </div>
     </div>
   )
 }
