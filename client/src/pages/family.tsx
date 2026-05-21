@@ -565,6 +565,9 @@ export default function FamilyPage() {
       {/* 家庭儲蓄速度排名 */}
       <FamilySavingsVelocityRankCard />
 
+      {/* 家庭 jar 分配對比 */}
+      <FamilyJarAllocationByKidCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3519,6 +3522,77 @@ function ParentTodoList() {
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
       )}
+    </div>
+  )
+}
+
+function FamilyJarAllocationByKidCard() {
+  const { data } = useQuery<{
+    kids: Array<{
+      kidId: number
+      kidName: string
+      avatar: string
+      spendRatio: number
+      saveRatio: number
+      giveRatio: number
+      type: "saver" | "spender" | "giver" | "balanced"
+    }>
+    familyAvg: { spend: number; save: number; give: number }
+    typeCounts: { saver: number; spender: number; giver: number; balanced: number }
+    message: string
+  }>({
+    queryKey: ["/api/family/jar-allocation-by-kid"],
+  })
+  if (!data || data.kids.length === 0) return null
+
+  const TYPE_LABEL: Record<string, string> = {
+    saver: "💎 儲蓄型",
+    spender: "🛒 花用型",
+    giver: "💝 捐贈型",
+    balanced: "⚖️ 平衡型",
+  }
+  const TYPE_COLOR: Record<string, string> = {
+    saver: "bg-emerald-100 text-emerald-700",
+    spender: "bg-rose-100 text-rose-700",
+    giver: "bg-violet-100 text-violet-700",
+    balanced: "bg-blue-100 text-blue-700",
+  }
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-indigo-300 bg-gradient-to-br from-indigo-50 to-violet-50 p-3 shadow">
+      <h3 className="font-bold mb-2 flex items-center gap-2">🏺 Jar 分配對比</h3>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-2 text-xs">
+        {data.message}
+        <div className="text-gray-600 mt-1">
+          全家平均 花 {data.familyAvg.spend}% / 存 {data.familyAvg.save}% / 捐 {data.familyAvg.give}
+          %
+        </div>
+      </div>
+
+      <div className="space-y-1.5">
+        {data.kids.map((k) => (
+          <div key={k.kidId} className="bg-white rounded-lg p-2">
+            <div className="flex items-center gap-2 mb-1">
+              <div className="text-lg">{k.avatar}</div>
+              <div className="flex-1 text-sm font-medium">{k.kidName}</div>
+              <div className={`text-[10px] px-2 py-0.5 rounded ${TYPE_COLOR[k.type]}`}>
+                {TYPE_LABEL[k.type]}
+              </div>
+            </div>
+            <div className="flex h-2 rounded-full overflow-hidden bg-gray-100">
+              <div className="bg-rose-400" style={{ width: `${k.spendRatio}%` }} />
+              <div className="bg-emerald-500" style={{ width: `${k.saveRatio}%` }} />
+              <div className="bg-violet-500" style={{ width: `${k.giveRatio}%` }} />
+            </div>
+            <div className="flex justify-between text-[10px] text-gray-500 mt-0.5">
+              <span>🛒{k.spendRatio}%</span>
+              <span>💎{k.saveRatio}%</span>
+              <span>💝{k.giveRatio}%</span>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

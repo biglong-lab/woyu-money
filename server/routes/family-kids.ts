@@ -8602,6 +8602,105 @@ async function bulkApproveOne(
 }
 
 /**
+ * GET /api/family/jar-allocation-by-kid
+ * 家庭兒童 jar 分配對比：每個 kid 的 spend/save/give ratio + 類型判斷
+ * type: saver_type(save 最高) / spender_type(spend 最高) / giver_type(give 最高) / balanced
+ */
+router.get(
+  "/api/family/jar-allocation-by-kid",
+  asyncHandler(async (_req, res) => {
+    const rows = await db.execute(sql`
+      SELECT
+        id::int AS kid_id,
+        display_name AS kid_name,
+        avatar,
+        spend_ratio::int AS spend_ratio,
+        save_ratio::int AS save_ratio,
+        give_ratio::int AS give_ratio
+      FROM kids_accounts
+      WHERE is_active = true
+      ORDER BY id ASC
+    `)
+
+    const kids = (
+      rows as unknown as {
+        rows: Array<{
+          kid_id: number
+          kid_name: string
+          avatar: string
+          spend_ratio: number
+          save_ratio: number
+          give_ratio: number
+        }>
+      }
+    ).rows.map((r) => {
+      const spend = r.spend_ratio
+      const save = r.save_ratio
+      const give = r.give_ratio
+      const max = Math.max(spend, save, give)
+      let type: "saver" | "spender" | "giver" | "balanced"
+      if (max - Math.min(spend, save, give) <= 10) {
+        type = "balanced"
+      } else if (save === max) {
+        type = "saver"
+      } else if (give === max) {
+        type = "giver"
+      } else {
+        type = "spender"
+      }
+      return {
+        kidId: r.kid_id,
+        kidName: r.kid_name,
+        avatar: r.avatar,
+        spendRatio: spend,
+        saveRatio: save,
+        giveRatio: give,
+        type,
+      }
+    })
+
+    // 家庭平均
+    const familyAvg =
+      kids.length > 0
+        ? {
+            spend: Math.round(kids.reduce((s, k) => s + k.spendRatio, 0) / kids.length),
+            save: Math.round(kids.reduce((s, k) => s + k.saveRatio, 0) / kids.length),
+            give: Math.round(kids.reduce((s, k) => s + k.giveRatio, 0) / kids.length),
+          }
+        : { spend: 0, save: 0, give: 0 }
+
+    const counts = {
+      saver: kids.filter((k) => k.type === "saver").length,
+      spender: kids.filter((k) => k.type === "spender").length,
+      giver: kids.filter((k) => k.type === "giver").length,
+      balanced: kids.filter((k) => k.type === "balanced").length,
+    }
+
+    let message: string
+    if (kids.length === 0) {
+      message = "還沒有小孩"
+    } else if (counts.balanced === kids.length) {
+      message = `⚖️ 全家三罐分配平衡（${familyAvg.spend}/${familyAvg.save}/${familyAvg.give}）`
+    } else if (counts.saver > counts.spender) {
+      message = `💎 家庭偏向存錢（${counts.saver} 個儲蓄型）、平均存 ${familyAvg.save}%`
+    } else if (counts.giver > 0) {
+      message = `💝 有 ${counts.giver} 個小孩重視捐贈、家庭有愛心`
+    } else if (counts.spender > 0) {
+      message = `🛒 有 ${counts.spender} 個花用型小孩、可以鼓勵調整 ratio 多存點`
+    } else {
+      message = "家庭分配組合多元、各有特色"
+    }
+
+    res.json({
+      kids,
+      familyAvg,
+      typeCounts: counts,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/savings-velocity-rank?months=3
  * 家庭兒童儲蓄速度排名
  * 速度 = 過去 N 月 task reward * saveRatio / N（月均 save 增量）

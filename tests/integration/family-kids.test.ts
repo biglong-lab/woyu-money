@@ -4245,6 +4245,33 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.body.weeks).toBe(52)
   })
 
+  it("Jar 分配對比：基本結構 kids/familyAvg/typeCounts", async () => {
+    const res = await request(app).get("/api/family/jar-allocation-by-kid")
+    expect(res.status).toBe(200)
+    expect(Array.isArray(res.body.kids)).toBe(true)
+    expect(res.body.familyAvg).toHaveProperty("spend")
+    expect(res.body.familyAvg).toHaveProperty("save")
+    expect(res.body.familyAvg).toHaveProperty("give")
+    expect(res.body.typeCounts).toHaveProperty("saver")
+    expect(res.body.message).toBeTruthy()
+  })
+
+  it("Jar 分配對比：建 save=70 kid → type=saver", async () => {
+    const kidObj = (await createKid({
+      spendRatio: 10,
+      saveRatio: 70,
+      giveRatio: 20,
+    })) as { id: number }
+    const myKidId = kidObj.id
+    const res = await request(app).get("/api/family/jar-allocation-by-kid")
+    expect(res.status).toBe(200)
+    const myKid = res.body.kids.find((k: { kidId: number }) => k.kidId === myKidId)
+    expect(myKid).toBeDefined()
+    expect(myKid.saveRatio).toBe(70)
+    expect(myKid.type).toBe("saver")
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
   it("儲蓄速度排名：基本結構 kids/topSaver/message", async () => {
     const res = await request(app).get("/api/family/savings-velocity-rank")
     expect(res.status).toBe(200)
