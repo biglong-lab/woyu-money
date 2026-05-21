@@ -1022,6 +1022,9 @@ function KidDashboard({
       {/* 家長誇獎回顧（暖心）*/}
       <KidPraisesCard kidId={kidId} />
 
+      {/* 時光膠囊（年前/月前的今天）*/}
+      <KidTimecapsuleCard kidId={kidId} />
+
       {/* 最近活動時間軸 */}
       <KidActivityTimeline kidId={kidId} />
 
@@ -1799,6 +1802,85 @@ function WishesSection({
           ))}
         </div>
       )}
+    </div>
+  )
+}
+
+function KidTimecapsuleCard({ kidId }: { kidId: number }) {
+  const { data } = useQuery<{
+    total: number
+    capsules: Array<{
+      key: "year" | "halfYear" | "month"
+      label: string
+      date: string
+      tasks: Array<{ title: string; emoji: string; reward: number }>
+      spendings: Array<{ description: string; emoji: string; amount: number; jar: string }>
+      mood: string | null
+    }>
+  }>({
+    queryKey: ["/api/family/kid-timecapsule", kidId],
+    queryFn: async () => {
+      const res = await fetch(`/api/family/kid-timecapsule?kidId=${kidId}`, {
+        credentials: "include",
+      })
+      return res.json()
+    },
+  })
+  if (!data || data.total === 0) return null
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-indigo-300 bg-gradient-to-br from-indigo-50 to-purple-50 p-4 shadow">
+      <h3 className="font-bold text-indigo-900 mb-3 flex items-center gap-2">🕰️ 時光膠囊</h3>
+
+      <div className="space-y-3">
+        {data.capsules.map((c) => (
+          <div key={c.key} className="bg-white rounded-lg p-3 shadow-sm">
+            <div className="flex items-center justify-between mb-2">
+              <span className="font-bold text-indigo-700">📅 {c.label}的今天</span>
+              <span className="text-xs text-gray-500">{c.date}</span>
+            </div>
+
+            {c.tasks.length > 0 && (
+              <div className="mb-1.5">
+                <div className="text-xs text-gray-500 mb-0.5">完成了：</div>
+                <div className="flex flex-wrap gap-1">
+                  {c.tasks.map((t, i) => (
+                    <span
+                      key={i}
+                      className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full"
+                    >
+                      {t.emoji} {t.title} (${t.reward})
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {c.spendings.length > 0 && (
+              <div className="mb-1.5">
+                <div className="text-xs text-gray-500 mb-0.5">花了：</div>
+                <div className="flex flex-wrap gap-1">
+                  {c.spendings.map((s, i) => (
+                    <span
+                      key={i}
+                      className="text-xs bg-rose-100 text-rose-800 px-2 py-0.5 rounded-full"
+                    >
+                      {s.emoji} {s.description} ${s.amount}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {c.mood && (
+              <div className="text-xs">
+                <span className="text-gray-500">當天心情：</span>
+                <span className="font-medium">{c.mood}</span>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

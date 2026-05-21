@@ -3508,6 +3508,49 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(r.status).toBe(400)
   })
 
+  it("時光膠囊：完成 task + 改 completed_at 為 1 月前 → capsules 含 month", async () => {
+    await createKid()
+
+    // 完成任務
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId, title: "1個月前的任務", rewardAmount: 50 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`)
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`)
+    // 把 completed_at 改成 30 天前
+    await db.execute(
+      sql`UPDATE kids_tasks SET completed_at = NOW() - INTERVAL '30 days' WHERE id = ${t.body.id}`
+    )
+
+    const res = await request(app).get(`/api/family/kid-timecapsule?kidId=${kidId}`)
+    expect(res.status).toBe(200)
+    expect(res.body.total).toBeGreaterThanOrEqual(1)
+
+    const capsules = res.body.capsules as Array<{
+      key: string
+      label: string
+      tasks: Array<{ title: string }>
+    }>
+    const monthCapsule = capsules.find((c) => c.key === "month")
+    expect(monthCapsule).toBeTruthy()
+    expect(monthCapsule!.label).toBe("一個月前")
+    expect(monthCapsule!.tasks.length).toBeGreaterThanOrEqual(1)
+    expect(monthCapsule!.tasks[0].title).toBe("1個月前的任務")
+  })
+
+  it("時光膠囊：無歷史紀錄 → capsules=[]", async () => {
+    await createKid()
+    const res = await request(app).get(`/api/family/kid-timecapsule?kidId=${kidId}`)
+    expect(res.status).toBe(200)
+    expect(res.body.total).toBe(0)
+    expect(res.body.capsules).toEqual([])
+  })
+
+  it("kid-timecapsule 缺 kidId 回 400", async () => {
+    const r = await request(app).get("/api/family/kid-timecapsule")
+    expect(r.status).toBe(400)
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)

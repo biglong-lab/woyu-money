@@ -2875,6 +2875,125 @@ router.get(
 )
 
 /**
+ * GET /api/family/kid-timecapsule?kidId=
+ * 小孩時光膠囊：1 年 / 半年 / 1 個月前的同一天紀錄
+ *
+ * 對每個時間點找：
+ *   - approved tasks
+ *   - spendings
+ *   - mood checkin
+ * 回 3 個 capsules（year / halfYear / month）
+ */
+router.get(
+  "/api/family/kid-timecapsule",
+  asyncHandler(async (req, res) => {
+    const kidIdQ = Number(req.query.kidId)
+    if (!Number.isInteger(kidIdQ) || kidIdQ < 1) throw new AppError(400, "需傳 kidId")
+
+    type Capsule = {
+      key: "year" | "halfYear" | "month"
+      label: string
+      date: string
+      tasks: Array<{ title: string; emoji: string; reward: number }>
+      spendings: Array<{ description: string; emoji: string; amount: number; jar: string }>
+      mood: string | null
+    }
+
+    async function fetchCapsule(
+      key: Capsule["key"],
+      label: string,
+      daysBack: number
+    ): Promise<Capsule | null> {
+      const result = await db.execute(sql`
+        SELECT
+          CURRENT_DATE - (${daysBack}::int) AS d,
+          (
+            SELECT json_agg(json_build_object(
+              'title', title,
+              'emoji', emoji,
+              'reward', reward_amount::numeric
+            ))
+            FROM kids_tasks
+            WHERE kid_id = ${kidIdQ} AND status = 'approved'
+              AND DATE(completed_at) = CURRENT_DATE - (${daysBack}::int)
+          ) AS tasks,
+          (
+            SELECT json_agg(json_build_object(
+              'description', description,
+              'emoji', emoji,
+              'amount', amount::numeric,
+              'jar', jar
+            ))
+            FROM kids_spendings
+            WHERE kid_id = ${kidIdQ}
+              AND spend_date = CURRENT_DATE - (${daysBack}::int)
+          ) AS spendings,
+          (
+            SELECT mood FROM kids_checkins
+            WHERE kid_id = ${kidIdQ}
+              AND checkin_date = CURRENT_DATE - (${daysBack}::int)
+            LIMIT 1
+          ) AS mood
+      `)
+      const row = (
+        result as unknown as {
+          rows: {
+            d: Date
+            tasks: Array<{ title: string; emoji: string; reward: number }> | null
+            spendings: Array<{
+              description: string
+              emoji: string
+              amount: number
+              jar: string
+            }> | null
+            mood: string | null
+          }[]
+        }
+      ).rows[0]
+      if (!row) return null
+
+      const tasks = (row.tasks ?? []).map((t) => ({
+        title: t.title,
+        emoji: t.emoji ?? "📋",
+        reward: Number(t.reward ?? 0),
+      }))
+      const spendings = (row.spendings ?? []).map((s) => ({
+        description: s.description,
+        emoji: s.emoji ?? "💰",
+        amount: Number(s.amount ?? 0),
+        jar: s.jar,
+      }))
+
+      // 沒任何紀錄不回 capsule
+      if (tasks.length === 0 && spendings.length === 0 && !row.mood) return null
+
+      return {
+        key,
+        label,
+        date: new Date(row.d).toISOString().slice(0, 10),
+        tasks,
+        spendings,
+        mood: row.mood,
+      }
+    }
+
+    const [year, halfYear, month] = await Promise.all([
+      fetchCapsule("year", "一年前", 365),
+      fetchCapsule("halfYear", "半年前", 182),
+      fetchCapsule("month", "一個月前", 30),
+    ])
+
+    const capsules = [year, halfYear, month].filter((c): c is Capsule => c !== null)
+
+    res.json({
+      kidId: kidIdQ,
+      total: capsules.length,
+      capsules,
+    })
+  })
+)
+
+/**
  * GET /api/family/kid-goals-deadlines?kidId=
  * 小孩端：有 deadline 的 active goals 倒數 + 緊迫度
  */
