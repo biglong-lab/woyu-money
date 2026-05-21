@@ -607,6 +607,9 @@ export default function FamilyPage() {
       {/* 家庭兒童難度分佈對比 */}
       <FamilyDifficultyByKidCard />
 
+      {/* 家庭任務高峰小時 */}
+      <FamilyKidPeakHourCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3561,6 +3564,58 @@ function ParentTodoList() {
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
       )}
+    </div>
+  )
+}
+
+function FamilyKidPeakHourCard() {
+  const { data } = useQuery<{
+    days: number
+    kids: Array<{
+      kidId: number
+      kidName: string
+      avatar: string
+      peakHour: number | null
+      peakCount: number
+      peakLabel: string | null
+    }>
+    familyPeak: { hour: number; count: number } | null
+    message: string
+  }>({
+    queryKey: ["/api/family/kid-peak-hour?days=30"],
+  })
+  if (!data || !data.familyPeak) return null
+
+  const withPeak = data.kids.filter((k) => k.peakHour !== null)
+  if (withPeak.length === 0) return null
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-indigo-400 bg-gradient-to-br from-indigo-50 to-purple-50 p-3 shadow">
+      <h3 className="font-bold mb-2 flex items-center gap-2">🕐 任務高峰小時（30 天）</h3>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-2 text-xs">
+        {data.message}
+        <div className="text-gray-600 mt-1">
+          全家最常在 {data.familyPeak.hour < 12 ? "上午" : "下午"} {data.familyPeak.hour}:00
+          完成任務
+        </div>
+      </div>
+
+      <div className="space-y-1.5">
+        {withPeak.map((k) => (
+          <div key={k.kidId} className="bg-white rounded-lg p-2 flex items-center gap-2">
+            <div className="text-lg">{k.avatar}</div>
+            <div className="flex-1">
+              <div className="text-sm font-medium">{k.kidName}</div>
+              <div className="text-[10px] text-gray-500">{k.peakCount} 個任務</div>
+            </div>
+            <div className="text-right">
+              <div className="text-lg font-bold text-indigo-600">{k.peakLabel}</div>
+              <div className="text-[9px] text-gray-500">最常做</div>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

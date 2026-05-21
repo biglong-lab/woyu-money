@@ -8602,6 +8602,108 @@ async function bulkApproveOne(
 }
 
 /**
+ * GET /api/family/kid-peak-hour?days=30
+ * 每個 active kid 過去 N 天最活躍小時（0-23）+ 全家 peak hour
+ */
+router.get(
+  "/api/family/kid-peak-hour",
+  asyncHandler(async (req, res) => {
+    const days = Math.min(Math.max(Number(req.query.days) || 30, 7), 90)
+
+    const rows = await db.execute(sql`
+      WITH kid_hours AS (
+        SELECT
+          ka.id AS kid_id,
+          ka.display_name AS kid_name,
+          ka.avatar,
+          EXTRACT(HOUR FROM t.completed_at AT TIME ZONE 'Asia/Taipei')::int AS hour,
+          COUNT(*)::int AS count
+        FROM kids_accounts ka
+        JOIN kids_tasks t ON
+          t.kid_id = ka.id
+          AND t.status = 'approved'
+          AND t.completed_at >= CURRENT_DATE - (${days}::int * INTERVAL '1 day')
+        WHERE ka.is_active = true
+        GROUP BY ka.id, ka.display_name, ka.avatar, EXTRACT(HOUR FROM t.completed_at AT TIME ZONE 'Asia/Taipei')
+      ),
+      kid_peaks AS (
+        SELECT DISTINCT ON (kid_id) kid_id, kid_name, avatar, hour, count
+        FROM kid_hours
+        ORDER BY kid_id, count DESC, hour ASC
+      ),
+      all_kids AS (
+        SELECT id::int AS kid_id, display_name AS kid_name, avatar FROM kids_accounts WHERE is_active = true
+      )
+      SELECT
+        ak.kid_id,
+        ak.kid_name,
+        ak.avatar,
+        kp.hour,
+        kp.count
+      FROM all_kids ak
+      LEFT JOIN kid_peaks kp ON kp.kid_id = ak.kid_id
+      ORDER BY ak.kid_id ASC
+    `)
+
+    const kids = (
+      rows as unknown as {
+        rows: Array<{
+          kid_id: number
+          kid_name: string
+          avatar: string
+          hour: number | null
+          count: number | null
+        }>
+      }
+    ).rows.map((r) => ({
+      kidId: r.kid_id,
+      kidName: r.kid_name,
+      avatar: r.avatar,
+      peakHour: r.hour,
+      peakCount: r.count ?? 0,
+      peakLabel: r.hour !== null ? `${String(r.hour).padStart(2, "0")}:00` : null,
+    }))
+
+    // 全家 peak hour
+    const familyHours = await db.execute(sql`
+      SELECT
+        EXTRACT(HOUR FROM t.completed_at AT TIME ZONE 'Asia/Taipei')::int AS hour,
+        COUNT(*)::int AS count
+      FROM kids_tasks t
+      JOIN kids_accounts ka ON ka.id = t.kid_id
+      WHERE t.status = 'approved'
+        AND ka.is_active = true
+        AND t.completed_at >= CURRENT_DATE - (${days}::int * INTERVAL '1 day')
+      GROUP BY hour
+      ORDER BY count DESC
+      LIMIT 1
+    `)
+    const familyPeakRow = (
+      familyHours as unknown as { rows: Array<{ hour: number; count: number }> }
+    ).rows[0]
+    const familyPeak = familyPeakRow
+      ? { hour: familyPeakRow.hour, count: familyPeakRow.count }
+      : null
+
+    let message: string
+    if (kids.length === 0) {
+      message = "還沒有小孩"
+    } else if (!familyPeak) {
+      message = `過去 ${days} 天還沒完成任務`
+    } else {
+      message = `🕐 全家最常在 ${String(familyPeak.hour).padStart(2, "0")}:00 完成任務（${familyPeak.count} 個）`
+    }
+
+    res.json({
+      days,
+      kids,
+      familyPeak,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/difficulty-by-kid?days=90
  * 每個 active kid 過去 N 天 easy/medium/hard 任務數
  * challengeLevel: bold(hard>=30%) / balanced / safe / no_data

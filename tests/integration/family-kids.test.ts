@@ -4245,6 +4245,30 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.body.weeks).toBe(52)
   })
 
+  it("任務高峰小時：基本結構 kids/familyPeak/message", async () => {
+    const res = await request(app).get("/api/family/kid-peak-hour")
+    expect(res.status).toBe(200)
+    expect(Array.isArray(res.body.kids)).toBe(true)
+    expect(res.body.message).toBeTruthy()
+  })
+
+  it("任務高峰小時：approve task → familyPeak 有值", async () => {
+    const kidObj = (await createKid()) as { id: number }
+    const myKidId = kidObj.id
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId: myKidId, title: "高峰測試", rewardAmount: 30 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`).send({})
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`).send({})
+    const res = await request(app).get("/api/family/kid-peak-hour?days=7")
+    expect(res.status).toBe(200)
+    expect(res.body.familyPeak).not.toBeNull()
+    const myKid = res.body.kids.find((k: { kidId: number }) => k.kidId === myKidId)
+    expect(myKid).toBeDefined()
+    expect(myKid.peakHour).not.toBeNull()
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
   it("難度分佈對比：基本結構 kids/boldCount/message", async () => {
     const res = await request(app).get("/api/family/difficulty-by-kid")
     expect(res.status).toBe(200)
