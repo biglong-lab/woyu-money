@@ -8602,6 +8602,90 @@ async function bulkApproveOne(
 }
 
 /**
+ * GET /api/family/activity-streak?lookback=90
+ * 全家整體 streak（至少有 1 任務通過 或 打卡 或 spending 算當天活躍）
+ * 計算：當前 streak（從今天倒推連續活躍天數）+ 歷史最長 + 過去 N 天活躍率
+ */
+router.get(
+  "/api/family/activity-streak",
+  asyncHandler(async (req, res) => {
+    const lookback = Math.min(Math.max(Number(req.query.lookback) || 90, 7), 365)
+
+    const rows = await db.execute(sql`
+      WITH days AS (
+        SELECT generate_series(
+          CURRENT_DATE - (${lookback - 1}::int * INTERVAL '1 day'),
+          CURRENT_DATE,
+          INTERVAL '1 day'
+        )::date AS d
+      )
+      SELECT
+        d.d::text AS date,
+        (
+          EXISTS (SELECT 1 FROM kids_tasks WHERE status = 'approved' AND DATE(completed_at) = d.d)
+          OR EXISTS (SELECT 1 FROM kids_checkins WHERE checkin_date = d.d)
+          OR EXISTS (SELECT 1 FROM kids_spendings WHERE spend_date = d.d)
+        ) AS active
+      FROM days d
+      ORDER BY d.d ASC
+    `)
+
+    const daysArr = (rows as unknown as { rows: Array<{ date: string; active: boolean }> }).rows
+
+    // 算當前 streak（從最後一天往前數連續 true）
+    let currentStreak = 0
+    for (let i = daysArr.length - 1; i >= 0; i--) {
+      if (daysArr[i].active) currentStreak++
+      else break
+    }
+
+    // 歷史最長
+    let longestStreak = 0
+    let temp = 0
+    for (const d of daysArr) {
+      if (d.active) {
+        temp++
+        if (temp > longestStreak) longestStreak = temp
+      } else {
+        temp = 0
+      }
+    }
+
+    const activeDaysCount = daysArr.filter((d) => d.active).length
+    const activeRatio = Math.round((activeDaysCount / lookback) * 100)
+
+    let level: "legendary" | "great" | "good" | "starting" | "inactive"
+    let message: string
+    if (currentStreak >= 30) {
+      level = "legendary"
+      message = `🏆 連續活躍 ${currentStreak} 天、家庭傳奇！`
+    } else if (currentStreak >= 14) {
+      level = "great"
+      message = `🔥 連續 ${currentStreak} 天、超棒！`
+    } else if (currentStreak >= 3) {
+      level = "good"
+      message = `🌱 連續 ${currentStreak} 天活躍、保持住！`
+    } else if (currentStreak >= 1) {
+      level = "starting"
+      message = `✨ 今天有活動、開始累積 streak！`
+    } else {
+      level = "inactive"
+      message = "今天還沒人活動、誰要打破沉默？"
+    }
+
+    res.json({
+      currentStreak,
+      longestStreak,
+      activeDaysCount,
+      lookback,
+      activeRatio,
+      level,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/kid-task-variety?kidId=&days=30
  * 個別小孩過去 N 天任務多樣性：嘗試過幾個不同 title / category / difficulty
  * diversity: high(>=5 categories) / medium(3-4) / low(1-2) / none

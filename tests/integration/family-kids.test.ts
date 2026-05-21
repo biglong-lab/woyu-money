@@ -4245,6 +4245,39 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.body.weeks).toBe(52)
   })
 
+  it("家庭 streak：基本結構 + currentStreak/longestStreak/level/message", async () => {
+    const res = await request(app).get("/api/family/activity-streak")
+    expect(res.status).toBe(200)
+    expect(res.body).toHaveProperty("currentStreak")
+    expect(res.body).toHaveProperty("longestStreak")
+    expect(res.body).toHaveProperty("activeRatio")
+    expect(["legendary", "great", "good", "starting", "inactive"]).toContain(res.body.level)
+    expect(res.body.message).toBeTruthy()
+    expect(res.body.lookback).toBe(90)
+  })
+
+  it("家庭 streak：完成任務後 currentStreak>=1", async () => {
+    const kidObj = (await createKid()) as { id: number }
+    const myKidId = kidObj.id
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId: myKidId, title: "活躍測試", rewardAmount: 30 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`).send({})
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`).send({})
+    const res = await request(app).get("/api/family/activity-streak")
+    expect(res.status).toBe(200)
+    expect(res.body.currentStreak).toBeGreaterThanOrEqual(1)
+    expect(["starting", "good", "great", "legendary"]).toContain(res.body.level)
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
+  it("家庭 streak：lookback clamp 7-365", async () => {
+    const r1 = await request(app).get("/api/family/activity-streak?lookback=1000")
+    expect(r1.body.lookback).toBe(365)
+    const r2 = await request(app).get("/api/family/activity-streak?lookback=3")
+    expect(r2.body.lookback).toBe(7)
+  })
+
   it("任務多樣性：缺 kidId → 400", async () => {
     const res = await request(app).get("/api/family/kid-task-variety")
     expect(res.status).toBe(400)
