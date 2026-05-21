@@ -443,6 +443,9 @@ export default function FamilyPage() {
       {/* 跨域搜尋 */}
       <FamilySearch />
 
+      {/* 全家月度統計 */}
+      <FamilyMonthlyStats />
+
       {/* 全家活動 feed */}
       <FamilyActivityFeed />
 
@@ -1870,6 +1873,91 @@ function DifficultyInsights() {
         ))}
       </CardContent>
     </Card>
+  )
+}
+
+function FamilyMonthlyStats() {
+  const currentMonth = new Date().toISOString().slice(0, 7)
+  const { data } = useQuery<{
+    month: string
+    family: {
+      tasksApproved: number
+      totalReward: number
+      totalSpent: number
+      totalSaveUsed: number
+      totalGiven: number
+      checkinDays: number
+    }
+    perKid: Array<{
+      kidId: number
+      kidName: string
+      avatar: string
+      tasksApproved: number
+      totalReward: number
+      totalSpent: number
+      totalSaveUsed: number
+      totalGiven: number
+      checkinDays: number
+    }>
+  }>({
+    queryKey: ["/api/family/monthly-stats", currentMonth],
+    queryFn: async () => {
+      const res = await fetch(`/api/family/monthly-stats?month=${currentMonth}`, {
+        credentials: "include",
+      })
+      return res.json()
+    },
+  })
+  if (!data || data.perKid.length === 0) return null
+
+  const monthLabel = `${data.month.slice(0, 4)}/${data.month.slice(5)}`
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-indigo-300 bg-gradient-to-br from-indigo-50 to-purple-50 p-4 shadow">
+      <h3 className="font-bold text-indigo-900 mb-3 flex items-center justify-between">
+        <span>📊 全家本月（{monthLabel}）</span>
+      </h3>
+
+      {/* 全家 KPI 4 格 */}
+      <div className="grid grid-cols-4 gap-2 mb-3">
+        <div className="bg-white rounded-lg p-2 text-center shadow-sm">
+          <div className="text-xl font-bold text-indigo-700">{data.family.tasksApproved}</div>
+          <div className="text-xs text-gray-500">完成任務</div>
+        </div>
+        <div className="bg-white rounded-lg p-2 text-center shadow-sm">
+          <div className="text-xl font-bold text-emerald-700">${data.family.totalReward}</div>
+          <div className="text-xs text-gray-500">獎勵總額</div>
+        </div>
+        <div className="bg-white rounded-lg p-2 text-center shadow-sm">
+          <div className="text-xl font-bold text-rose-700">${data.family.totalSpent}</div>
+          <div className="text-xs text-gray-500">花費</div>
+        </div>
+        <div className="bg-white rounded-lg p-2 text-center shadow-sm">
+          <div className="text-xl font-bold text-pink-700">${data.family.totalGiven}</div>
+          <div className="text-xs text-gray-500">捐贈</div>
+        </div>
+      </div>
+
+      {/* 每個小孩細項 */}
+      <div className="space-y-1">
+        {data.perKid.map((k) => (
+          <div key={k.kidId} className="bg-white/70 rounded-lg p-2 flex items-center gap-2">
+            <span className="text-2xl">{k.avatar}</span>
+            <div className="flex-1 min-w-0">
+              <div className="font-bold text-sm">{k.kidName}</div>
+              <div className="text-xs text-gray-600">
+                {k.tasksApproved} 任務・領 ${k.totalReward}・花 ${k.totalSpent}・捐 ${k.totalGiven}
+              </div>
+            </div>
+            {k.checkinDays > 0 && (
+              <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">
+                {k.checkinDays} 天打卡
+              </span>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
   )
 }
 

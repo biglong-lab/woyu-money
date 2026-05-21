@@ -2875,6 +2875,121 @@ router.get(
 )
 
 /**
+ * GET /api/family/monthly-stats?month=YYYY-MM
+ * 全家月度統計（家長端、不指定 kidId）
+ * 一頁看全家本月表現、含每個小孩的細項
+ *
+ * 回：
+ *   month, family: { tasksApproved, totalReward, totalSpent, totalSaved, totalGiven, checkinDays }
+ *   perKid: [{ kidId, kidName, avatar, tasksApproved, totalReward, totalSpent, totalSaved, totalGiven }]
+ */
+router.get(
+  "/api/family/monthly-stats",
+  asyncHandler(async (req, res) => {
+    const monthQ = String(req.query.month ?? "").trim()
+    const monthRegex = /^\d{4}-\d{2}$/
+    const month = monthRegex.test(monthQ) ? monthQ : new Date().toISOString().slice(0, 7)
+    const startDate = `${month}-01`
+    // 下個月 1 號
+    const [y, m] = month.split("-").map(Number)
+    const nextMonth = m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, "0")}-01`
+
+    const perKid = await db.execute(sql`
+      SELECT
+        ka.id::int AS kid_id,
+        ka.display_name AS kid_name,
+        ka.avatar AS avatar,
+        COALESCE((
+          SELECT COUNT(*)::int FROM kids_tasks
+          WHERE kid_id = ka.id AND status = 'approved'
+            AND completed_at >= ${startDate}::date AND completed_at < ${nextMonth}::date
+        ), 0) AS tasks_approved,
+        COALESCE((
+          SELECT SUM(reward_amount::numeric)::numeric FROM kids_tasks
+          WHERE kid_id = ka.id AND status = 'approved'
+            AND completed_at >= ${startDate}::date AND completed_at < ${nextMonth}::date
+        ), 0) AS total_reward,
+        COALESCE((
+          SELECT SUM(amount::numeric)::numeric FROM kids_spendings
+          WHERE kid_id = ka.id AND jar = 'spend'
+            AND spend_date >= ${startDate}::date AND spend_date < ${nextMonth}::date
+        ), 0) AS total_spent,
+        COALESCE((
+          SELECT SUM(amount::numeric)::numeric FROM kids_spendings
+          WHERE kid_id = ka.id AND jar = 'save'
+            AND spend_date >= ${startDate}::date AND spend_date < ${nextMonth}::date
+        ), 0) AS total_save_used,
+        COALESCE((
+          SELECT SUM(amount::numeric)::numeric FROM kids_spendings
+          WHERE kid_id = ka.id AND jar = 'give'
+            AND spend_date >= ${startDate}::date AND spend_date < ${nextMonth}::date
+        ), 0) AS total_given,
+        COALESCE((
+          SELECT COUNT(DISTINCT checkin_date)::int FROM kids_checkins
+          WHERE kid_id = ka.id
+            AND checkin_date >= ${startDate}::date AND checkin_date < ${nextMonth}::date
+        ), 0) AS checkin_days
+      FROM kids_accounts ka
+      WHERE ka.is_active = true
+      ORDER BY ka.id ASC
+    `)
+    const rows = (
+      perKid as unknown as {
+        rows: {
+          kid_id: number
+          kid_name: string
+          avatar: string
+          tasks_approved: number
+          total_reward: string | number
+          total_spent: string | number
+          total_save_used: string | number
+          total_given: string | number
+          checkin_days: number
+        }[]
+      }
+    ).rows
+
+    const family = {
+      tasksApproved: 0,
+      totalReward: 0,
+      totalSpent: 0,
+      totalSaveUsed: 0,
+      totalGiven: 0,
+      checkinDays: 0,
+    }
+    const perKidOut = rows.map((r) => {
+      const reward = Number(r.total_reward ?? 0)
+      const spent = Number(r.total_spent ?? 0)
+      const saveUsed = Number(r.total_save_used ?? 0)
+      const given = Number(r.total_given ?? 0)
+      family.tasksApproved += r.tasks_approved ?? 0
+      family.totalReward += reward
+      family.totalSpent += spent
+      family.totalSaveUsed += saveUsed
+      family.totalGiven += given
+      family.checkinDays += r.checkin_days ?? 0
+      return {
+        kidId: r.kid_id,
+        kidName: r.kid_name,
+        avatar: r.avatar,
+        tasksApproved: r.tasks_approved ?? 0,
+        totalReward: reward,
+        totalSpent: spent,
+        totalSaveUsed: saveUsed,
+        totalGiven: given,
+        checkinDays: r.checkin_days ?? 0,
+      }
+    })
+
+    res.json({
+      month,
+      family,
+      perKid: perKidOut,
+    })
+  })
+)
+
+/**
  * GET /api/family/kid-difficulty-stats?kidId=
  * 小孩任務難度分佈統計
  * 看小孩有沒有挑戰更難的任務、鼓勵成長

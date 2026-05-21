@@ -2514,6 +2514,82 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(r.status).toBe(400)
   })
 
+  it("全家月度統計：family 加總 + perKid 細項", async () => {
+    // 確保乾淨：清掉任何殘留小孩（其他測試可能 leak）
+    await db.execute(sql`DELETE FROM kids_accounts WHERE pin = ${TEST_PIN}`)
+
+    await createKid({ displayName: "小阿", spendRatio: 70, saveRatio: 20, giveRatio: 10 })
+    const k1 = kidId
+
+    // 完成 2 個任務 × 100 元（k1）
+    for (let i = 0; i < 2; i++) {
+      const t = await request(app)
+        .post("/api/family/tasks")
+        .send({ kidId: k1, title: `T${i}`, rewardAmount: 100 })
+      await request(app).post(`/api/family/tasks/${t.body.id}/submit`)
+      await request(app).post(`/api/family/tasks/${t.body.id}/approve`)
+    }
+    // 花掉 30 元 spend
+    await request(app)
+      .post("/api/family/spendings")
+      .send({ kidId: k1, jar: "spend", amount: 30, description: "零食" })
+
+    await createKid({ displayName: "小弟", spendRatio: 50, saveRatio: 50, giveRatio: 0 })
+    const k2 = kidId
+    // 1 個任務 × 50 元（k2）
+    const t2 = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId: k2, title: "T2", rewardAmount: 50 })
+    await request(app).post(`/api/family/tasks/${t2.body.id}/submit`)
+    await request(app).post(`/api/family/tasks/${t2.body.id}/approve`)
+
+    const res = await request(app).get("/api/family/monthly-stats")
+    expect(res.status).toBe(200)
+    expect(res.body.month).toMatch(/^\d{4}-\d{2}$/)
+
+    // family 總計
+    expect(res.body.family.tasksApproved).toBe(3) // 2 + 1
+    expect(res.body.family.totalReward).toBe(250) // 200 + 50
+    expect(res.body.family.totalSpent).toBe(30)
+
+    // perKid 含兩位
+    const perKid = res.body.perKid as Array<{
+      kidId: number
+      kidName: string
+      tasksApproved: number
+      totalReward: number
+      totalSpent: number
+    }>
+    expect(perKid.length).toBeGreaterThanOrEqual(2)
+    const xiaoA = perKid.find((p) => p.kidId === k1)!
+    expect(xiaoA.kidName).toBe("小阿")
+    expect(xiaoA.tasksApproved).toBe(2)
+    expect(xiaoA.totalReward).toBe(200)
+    expect(xiaoA.totalSpent).toBe(30)
+
+    const xiaoB = perKid.find((p) => p.kidId === k2)!
+    expect(xiaoB.tasksApproved).toBe(1)
+    expect(xiaoB.totalReward).toBe(50)
+
+    // 清第一個小孩（afterEach 只清 kidId=k2）
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${k1}`)
+  })
+
+  it("monthly-stats 指定 month 參數：未來月份 → 全 0", async () => {
+    await createKid()
+    const res = await request(app).get("/api/family/monthly-stats?month=2099-12")
+    expect(res.status).toBe(200)
+    expect(res.body.month).toBe("2099-12")
+    expect(res.body.family.tasksApproved).toBe(0)
+    expect(res.body.family.totalReward).toBe(0)
+  })
+
+  it("monthly-stats 非法 month → 用當月", async () => {
+    const res = await request(app).get("/api/family/monthly-stats?month=BOGUS")
+    expect(res.status).toBe(200)
+    expect(res.body.month).toMatch(/^\d{4}-\d{2}$/)
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)
