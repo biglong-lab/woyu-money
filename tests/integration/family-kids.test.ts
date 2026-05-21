@@ -2446,6 +2446,74 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(r.status).toBe(404)
   })
 
+  it("難度分佈：5 easy + 2 medium + 1 hard、challengeLevel=growing", async () => {
+    await createKid()
+
+    const tasks: Array<{ difficulty: string; title: string }> = [
+      ...Array(5)
+        .fill(null)
+        .map((_, i) => ({ difficulty: "easy", title: `E${i}` })),
+      ...Array(2)
+        .fill(null)
+        .map((_, i) => ({ difficulty: "medium", title: `M${i}` })),
+      { difficulty: "hard", title: "H1" },
+    ]
+    for (const tk of tasks) {
+      const t = await request(app)
+        .post("/api/family/tasks")
+        .send({ kidId, title: tk.title, rewardAmount: 10, difficulty: tk.difficulty })
+      await request(app).post(`/api/family/tasks/${t.body.id}/submit`)
+      await request(app).post(`/api/family/tasks/${t.body.id}/approve`)
+    }
+
+    const res = await request(app).get(`/api/family/kid-difficulty-stats?kidId=${kidId}`)
+    expect(res.status).toBe(200)
+    expect(res.body.totalTasks).toBe(8)
+
+    const diffs = res.body.difficulties as Array<{
+      difficulty: string
+      count: number
+      percentage: number
+    }>
+    expect(diffs.length).toBe(3)
+    expect(diffs.find((d) => d.difficulty === "easy")!.count).toBe(5)
+    expect(diffs.find((d) => d.difficulty === "easy")!.percentage).toBe(63)
+    expect(diffs.find((d) => d.difficulty === "medium")!.count).toBe(2)
+    expect(diffs.find((d) => d.difficulty === "hard")!.count).toBe(1)
+
+    // averageScore = (5×1 + 2×2 + 1×3) / 8 = 12/8 = 1.5
+    expect(res.body.averageScore).toBe(1.5)
+    expect(res.body.challengeLevel).toBe("growing")
+    expect(res.body.suggestion).toBeTruthy()
+  })
+
+  it("難度分佈：無任務 → challengeLevel=none、suggestion 鼓勵嘗試", async () => {
+    await createKid()
+    const res = await request(app).get(`/api/family/kid-difficulty-stats?kidId=${kidId}`)
+    expect(res.status).toBe(200)
+    expect(res.body.totalTasks).toBe(0)
+    expect(res.body.challengeLevel).toBe("none")
+  })
+
+  it("難度分佈：全 hard → challengeLevel=advanced", async () => {
+    await createKid()
+    for (let i = 0; i < 3; i++) {
+      const t = await request(app)
+        .post("/api/family/tasks")
+        .send({ kidId, title: `H${i}`, rewardAmount: 50, difficulty: "hard" })
+      await request(app).post(`/api/family/tasks/${t.body.id}/submit`)
+      await request(app).post(`/api/family/tasks/${t.body.id}/approve`)
+    }
+    const res = await request(app).get(`/api/family/kid-difficulty-stats?kidId=${kidId}`)
+    expect(res.body.averageScore).toBe(3)
+    expect(res.body.challengeLevel).toBe("advanced")
+  })
+
+  it("kid-difficulty-stats 缺 kidId 回 400", async () => {
+    const r = await request(app).get("/api/family/kid-difficulty-stats")
+    expect(r.status).toBe(400)
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)

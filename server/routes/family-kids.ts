@@ -2875,6 +2875,93 @@ router.get(
 )
 
 /**
+ * GET /api/family/kid-difficulty-stats?kidId=
+ * 小孩任務難度分佈統計
+ * 看小孩有沒有挑戰更難的任務、鼓勵成長
+ *
+ * 回：
+ *   difficulties: [easy/medium/hard 三筆]，含 count + percentage + emoji
+ *   totalTasks
+ *   averageScore：1.0–3.0（easy=1, medium=2, hard=3）
+ *   challengeLevel：beginner / growing / balanced / advanced
+ *   suggestion：依分佈給建議
+ */
+router.get(
+  "/api/family/kid-difficulty-stats",
+  asyncHandler(async (req, res) => {
+    const kidIdQ = Number(req.query.kidId)
+    if (!Number.isInteger(kidIdQ) || kidIdQ < 1) throw new AppError(400, "需傳 kidId")
+
+    const result = await db.execute(sql`
+      SELECT difficulty, COUNT(*)::int AS n
+      FROM kids_tasks
+      WHERE kid_id = ${kidIdQ} AND status = 'approved'
+      GROUP BY difficulty
+    `)
+    const byDiff = new Map(
+      (result as unknown as { rows: { difficulty: string; n: number }[] }).rows.map((r) => [
+        r.difficulty,
+        r.n,
+      ])
+    )
+
+    const easyN = byDiff.get("easy") ?? 0
+    const mediumN = byDiff.get("medium") ?? 0
+    const hardN = byDiff.get("hard") ?? 0
+    const total = easyN + mediumN + hardN
+
+    const DIFF_META = {
+      easy: { emoji: "🟢", name: "簡單", score: 1 },
+      medium: { emoji: "🟡", name: "中等", score: 2 },
+      hard: { emoji: "🔴", name: "困難", score: 3 },
+    } as const
+
+    const difficulties = (["easy", "medium", "hard"] as const).map((key) => {
+      const count = byDiff.get(key) ?? 0
+      const percentage = total > 0 ? Math.round((count / total) * 100) : 0
+      return {
+        difficulty: key,
+        name: DIFF_META[key].name,
+        emoji: DIFF_META[key].emoji,
+        count,
+        percentage,
+      }
+    })
+
+    const totalScore = easyN * 1 + mediumN * 2 + hardN * 3
+    const averageScore = total > 0 ? Math.round((totalScore / total) * 100) / 100 : 0
+
+    let challengeLevel: "none" | "beginner" | "growing" | "balanced" | "advanced"
+    let suggestion: string
+    if (total === 0) {
+      challengeLevel = "none"
+      suggestion = "還沒做過任務、開始第一個試試吧！"
+    } else if (averageScore < 1.3) {
+      challengeLevel = "beginner"
+      suggestion = "幾乎都是簡單任務、可以嘗試中等難度挑戰看看！"
+    } else if (averageScore < 1.8) {
+      challengeLevel = "growing"
+      suggestion = "進步中、再多挑戰幾個中等任務"
+    } else if (averageScore < 2.3) {
+      challengeLevel = "balanced"
+      suggestion = "難度搭配得不錯！偶爾試試困難任務獎勵更高"
+    } else {
+      challengeLevel = "advanced"
+      suggestion = "勇於挑戰困難任務、超強的！👏"
+    }
+
+    res.json({
+      kidId: kidIdQ,
+      totalTasks: total,
+      difficulties,
+      averageScore,
+      challengeLevel,
+      suggestion,
+    })
+  })
+)
+
+/**
  * GET /api/family/goals/:id/eta
  * 目標達成 ETA 預測（按近 30 天 save 罐淨流入推估）
  *

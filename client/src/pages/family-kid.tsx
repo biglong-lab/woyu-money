@@ -1010,6 +1010,9 @@ function KidDashboard({
       {/* 能力強項統計 */}
       <KidStrengthsCard kidId={kidId} />
 
+      {/* 任務難度分佈 */}
+      <KidDifficultyCard kidId={kidId} />
+
       {/* 成就牆（含未解鎖徽章 + 進度條）*/}
       <AchievementWall kidId={kidId} />
 
@@ -1763,6 +1766,84 @@ function WishesSection({
           ))}
         </div>
       )}
+    </div>
+  )
+}
+
+function KidDifficultyCard({ kidId }: { kidId: number }) {
+  const { data } = useQuery<{
+    totalTasks: number
+    difficulties: Array<{
+      difficulty: "easy" | "medium" | "hard"
+      name: string
+      emoji: string
+      count: number
+      percentage: number
+    }>
+    averageScore: number
+    challengeLevel: "none" | "beginner" | "growing" | "balanced" | "advanced"
+    suggestion: string
+  }>({
+    queryKey: ["/api/family/kid-difficulty-stats", kidId],
+    queryFn: async () => {
+      const res = await fetch(`/api/family/kid-difficulty-stats?kidId=${kidId}`, {
+        credentials: "include",
+      })
+      return res.json()
+    },
+  })
+  if (!data || data.totalTasks === 0) return null
+
+  const LEVEL_COLOR: Record<string, { bg: string; text: string }> = {
+    beginner: { bg: "bg-green-50 border-green-200", text: "text-green-700" },
+    growing: { bg: "bg-yellow-50 border-yellow-200", text: "text-yellow-700" },
+    balanced: { bg: "bg-blue-50 border-blue-200", text: "text-blue-700" },
+    advanced: { bg: "bg-rose-50 border-rose-200", text: "text-rose-700" },
+    none: { bg: "bg-gray-50 border-gray-200", text: "text-gray-700" },
+  }
+  const c = LEVEL_COLOR[data.challengeLevel]
+
+  return (
+    <div className={`mb-4 rounded-2xl border-2 ${c.bg} p-4 shadow`}>
+      <div className="flex items-center justify-between mb-3">
+        <h3 className={`font-bold ${c.text} flex items-center gap-2`}>🎯 挑戰度</h3>
+        <span className={`text-xs ${c.text} font-bold`}>
+          平均 {data.averageScore.toFixed(2)} 分
+        </span>
+      </div>
+
+      {/* 3 個難度條形圖 */}
+      <div className="space-y-2 mb-3">
+        {data.difficulties.map((d) => (
+          <div key={d.difficulty} className="bg-white/70 rounded-lg p-2">
+            <div className="flex items-center justify-between mb-1 text-sm">
+              <span>
+                {d.emoji} {d.name}
+              </span>
+              <span className="font-bold">
+                {d.count} 個 ({d.percentage}%)
+              </span>
+            </div>
+            <div className="h-2 w-full bg-white rounded-full overflow-hidden">
+              <div
+                className={
+                  d.difficulty === "easy"
+                    ? "h-full bg-green-400"
+                    : d.difficulty === "medium"
+                      ? "h-full bg-yellow-400"
+                      : "h-full bg-rose-400"
+                }
+                style={{ width: `${d.percentage}%` }}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* 建議文案 */}
+      <div className={`text-sm ${c.text} bg-white/70 rounded px-3 py-2 font-medium`}>
+        💬 {data.suggestion}
+      </div>
     </div>
   )
 }
