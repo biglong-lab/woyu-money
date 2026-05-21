@@ -8602,6 +8602,92 @@ async function bulkApproveOne(
 }
 
 /**
+ * GET /api/family/kid-task-completion-rate?days=90
+ * 每個 active kid 過去 N 天 approved / (approved + rejected) 批准率
+ * 看任務做得好不好（被駁回多 → 比例低）
+ */
+router.get(
+  "/api/family/kid-task-completion-rate",
+  asyncHandler(async (req, res) => {
+    const days = Math.min(Math.max(Number(req.query.days) || 90, 7), 365)
+
+    const rows = await db.execute(sql`
+      SELECT
+        ka.id::int AS kid_id,
+        ka.display_name AS kid_name,
+        ka.avatar,
+        COUNT(t.id) FILTER (WHERE t.status = 'approved')::int AS approved,
+        COUNT(t.id) FILTER (WHERE t.status = 'rejected')::int AS rejected
+      FROM kids_accounts ka
+      LEFT JOIN kids_tasks t ON
+        t.kid_id = ka.id
+        AND t.status IN ('approved', 'rejected')
+        AND t.updated_at >= CURRENT_DATE - (${days}::int * INTERVAL '1 day')
+      WHERE ka.is_active = true
+      GROUP BY ka.id, ka.display_name, ka.avatar
+      ORDER BY ka.id ASC
+    `)
+
+    const kids = (
+      rows as unknown as {
+        rows: Array<{
+          kid_id: number
+          kid_name: string
+          avatar: string
+          approved: number
+          rejected: number
+        }>
+      }
+    ).rows.map((r) => {
+      const total = r.approved + r.rejected
+      const rate = total > 0 ? Math.round((r.approved / total) * 100) : 0
+      let level: "perfect" | "great" | "good" | "needs_practice" | "no_data"
+      if (total === 0) level = "no_data"
+      else if (rate >= 95) level = "perfect"
+      else if (rate >= 80) level = "great"
+      else if (rate >= 60) level = "good"
+      else level = "needs_practice"
+      return {
+        kidId: r.kid_id,
+        kidName: r.kid_name,
+        avatar: r.avatar,
+        approved: r.approved,
+        rejected: r.rejected,
+        rate,
+        level,
+      }
+    })
+
+    const withData = kids.filter((k) => k.approved + k.rejected > 0)
+    const sorted = [...withData].sort((a, b) => b.rate - a.rate)
+    const familyAvg =
+      withData.length > 0
+        ? Math.round(withData.reduce((s, k) => s + k.rate, 0) / withData.length)
+        : 0
+
+    let message: string
+    if (withData.length === 0) {
+      message = `過去 ${days} 天還沒任務 approve/reject、批准率無法計算`
+    } else if (familyAvg >= 95) {
+      message = `🏆 全家平均批准率 ${familyAvg}%、小孩任務做得超棒！`
+    } else if (familyAvg >= 80) {
+      message = `💪 全家平均 ${familyAvg}%、小孩任務品質不錯`
+    } else if (familyAvg >= 60) {
+      message = `📋 全家平均 ${familyAvg}%、可以再加強任務品質`
+    } else {
+      message = `🌱 全家平均 ${familyAvg}%、被駁回較多、家長可以更明確說明任務標準`
+    }
+
+    res.json({
+      days,
+      kids: sorted.length > 0 ? sorted : kids,
+      familyAvg,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/jar-allocation-by-kid
  * 家庭兒童 jar 分配對比：每個 kid 的 spend/save/give ratio + 類型判斷
  * type: saver_type(save 最高) / spender_type(spend 最高) / giver_type(give 最高) / balanced

@@ -568,6 +568,9 @@ export default function FamilyPage() {
       {/* 家庭 jar 分配對比 */}
       <FamilyJarAllocationByKidCard />
 
+      {/* 家庭兒童任務批准率 */}
+      <FamilyKidTaskCompletionRateCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3522,6 +3525,73 @@ function ParentTodoList() {
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
       )}
+    </div>
+  )
+}
+
+function FamilyKidTaskCompletionRateCard() {
+  const { data } = useQuery<{
+    days: number
+    kids: Array<{
+      kidId: number
+      kidName: string
+      avatar: string
+      approved: number
+      rejected: number
+      rate: number
+      level: "perfect" | "great" | "good" | "needs_practice" | "no_data"
+    }>
+    familyAvg: number
+    message: string
+  }>({
+    queryKey: ["/api/family/kid-task-completion-rate?days=90"],
+  })
+  if (!data || data.kids.length === 0) return null
+  const withData = data.kids.filter((k) => k.approved + k.rejected > 0)
+  if (withData.length === 0) return null
+
+  const LEVEL_COLOR: Record<string, string> = {
+    perfect: "bg-yellow-400 text-yellow-900",
+    great: "bg-emerald-400 text-white",
+    good: "bg-blue-400 text-white",
+    needs_practice: "bg-amber-400 text-white",
+    no_data: "bg-gray-300 text-gray-700",
+  }
+  const LEVEL_LABEL: Record<string, string> = {
+    perfect: "🏆 完美",
+    great: "💪 優秀",
+    good: "👍 良好",
+    needs_practice: "📋 加強",
+    no_data: "—",
+  }
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-amber-300 bg-gradient-to-br from-amber-50 to-yellow-50 p-3 shadow">
+      <h3 className="font-bold mb-2 flex items-center gap-2">✅ 任務批准率（90 天）</h3>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-2 text-xs">{data.message}</div>
+
+      <div className="space-y-1.5">
+        {withData.map((k) => (
+          <div key={k.kidId} className="bg-white rounded-lg p-2 flex items-center gap-2">
+            <div className="text-lg">{k.avatar}</div>
+            <div className="flex-1">
+              <div className="text-sm font-medium">{k.kidName}</div>
+              <div className="text-[10px] text-gray-500">
+                ✓ {k.approved} · ✗ {k.rejected}
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="text-lg font-bold">{k.rate}%</div>
+              <div
+                className={`text-[10px] px-1.5 py-0.5 rounded ${LEVEL_COLOR[k.level]} inline-block`}
+              >
+                {LEVEL_LABEL[k.level]}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

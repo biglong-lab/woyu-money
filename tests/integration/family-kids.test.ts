@@ -4245,6 +4245,32 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.body.weeks).toBe(52)
   })
 
+  it("兒童批准率：基本結構 kids/familyAvg/message", async () => {
+    const res = await request(app).get("/api/family/kid-task-completion-rate")
+    expect(res.status).toBe(200)
+    expect(Array.isArray(res.body.kids)).toBe(true)
+    expect(res.body).toHaveProperty("familyAvg")
+    expect(res.body.message).toBeTruthy()
+  })
+
+  it("兒童批准率：approve 1 個 → rate=100 + level=perfect", async () => {
+    const kidObj = (await createKid()) as { id: number }
+    const myKidId = kidObj.id
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId: myKidId, title: "批准率測試", rewardAmount: 30 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`).send({})
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`).send({})
+    const res = await request(app).get("/api/family/kid-task-completion-rate?days=7")
+    expect(res.status).toBe(200)
+    const myKid = res.body.kids.find((k: { kidId: number }) => k.kidId === myKidId)
+    expect(myKid).toBeDefined()
+    expect(myKid.approved).toBeGreaterThanOrEqual(1)
+    expect(myKid.rate).toBe(100)
+    expect(myKid.level).toBe("perfect")
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
   it("Jar 分配對比：基本結構 kids/familyAvg/typeCounts", async () => {
     const res = await request(app).get("/api/family/jar-allocation-by-kid")
     expect(res.status).toBe(200)
