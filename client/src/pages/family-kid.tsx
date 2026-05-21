@@ -1213,6 +1213,9 @@ function KidDashboard({
       {/* 任務多樣性（過去 30 天）*/}
       <KidTaskVarietyCard kidId={kidId} />
 
+      {/* 30 天金流摘要（賺多少 / 花多少 / 三罐比例提示）*/}
+      <KidJarFlow30dCard kidId={kidId} />
+
       {/* 成長階段 */}
       <KidGrowthStageCard kidId={kidId} />
 
@@ -3451,6 +3454,69 @@ function KidWishlistSummaryCard({ kidId }: { kidId: number }) {
           </div>
         ))}
       </div>
+    </div>
+  )
+}
+
+function KidJarFlow30dCard({ kidId }: { kidId: number }) {
+  const { data } = useQuery<{
+    days: number
+    ratio: { spend: number; save: number; give: number }
+    daily: Array<{
+      spendIn: number
+      saveIn: number
+      giveIn: number
+      spendOut: number
+      saveOut: number
+      giveOut: number
+    }>
+    totalEarned: number
+    totalSpent: number
+    message: string
+  }>({
+    queryKey: [`/api/family/kids/${kidId}/jar-balance-history?days=30`],
+  })
+  if (!data) return null
+
+  const totalSpendIn = data.daily.reduce((s, d) => s + d.spendIn, 0)
+  const totalSaveIn = data.daily.reduce((s, d) => s + d.saveIn, 0)
+  const totalGiveIn = data.daily.reduce((s, d) => s + d.giveIn, 0)
+
+  return (
+    <div className="mb-4 rounded-xl border-2 border-violet-300 bg-gradient-to-br from-violet-50 to-purple-50 p-3 shadow">
+      <h3 className="font-bold mb-2 text-sm">📊 過去 30 天金流摘要</h3>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-2 text-xs">{data.message}</div>
+
+      <div className="grid grid-cols-2 gap-2 mb-2">
+        <div className="bg-emerald-50 rounded-lg p-2 text-center">
+          <div className="text-[10px] text-gray-600">💰 賺</div>
+          <div className="text-base font-bold text-emerald-700">${data.totalEarned}</div>
+        </div>
+        <div className="bg-rose-50 rounded-lg p-2 text-center">
+          <div className="text-[10px] text-gray-600">💸 花</div>
+          <div className="text-base font-bold text-rose-700">${data.totalSpent}</div>
+        </div>
+      </div>
+
+      {data.totalEarned > 0 && (
+        <div className="bg-white rounded-lg p-2">
+          <div className="text-[10px] text-gray-600 mb-1">
+            收入按 {data.ratio.spend}/{data.ratio.save}/{data.ratio.give} 分配
+          </div>
+          <div className="grid grid-cols-3 gap-1 text-xs">
+            <div className="text-center">
+              <div className="text-rose-600">💸 ${Math.round(totalSpendIn)}</div>
+            </div>
+            <div className="text-center">
+              <div className="text-emerald-600">🐷 ${Math.round(totalSaveIn)}</div>
+            </div>
+            <div className="text-center">
+              <div className="text-amber-600">🎁 ${Math.round(totalGiveIn)}</div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

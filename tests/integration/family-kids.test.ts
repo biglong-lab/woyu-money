@@ -4272,6 +4272,49 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
   })
 
+  it("三罐餘額趨勢：基本結構 daily/currentBalance/ratio/message", async () => {
+    const kidObj = (await createKid()) as { id: number }
+    const myKidId = kidObj.id
+    const res = await request(app).get(`/api/family/kids/${myKidId}/jar-balance-history`)
+    expect(res.status).toBe(200)
+    expect(res.body.kidId).toBe(myKidId)
+    expect(res.body.days).toBe(30)
+    expect(Array.isArray(res.body.daily)).toBe(true)
+    expect(res.body.daily).toHaveLength(30)
+    expect(res.body.currentBalance).toHaveProperty("spend")
+    expect(res.body.currentBalance).toHaveProperty("save")
+    expect(res.body.currentBalance).toHaveProperty("give")
+    expect(res.body.ratio.spend + res.body.ratio.save + res.body.ratio.give).toBe(100)
+    expect(res.body.message).toBeTruthy()
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
+  it("三罐餘額趨勢：approve 任務後今日 spendIn 按比例分配", async () => {
+    const kidObj = (await createKid()) as { id: number }
+    const myKidId = kidObj.id
+    // createKid 預設 70/20/10
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId: myKidId, title: "趨勢測試", rewardAmount: 100 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`).send({})
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`).send({})
+    const res = await request(app).get(`/api/family/kids/${myKidId}/jar-balance-history?days=7`)
+    expect(res.status).toBe(200)
+    expect(res.body.days).toBe(7)
+    expect(res.body.daily).toHaveLength(7)
+    const today = res.body.daily[6]
+    expect(today.spendIn).toBe(70)
+    expect(today.saveIn).toBe(20)
+    expect(today.giveIn).toBe(10)
+    expect(res.body.totalEarned).toBe(100)
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
+  it("三罐餘額趨勢：404 找不到小孩", async () => {
+    const res = await request(app).get("/api/family/kids/99999999/jar-balance-history")
+    expect(res.status).toBe(404)
+  })
+
   it("任務重複率：基本結構 kids/patternCounts/message", async () => {
     const res = await request(app).get("/api/family/task-repeat-by-kid")
     expect(res.status).toBe(200)

@@ -8675,6 +8675,153 @@ router.get(
 )
 
 /**
+ * GET /api/family/kids/:kidId/jar-balance-history?days=30
+ * 三罐每日金流（in/out）+ 當前餘額快照、前端畫累計餘額趨勢
+ */
+router.get(
+  "/api/family/kids/:kidId/jar-balance-history",
+  asyncHandler(async (req, res) => {
+    const kidId = Number(req.params.kidId)
+    if (isNaN(kidId)) {
+      res.status(400).json({ error: "kidId 必須為數字" })
+      return
+    }
+    const days = Math.min(Math.max(Number(req.query.days) || 30, 7), 90)
+
+    const kidRow = await db.execute(sql`
+      SELECT id, display_name, spend_ratio, save_ratio, give_ratio
+      FROM kids_accounts WHERE id = ${kidId}
+    `)
+    const kidR = (
+      kidRow as unknown as {
+        rows: Array<{
+          id: number
+          display_name: string
+          spend_ratio: number
+          save_ratio: number
+          give_ratio: number
+        }>
+      }
+    ).rows
+    if (kidR.length === 0) {
+      res.status(404).json({ error: "找不到小孩" })
+      return
+    }
+    const kid = kidR[0]
+
+    const jarRow = await db.execute(sql`
+      SELECT spend_balance, save_balance, give_balance
+      FROM kids_jars WHERE kid_id = ${kidId}
+    `)
+    const jr = (
+      jarRow as unknown as {
+        rows: Array<{
+          spend_balance: string
+          save_balance: string
+          give_balance: string
+        }>
+      }
+    ).rows
+    const currentBalance = {
+      spend: jr.length > 0 ? Number(jr[0].spend_balance) : 0,
+      save: jr.length > 0 ? Number(jr[0].save_balance) : 0,
+      give: jr.length > 0 ? Number(jr[0].give_balance) : 0,
+    }
+
+    const flow = await db.execute(sql`
+      WITH days AS (
+        SELECT generate_series(
+          CURRENT_DATE - (${days - 1} || ' days')::interval,
+          CURRENT_DATE,
+          '1 day'::interval
+        )::date AS day
+      ),
+      income AS (
+        SELECT DATE(approved_at) AS day, SUM(reward_amount)::numeric AS total
+        FROM kids_tasks
+        WHERE kid_id = ${kidId} AND status = 'approved'
+          AND DATE(approved_at) >= CURRENT_DATE - (${days - 1} || ' days')::interval
+        GROUP BY DATE(approved_at)
+      ),
+      outflow AS (
+        SELECT spend_date AS day,
+          SUM(CASE WHEN jar = 'spend' THEN amount ELSE 0 END)::numeric AS spend_out,
+          SUM(CASE WHEN jar = 'save' THEN amount ELSE 0 END)::numeric AS save_out,
+          SUM(CASE WHEN jar = 'give' THEN amount ELSE 0 END)::numeric AS give_out
+        FROM kids_spendings
+        WHERE kid_id = ${kidId}
+          AND spend_date >= CURRENT_DATE - (${days - 1} || ' days')::interval
+        GROUP BY spend_date
+      )
+      SELECT d.day,
+        COALESCE(i.total, 0)::numeric AS day_income,
+        COALESCE(o.spend_out, 0)::numeric AS spend_out,
+        COALESCE(o.save_out, 0)::numeric AS save_out,
+        COALESCE(o.give_out, 0)::numeric AS give_out
+      FROM days d
+      LEFT JOIN income i ON i.day = d.day
+      LEFT JOIN outflow o ON o.day = d.day
+      ORDER BY d.day
+    `)
+
+    const flowRows = (
+      flow as unknown as {
+        rows: Array<{
+          day: string
+          day_income: string
+          spend_out: string
+          save_out: string
+          give_out: string
+        }>
+      }
+    ).rows
+
+    const spendRatio = kid.spend_ratio / 100
+    const saveRatio = kid.save_ratio / 100
+    const giveRatio = kid.give_ratio / 100
+
+    const daily = flowRows.map((r) => {
+      const income = Number(r.day_income)
+      return {
+        day: r.day,
+        spendIn: Math.round(income * spendRatio * 100) / 100,
+        saveIn: Math.round(income * saveRatio * 100) / 100,
+        giveIn: Math.round(income * giveRatio * 100) / 100,
+        spendOut: Number(r.spend_out),
+        saveOut: Number(r.save_out),
+        giveOut: Number(r.give_out),
+      }
+    })
+
+    const totalEarned = daily.reduce((s, d) => s + d.spendIn + d.saveIn + d.giveIn, 0)
+    const totalSpent = daily.reduce((s, d) => s + d.spendOut + d.saveOut + d.giveOut, 0)
+
+    let message: string
+    if (totalEarned === 0 && totalSpent === 0) {
+      message = `${kid.display_name} 最近 ${days} 天還沒有金流活動`
+    } else {
+      message = `📊 最近 ${days} 天賺 $${Math.round(totalEarned)}、花 $${Math.round(totalSpent)}`
+    }
+
+    res.json({
+      kidId,
+      kidName: kid.display_name,
+      days,
+      ratio: {
+        spend: kid.spend_ratio,
+        save: kid.save_ratio,
+        give: kid.give_ratio,
+      },
+      daily,
+      currentBalance,
+      totalEarned: Math.round(totalEarned * 100) / 100,
+      totalSpent: Math.round(totalSpent * 100) / 100,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/task-repeat-by-kid?days=90
  * 每個 active kid 過去 N 天 task 重複率（1 - unique/total）
  * pattern: routine(>=60% repeat) / mixed / variety(<20% repeat) / no_data
