@@ -1210,6 +1210,9 @@ function KidDashboard({
       {/* 難度演進（過去 6 個月）*/}
       <KidDifficultyEvolutionCard kidId={kidId} />
 
+      {/* 任務多樣性（過去 30 天）*/}
+      <KidTaskVarietyCard kidId={kidId} />
+
       {/* 三罐趨勢圖（過去 30 天）*/}
       {trend && trend.trend.length > 0 && (
         <div className="mb-4">
@@ -1835,6 +1838,71 @@ function WishesSection({
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function KidTaskVarietyCard({ kidId }: { kidId: number }) {
+  const { data } = useQuery<{
+    summary: {
+      totalTasks: number
+      uniqueTitles: number
+      uniqueCategories: number
+      uniqueDifficulties: number
+      days: number
+    }
+    byCategory: Array<{ category: string; label: string; count: number }>
+    diversity: "high" | "medium" | "low" | "none"
+    message: string
+  }>({
+    queryKey: [`/api/family/kid-task-variety?kidId=${kidId}&days=30`],
+  })
+  if (!data) return null
+  if (data.summary.totalTasks === 0) return null
+
+  const DIVERSITY_BG: Record<string, string> = {
+    high: "from-rainbow-50 to-violet-50 border-violet-400 bg-gradient-to-br from-violet-50 to-pink-50",
+    medium: "from-emerald-50 to-green-50 border-emerald-300",
+    low: "from-amber-50 to-yellow-50 border-amber-300",
+    none: "from-gray-50 to-slate-50 border-gray-300",
+  }
+
+  return (
+    <div
+      className={`mb-4 rounded-2xl border-2 bg-gradient-to-br ${DIVERSITY_BG[data.diversity]} p-3 shadow`}
+    >
+      <h2 className="font-bold mb-2 flex items-center gap-2">🎨 任務多樣性（30 天）</h2>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-2 text-sm">{data.message}</div>
+
+      <div className="grid grid-cols-3 gap-1.5 mb-2">
+        <div className="bg-white rounded-lg p-2 text-center">
+          <div className="text-lg font-bold">{data.summary.totalTasks}</div>
+          <div className="text-[10px] text-gray-500">總任務</div>
+        </div>
+        <div className="bg-white rounded-lg p-2 text-center">
+          <div className="text-lg font-bold">{data.summary.uniqueTitles}</div>
+          <div className="text-[10px] text-gray-500">不同任務</div>
+        </div>
+        <div className="bg-white rounded-lg p-2 text-center">
+          <div className="text-lg font-bold">{data.summary.uniqueCategories}/5</div>
+          <div className="text-[10px] text-gray-500">類別覆蓋</div>
+        </div>
+      </div>
+
+      {data.byCategory.length > 0 && (
+        <div className="space-y-1">
+          {data.byCategory.map((c) => (
+            <div
+              key={c.category}
+              className="flex items-center justify-between bg-white/80 rounded p-1.5"
+            >
+              <span className="text-xs">{c.label}</span>
+              <span className="text-xs font-bold">{c.count}</span>
             </div>
           ))}
         </div>

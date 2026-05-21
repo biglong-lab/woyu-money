@@ -8602,6 +8602,107 @@ async function bulkApproveOne(
 }
 
 /**
+ * GET /api/family/kid-task-variety?kidId=&days=30
+ * 個別小孩過去 N 天任務多樣性：嘗試過幾個不同 title / category / difficulty
+ * diversity: high(>=5 categories) / medium(3-4) / low(1-2) / none
+ */
+router.get(
+  "/api/family/kid-task-variety",
+  asyncHandler(async (req, res) => {
+    const kidId = Number(req.query.kidId)
+    if (!Number.isInteger(kidId) || kidId < 1) throw new AppError(400, "需傳 kidId")
+    const days = Math.min(Math.max(Number(req.query.days) || 30, 1), 365)
+
+    const rows = await db.execute(sql`
+      WITH approved AS (
+        SELECT title, category, difficulty
+        FROM kids_tasks
+        WHERE kid_id = ${kidId}
+          AND status = 'approved'
+          AND completed_at >= CURRENT_DATE - (${days}::int * INTERVAL '1 day')
+      )
+      SELECT
+        (SELECT COUNT(*)::int FROM approved) AS total_tasks,
+        (SELECT COUNT(DISTINCT title)::int FROM approved) AS unique_titles,
+        (SELECT COUNT(DISTINCT category)::int FROM approved) AS unique_categories,
+        (SELECT COUNT(DISTINCT difficulty)::int FROM approved) AS unique_difficulties
+    `)
+
+    const row = (
+      rows as unknown as {
+        rows: Array<{
+          total_tasks: number
+          unique_titles: number
+          unique_categories: number
+          unique_difficulties: number
+        }>
+      }
+    ).rows[0]
+
+    const catRows = await db.execute(sql`
+      SELECT category, COUNT(*)::int AS n
+      FROM kids_tasks
+      WHERE kid_id = ${kidId}
+        AND status = 'approved'
+        AND completed_at >= CURRENT_DATE - (${days}::int * INTERVAL '1 day')
+      GROUP BY category
+      ORDER BY n DESC
+    `)
+    const byCategory = (catRows as unknown as { rows: Array<{ category: string; n: number }> }).rows
+
+    const totalTasks = row?.total_tasks ?? 0
+    const uniqueTitles = row?.unique_titles ?? 0
+    const uniqueCategories = row?.unique_categories ?? 0
+    const uniqueDifficulties = row?.unique_difficulties ?? 0
+
+    const CAT_LABELS: Record<string, string> = {
+      housework: "🧹 家事",
+      study: "📚 學習",
+      self_care: "🧴 自我照顧",
+      kindness: "💝 善行",
+      other: "📋 其他",
+    }
+
+    let diversity: "high" | "medium" | "low" | "none"
+    let message: string
+    if (totalTasks === 0) {
+      diversity = "none"
+      message = `過去 ${days} 天還沒完成任務、開始第一個吧！`
+    } else if (uniqueCategories >= 5) {
+      diversity = "high"
+      message = `🌈 嘗試了全部 ${uniqueCategories} 個類別、超全方位！`
+    } else if (uniqueCategories >= 3) {
+      diversity = "medium"
+      message = `🎨 嘗試過 ${uniqueCategories} 個類別、多元發展`
+    } else if (uniqueCategories >= 1) {
+      diversity = "low"
+      message = `🌱 主要做了 ${uniqueCategories} 個類別、試試新類型吧`
+    } else {
+      diversity = "none"
+      message = "尚未分類、加油完成任務"
+    }
+
+    res.json({
+      kidId,
+      summary: {
+        totalTasks,
+        uniqueTitles,
+        uniqueCategories,
+        uniqueDifficulties,
+        days,
+      },
+      byCategory: byCategory.map((c) => ({
+        category: c.category,
+        label: CAT_LABELS[c.category] ?? c.category,
+        count: c.n,
+      })),
+      diversity,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/task-creation-cadence?days=30
  * 家長派任務 cadence 分析：每天派幾個 + 星期分佈 + 連續沒派警告
  * 含所有 status 的 task（按 created_at）

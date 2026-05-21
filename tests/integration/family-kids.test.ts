@@ -4245,6 +4245,41 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.body.weeks).toBe(52)
   })
 
+  it("任務多樣性：缺 kidId → 400", async () => {
+    const res = await request(app).get("/api/family/kid-task-variety")
+    expect(res.status).toBe(400)
+  })
+
+  it("任務多樣性：新小孩 → diversity=none + totalTasks=0", async () => {
+    const kidObj = (await createKid()) as { id: number }
+    const myKidId = kidObj.id
+    const res = await request(app).get(`/api/family/kid-task-variety?kidId=${myKidId}`)
+    expect(res.status).toBe(200)
+    expect(res.body.summary.totalTasks).toBe(0)
+    expect(res.body.diversity).toBe("none")
+    expect(res.body.byCategory).toEqual([])
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
+  it("任務多樣性：3 個 category → diversity=medium", async () => {
+    const kidObj = (await createKid()) as { id: number }
+    const myKidId = kidObj.id
+    for (const cat of ["housework", "study", "kindness"]) {
+      const t = await request(app)
+        .post("/api/family/tasks")
+        .send({ kidId: myKidId, title: `${cat} 任務`, rewardAmount: 30, category: cat })
+      await request(app).post(`/api/family/tasks/${t.body.id}/submit`).send({})
+      await request(app).post(`/api/family/tasks/${t.body.id}/approve`).send({})
+    }
+    const res = await request(app).get(`/api/family/kid-task-variety?kidId=${myKidId}`)
+    expect(res.status).toBe(200)
+    expect(res.body.summary.uniqueCategories).toBe(3)
+    expect(res.body.summary.totalTasks).toBe(3)
+    expect(res.body.diversity).toBe("medium")
+    expect(res.body.byCategory.length).toBe(3)
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
   it("派發頻率：基本結構 daily/byWeekday/summary/cadenceLevel", async () => {
     const res = await request(app).get("/api/family/task-creation-cadence")
     expect(res.status).toBe(200)
