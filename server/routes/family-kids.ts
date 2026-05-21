@@ -8602,6 +8602,65 @@ async function bulkApproveOne(
 }
 
 /**
+ * GET /api/family/deadline-hit-rate?days=90
+ * 任務 deadline 準時達成率：approved_at <= due_date 算準時
+ * level: excellent(>=80%) / good(>=60%) / fair(>=30%) / poor / no_data
+ */
+router.get(
+  "/api/family/deadline-hit-rate",
+  asyncHandler(async (req, res) => {
+    const days = Math.min(Math.max(Number(req.query.days) || 90, 7), 365)
+
+    const rows = await db.execute(sql`
+      SELECT
+        COUNT(*)::int AS total,
+        COUNT(*) FILTER (WHERE DATE(approved_at) <= due_date)::int AS on_time,
+        COUNT(*) FILTER (WHERE DATE(approved_at) > due_date)::int AS late
+      FROM kids_tasks
+      WHERE status = 'approved'
+        AND due_date IS NOT NULL
+        AND approved_at IS NOT NULL
+        AND approved_at >= CURRENT_DATE - (${days}::int * INTERVAL '1 day')
+    `)
+    const row = (
+      rows as unknown as { rows: Array<{ total: number; on_time: number; late: number }> }
+    ).rows[0]
+
+    const total = row?.total ?? 0
+    const onTime = row?.on_time ?? 0
+    const late = row?.late ?? 0
+    const hitRate = total > 0 ? Math.round((onTime / total) * 100) : 0
+
+    let level: "excellent" | "good" | "fair" | "poor" | "no_data"
+    let message: string
+    if (total === 0) {
+      level = "no_data"
+      message = `過去 ${days} 天沒有設定 deadline 的任務、可以試試在派任務時設定 due date`
+    } else if (hitRate >= 80) {
+      level = "excellent"
+      message = `🏆 ${hitRate}% 任務準時完成、家裡守時功夫一流！`
+    } else if (hitRate >= 60) {
+      level = "good"
+      message = `💪 ${hitRate}% 準時、不錯（${late} 個遲了）`
+    } else if (hitRate >= 30) {
+      level = "fair"
+      message = `⏰ ${hitRate}% 準時、${late} 個過期才做、提醒小孩注意時間`
+    } else {
+      level = "poor"
+      message = `🐢 ${hitRate}% 準時、deadline 沒在管、需要時間管理練習`
+    }
+
+    res.json({
+      days,
+      stats: { total, onTime, late },
+      hitRate,
+      level,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/today-tip
  * 家庭今日智能提示（根據多 source 動態給家長 actionable advice）
  * tipType: pending_overflow / no_recent_activity / save_too_low / goal_stalled / encourage_checkin / positive

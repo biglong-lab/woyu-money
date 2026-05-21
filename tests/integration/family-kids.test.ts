@@ -4245,6 +4245,37 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.body.weeks).toBe(52)
   })
 
+  it("Deadline 達標率：基本結構 stats/hitRate/level", async () => {
+    const res = await request(app).get("/api/family/deadline-hit-rate")
+    expect(res.status).toBe(200)
+    expect(res.body.stats).toHaveProperty("total")
+    expect(res.body.stats).toHaveProperty("onTime")
+    expect(res.body.stats).toHaveProperty("late")
+    expect(res.body).toHaveProperty("hitRate")
+    expect(["excellent", "good", "fair", "poor", "no_data"]).toContain(res.body.level)
+    expect(res.body.message).toBeTruthy()
+  })
+
+  it("Deadline 達標率：dueDate=明天 + 今天完成 → onTime=1 + hitRate=100", async () => {
+    const kidObj = (await createKid()) as { id: number }
+    const myKidId = kidObj.id
+    const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10)
+    const t = await request(app).post("/api/family/tasks").send({
+      kidId: myKidId,
+      title: "Deadline 測試",
+      rewardAmount: 30,
+      dueDate: tomorrow,
+    })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`).send({})
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`).send({})
+    const res = await request(app).get("/api/family/deadline-hit-rate?days=7")
+    expect(res.status).toBe(200)
+    expect(res.body.stats.total).toBeGreaterThanOrEqual(1)
+    expect(res.body.stats.onTime).toBeGreaterThanOrEqual(1)
+    expect(res.body.hitRate).toBe(100)
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
   it("今日提示：基本結構 tipType + message", async () => {
     const res = await request(app).get("/api/family/today-tip")
     expect(res.status).toBe(200)

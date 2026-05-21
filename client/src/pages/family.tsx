@@ -541,6 +541,9 @@ export default function FamilyPage() {
       {/* 家庭今日提示 */}
       <FamilyTodayTipCard />
 
+      {/* 家庭 deadline 達標率 */}
+      <FamilyDeadlineHitRateCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3495,6 +3498,63 @@ function ParentTodoList() {
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
       )}
+    </div>
+  )
+}
+
+function FamilyDeadlineHitRateCard() {
+  const { data } = useQuery<{
+    days: number
+    stats: { total: number; onTime: number; late: number }
+    hitRate: number
+    level: "excellent" | "good" | "fair" | "poor" | "no_data"
+    message: string
+  }>({
+    queryKey: ["/api/family/deadline-hit-rate?days=90"],
+  })
+  if (!data || data.stats.total === 0) return null
+
+  const LEVEL_BG: Record<string, string> = {
+    excellent: "from-emerald-50 to-green-50 border-emerald-500",
+    good: "from-blue-50 to-sky-50 border-blue-400",
+    fair: "from-amber-50 to-yellow-50 border-amber-400",
+    poor: "from-rose-50 to-red-50 border-rose-400",
+    no_data: "from-gray-50 to-slate-50 border-gray-300",
+  }
+
+  return (
+    <div
+      className={`mb-4 rounded-2xl border-2 bg-gradient-to-br ${LEVEL_BG[data.level]} p-3 shadow`}
+    >
+      <h3 className="font-bold mb-2 flex items-center gap-2">⏰ Deadline 達標率（90 天）</h3>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-2 text-xs">{data.message}</div>
+
+      <div className="grid grid-cols-4 gap-2 mb-2">
+        <div className="bg-white rounded-lg p-2 text-center">
+          <div className="text-xl font-bold text-blue-600">{data.stats.total}</div>
+          <div className="text-[10px] text-gray-500">總計</div>
+        </div>
+        <div className="bg-white rounded-lg p-2 text-center">
+          <div className="text-xl font-bold text-emerald-600">{data.stats.onTime}</div>
+          <div className="text-[10px] text-gray-500">準時</div>
+        </div>
+        <div className="bg-white rounded-lg p-2 text-center">
+          <div className="text-xl font-bold text-rose-500">{data.stats.late}</div>
+          <div className="text-[10px] text-gray-500">遲到</div>
+        </div>
+        <div className="bg-white rounded-lg p-2 text-center">
+          <div className="text-xl font-bold text-violet-600">{data.hitRate}%</div>
+          <div className="text-[10px] text-gray-500">達標率</div>
+        </div>
+      </div>
+
+      <div className="h-2 bg-white rounded overflow-hidden">
+        <div
+          className="h-full bg-gradient-to-r from-emerald-400 to-emerald-600"
+          style={{ width: `${data.hitRate}%` }}
+        />
+      </div>
     </div>
   )
 }
