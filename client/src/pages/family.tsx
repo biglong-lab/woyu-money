@@ -505,6 +505,9 @@ export default function FamilyPage() {
       {/* 家庭花用每日線 */}
       <FamilySpendingDailyCard />
 
+      {/* 家庭目標達成率 */}
+      <FamilyGoalsCompletionRateCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3458,6 +3461,65 @@ function ParentTodoList() {
         >
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
+      )}
+    </div>
+  )
+}
+
+function FamilyGoalsCompletionRateCard() {
+  const { data } = useQuery<{
+    stats: { active: number; completed: number; abandoned: number; total: number }
+    completionRate: number
+    avgCompletionDays: number
+    avgCompletedAmount: number
+    avgActiveAmount: number
+    level: "excellent" | "good" | "fair" | "needs_work" | "no_data"
+    message: string
+  }>({
+    queryKey: ["/api/family/goals-completion-rate"],
+  })
+  if (!data || data.stats.total === 0) return null
+
+  const LEVEL_BG: Record<string, string> = {
+    excellent: "from-yellow-50 to-amber-50 border-yellow-500",
+    good: "from-emerald-50 to-green-50 border-emerald-400",
+    fair: "from-sky-50 to-blue-50 border-sky-300",
+    needs_work: "from-amber-50 to-orange-50 border-amber-300",
+    no_data: "from-gray-50 to-slate-50 border-gray-300",
+  }
+
+  return (
+    <div
+      className={`mb-4 rounded-2xl border-2 bg-gradient-to-br ${LEVEL_BG[data.level]} p-3 shadow`}
+    >
+      <h3 className="font-bold mb-2 flex items-center gap-2">🎯 家庭目標達成率</h3>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-2 text-xs">{data.message}</div>
+
+      <div className="grid grid-cols-4 gap-2">
+        <div className="bg-white rounded-lg p-2 text-center">
+          <div className="text-2xl font-bold text-emerald-600">{data.stats.completed}</div>
+          <div className="text-[10px] text-gray-500">已達成</div>
+        </div>
+        <div className="bg-white rounded-lg p-2 text-center">
+          <div className="text-2xl font-bold text-blue-600">{data.stats.active}</div>
+          <div className="text-[10px] text-gray-500">進行中</div>
+        </div>
+        <div className="bg-white rounded-lg p-2 text-center">
+          <div className="text-2xl font-bold text-gray-500">{data.stats.abandoned}</div>
+          <div className="text-[10px] text-gray-500">已放棄</div>
+        </div>
+        <div className="bg-white rounded-lg p-2 text-center">
+          <div className="text-2xl font-bold text-violet-600">{data.completionRate}%</div>
+          <div className="text-[10px] text-gray-500">達成率</div>
+        </div>
+      </div>
+
+      {data.avgCompletionDays > 0 && (
+        <div className="mt-2 text-[11px] text-gray-600 bg-white/40 rounded p-1.5">
+          平均達成 {data.avgCompletionDays} 天 · 已達成平均 ${data.avgCompletedAmount} · 進行中平均
+          ${data.avgActiveAmount}
+        </div>
       )}
     </div>
   )

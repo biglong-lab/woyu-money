@@ -8602,6 +8602,81 @@ async function bulkApproveOne(
 }
 
 /**
+ * GET /api/family/goals-completion-rate
+ * 家庭目標達成率分析：active / completed / abandoned 統計 + 平均達成天數
+ */
+router.get(
+  "/api/family/goals-completion-rate",
+  asyncHandler(async (_req, res) => {
+    const rows = await db.execute(sql`
+      SELECT
+        COUNT(*) FILTER (WHERE status = 'active')::int AS active,
+        COUNT(*) FILTER (WHERE status = 'completed')::int AS completed,
+        COUNT(*) FILTER (WHERE status = 'abandoned')::int AS abandoned,
+        COUNT(*)::int AS total,
+        COALESCE(AVG(EXTRACT(DAY FROM (completed_at - created_at))) FILTER (WHERE status = 'completed'), 0)::numeric AS avg_completion_days,
+        COALESCE(AVG(target_amount::numeric) FILTER (WHERE status = 'completed'), 0)::numeric AS avg_completed_amount,
+        COALESCE(AVG(target_amount::numeric) FILTER (WHERE status = 'active'), 0)::numeric AS avg_active_amount
+      FROM kids_goals
+    `)
+
+    const row = (
+      rows as unknown as {
+        rows: Array<{
+          active: number
+          completed: number
+          abandoned: number
+          total: number
+          avg_completion_days: string | number
+          avg_completed_amount: string | number
+          avg_active_amount: string | number
+        }>
+      }
+    ).rows[0]
+
+    const active = row?.active ?? 0
+    const completed = row?.completed ?? 0
+    const abandoned = row?.abandoned ?? 0
+    const total = row?.total ?? 0
+    const avgCompletionDays = Math.round(Number(row?.avg_completion_days ?? 0))
+    const avgCompletedAmount = Math.round(Number(row?.avg_completed_amount ?? 0))
+    const avgActiveAmount = Math.round(Number(row?.avg_active_amount ?? 0))
+
+    const denom = active + completed
+    const completionRate = denom > 0 ? Math.round((completed / denom) * 100) : 0
+
+    let level: "excellent" | "good" | "fair" | "needs_work" | "no_data"
+    let message: string
+    if (total === 0) {
+      level = "no_data"
+      message = "還沒有目標、建立第一個吧 🎯"
+    } else if (completionRate >= 70) {
+      level = "excellent"
+      message = `🏆 達成率 ${completionRate}%、超會完成目標！平均 ${avgCompletionDays} 天達成`
+    } else if (completionRate >= 50) {
+      level = "good"
+      message = `💎 達成率 ${completionRate}%、不錯！平均 ${avgCompletionDays} 天達成`
+    } else if (completionRate >= 25) {
+      level = "fair"
+      message = `🌱 達成率 ${completionRate}%、再加把勁`
+    } else {
+      level = "needs_work"
+      message = `📋 達成率 ${completionRate}%、目標難度設定可能太高、試試小目標累積成就`
+    }
+
+    res.json({
+      stats: { active, completed, abandoned, total },
+      completionRate,
+      avgCompletionDays,
+      avgCompletedAmount,
+      avgActiveAmount,
+      level,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/spending-daily?days=30
  * 全家過去 N 天每日花用線（spend + give 罐）+ 趨勢分析
  * alert: 最近 7 天平均 > 過去 N 天平均 1.5 倍
