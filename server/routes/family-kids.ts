@@ -2875,6 +2875,302 @@ router.get(
 )
 
 /**
+ * GET /api/family/kids-attention
+ * 家長關心雷達：找出最近無 task / 無 checkin 的 kid
+ */
+router.get(
+  "/api/family/kids-attention",
+  asyncHandler(async (_req, res) => {
+    const result = await db.execute(sql`
+      SELECT
+        ka.id::int AS kid_id,
+        ka.display_name AS kid_name,
+        ka.avatar,
+        (
+          SELECT MAX(DATE(completed_at)) FROM kids_tasks
+          WHERE kid_id = ka.id AND status = 'approved'
+        ) AS last_task_date,
+        (
+          SELECT MAX(checkin_date) FROM kids_checkins
+          WHERE kid_id = ka.id
+        ) AS last_checkin_date
+      FROM kids_accounts ka
+      WHERE ka.is_active = true
+      ORDER BY ka.id ASC
+    `)
+    const rows = (
+      result as unknown as {
+        rows: {
+          kid_id: number
+          kid_name: string
+          avatar: string
+          last_task_date: Date | null
+          last_checkin_date: Date | null
+        }[]
+      }
+    ).rows
+
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    function daysSince(d: Date | null | string): number {
+      if (!d) return 9999
+      const date = typeof d === "string" ? new Date(d) : new Date(d)
+      date.setHours(0, 0, 0, 0)
+      return Math.floor((today.getTime() - date.getTime()) / 86_400_000)
+    }
+
+    const kids = rows.map((r) => {
+      const daysSinceTask = daysSince(r.last_task_date)
+      const daysSinceCheckin = daysSince(r.last_checkin_date)
+      const daysQuiet = Math.min(daysSinceTask, daysSinceCheckin)
+      const needsAttention = daysQuiet >= 7
+
+      let message: string | null = null
+      if (daysQuiet === 9999) message = `${r.kid_name} 完全沒活動過、想想要不要派任務？`
+      else if (daysQuiet >= 14) message = `${r.kid_name} 已經 ${daysQuiet} 天沒活動了、該關心！`
+      else if (daysQuiet >= 7) message = `${r.kid_name} 已經 ${daysQuiet} 天沒活動、聊聊吧`
+
+      return {
+        kidId: r.kid_id,
+        kidName: r.kid_name,
+        avatar: r.avatar,
+        lastTaskDate: r.last_task_date,
+        lastCheckinDate: r.last_checkin_date,
+        daysSinceTask: daysSinceTask === 9999 ? null : daysSinceTask,
+        daysSinceCheckin: daysSinceCheckin === 9999 ? null : daysSinceCheckin,
+        daysQuiet: daysQuiet === 9999 ? null : daysQuiet,
+        needsAttention,
+        message,
+      }
+    })
+
+    const attentionCount = kids.filter((k) => k.needsAttention).length
+
+    res.json({
+      totalKids: kids.length,
+      attentionCount,
+      kids,
+    })
+  })
+)
+
+/**
+ * GET /api/family/kid-net-worth?kidId=
+ * 小孩總財產：3 罐 balance + 各目標 + lifetime 收入
+ */
+router.get(
+  "/api/family/kid-net-worth",
+  asyncHandler(async (req, res) => {
+    const kidIdQ = Number(req.query.kidId)
+    if (!Number.isInteger(kidIdQ) || kidIdQ < 1) throw new AppError(400, "需傳 kidId")
+
+    const result = await db.execute(sql`
+      SELECT
+        COALESCE((SELECT spend_balance::numeric FROM kids_jars WHERE kid_id = ${kidIdQ}), 0) AS spend,
+        COALESCE((SELECT save_balance::numeric FROM kids_jars WHERE kid_id = ${kidIdQ}), 0) AS save,
+        COALESCE((SELECT give_balance::numeric FROM kids_jars WHERE kid_id = ${kidIdQ}), 0) AS give,
+        COALESCE((
+          SELECT SUM(current_amount::numeric)::numeric FROM kids_goals
+          WHERE kid_id = ${kidIdQ} AND status = 'active'
+        ), 0) AS goals_saved,
+        COALESCE((
+          SELECT SUM(reward_amount::numeric)::numeric FROM kids_tasks
+          WHERE kid_id = ${kidIdQ} AND status = 'approved'
+        ), 0) AS lifetime_earned
+    `)
+    const row = (
+      result as unknown as {
+        rows: {
+          spend: string | number
+          save: string | number
+          give: string | number
+          goals_saved: string | number
+          lifetime_earned: string | number
+        }[]
+      }
+    ).rows[0]!
+
+    const jars = {
+      spend: Number(row.spend ?? 0),
+      save: Number(row.save ?? 0),
+      give: Number(row.give ?? 0),
+    }
+    const goalsSaved = Number(row.goals_saved ?? 0)
+    const lifetimeEarned = Number(row.lifetime_earned ?? 0)
+    const totalNetWorth = jars.spend + jars.save + jars.give + goalsSaved
+
+    let levelLabel: string
+    if (totalNetWorth >= 5000) levelLabel = "👑 小富翁"
+    else if (totalNetWorth >= 1000) levelLabel = "💎 小財主"
+    else if (totalNetWorth >= 500) levelLabel = "🌟 存錢小達人"
+    else if (totalNetWorth >= 100) levelLabel = "🌱 開始累積"
+    else levelLabel = "🥚 剛起步"
+
+    res.json({
+      kidId: kidIdQ,
+      jars,
+      goalsSaved,
+      totalNetWorth,
+      lifetimeEarned,
+      levelLabel,
+    })
+  })
+)
+
+/**
+ * GET /api/family/fairness?days=30
+ * 家事公平度分析：看任務分配是否公平
+ * 算每個 active kid 近 N 天 approved 任務佔比
+ * 若一人 > 60% → 警示
+ */
+router.get(
+  "/api/family/fairness",
+  asyncHandler(async (req, res) => {
+    const days = Math.min(Math.max(Number(req.query.days) || 30, 1), 365)
+
+    const result = await db.execute(sql`
+      SELECT
+        ka.id::int AS kid_id,
+        ka.display_name AS kid_name,
+        ka.avatar,
+        COALESCE((
+          SELECT COUNT(*)::int FROM kids_tasks
+          WHERE kid_id = ka.id AND status = 'approved'
+            AND completed_at >= NOW() - (${days}::int || ' days')::interval
+        ), 0) AS tasks,
+        COALESCE((
+          SELECT SUM(reward_amount::numeric)::numeric FROM kids_tasks
+          WHERE kid_id = ka.id AND status = 'approved'
+            AND completed_at >= NOW() - (${days}::int || ' days')::interval
+        ), 0) AS reward
+      FROM kids_accounts ka
+      WHERE ka.is_active = true
+      ORDER BY tasks DESC
+    `)
+    const rows = (
+      result as unknown as {
+        rows: {
+          kid_id: number
+          kid_name: string
+          avatar: string
+          tasks: number
+          reward: string | number
+        }[]
+      }
+    ).rows
+
+    const totalTasks = rows.reduce((s, r) => s + r.tasks, 0)
+    const totalReward = rows.reduce((s, r) => s + Number(r.reward ?? 0), 0)
+
+    const kids = rows.map((r) => ({
+      kidId: r.kid_id,
+      kidName: r.kid_name,
+      avatar: r.avatar,
+      tasks: r.tasks,
+      reward: Number(r.reward ?? 0),
+      taskPercentage: totalTasks > 0 ? Math.round((r.tasks / totalTasks) * 100) : 0,
+      rewardPercentage:
+        totalReward > 0 ? Math.round((Number(r.reward ?? 0) / totalReward) * 100) : 0,
+    }))
+
+    // 公平度評分：standard deviation 越小越公平
+    // 但更直觀：看最大佔比 - 理論平均
+    const expectedPerKid = kids.length > 0 ? Math.round(100 / kids.length) : 0
+    const maxKid = kids[0] ?? null
+    const minKid = kids.length > 0 ? kids[kids.length - 1] : null
+
+    let fairnessLevel: "fair" | "ok" | "unbalanced" | "biased" | "n/a"
+    let message: string
+    if (totalTasks === 0 || kids.length < 2) {
+      fairnessLevel = "n/a"
+      message = kids.length < 2 ? "至少 2 個小孩才能比較" : "近期沒有任務、做幾個再看"
+    } else if (maxKid && maxKid.taskPercentage <= expectedPerKid + 10) {
+      fairnessLevel = "fair"
+      message = `🌈 任務分配很公平、每個小孩約 ${expectedPerKid}%`
+    } else if (maxKid && maxKid.taskPercentage <= expectedPerKid + 25) {
+      fairnessLevel = "ok"
+      message = `👍 大致平均、${maxKid.kidName} 略多一些`
+    } else if (maxKid && maxKid.taskPercentage <= expectedPerKid + 40) {
+      fairnessLevel = "unbalanced"
+      message = `⚖️ ${maxKid.kidName} 做太多了（${maxKid.taskPercentage}%）、可以分一些給其他人`
+    } else {
+      fairnessLevel = "biased"
+      message = `❗ ${maxKid?.kidName} 做了 ${maxKid?.taskPercentage}%！分配不平均`
+    }
+
+    res.json({
+      days,
+      totalTasks,
+      totalReward,
+      expectedPerKid,
+      fairnessLevel,
+      message,
+      maxKid,
+      minKid,
+      kids,
+    })
+  })
+)
+
+/**
+ * GET /api/family/goal-achievers
+ * 小孩達成目標排行（看誰最會存錢、家長端）
+ */
+router.get(
+  "/api/family/goal-achievers",
+  asyncHandler(async (_req, res) => {
+    const result = await db.execute(sql`
+      SELECT
+        ka.id::int AS kid_id,
+        ka.display_name AS kid_name,
+        ka.avatar,
+        COALESCE(COUNT(kg.id)::int, 0) AS goals_completed,
+        COALESCE(SUM(kg.target_amount::numeric)::numeric, 0) AS total_target,
+        COALESCE(
+          AVG(DATE(kg.completed_at) - DATE(kg.created_at))::int,
+          0
+        ) AS avg_days
+      FROM kids_accounts ka
+      LEFT JOIN kids_goals kg ON kg.kid_id = ka.id AND kg.status = 'completed'
+      WHERE ka.is_active = true
+      GROUP BY ka.id, ka.display_name, ka.avatar
+      ORDER BY goals_completed DESC, total_target DESC
+    `)
+    const rows = (
+      result as unknown as {
+        rows: {
+          kid_id: number
+          kid_name: string
+          avatar: string
+          goals_completed: number
+          total_target: string | number
+          avg_days: number
+        }[]
+      }
+    ).rows
+
+    const achievers = rows.map((r) => ({
+      kidId: r.kid_id,
+      kidName: r.kid_name,
+      avatar: r.avatar,
+      goalsCompleted: r.goals_completed,
+      totalTarget: Number(r.total_target ?? 0),
+      avgDays: r.avg_days ?? 0,
+    }))
+
+    const totalGoals = achievers.reduce((s, a) => s + a.goalsCompleted, 0)
+    const champion = achievers.find((a) => a.goalsCompleted > 0) ?? null
+
+    res.json({
+      totalGoals,
+      champion,
+      achievers,
+    })
+  })
+)
+
+/**
  * GET /api/family/completed-goals-history?limit=20
  * 家庭目標達成歷史（家長端、看過去達成的目標）
  *

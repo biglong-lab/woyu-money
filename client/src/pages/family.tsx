@@ -449,6 +449,9 @@ export default function FamilyPage() {
       {/* 家長待辦清單 */}
       <ParentTodoList />
 
+      {/* 關心雷達（找需要關心的 kid）*/}
+      <KidsAttentionRadar />
+
       {/* 跨域搜尋 */}
       <FamilySearch />
 
@@ -461,6 +464,9 @@ export default function FamilyPage() {
       {/* 目標達成歷史 */}
       <CompletedGoalsHistory />
 
+      {/* 目標達成者排行 */}
+      <GoalAchieversCard />
+
       {/* 熱門任務 TOP 5 */}
       <PopularTasksCard />
 
@@ -472,6 +478,9 @@ export default function FamilyPage() {
 
       {/* 兄弟姊妹比較 */}
       <SiblingComparisonCard />
+
+      {/* 家事公平度分析 */}
+      <FairnessCard />
 
       {/* 教育成果報告（每個 kid 一份）*/}
       <FamilyEducationReports />
@@ -2148,6 +2157,77 @@ function FamilyEducationReports() {
   )
 }
 
+function FairnessCard() {
+  const { data } = useQuery<{
+    days: number
+    totalTasks: number
+    expectedPerKid: number
+    fairnessLevel: "fair" | "ok" | "unbalanced" | "biased" | "n/a"
+    message: string
+    maxKid: { kidName: string; avatar: string; taskPercentage: number } | null
+    minKid: { kidName: string; avatar: string; taskPercentage: number } | null
+    kids: Array<{
+      kidId: number
+      kidName: string
+      avatar: string
+      tasks: number
+      reward: number
+      taskPercentage: number
+    }>
+  }>({
+    queryKey: ["/api/family/fairness"],
+    queryFn: async () => {
+      const res = await fetch("/api/family/fairness?days=30", { credentials: "include" })
+      return res.json()
+    },
+  })
+  if (!data || data.fairnessLevel === "n/a" || data.totalTasks === 0) return null
+
+  const LEVEL_COLOR: Record<string, string> = {
+    fair: "border-emerald-300 from-emerald-50 to-green-50 text-emerald-900",
+    ok: "border-blue-300 from-blue-50 to-sky-50 text-blue-900",
+    unbalanced: "border-amber-300 from-amber-50 to-yellow-50 text-amber-900",
+    biased: "border-rose-400 from-rose-50 to-red-50 text-rose-900",
+  }
+
+  return (
+    <div
+      className={`mb-4 rounded-2xl border-2 bg-gradient-to-br ${LEVEL_COLOR[data.fairnessLevel] || ""} p-4 shadow`}
+    >
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="font-bold flex items-center gap-2">⚖️ 任務公平度（{data.days} 天）</h3>
+        <span className="text-xs opacity-75">
+          {data.totalTasks} 任務・每人 {data.expectedPerKid}%
+        </span>
+      </div>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-3 text-sm font-medium">{data.message}</div>
+
+      <div className="space-y-1">
+        {data.kids
+          .filter((k) => k.tasks > 0)
+          .map((k) => (
+            <div key={k.kidId} className="bg-white rounded-lg p-2">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-lg">{k.avatar}</span>
+                <span className="text-sm font-bold flex-1">{k.kidName}</span>
+                <span className="text-xs font-bold">
+                  {k.tasks} 任務（{k.taskPercentage}%）
+                </span>
+              </div>
+              <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-amber-400 to-orange-500"
+                  style={{ width: `${k.taskPercentage}%` }}
+                />
+              </div>
+            </div>
+          ))}
+      </div>
+    </div>
+  )
+}
+
 function SiblingComparisonCard() {
   const { data } = useQuery<{
     kidCount: number
@@ -2424,6 +2504,71 @@ function FamilyWealthTrend() {
           <span className="w-3 h-3 bg-pink-400 rounded inline-block" />
           捐贈
         </span>
+      </div>
+    </div>
+  )
+}
+
+function GoalAchieversCard() {
+  const { data } = useQuery<{
+    totalGoals: number
+    champion: {
+      kidName: string
+      avatar: string
+      goalsCompleted: number
+      totalTarget: number
+    } | null
+    achievers: Array<{
+      kidId: number
+      kidName: string
+      avatar: string
+      goalsCompleted: number
+      totalTarget: number
+      avgDays: number
+    }>
+  }>({
+    queryKey: ["/api/family/goal-achievers"],
+    queryFn: async () => {
+      const res = await fetch("/api/family/goal-achievers", { credentials: "include" })
+      return res.json()
+    },
+  })
+  if (!data || data.totalGoals === 0) return null
+
+  const medals = ["🥇", "🥈", "🥉", "🏅", "🏅"]
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-amber-300 bg-gradient-to-br from-amber-50 to-yellow-50 p-4 shadow">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="font-bold text-amber-900 flex items-center gap-2">🎖️ 目標達成排行</h3>
+        <span className="text-xs text-gray-500">共 {data.totalGoals} 個達成</span>
+      </div>
+
+      {data.champion && (
+        <div className="bg-white rounded-lg p-3 mb-3 text-center">
+          <div className="text-4xl mb-1">{data.champion.avatar}</div>
+          <div className="text-sm font-bold text-amber-900">存錢王：{data.champion.kidName}</div>
+          <div className="text-xs text-gray-600">
+            達成 {data.champion.goalsCompleted} 個・累積 ${data.champion.totalTarget}
+          </div>
+        </div>
+      )}
+
+      <div className="space-y-1">
+        {data.achievers
+          .filter((a) => a.goalsCompleted > 0)
+          .map((a, i) => (
+            <div key={a.kidId} className="bg-white rounded-lg p-2 flex items-center gap-2">
+              <span className="text-xl shrink-0">{medals[i] ?? "🏅"}</span>
+              <span className="text-lg shrink-0">{a.avatar}</span>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-bold">{a.kidName}</div>
+                <div className="text-xs text-gray-500">
+                  {a.goalsCompleted} 個目標・${a.totalTarget}・平均 {a.avgDays} 天
+                </div>
+              </div>
+            </div>
+          ))}
       </div>
     </div>
   )
@@ -2837,6 +2982,55 @@ function FamilyActivityFeed() {
           {expanded ? "收起" : `看更多 (${acts.length - 6} 筆)`}
         </button>
       )}
+    </div>
+  )
+}
+
+function KidsAttentionRadar() {
+  const { data } = useQuery<{
+    totalKids: number
+    attentionCount: number
+    kids: Array<{
+      kidId: number
+      kidName: string
+      avatar: string
+      daysSinceTask: number | null
+      daysSinceCheckin: number | null
+      daysQuiet: number | null
+      needsAttention: boolean
+      message: string | null
+    }>
+  }>({
+    queryKey: ["/api/family/kids-attention"],
+    queryFn: async () => {
+      const res = await fetch("/api/family/kids-attention", { credentials: "include" })
+      return res.json()
+    },
+  })
+  if (!data || data.attentionCount === 0) return null
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-orange-300 bg-gradient-to-br from-orange-50 to-amber-50 p-4 shadow">
+      <h3 className="font-bold text-orange-900 mb-3 flex items-center gap-2">
+        🧡 需要關心（{data.attentionCount}）
+      </h3>
+      <div className="space-y-2">
+        {data.kids
+          .filter((k) => k.needsAttention)
+          .map((k) => (
+            <div key={k.kidId} className="bg-white rounded-lg p-2 flex items-center gap-2">
+              <span className="text-2xl shrink-0">{k.avatar}</span>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-bold">{k.kidName}</div>
+                {k.message && <div className="text-xs text-gray-600">{k.message}</div>}
+                <div className="text-[10px] text-gray-400">
+                  最近任務 {k.daysSinceTask === null ? "從未" : `${k.daysSinceTask} 天前`}
+                  ・打卡 {k.daysSinceCheckin === null ? "從未" : `${k.daysSinceCheckin} 天前`}
+                </div>
+              </div>
+            </div>
+          ))}
+      </div>
     </div>
   )
 }

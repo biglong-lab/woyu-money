@@ -1011,6 +1011,9 @@ function KidDashboard({
       {/* 每日金錢小語 */}
       <DailyMoneyQuote />
 
+      {/* 總財產 */}
+      <KidNetWorthCard kidId={kidId} />
+
       {/* 等級徽章（累積分數升 level）*/}
       <KidLevelBadge kidId={kidId} />
 
@@ -3056,6 +3059,52 @@ const MONEY_QUOTES: Array<{ text: string; emoji: string }> = [
   { text: "學會等待、就學會了存錢。", emoji: "🕰️" },
   { text: "節儉是美德、不是吝嗇。", emoji: "🌟" },
 ]
+
+function KidNetWorthCard({ kidId }: { kidId: number }) {
+  const { data } = useQuery<{
+    jars: { spend: number; save: number; give: number }
+    goalsSaved: number
+    totalNetWorth: number
+    lifetimeEarned: number
+    levelLabel: string
+  }>({
+    queryKey: ["/api/family/kid-net-worth", kidId],
+    queryFn: async () => {
+      const res = await fetch(`/api/family/kid-net-worth?kidId=${kidId}`, {
+        credentials: "include",
+      })
+      return res.json()
+    },
+  })
+  if (!data || data.totalNetWorth === 0) return null
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-amber-400 bg-gradient-to-r from-yellow-100 via-amber-100 to-orange-100 p-4 shadow">
+      <div className="flex items-center justify-between mb-2">
+        <div>
+          <div className="text-xs text-amber-800">{data.levelLabel}</div>
+          <div className="text-3xl font-bold text-amber-900">${data.totalNetWorth}</div>
+          <div className="text-xs text-gray-600">我目前總財產</div>
+        </div>
+        <div className="text-right text-xs text-gray-600">
+          <div>賺過 ${data.lifetimeEarned}</div>
+          {data.goalsSaved > 0 && <div>存目標 ${data.goalsSaved}</div>}
+        </div>
+      </div>
+      <div className="flex gap-1 text-xs">
+        <span className="flex-1 bg-rose-100 text-rose-700 rounded px-2 py-1 text-center">
+          💸 ${data.jars.spend}
+        </span>
+        <span className="flex-1 bg-blue-100 text-blue-700 rounded px-2 py-1 text-center">
+          🐷 ${data.jars.save}
+        </span>
+        <span className="flex-1 bg-pink-100 text-pink-700 rounded px-2 py-1 text-center">
+          ❤️ ${data.jars.give}
+        </span>
+      </div>
+    </div>
+  )
+}
 
 function DailyMoneyQuote() {
   // 用 day-of-year 選每天不同金句

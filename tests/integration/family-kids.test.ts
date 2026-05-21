@@ -3831,6 +3831,165 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.body.goals.length).toBeLessThanOrEqual(50)
   })
 
+  it("目標達成者排行：完成 goal → champion + achievers 含 goalsCompleted", async () => {
+    // 清乾淨
+    await db.execute(sql`DELETE FROM kids_accounts WHERE pin = ${TEST_PIN}`)
+    await createKid({ spendRatio: 0, saveRatio: 100, giveRatio: 0 })
+
+    // 任務 + 達成 goal
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId, title: "T", rewardAmount: 1000 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`)
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`)
+
+    const gRes = await request(app)
+      .post("/api/family/goals")
+      .send({ kidId, name: "達成測試", targetAmount: 100 })
+    await request(app).post(`/api/family/goals/${gRes.body.id}/save`).send({ amount: 100 })
+
+    const res = await request(app).get("/api/family/goal-achievers")
+    expect(res.status).toBe(200)
+    expect(res.body.totalGoals).toBeGreaterThanOrEqual(1)
+    expect(res.body.champion).toBeTruthy()
+    expect(res.body.champion.goalsCompleted).toBeGreaterThanOrEqual(1)
+    expect(res.body.champion.totalTarget).toBeGreaterThanOrEqual(100)
+
+    // achievers 含這個小孩
+    const me = res.body.achievers.find((a: { kidId: number }) => a.kidId === kidId)
+    expect(me).toBeTruthy()
+    expect(me.goalsCompleted).toBeGreaterThanOrEqual(1)
+  })
+
+  it("目標達成者排行：沒人達成 → champion=null", async () => {
+    await db.execute(sql`DELETE FROM kids_accounts WHERE pin = ${TEST_PIN}`)
+    await createKid()
+
+    const res = await request(app).get("/api/family/goal-achievers")
+    expect(res.status).toBe(200)
+    expect(res.body.totalGoals).toBe(0)
+    expect(res.body.champion).toBeNull()
+  })
+
+  it("公平度：2 個 kid 任務分配 → fairnessLevel + 統計", async () => {
+    await db.execute(sql`DELETE FROM kids_accounts WHERE pin = ${TEST_PIN}`)
+
+    // 小華做 3 個任務
+    await createKid({ displayName: "小華" })
+    const hua = kidId
+    for (let i = 0; i < 3; i++) {
+      const t = await request(app)
+        .post("/api/family/tasks")
+        .send({ kidId: hua, title: `T${i}`, rewardAmount: 30 })
+      await request(app).post(`/api/family/tasks/${t.body.id}/submit`)
+      await request(app).post(`/api/family/tasks/${t.body.id}/approve`)
+    }
+
+    // 小明做 1 個任務
+    await createKid({ displayName: "小明" })
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId, title: "M", rewardAmount: 30 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`)
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`)
+
+    const res = await request(app).get("/api/family/fairness")
+    expect(res.status).toBe(200)
+    expect(res.body.totalTasks).toBe(4)
+    expect(res.body.expectedPerKid).toBe(50)
+
+    // 小華 75%、小明 25% → unbalanced
+    expect(res.body.maxKid.kidName).toBe("小華")
+    expect(res.body.maxKid.taskPercentage).toBe(75)
+    expect(["ok", "unbalanced", "biased"]).toContain(res.body.fairnessLevel)
+    expect(res.body.message).toBeTruthy()
+
+    // 清姐姐
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${hua}`)
+  })
+
+  it("公平度：1 個 kid → fairnessLevel=n/a", async () => {
+    await db.execute(sql`DELETE FROM kids_accounts WHERE pin = ${TEST_PIN}`)
+    await createKid()
+    const res = await request(app).get("/api/family/fairness")
+    expect(res.status).toBe(200)
+    expect(res.body.fairnessLevel).toBe("n/a")
+    expect(res.body.message).toContain("至少 2")
+  })
+
+  it("公平度：days 範圍 clamp", async () => {
+    const res = await request(app).get("/api/family/fairness?days=1000")
+    expect(res.status).toBe(200)
+    expect(res.body.days).toBe(365)
+  })
+
+  it("總財產：3 罐 + goals + lifetimeEarned + levelLabel", async () => {
+    await createKid({ spendRatio: 50, saveRatio: 30, giveRatio: 20 })
+
+    // 任務 1000：spend 500 / save 300 / give 200
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId, title: "T", rewardAmount: 1000 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`)
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`)
+
+    const res = await request(app).get(`/api/family/kid-net-worth?kidId=${kidId}`)
+    expect(res.status).toBe(200)
+    expect(res.body.jars.spend).toBe(500)
+    expect(res.body.jars.save).toBe(300)
+    expect(res.body.jars.give).toBe(200)
+    expect(res.body.totalNetWorth).toBe(1000) // 3 罐 + 0 goals
+    expect(res.body.lifetimeEarned).toBe(1000)
+    expect(res.body.levelLabel).toBeTruthy() // 1000 元 → 💎 小財主
+    expect(res.body.levelLabel).toContain("小財主")
+  })
+
+  it("總財產：新小孩 → 全 0、levelLabel 含「剛起步」", async () => {
+    await createKid()
+    const res = await request(app).get(`/api/family/kid-net-worth?kidId=${kidId}`)
+    expect(res.status).toBe(200)
+    expect(res.body.totalNetWorth).toBe(0)
+    expect(res.body.levelLabel).toContain("剛起步")
+  })
+
+  it("kid-net-worth 缺 kidId 回 400", async () => {
+    const r = await request(app).get("/api/family/kid-net-worth")
+    expect(r.status).toBe(400)
+  })
+
+  it("關心雷達：新小孩沒活動 → needsAttention=true、message 含「想想」", async () => {
+    await db.execute(sql`DELETE FROM kids_accounts WHERE pin = ${TEST_PIN}`)
+    await createKid()
+
+    const res = await request(app).get("/api/family/kids-attention")
+    expect(res.status).toBe(200)
+    expect(res.body.totalKids).toBe(1)
+
+    const k = res.body.kids[0]
+    expect(k.daysQuiet).toBeNull()
+    expect(k.needsAttention).toBe(true)
+    expect(k.message).toContain("想想")
+    expect(res.body.attentionCount).toBe(1)
+  })
+
+  it("關心雷達：今日有 task → needsAttention=false", async () => {
+    await db.execute(sql`DELETE FROM kids_accounts WHERE pin = ${TEST_PIN}`)
+    await createKid()
+
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId, title: "T", rewardAmount: 20 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`)
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`)
+
+    const res = await request(app).get("/api/family/kids-attention")
+    expect(res.status).toBe(200)
+    const k = res.body.kids[0]
+    expect(k.daysSinceTask).toBe(0)
+    expect(k.needsAttention).toBe(false)
+    expect(k.message).toBeNull()
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)
