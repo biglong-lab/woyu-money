@@ -4245,6 +4245,43 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.body.weeks).toBe(52)
   })
 
+  it("多月趨勢：12 個月 + summary + trend", async () => {
+    const res = await request(app).get("/api/family/multi-month-trend")
+    expect(res.status).toBe(200)
+    expect(res.body.months).toHaveLength(12)
+    expect(res.body.months[0]).toHaveProperty("month")
+    expect(res.body.months[0]).toHaveProperty("tasks")
+    expect(res.body.months[0]).toHaveProperty("reward")
+    expect(res.body.months[0]).toHaveProperty("checkinDays")
+    expect(res.body.summary).toHaveProperty("totalTasks")
+    expect(["growing", "declining", "steady", "no_data"]).toContain(res.body.trend)
+    expect(res.body.message).toBeTruthy()
+  })
+
+  it("多月趨勢：完成任務後本月有資料", async () => {
+    const kidObj = (await createKid()) as { id: number }
+    const myKidId = kidObj.id
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId: myKidId, title: "本月", rewardAmount: 100 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`).send({})
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`).send({})
+    const res = await request(app).get("/api/family/multi-month-trend?months=3")
+    expect(res.status).toBe(200)
+    expect(res.body.months).toHaveLength(3)
+    const lastMonth = res.body.months[2]
+    expect(lastMonth.tasks).toBeGreaterThanOrEqual(1)
+    expect(lastMonth.reward).toBeGreaterThanOrEqual(100)
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
+  it("多月趨勢：months clamp 1-24", async () => {
+    const r1 = await request(app).get("/api/family/multi-month-trend?months=100")
+    expect(r1.body.months).toHaveLength(24)
+    const r2 = await request(app).get("/api/family/multi-month-trend?months=0")
+    expect(r2.body.months).toHaveLength(12)
+  })
+
   it("一週日報：基本結構 days[7] + summary + message", async () => {
     const res = await request(app).get("/api/family/daily-recap")
     expect(res.status).toBe(200)

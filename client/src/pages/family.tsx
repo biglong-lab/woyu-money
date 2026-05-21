@@ -484,6 +484,9 @@ export default function FamilyPage() {
       {/* 家庭一週日報 */}
       <FamilyDailyRecapCard />
 
+      {/* 家庭多月趨勢 */}
+      <FamilyMultiMonthTrendCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3438,6 +3441,77 @@ function ParentTodoList() {
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
       )}
+    </div>
+  )
+}
+
+function FamilyMultiMonthTrendCard() {
+  const { data } = useQuery<{
+    months: Array<{
+      month: string
+      tasks: number
+      reward: number
+      spent: number
+      checkinDays: number
+    }>
+    summary: {
+      totalTasks: number
+      totalReward: number
+      peakMonth: string | null
+      peakTasks: number
+    }
+    trend: "growing" | "declining" | "steady" | "no_data"
+    message: string
+  }>({
+    queryKey: ["/api/family/multi-month-trend?months=12"],
+  })
+  if (!data) return null
+  if (data.summary.totalTasks === 0) return null
+
+  const maxTasks = Math.max(...data.months.map((m) => m.tasks), 1)
+
+  const TREND_BG: Record<string, string> = {
+    growing: "from-emerald-50 to-green-50 border-emerald-300",
+    declining: "from-amber-50 to-orange-50 border-amber-300",
+    steady: "from-sky-50 to-blue-50 border-sky-300",
+    no_data: "from-gray-50 to-slate-50 border-gray-300",
+  }
+
+  return (
+    <div
+      className={`mb-4 rounded-2xl border-2 bg-gradient-to-br ${TREND_BG[data.trend]} p-3 shadow`}
+    >
+      <h3 className="font-bold mb-2 flex items-center gap-2">📈 過去 12 個月趨勢</h3>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-2 text-xs">
+        {data.message}
+        {data.summary.peakMonth && (
+          <div className="text-gray-600 mt-1">
+            高峰：{data.summary.peakMonth}（{data.summary.peakTasks} 個任務） · 累計{" "}
+            {data.summary.totalTasks} 個 / ${data.summary.totalReward}
+          </div>
+        )}
+      </div>
+
+      <div className="flex items-end gap-1 h-24 bg-white/40 rounded p-2">
+        {data.months.map((m) => {
+          const h = (m.tasks / maxTasks) * 100
+          return (
+            <div
+              key={m.month}
+              className="flex-1 flex flex-col items-center justify-end"
+              title={`${m.month}: ${m.tasks} 個任務 / $${m.reward}`}
+            >
+              <div className="text-[9px] text-gray-500">{m.tasks}</div>
+              <div
+                className="w-full bg-blue-500 rounded-t"
+                style={{ height: `${Math.max(h, 2)}%` }}
+              />
+              <div className="text-[9px] text-gray-500 mt-1">{m.month.slice(5)}</div>
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }

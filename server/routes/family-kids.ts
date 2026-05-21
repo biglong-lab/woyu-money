@@ -8602,6 +8602,115 @@ async function bulkApproveOne(
 }
 
 /**
+ * GET /api/family/multi-month-trend?months=12
+ * 過去 N 個月每月：任務數 / 入帳 / 花用 / 打卡天數
+ * 用 generate_series 確保每月都有資料、從舊到新排序
+ */
+router.get(
+  "/api/family/multi-month-trend",
+  asyncHandler(async (req, res) => {
+    const months = Math.min(Math.max(Number(req.query.months) || 12, 1), 24)
+
+    const rows = await db.execute(sql`
+      WITH months AS (
+        SELECT generate_series(
+          DATE_TRUNC('month', CURRENT_DATE) - ((${months}::int - 1) * INTERVAL '1 month'),
+          DATE_TRUNC('month', CURRENT_DATE),
+          INTERVAL '1 month'
+        )::date AS m_start
+      )
+      SELECT
+        TO_CHAR(m.m_start, 'YYYY-MM') AS month,
+        (SELECT COUNT(*)::int FROM kids_tasks t
+          WHERE t.status = 'approved'
+            AND t.completed_at >= m.m_start
+            AND t.completed_at < m.m_start + INTERVAL '1 month'
+        ) AS tasks,
+        (SELECT COALESCE(SUM(reward_amount::numeric), 0)::numeric FROM kids_tasks t
+          WHERE t.status = 'approved'
+            AND t.completed_at >= m.m_start
+            AND t.completed_at < m.m_start + INTERVAL '1 month'
+        ) AS reward,
+        (SELECT COALESCE(SUM(amount::numeric), 0)::numeric FROM kids_spendings s
+          WHERE s.jar = 'spend'
+            AND s.spend_date >= m.m_start::date
+            AND s.spend_date < (m.m_start + INTERVAL '1 month')::date
+        ) AS spent,
+        (SELECT COUNT(DISTINCT checkin_date)::int FROM kids_checkins c
+          WHERE c.checkin_date >= m.m_start::date
+            AND c.checkin_date < (m.m_start + INTERVAL '1 month')::date
+        ) AS checkin_days
+      FROM months m
+      ORDER BY m.m_start ASC
+    `)
+
+    const monthsArr = (
+      rows as unknown as {
+        rows: Array<{
+          month: string
+          tasks: number
+          reward: string | number
+          spent: string | number
+          checkin_days: number
+        }>
+      }
+    ).rows.map((r) => ({
+      month: r.month,
+      tasks: r.tasks,
+      reward: Number(r.reward),
+      spent: Number(r.spent),
+      checkinDays: r.checkin_days,
+    }))
+
+    const totalTasks = monthsArr.reduce((s, m) => s + m.tasks, 0)
+    const totalReward = monthsArr.reduce((s, m) => s + m.reward, 0)
+    const peakMonth = monthsArr.reduce((best, m) => (m.tasks > best.tasks ? m : best), monthsArr[0])
+
+    // 比較最近 3 個月 vs 之前的平均、判斷整體趨勢
+    let trend: "growing" | "declining" | "steady" | "no_data"
+    let message: string
+    if (totalTasks === 0) {
+      trend = "no_data"
+      message = "過去都沒任務、開始第一個吧 🌱"
+    } else if (monthsArr.length >= 4) {
+      const recent = monthsArr.slice(-3)
+      const earlier = monthsArr.slice(0, -3)
+      const recentAvg = recent.reduce((s, m) => s + m.tasks, 0) / recent.length
+      const earlierAvg =
+        earlier.length > 0 ? earlier.reduce((s, m) => s + m.tasks, 0) / earlier.length : 0
+      if (earlierAvg === 0 && recentAvg > 0) {
+        trend = "growing"
+        message = `🚀 最近 3 個月開始活躍（平均 ${Math.round(recentAvg)} 個任務）`
+      } else if (recentAvg > earlierAvg * 1.2) {
+        trend = "growing"
+        message = `📈 越來越活躍（最近 3 月平均 ${Math.round(recentAvg)} vs 過去 ${Math.round(earlierAvg)}）`
+      } else if (recentAvg < earlierAvg * 0.8) {
+        trend = "declining"
+        message = `📉 最近活動變少（最近 3 月 ${Math.round(recentAvg)} vs 過去 ${Math.round(earlierAvg)}），加把勁！`
+      } else {
+        trend = "steady"
+        message = "穩定發揮 👍"
+      }
+    } else {
+      trend = "steady"
+      message = "剛起步階段、繼續累積 🌱"
+    }
+
+    res.json({
+      months: monthsArr,
+      summary: {
+        totalTasks,
+        totalReward,
+        peakMonth: peakMonth?.month ?? null,
+        peakTasks: peakMonth?.tasks ?? 0,
+      },
+      trend,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/daily-recap?days=7
  * 過去 N 天每日活動概覽（任務 / 打卡 / 花用 / 捐贈）
  * 用 generate_series 確保每天都有資料（即使 0）、從舊到新
