@@ -8602,6 +8602,79 @@ async function bulkApproveOne(
 }
 
 /**
+ * GET /api/family/goals-vs-wishes
+ * 家庭自律度：goals 數 vs wishes 數 + promotion rate
+ * 高 promotion rate = 小孩會把願望變成有計畫的目標
+ */
+router.get(
+  "/api/family/goals-vs-wishes",
+  asyncHandler(async (_req, res) => {
+    const rows = await db.execute(sql`
+      SELECT
+        (SELECT COUNT(*)::int FROM kids_goals) AS total_goals,
+        (SELECT COUNT(*)::int FROM kids_goals WHERE status = 'active') AS active_goals,
+        (SELECT COUNT(*)::int FROM kids_goals WHERE status = 'completed') AS completed_goals,
+        (SELECT COUNT(*)::int FROM kids_wishes) AS total_wishes,
+        (SELECT COUNT(*)::int FROM kids_wishes WHERE status = 'wished') AS wished,
+        (SELECT COUNT(*)::int FROM kids_wishes WHERE status = 'promoted') AS promoted,
+        (SELECT COUNT(*)::int FROM kids_wishes WHERE status = 'abandoned') AS abandoned_wishes
+    `)
+    const row = (
+      rows as unknown as {
+        rows: Array<{
+          total_goals: number
+          active_goals: number
+          completed_goals: number
+          total_wishes: number
+          wished: number
+          promoted: number
+          abandoned_wishes: number
+        }>
+      }
+    ).rows[0]
+
+    const totalGoals = row?.total_goals ?? 0
+    const activeGoals = row?.active_goals ?? 0
+    const completedGoals = row?.completed_goals ?? 0
+    const totalWishes = row?.total_wishes ?? 0
+    const wished = row?.wished ?? 0
+    const promoted = row?.promoted ?? 0
+    const abandoned = row?.abandoned_wishes ?? 0
+
+    const promotionRate = totalWishes > 0 ? Math.round((promoted / totalWishes) * 100) : 0
+    const goalToWishRatio = totalWishes > 0 ? Math.round((totalGoals / totalWishes) * 100) / 100 : 0
+
+    let discipline: "highly_disciplined" | "balanced" | "wishful" | "no_goals" | "no_data"
+    let message: string
+    if (totalGoals === 0 && totalWishes === 0) {
+      discipline = "no_data"
+      message = "還沒目標或願望、開始建立第一個吧 🎯"
+    } else if (totalGoals > 0 && promotionRate >= 40) {
+      discipline = "highly_disciplined"
+      message = `🎯 自律度高：${promotionRate}% 願望升級成目標、${completedGoals} 個已達成`
+    } else if (totalGoals > 0 && promotionRate >= 15) {
+      discipline = "balanced"
+      message = `⚖️ 平衡發展：${promotionRate}% 願望變目標、${activeGoals} 個進行中`
+    } else if (totalGoals > 0) {
+      discipline = "wishful"
+      message = `✨ 願望多於計畫：${wished} 個願望未升級、可以鼓勵小孩把想要的存錢買`
+    } else {
+      discipline = "no_goals"
+      message = `📋 ${totalWishes} 個願望但沒目標、引導小孩設定具體儲蓄計畫`
+    }
+
+    res.json({
+      goals: { total: totalGoals, active: activeGoals, completed: completedGoals },
+      wishes: { total: totalWishes, wished, promoted, abandoned },
+      promotionRate,
+      goalToWishRatio,
+      discipline,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/approve-latency?days=60
  * 家長批准延遲：submitted（completed_at）→ approved 平均小時
  * 分桶：<1h / 1-6h / 6-24h / 1-3 天 / >3 天

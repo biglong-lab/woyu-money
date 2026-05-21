@@ -4245,6 +4245,40 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.body.weeks).toBe(52)
   })
 
+  it("目標願望：基本結構 goals/wishes/promotionRate/discipline", async () => {
+    const res = await request(app).get("/api/family/goals-vs-wishes")
+    expect(res.status).toBe(200)
+    expect(res.body.goals).toHaveProperty("total")
+    expect(res.body.goals).toHaveProperty("active")
+    expect(res.body.goals).toHaveProperty("completed")
+    expect(res.body.wishes).toHaveProperty("total")
+    expect(res.body).toHaveProperty("promotionRate")
+    expect(["highly_disciplined", "balanced", "wishful", "no_goals", "no_data"]).toContain(
+      res.body.discipline
+    )
+    expect(res.body.message).toBeTruthy()
+  })
+
+  it("目標願望：建 wish + goal → 結構有 active=1 / wished>=1", async () => {
+    const kidObj = (await createKid()) as { id: number }
+    const myKidId = kidObj.id
+    await request(app).post("/api/family/wishes").send({
+      kidId: myKidId,
+      title: "想要的玩具",
+      estimatedPrice: 200,
+    })
+    await request(app).post("/api/family/goals").send({
+      kidId: myKidId,
+      name: "腳踏車",
+      targetAmount: 5000,
+    })
+    const res = await request(app).get("/api/family/goals-vs-wishes")
+    expect(res.status).toBe(200)
+    expect(res.body.goals.active).toBeGreaterThanOrEqual(1)
+    expect(res.body.wishes.wished).toBeGreaterThanOrEqual(1)
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
   it("批准延遲：基本結構 stats/buckets/level", async () => {
     const res = await request(app).get("/api/family/approve-latency")
     expect(res.status).toBe(200)

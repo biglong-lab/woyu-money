@@ -529,6 +529,9 @@ export default function FamilyPage() {
       {/* 家庭批准延遲 */}
       <FamilyApproveLatencyCard />
 
+      {/* 家庭目標 vs 願望 */}
+      <FamilyGoalsVsWishesCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3482,6 +3485,68 @@ function ParentTodoList() {
         >
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
+      )}
+    </div>
+  )
+}
+
+function FamilyGoalsVsWishesCard() {
+  const { data } = useQuery<{
+    goals: { total: number; active: number; completed: number }
+    wishes: { total: number; wished: number; promoted: number; abandoned: number }
+    promotionRate: number
+    goalToWishRatio: number
+    discipline: "highly_disciplined" | "balanced" | "wishful" | "no_goals" | "no_data"
+    message: string
+  }>({
+    queryKey: ["/api/family/goals-vs-wishes"],
+  })
+  if (!data) return null
+  if (data.goals.total === 0 && data.wishes.total === 0) return null
+
+  const LEVEL_BG: Record<string, string> = {
+    highly_disciplined: "from-yellow-50 to-amber-50 border-yellow-500",
+    balanced: "from-emerald-50 to-green-50 border-emerald-400",
+    wishful: "from-sky-50 to-blue-50 border-sky-300",
+    no_goals: "from-amber-50 to-orange-50 border-amber-400",
+    no_data: "from-gray-50 to-slate-50 border-gray-300",
+  }
+
+  return (
+    <div
+      className={`mb-4 rounded-2xl border-2 bg-gradient-to-br ${LEVEL_BG[data.discipline]} p-3 shadow`}
+    >
+      <h3 className="font-bold mb-2 flex items-center gap-2">🎯 目標 vs 願望（自律度）</h3>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-2 text-xs">{data.message}</div>
+
+      <div className="grid grid-cols-2 gap-2 mb-2">
+        <div className="bg-white rounded-lg p-2">
+          <div className="text-[10px] text-gray-500 mb-1">🎯 目標</div>
+          <div className="text-sm font-bold">{data.goals.total} 個</div>
+          <div className="text-[10px] text-gray-600">
+            進行 {data.goals.active} · 達成 {data.goals.completed}
+          </div>
+        </div>
+        <div className="bg-white rounded-lg p-2">
+          <div className="text-[10px] text-gray-500 mb-1">✨ 願望</div>
+          <div className="text-sm font-bold">{data.wishes.total} 個</div>
+          <div className="text-[10px] text-gray-600">
+            未動 {data.wishes.wished} · 升級 {data.wishes.promoted}
+          </div>
+        </div>
+      </div>
+
+      {data.wishes.total > 0 && (
+        <div className="bg-white/40 rounded p-2">
+          <div className="text-[10px] text-gray-600 mb-1">願望升級率 {data.promotionRate}%</div>
+          <div className="h-2 bg-white rounded overflow-hidden">
+            <div
+              className={`h-full ${data.promotionRate >= 40 ? "bg-yellow-500" : data.promotionRate >= 15 ? "bg-emerald-500" : "bg-amber-400"}`}
+              style={{ width: `${Math.min(data.promotionRate, 100)}%` }}
+            />
+          </div>
+        </div>
       )}
     </div>
   )
