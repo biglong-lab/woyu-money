@@ -311,6 +311,21 @@ export default function FamilyPage() {
     },
   })
 
+  // 編輯既有 pending 任務（prompt 改 title + rewardAmount）
+  const editTaskMutation = useMutation({
+    mutationFn: (vars: { id: number; title?: string; rewardAmount?: number }) => {
+      const body: Record<string, unknown> = {}
+      if (vars.title !== undefined) body.title = vars.title
+      if (vars.rewardAmount !== undefined) body.rewardAmount = vars.rewardAmount
+      return apiRequest("PUT", `/api/family/tasks/${vars.id}`, body)
+    },
+    onSuccess: () => {
+      toast({ title: "✅ 已更新任務" })
+      invalidateAll()
+    },
+    onError: (e: Error) => toast({ title: "失敗", description: e.message, variant: "destructive" }),
+  })
+
   // 一鍵再做任務（複製 approved 任務為新 pending）
   const cloneTaskMutation = useMutation({
     mutationFn: (t: Task) =>
@@ -799,6 +814,34 @@ export default function FamilyPage() {
                   <span className="text-xs text-gray-500">{kid?.displayName ?? "—"}</span>
                   <span className="text-xs font-mono">{formatMoney(t.rewardAmount)}</span>
                   <TaskStatusBadge status={t.status} />
+                  {t.status === "pending" && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newTitle = window.prompt(`編輯任務標題（目前：${t.title}）`, t.title)
+                        const newReward = window.prompt(
+                          `編輯獎勵金額（目前：${t.rewardAmount}）`,
+                          String(parseFloat(t.rewardAmount))
+                        )
+                        const titleChanged = newTitle && newTitle.trim() !== t.title
+                        const rewardNum = newReward ? parseFloat(newReward) : NaN
+                        const rewardChanged =
+                          !isNaN(rewardNum) && rewardNum !== parseFloat(t.rewardAmount)
+                        if (titleChanged || rewardChanged) {
+                          editTaskMutation.mutate({
+                            id: t.id,
+                            title: titleChanged ? newTitle!.trim() : undefined,
+                            rewardAmount: rewardChanged ? rewardNum : undefined,
+                          })
+                        }
+                      }}
+                      disabled={editTaskMutation.isPending}
+                      className="text-amber-600 hover:bg-amber-50 rounded p-1 text-xs"
+                      title="編輯任務"
+                    >
+                      ✏️
+                    </button>
+                  )}
                   {(t.status === "approved" || t.status === "rejected") && (
                     <button
                       type="button"

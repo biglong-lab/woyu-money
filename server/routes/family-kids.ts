@@ -649,6 +649,61 @@ router.post(
 )
 
 /**
+ * PUT /api/family/tasks/:id
+ * 編輯既有任務（限 pending 狀態）
+ */
+router.put(
+  "/api/family/tasks/:id",
+  asyncHandler(async (req, res) => {
+    const id = Number(req.params.id)
+    if (!Number.isInteger(id) || id < 1) throw new AppError(400, "無效的 ID")
+    const [task] = await db.select().from(kidsTasks).where(eq(kidsTasks.id, id)).limit(1)
+    if (!task) throw new AppError(404, "任務不存在")
+    if (task.status !== "pending") {
+      throw new AppError(400, "只可編輯尚未開始的任務（pending 狀態）")
+    }
+
+    const body: Record<string, unknown> = {}
+    if (req.body?.title !== undefined) {
+      const t = String(req.body.title).trim()
+      if (!t) throw new AppError(400, "title 不可空")
+      if (t.length > 100) throw new AppError(400, "title 過長")
+      body.title = t
+    }
+    if (req.body?.emoji !== undefined) body.emoji = String(req.body.emoji).slice(0, 8)
+    if (req.body?.rewardAmount !== undefined) {
+      const r = Number(req.body.rewardAmount)
+      if (!(r > 0)) throw new AppError(400, "rewardAmount 需為正數")
+      body.rewardAmount = r.toFixed(2)
+    }
+    if (req.body?.dueDate !== undefined) {
+      body.dueDate = req.body.dueDate || null
+    }
+    if (req.body?.difficulty !== undefined) {
+      const d = String(req.body.difficulty)
+      if (!["easy", "medium", "hard"].includes(d)) throw new AppError(400, "difficulty 不合法")
+      body.difficulty = d
+    }
+    if (req.body?.category !== undefined) {
+      const c = String(req.body.category)
+      if (!["housework", "study", "self_care", "kindness", "other"].includes(c))
+        throw new AppError(400, "category 不合法")
+      body.category = c
+    }
+    if (req.body?.notes !== undefined) {
+      body.notes = req.body.notes ? String(req.body.notes).slice(0, 500) : null
+    }
+    if (req.body?.kidId !== undefined) {
+      body.kidId = req.body.kidId === null ? null : Number(req.body.kidId)
+    }
+    if (Object.keys(body).length === 0) throw new AppError(400, "至少需提供一個欄位")
+    body.updatedAt = new Date()
+    const [updated] = await db.update(kidsTasks).set(body).where(eq(kidsTasks.id, id)).returning()
+    res.json(updated)
+  })
+)
+
+/**
  * POST /api/family/tasks/broadcast
  * 對所有 active 小孩各建一份相同任務（家長一鍵派全家）
  */

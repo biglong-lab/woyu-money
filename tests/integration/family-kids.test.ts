@@ -2025,6 +2025,40 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     }
   })
 
+  it("任務編輯：pending 可改、非 pending 拒絕", async () => {
+    await createKid()
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId, title: "原標題", rewardAmount: 50 })
+
+    // 改 title + rewardAmount
+    const upd = await request(app)
+      .put(`/api/family/tasks/${t.body.id}`)
+      .send({ title: "新標題", rewardAmount: 99 })
+    expect(upd.status).toBe(200)
+    expect(upd.body.title).toBe("新標題")
+    expect(parseFloat(upd.body.rewardAmount)).toBe(99)
+
+    // 不合法 category 拒絕
+    const bad = await request(app)
+      .put(`/api/family/tasks/${t.body.id}`)
+      .send({ category: "invalid" })
+    expect(bad.status).toBe(400)
+
+    // 空 body 拒絕
+    const empty = await request(app).put(`/api/family/tasks/${t.body.id}`).send({})
+    expect(empty.status).toBe(400)
+
+    // submit 後不可編輯
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`)
+    const nope = await request(app).put(`/api/family/tasks/${t.body.id}`).send({ title: "再改" })
+    expect(nope.status).toBe(400)
+
+    // 不存在 404
+    const notFound = await request(app).put("/api/family/tasks/999999").send({ title: "x" })
+    expect(notFound.status).toBe(404)
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)
