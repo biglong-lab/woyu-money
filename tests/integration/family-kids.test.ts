@@ -4245,6 +4245,43 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.body.weeks).toBe(52)
   })
 
+  it("花用習慣：基本結構 kids/habitCounts/message", async () => {
+    const res = await request(app).get("/api/family/kid-spending-habits")
+    expect(res.status).toBe(200)
+    expect(Array.isArray(res.body.kids)).toBe(true)
+    expect(res.body.habitCounts).toHaveProperty("generous")
+    expect(res.body.message).toBeTruthy()
+  })
+
+  it("花用習慣：捐 50/花 50 → habit=generous (give 50%)", async () => {
+    const kidObj = (await createKid()) as { id: number }
+    const myKidId = kidObj.id
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId: myKidId, title: "賺錢", rewardAmount: 500 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`).send({})
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`).send({})
+    await request(app).post("/api/family/spendings").send({
+      kidId: myKidId,
+      jar: "spend",
+      amount: 50,
+      description: "玩具",
+    })
+    await request(app).post("/api/family/spendings").send({
+      kidId: myKidId,
+      jar: "give",
+      amount: 50,
+      description: "捐贈",
+    })
+    const res = await request(app).get("/api/family/kid-spending-habits?days=7")
+    expect(res.status).toBe(200)
+    const myKid = res.body.kids.find((k: { kidId: number }) => k.kidId === myKidId)
+    expect(myKid).toBeDefined()
+    expect(myKid.giveRatio).toBeGreaterThanOrEqual(30)
+    expect(myKid.habit).toBe("generous")
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
   it("兒童活躍天數：基本結構 kids/familyAvgRatio/message", async () => {
     const res = await request(app).get("/api/family/kid-active-days")
     expect(res.status).toBe(200)

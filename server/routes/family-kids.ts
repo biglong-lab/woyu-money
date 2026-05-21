@@ -8602,6 +8602,112 @@ async function bulkApproveOne(
 }
 
 /**
+ * GET /api/family/kid-spending-habits?days=30
+ * 每個 active kid 過去 N 天 spend vs give 對比
+ * habit: generous / spender / saver / balanced / no_data
+ */
+router.get(
+  "/api/family/kid-spending-habits",
+  asyncHandler(async (req, res) => {
+    const days = Math.min(Math.max(Number(req.query.days) || 30, 7), 365)
+
+    const rows = await db.execute(sql`
+      SELECT
+        ka.id::int AS kid_id,
+        ka.display_name AS kid_name,
+        ka.avatar,
+        COALESCE((SELECT SUM(amount::numeric)::numeric FROM kids_spendings
+          WHERE kid_id = ka.id AND jar = 'spend'
+            AND spend_date >= CURRENT_DATE - (${days}::int * INTERVAL '1 day')
+        ), 0) AS spent,
+        COALESCE((SELECT SUM(amount::numeric)::numeric FROM kids_spendings
+          WHERE kid_id = ka.id AND jar = 'give'
+            AND spend_date >= CURRENT_DATE - (${days}::int * INTERVAL '1 day')
+        ), 0) AS given,
+        COALESCE((SELECT SUM(reward_amount::numeric)::numeric FROM kids_tasks
+          WHERE kid_id = ka.id AND status = 'approved'
+            AND completed_at >= CURRENT_DATE - (${days}::int * INTERVAL '1 day')
+        ), 0) AS earned
+      FROM kids_accounts ka
+      WHERE ka.is_active = true
+      ORDER BY ka.id ASC
+    `)
+
+    const kids = (
+      rows as unknown as {
+        rows: Array<{
+          kid_id: number
+          kid_name: string
+          avatar: string
+          spent: string | number
+          given: string | number
+          earned: string | number
+        }>
+      }
+    ).rows.map((r) => {
+      const spent = Number(r.spent)
+      const given = Number(r.given)
+      const earned = Number(r.earned)
+      const totalOut = spent + given
+      const giveRatio = totalOut > 0 ? Math.round((given / totalOut) * 100) : 0
+
+      let habit: "generous" | "spender" | "saver" | "balanced" | "no_data"
+      if (earned === 0 && totalOut === 0) {
+        habit = "no_data"
+      } else if (totalOut === 0) {
+        habit = "saver"
+      } else if (giveRatio >= 30) {
+        habit = "generous"
+      } else if (totalOut < earned * 0.3) {
+        habit = "saver"
+      } else if (giveRatio < 10) {
+        habit = "spender"
+      } else {
+        habit = "balanced"
+      }
+
+      return {
+        kidId: r.kid_id,
+        kidName: r.kid_name,
+        avatar: r.avatar,
+        spent: Math.round(spent),
+        given: Math.round(given),
+        earned: Math.round(earned),
+        giveRatio,
+        habit,
+      }
+    })
+
+    const counts = {
+      generous: kids.filter((k) => k.habit === "generous").length,
+      spender: kids.filter((k) => k.habit === "spender").length,
+      saver: kids.filter((k) => k.habit === "saver").length,
+      balanced: kids.filter((k) => k.habit === "balanced").length,
+    }
+
+    let message: string
+    if (kids.length === 0) {
+      message = "還沒有小孩"
+    } else if (counts.generous > 0) {
+      message = `💝 有 ${counts.generous} 個慷慨的小孩、家庭有愛心`
+    } else if (counts.saver === kids.length) {
+      message = "全家都偏儲蓄、紀律十足"
+    } else if (counts.spender > counts.balanced + counts.saver) {
+      message = `🛒 ${counts.spender} 個偏花用、可以鼓勵多存或捐`
+    } else {
+      message = "家庭花用習慣多元、各有特色"
+    }
+
+    res.json({
+      days,
+      kids,
+      habitCounts: counts,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/kid-active-days?days=30
  * 每個 active kid 過去 N 天有活動（task/checkin/spending）的天數比例
  * 排名 + topPerformer
