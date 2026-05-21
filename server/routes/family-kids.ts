@@ -8602,6 +8602,86 @@ async function bulkApproveOne(
 }
 
 /**
+ * GET /api/family/kid-favorite-emoji?days=90
+ * 每個 active kid 過去 N 天 task emoji 使用最多者
+ */
+router.get(
+  "/api/family/kid-favorite-emoji",
+  asyncHandler(async (req, res) => {
+    const days = Math.min(Math.max(Number(req.query.days) || 90, 7), 365)
+
+    const rows = await db.execute(sql`
+      WITH emoji_counts AS (
+        SELECT
+          ka.id AS kid_id,
+          ka.display_name AS kid_name,
+          ka.avatar,
+          t.emoji,
+          COUNT(*)::int AS cnt
+        FROM kids_accounts ka
+        JOIN kids_tasks t ON
+          t.kid_id = ka.id
+          AND t.status = 'approved'
+          AND t.completed_at >= CURRENT_DATE - (${days}::int * INTERVAL '1 day')
+          AND t.emoji IS NOT NULL
+        WHERE ka.is_active = true
+        GROUP BY ka.id, ka.display_name, ka.avatar, t.emoji
+      ),
+      top_emojis AS (
+        SELECT DISTINCT ON (kid_id) kid_id, kid_name, avatar, emoji, cnt
+        FROM emoji_counts
+        ORDER BY kid_id, cnt DESC, emoji ASC
+      ),
+      all_kids AS (
+        SELECT id::int AS kid_id, display_name AS kid_name, avatar FROM kids_accounts WHERE is_active = true
+      )
+      SELECT
+        ak.kid_id,
+        ak.kid_name,
+        ak.avatar,
+        te.emoji,
+        te.cnt
+      FROM all_kids ak
+      LEFT JOIN top_emojis te ON te.kid_id = ak.kid_id
+      ORDER BY ak.kid_id ASC
+    `)
+
+    const kids = (
+      rows as unknown as {
+        rows: Array<{
+          kid_id: number
+          kid_name: string
+          avatar: string
+          emoji: string | null
+          cnt: number | null
+        }>
+      }
+    ).rows.map((r) => ({
+      kidId: r.kid_id,
+      kidName: r.kid_name,
+      avatar: r.avatar,
+      favoriteEmoji: r.emoji,
+      count: r.cnt ?? 0,
+    }))
+
+    const withEmoji = kids.filter((k) => k.favoriteEmoji)
+    let message: string
+    if (withEmoji.length === 0) {
+      message = `過去 ${days} 天還沒任務、無 emoji 偏好`
+    } else {
+      const personalities = withEmoji.map((k) => `${k.kidName} 愛 ${k.favoriteEmoji}`).join("、")
+      message = `🎨 ${personalities}`
+    }
+
+    res.json({
+      days,
+      kids,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/kid-peak-hour?days=30
  * 每個 active kid 過去 N 天最活躍小時（0-23）+ 全家 peak hour
  */

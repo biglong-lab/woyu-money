@@ -610,6 +610,9 @@ export default function FamilyPage() {
       {/* 家庭任務高峰小時 */}
       <FamilyKidPeakHourCard />
 
+      {/* 家庭兒童最愛 emoji */}
+      <FamilyKidFavoriteEmojiCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3564,6 +3567,46 @@ function ParentTodoList() {
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
       )}
+    </div>
+  )
+}
+
+function FamilyKidFavoriteEmojiCard() {
+  const { data } = useQuery<{
+    days: number
+    kids: Array<{
+      kidId: number
+      kidName: string
+      avatar: string
+      favoriteEmoji: string | null
+      count: number
+    }>
+    message: string
+  }>({
+    queryKey: ["/api/family/kid-favorite-emoji?days=90"],
+  })
+  if (!data) return null
+  const withEmoji = data.kids.filter((k) => k.favoriteEmoji)
+  if (withEmoji.length === 0) return null
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-pink-300 bg-gradient-to-br from-pink-50 to-rose-50 p-3 shadow">
+      <h3 className="font-bold mb-2 flex items-center gap-2">🎨 最愛 emoji（90 天）</h3>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-2 text-xs">{data.message}</div>
+
+      <div className="grid grid-cols-2 gap-2">
+        {withEmoji.map((k) => (
+          <div key={k.kidId} className="bg-white rounded-lg p-2 flex items-center gap-2">
+            <div className="text-lg">{k.avatar}</div>
+            <div className="flex-1 text-sm">{k.kidName}</div>
+            <div className="text-right">
+              <div className="text-2xl">{k.favoriteEmoji}</div>
+              <div className="text-[9px] text-gray-500">用 {k.count} 次</div>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

@@ -4245,6 +4245,30 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.body.weeks).toBe(52)
   })
 
+  it("最愛 emoji：基本結構 kids/message", async () => {
+    const res = await request(app).get("/api/family/kid-favorite-emoji")
+    expect(res.status).toBe(200)
+    expect(Array.isArray(res.body.kids)).toBe(true)
+    expect(res.body.message).toBeTruthy()
+  })
+
+  it("最愛 emoji：approve task emoji=🚀 → favoriteEmoji=🚀", async () => {
+    const kidObj = (await createKid()) as { id: number }
+    const myKidId = kidObj.id
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId: myKidId, title: "emoji 測試", emoji: "🚀", rewardAmount: 30 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`).send({})
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`).send({})
+    const res = await request(app).get("/api/family/kid-favorite-emoji?days=7")
+    expect(res.status).toBe(200)
+    const myKid = res.body.kids.find((k: { kidId: number }) => k.kidId === myKidId)
+    expect(myKid).toBeDefined()
+    expect(myKid.favoriteEmoji).toBe("🚀")
+    expect(myKid.count).toBeGreaterThanOrEqual(1)
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
   it("任務高峰小時：基本結構 kids/familyPeak/message", async () => {
     const res = await request(app).get("/api/family/kid-peak-hour")
     expect(res.status).toBe(200)
