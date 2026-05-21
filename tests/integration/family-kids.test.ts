@@ -3985,7 +3985,8 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     const res = await request(app).get("/api/family/kids-attention")
     expect(res.status).toBe(200)
     const k = res.body.kids[0]
-    expect(k.daysSinceTask).toBe(0)
+    // 跨午夜 race：daysSinceTask 可能 0 或 1
+    expect(k.daysSinceTask).toBeLessThanOrEqual(1)
     expect(k.needsAttention).toBe(false)
     expect(k.message).toBeNull()
   })
