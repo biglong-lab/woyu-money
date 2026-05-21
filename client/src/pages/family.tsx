@@ -520,6 +520,9 @@ export default function FamilyPage() {
       {/* 家庭主動性比例 */}
       <FamilyInitiativeRateCard />
 
+      {/* 家庭獎勵統計 */}
+      <FamilyRewardStatsCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3474,6 +3477,76 @@ function ParentTodoList() {
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
       )}
+    </div>
+  )
+}
+
+function FamilyRewardStatsCard() {
+  const { data } = useQuery<{
+    days: number
+    stats: { total: number; min: number; max: number; avg: number; median: number }
+    buckets: Array<{ label: string; range: string; count: number }>
+    dominantBucket: string
+    pattern: "diverse" | "concentrated" | "high_value" | "low_value" | "no_data"
+    message: string
+  }>({
+    queryKey: ["/api/family/reward-stats?days=90"],
+  })
+  if (!data || data.stats.total === 0) return null
+
+  const PATTERN_BG: Record<string, string> = {
+    diverse: "from-violet-50 to-pink-50 border-violet-400",
+    concentrated: "from-blue-50 to-sky-50 border-blue-300",
+    high_value: "from-emerald-50 to-green-50 border-emerald-400",
+    low_value: "from-amber-50 to-yellow-50 border-amber-300",
+    no_data: "from-gray-50 to-slate-50 border-gray-300",
+  }
+
+  const maxCount = Math.max(...data.buckets.map((b) => b.count), 1)
+
+  return (
+    <div
+      className={`mb-4 rounded-2xl border-2 bg-gradient-to-br ${PATTERN_BG[data.pattern]} p-3 shadow`}
+    >
+      <h3 className="font-bold mb-2 flex items-center gap-2">💰 獎勵統計（90 天）</h3>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-2 text-xs">{data.message}</div>
+
+      <div className="grid grid-cols-4 gap-2 mb-2">
+        <div className="bg-white rounded-lg p-1.5 text-center">
+          <div className="text-sm font-bold">${data.stats.avg}</div>
+          <div className="text-[9px] text-gray-500">平均</div>
+        </div>
+        <div className="bg-white rounded-lg p-1.5 text-center">
+          <div className="text-sm font-bold">${data.stats.median}</div>
+          <div className="text-[9px] text-gray-500">中位數</div>
+        </div>
+        <div className="bg-white rounded-lg p-1.5 text-center">
+          <div className="text-sm font-bold">${data.stats.min}</div>
+          <div className="text-[9px] text-gray-500">最小</div>
+        </div>
+        <div className="bg-white rounded-lg p-1.5 text-center">
+          <div className="text-sm font-bold">${data.stats.max}</div>
+          <div className="text-[9px] text-gray-500">最大</div>
+        </div>
+      </div>
+
+      <div className="space-y-1">
+        {data.buckets.map((b) => (
+          <div key={b.range} className="flex items-center gap-2 text-xs">
+            <div className="w-16 text-right text-gray-600">{b.label}</div>
+            <div className="flex-1 h-3 bg-white rounded overflow-hidden">
+              {b.count > 0 && (
+                <div
+                  className={`h-full ${b.label === data.dominantBucket ? "bg-emerald-500" : "bg-emerald-300"}`}
+                  style={{ width: `${(b.count / maxCount) * 100}%` }}
+                />
+              )}
+            </div>
+            <div className="w-8 text-right font-bold">{b.count}</div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

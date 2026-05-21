@@ -8602,6 +8602,107 @@ async function bulkApproveOne(
 }
 
 /**
+ * GET /api/family/reward-stats?days=90
+ * 家庭任務獎勵金額統計：avg/median/min/max + 分桶
+ * 5 桶：(0,10] / (10,50] / (50,100] / (100,500] / (500+]
+ */
+router.get(
+  "/api/family/reward-stats",
+  asyncHandler(async (req, res) => {
+    const days = Math.min(Math.max(Number(req.query.days) || 90, 7), 365)
+
+    const rows = await db.execute(sql`
+      WITH r AS (
+        SELECT reward_amount::numeric AS amount
+        FROM kids_tasks
+        WHERE status = 'approved'
+          AND completed_at >= CURRENT_DATE - (${days}::int * INTERVAL '1 day')
+      )
+      SELECT
+        COUNT(*)::int AS total,
+        COALESCE(MIN(amount), 0)::numeric AS min_amount,
+        COALESCE(MAX(amount), 0)::numeric AS max_amount,
+        COALESCE(AVG(amount), 0)::numeric AS avg_amount,
+        COALESCE(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY amount), 0)::numeric AS median_amount,
+        COUNT(*) FILTER (WHERE amount > 0 AND amount <= 10)::int AS bucket_tiny,
+        COUNT(*) FILTER (WHERE amount > 10 AND amount <= 50)::int AS bucket_small,
+        COUNT(*) FILTER (WHERE amount > 50 AND amount <= 100)::int AS bucket_medium,
+        COUNT(*) FILTER (WHERE amount > 100 AND amount <= 500)::int AS bucket_large,
+        COUNT(*) FILTER (WHERE amount > 500)::int AS bucket_huge
+      FROM r
+    `)
+
+    const row = (
+      rows as unknown as {
+        rows: Array<{
+          total: number
+          min_amount: string | number
+          max_amount: string | number
+          avg_amount: string | number
+          median_amount: string | number
+          bucket_tiny: number
+          bucket_small: number
+          bucket_medium: number
+          bucket_large: number
+          bucket_huge: number
+        }>
+      }
+    ).rows[0]
+
+    const total = row?.total ?? 0
+    const buckets = [
+      { label: "$1-10", range: "tiny", count: row?.bucket_tiny ?? 0 },
+      { label: "$11-50", range: "small", count: row?.bucket_small ?? 0 },
+      { label: "$51-100", range: "medium", count: row?.bucket_medium ?? 0 },
+      { label: "$101-500", range: "large", count: row?.bucket_large ?? 0 },
+      { label: "$501+", range: "huge", count: row?.bucket_huge ?? 0 },
+    ]
+
+    const dominantBucket = buckets.reduce(
+      (best, b) => (b.count > best.count ? b : best),
+      buckets[0]
+    )
+
+    let pattern: "diverse" | "concentrated" | "high_value" | "low_value" | "no_data"
+    let message: string
+    if (total === 0) {
+      pattern = "no_data"
+      message = `過去 ${days} 天還沒任務、開始派任務累積獎勵紀錄吧 🌱`
+    } else {
+      const nonEmpty = buckets.filter((b) => b.count > 0).length
+      if (nonEmpty >= 4) {
+        pattern = "diverse"
+        message = `🎨 獎勵金額多元（${nonEmpty} 個區間有任務）、不同難度都有`
+      } else if (dominantBucket.range === "huge" || dominantBucket.range === "large") {
+        pattern = "high_value"
+        message = `💰 多數任務獎勵偏高（${dominantBucket.label} 占 ${dominantBucket.count} 個）`
+      } else if (dominantBucket.range === "tiny" || dominantBucket.range === "small") {
+        pattern = "low_value"
+        message = `💸 多數任務獎勵較小（${dominantBucket.label} 占 ${dominantBucket.count} 個）`
+      } else {
+        pattern = "concentrated"
+        message = `📊 多數任務集中在 ${dominantBucket.label}（${dominantBucket.count} 個）`
+      }
+    }
+
+    res.json({
+      days,
+      stats: {
+        total,
+        min: Math.round(Number(row?.min_amount ?? 0)),
+        max: Math.round(Number(row?.max_amount ?? 0)),
+        avg: Math.round(Number(row?.avg_amount ?? 0)),
+        median: Math.round(Number(row?.median_amount ?? 0)),
+      },
+      buckets,
+      dominantBucket: dominantBucket.label,
+      pattern,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/initiative-rate?days=90
  * 家庭主動性比例：小孩自提任務（proposedByKid=true）vs 家長派的比例
  * + topProposer（最主動的小孩）

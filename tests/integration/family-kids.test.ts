@@ -4245,6 +4245,36 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.body.weeks).toBe(52)
   })
 
+  it("獎勵統計：基本結構 stats/buckets/pattern", async () => {
+    const res = await request(app).get("/api/family/reward-stats")
+    expect(res.status).toBe(200)
+    expect(res.body.stats).toHaveProperty("total")
+    expect(res.body.stats).toHaveProperty("avg")
+    expect(res.body.stats).toHaveProperty("median")
+    expect(res.body.buckets).toHaveLength(5)
+    expect(["diverse", "concentrated", "high_value", "low_value", "no_data"]).toContain(
+      res.body.pattern
+    )
+    expect(res.body.message).toBeTruthy()
+  })
+
+  it("獎勵統計：approve $80 → bucket_medium >=1 + avg=80", async () => {
+    const kidObj = (await createKid()) as { id: number }
+    const myKidId = kidObj.id
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId: myKidId, title: "中等獎勵", rewardAmount: 80 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`).send({})
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`).send({})
+    const res = await request(app).get("/api/family/reward-stats")
+    expect(res.status).toBe(200)
+    expect(res.body.stats.total).toBeGreaterThanOrEqual(1)
+    const medium = res.body.buckets.find((b: { range: string }) => b.range === "medium")
+    expect(medium.count).toBeGreaterThanOrEqual(1)
+    expect(res.body.stats.avg).toBeGreaterThanOrEqual(50)
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
   it("主動性比例：基本結構 stats/initiativeRate/level", async () => {
     const res = await request(app).get("/api/family/initiative-rate")
     expect(res.status).toBe(200)
