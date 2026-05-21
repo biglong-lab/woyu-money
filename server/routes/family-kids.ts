@@ -8602,6 +8602,96 @@ async function bulkApproveOne(
 }
 
 /**
+ * GET /api/family/first-task-timeline
+ * 每 active kid 加入後到第一個 approved task 的天數
+ * 看小孩接受系統的速度
+ */
+router.get(
+  "/api/family/first-task-timeline",
+  asyncHandler(async (_req, res) => {
+    const rows = await db.execute(sql`
+      SELECT
+        ka.id::int AS kid_id,
+        ka.display_name AS kid_name,
+        ka.avatar,
+        ka.created_at,
+        EXTRACT(DAY FROM (NOW() - ka.created_at))::int AS account_age_days,
+        (SELECT MIN(completed_at) FROM kids_tasks
+          WHERE kid_id = ka.id AND status = 'approved'
+        ) AS first_task_at
+      FROM kids_accounts ka
+      WHERE ka.is_active = true
+      ORDER BY ka.id ASC
+    `)
+
+    const kids = (
+      rows as unknown as {
+        rows: Array<{
+          kid_id: number
+          kid_name: string
+          avatar: string
+          created_at: string
+          account_age_days: number
+          first_task_at: string | null
+        }>
+      }
+    ).rows.map((r) => {
+      let daysToFirst: number | null = null
+      let speed: "instant" | "fast" | "normal" | "slow" | "never"
+      if (r.first_task_at) {
+        const created = new Date(r.created_at).getTime()
+        const first = new Date(r.first_task_at).getTime()
+        daysToFirst = Math.max(0, Math.floor((first - created) / 86400000))
+        if (daysToFirst < 1) speed = "instant"
+        else if (daysToFirst < 7) speed = "fast"
+        else if (daysToFirst < 30) speed = "normal"
+        else speed = "slow"
+      } else {
+        speed = "never"
+      }
+      return {
+        kidId: r.kid_id,
+        kidName: r.kid_name,
+        avatar: r.avatar,
+        accountAgeDays: r.account_age_days,
+        firstTaskAt: r.first_task_at,
+        daysToFirstTask: daysToFirst,
+        speed,
+      }
+    })
+
+    const withFirstTask = kids.filter((k) => k.daysToFirstTask !== null)
+    const fastest =
+      withFirstTask.length > 0
+        ? [...withFirstTask].sort((a, b) => (a.daysToFirstTask ?? 0) - (b.daysToFirstTask ?? 0))[0]
+        : null
+    const neverCount = kids.filter((k) => k.speed === "never").length
+
+    let message: string
+    if (kids.length === 0) {
+      message = "還沒有小孩"
+    } else if (!fastest) {
+      message = `${kids.length} 個小孩、還沒人完成第一個任務`
+    } else {
+      message = `🌱 最快上手：${fastest.avatar} ${fastest.kidName}（${fastest.daysToFirstTask} 天內就完成第一個任務）`
+    }
+
+    res.json({
+      kids,
+      fastestStart: fastest
+        ? {
+            kidName: fastest.kidName,
+            avatar: fastest.avatar,
+            daysToFirstTask: fastest.daysToFirstTask,
+          }
+        : null,
+      neverCount,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/kid-weekend-vs-weekday?days=60
  * 每個 active kid 過去 N 天週末 vs 平日 task 完成數對比
  * type: weekend_warrior(週末日均>1.5x平日) / weekday_focused(<0.67x) / balanced

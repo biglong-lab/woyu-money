@@ -631,6 +631,9 @@ export default function FamilyPage() {
       {/* 家庭兒童週末 vs 平日 */}
       <FamilyKidWeekendVsWeekdayCard />
 
+      {/* 家庭首次任務時間軸 */}
+      <FamilyFirstTaskTimelineCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3585,6 +3588,68 @@ function ParentTodoList() {
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
       )}
+    </div>
+  )
+}
+
+function FamilyFirstTaskTimelineCard() {
+  const { data } = useQuery<{
+    kids: Array<{
+      kidId: number
+      kidName: string
+      avatar: string
+      accountAgeDays: number
+      firstTaskAt: string | null
+      daysToFirstTask: number | null
+      speed: "instant" | "fast" | "normal" | "slow" | "never"
+    }>
+    fastestStart: { kidName: string; avatar: string; daysToFirstTask: number | null } | null
+    neverCount: number
+    message: string
+  }>({
+    queryKey: ["/api/family/first-task-timeline"],
+  })
+  if (!data || data.kids.length === 0) return null
+  const withTasks = data.kids.filter((k) => k.speed !== "never")
+  if (withTasks.length === 0) return null
+
+  const SPEED_LABEL: Record<string, string> = {
+    instant: "⚡ 當天",
+    fast: "🚀 一週內",
+    normal: "👍 一月內",
+    slow: "🐢 超過一月",
+    never: "—",
+  }
+  const SPEED_COLOR: Record<string, string> = {
+    instant: "bg-emerald-500 text-white",
+    fast: "bg-blue-400 text-white",
+    normal: "bg-amber-400 text-white",
+    slow: "bg-rose-400 text-white",
+    never: "bg-gray-300 text-gray-700",
+  }
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-emerald-300 bg-gradient-to-br from-emerald-50 to-teal-50 p-3 shadow">
+      <h3 className="font-bold mb-2 flex items-center gap-2">🌱 首次任務速度</h3>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-2 text-xs">{data.message}</div>
+
+      <div className="space-y-1.5">
+        {withTasks.map((k) => (
+          <div key={k.kidId} className="bg-white rounded-lg p-2 flex items-center gap-2">
+            <div className="text-lg">{k.avatar}</div>
+            <div className="flex-1">
+              <div className="text-sm font-medium">{k.kidName}</div>
+              <div className="text-[10px] text-gray-500">
+                {k.daysToFirstTask} 天 · 帳齡 {k.accountAgeDays} 天
+              </div>
+            </div>
+            <div className={`text-[10px] px-1.5 py-0.5 rounded ${SPEED_COLOR[k.speed]}`}>
+              {SPEED_LABEL[k.speed]}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

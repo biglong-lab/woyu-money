@@ -4245,6 +4245,31 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.body.weeks).toBe(52)
   })
 
+  it("首次任務時間軸：基本結構 kids/neverCount/message", async () => {
+    const res = await request(app).get("/api/family/first-task-timeline")
+    expect(res.status).toBe(200)
+    expect(Array.isArray(res.body.kids)).toBe(true)
+    expect(res.body).toHaveProperty("neverCount")
+    expect(res.body.message).toBeTruthy()
+  })
+
+  it("首次任務時間軸：approve 任務 → daysToFirstTask=0 + speed=instant", async () => {
+    const kidObj = (await createKid()) as { id: number }
+    const myKidId = kidObj.id
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId: myKidId, title: "首次任務", rewardAmount: 30 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`).send({})
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`).send({})
+    const res = await request(app).get("/api/family/first-task-timeline")
+    expect(res.status).toBe(200)
+    const myKid = res.body.kids.find((k: { kidId: number }) => k.kidId === myKidId)
+    expect(myKid).toBeDefined()
+    expect(myKid.daysToFirstTask).toBeLessThanOrEqual(1)
+    expect(["instant", "fast"]).toContain(myKid.speed)
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
   it("兒童週末平日：基本結構 kids/typeCounts/message", async () => {
     const res = await request(app).get("/api/family/kid-weekend-vs-weekday")
     expect(res.status).toBe(200)
