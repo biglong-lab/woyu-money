@@ -478,6 +478,9 @@ export default function FamilyPage() {
       {/* 全家本週摘要 vs 上週 */}
       <FamilyWeeklySummaryCard />
 
+      {/* 家庭月度故事 */}
+      <FamilyStoryCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3432,6 +3435,50 @@ function ParentTodoList() {
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
       )}
+    </div>
+  )
+}
+
+function FamilyStoryCard() {
+  const { data } = useQuery<{
+    month: string
+    paragraphs: string[]
+    stats: { totalTasks: number; totalReward: number; totalSpent: number; totalGiven: number }
+    characters: { topPerformer: string | null }
+  }>({
+    queryKey: ["/api/family/family-story"],
+  })
+  if (!data) return null
+
+  const copy = async () => {
+    const text = `📖 ${data.month} 家庭故事\n\n${data.paragraphs.join("\n\n")}`
+    try {
+      await navigator.clipboard.writeText(text)
+      alert("已複製到剪貼簿、可分享囉！")
+    } catch {
+      alert("複製失敗、請手動複製")
+    }
+  }
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-violet-300 bg-gradient-to-br from-violet-50 to-fuchsia-50 p-4 shadow">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="font-bold flex items-center gap-2">📖 {data.month} 家庭故事</h3>
+        <button
+          onClick={copy}
+          className="text-xs px-2 py-1 bg-violet-600 text-white rounded hover:bg-violet-700"
+        >
+          📋 複製分享
+        </button>
+      </div>
+
+      <div className="space-y-2 bg-white/70 rounded-lg p-3">
+        {data.paragraphs.map((p, i) => (
+          <p key={i} className="text-sm leading-relaxed">
+            {p}
+          </p>
+        ))}
+      </div>
     </div>
   )
 }

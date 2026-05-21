@@ -8602,6 +8602,145 @@ async function bulkApproveOne(
 }
 
 /**
+ * GET /api/family/family-story?month=YYYY-MM
+ * 月度家庭故事：敘事化呈現本月家庭數據（多段中文文字、好分享）
+ * 自動從 kids_tasks / kids_spendings / kids_checkins / kids_goals 彙整
+ */
+router.get(
+  "/api/family/family-story",
+  asyncHandler(async (req, res) => {
+    const monthStr = (req.query.month as string | undefined) ?? new Date().toISOString().slice(0, 7)
+    if (!/^\d{4}-\d{2}$/.test(monthStr)) throw new AppError(400, "month 格式 YYYY-MM")
+    const [year, month] = monthStr.split("-").map(Number)
+    const monthStart = `${year}-${String(month).padStart(2, "0")}-01`
+    const endY = month === 12 ? year + 1 : year
+    const endM = month === 12 ? 1 : month + 1
+    const nextMonth = `${endY}-${String(endM).padStart(2, "0")}-01`
+
+    const stats = await db.execute(sql`
+      WITH month_tasks AS (
+        SELECT t.*, ka.display_name AS kid_name, ka.avatar AS kid_avatar
+        FROM kids_tasks t
+        JOIN kids_accounts ka ON ka.id = t.kid_id
+        WHERE t.status = 'approved'
+          AND t.completed_at >= ${monthStart}::date
+          AND t.completed_at < ${nextMonth}::date
+      ),
+      month_spendings AS (
+        SELECT s.*, ka.display_name AS kid_name
+        FROM kids_spendings s
+        JOIN kids_accounts ka ON ka.id = s.kid_id
+        WHERE s.spend_date >= ${monthStart}::date AND s.spend_date < ${nextMonth}::date
+      )
+      SELECT
+        (SELECT COUNT(*)::int FROM month_tasks) AS total_tasks,
+        (SELECT COALESCE(SUM(reward_amount::numeric), 0)::numeric FROM month_tasks) AS total_reward,
+        (SELECT COALESCE(SUM(amount::numeric), 0)::numeric FROM month_spendings WHERE jar = 'spend') AS total_spent,
+        (SELECT COALESCE(SUM(amount::numeric), 0)::numeric FROM month_spendings WHERE jar = 'give') AS total_given,
+        (SELECT COUNT(DISTINCT checkin_date)::int FROM kids_checkins
+          WHERE checkin_date >= ${monthStart}::date AND checkin_date < ${nextMonth}::date) AS checkin_days,
+        (SELECT COUNT(*)::int FROM kids_goals
+          WHERE completed_at >= ${monthStart}::timestamp AND completed_at < ${nextMonth}::timestamp) AS goals_completed,
+        (SELECT kid_name FROM month_tasks GROUP BY kid_name
+          ORDER BY COUNT(*) DESC NULLS LAST LIMIT 1) AS top_performer,
+        (SELECT COUNT(*)::int FROM month_tasks
+          WHERE kid_name = (SELECT kid_name FROM month_tasks GROUP BY kid_name ORDER BY COUNT(*) DESC NULLS LAST LIMIT 1)
+        ) AS top_performer_tasks,
+        (SELECT title FROM month_tasks GROUP BY title
+          ORDER BY COUNT(*) DESC NULLS LAST LIMIT 1) AS most_done_task
+    `)
+
+    const row = (
+      stats as unknown as {
+        rows: Array<{
+          total_tasks: number
+          total_reward: string | number
+          total_spent: string | number
+          total_given: string | number
+          checkin_days: number
+          goals_completed: number
+          top_performer: string | null
+          top_performer_tasks: number | null
+          most_done_task: string | null
+        }>
+      }
+    ).rows[0]
+
+    const toNum = (v: string | number | null): number => (v === null ? 0 : Number(v))
+    const totalTasks = row?.total_tasks ?? 0
+    const totalReward = toNum(row?.total_reward ?? 0)
+    const totalSpent = toNum(row?.total_spent ?? 0)
+    const totalGiven = toNum(row?.total_given ?? 0)
+    const checkinDays = row?.checkin_days ?? 0
+    const goalsCompleted = row?.goals_completed ?? 0
+    const topPerformer = row?.top_performer ?? null
+    const topPerformerTasks = row?.top_performer_tasks ?? 0
+    const mostDoneTask = row?.most_done_task ?? null
+
+    const paragraphs: string[] = []
+
+    // 開場
+    paragraphs.push(
+      `📖 ${year} 年 ${month} 月，我們家走過了 ${totalTasks > 0 ? "充實" : "平靜"}的一個月。`
+    )
+
+    // 任務段
+    if (totalTasks > 0) {
+      paragraphs.push(
+        `這個月全家完成了 ${totalTasks} 個任務，總共入帳 $${totalReward}。${topPerformer ? `其中 ${topPerformer} 表現最亮眼，獨自完成了 ${topPerformerTasks} 個任務。` : ""}${mostDoneTask ? `「${mostDoneTask}」是本月最常出現的任務。` : ""}`
+      )
+    } else {
+      paragraphs.push("這個月沒有完成任何任務、可能在準備下一波計畫。")
+    }
+
+    // 花用段
+    if (totalSpent > 0 || totalGiven > 0) {
+      const parts: string[] = []
+      if (totalSpent > 0) parts.push(`花用罐用了 $${totalSpent}`)
+      if (totalGiven > 0) parts.push(`捐贈罐送出 $${totalGiven}（很有愛心！）`)
+      paragraphs.push(`理財方面，${parts.join("、")}。`)
+    }
+
+    // 打卡 / 目標段
+    if (checkinDays > 0 || goalsCompleted > 0) {
+      const parts: string[] = []
+      if (checkinDays > 0) parts.push(`累積打卡 ${checkinDays} 天`)
+      if (goalsCompleted > 0) parts.push(`達成 ${goalsCompleted} 個目標 🎯`)
+      paragraphs.push(`持續累積：${parts.join("，")}。`)
+    }
+
+    // 結語
+    if (totalTasks >= 20) {
+      paragraphs.push("這是個豐收的月份、繼續保持節奏 💪")
+    } else if (totalTasks >= 5) {
+      paragraphs.push("穩定的一個月、下個月加油！")
+    } else if (totalTasks > 0) {
+      paragraphs.push("起步階段、慢慢來會更好 🌱")
+    } else {
+      paragraphs.push("休息也是節奏的一部分、新的月份再衝刺！")
+    }
+
+    res.json({
+      month: monthStr,
+      paragraphs,
+      stats: {
+        totalTasks,
+        totalReward,
+        totalSpent,
+        totalGiven,
+        checkinDays,
+        goalsCompleted,
+      },
+      characters: {
+        topPerformer,
+        topPerformerTasks,
+        mostDoneTask,
+      },
+    })
+  })
+)
+
+/**
  * GET /api/family/difficulty-evolution?kidId=&months=6
  * 個別小孩過去 N 個月每月 easy / medium / hard 完成數變化趨勢
  * 用 generate_series 確保每月都有資料（即使 0）、從舊到新排序

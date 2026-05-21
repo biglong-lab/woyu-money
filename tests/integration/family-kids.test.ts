@@ -4245,6 +4245,46 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.body.weeks).toBe(52)
   })
 
+  it("月度故事：基本結構 month/paragraphs/stats/characters", async () => {
+    const res = await request(app).get("/api/family/family-story")
+    expect(res.status).toBe(200)
+    expect(res.body.month).toMatch(/^\d{4}-\d{2}$/)
+    expect(Array.isArray(res.body.paragraphs)).toBe(true)
+    expect(res.body.paragraphs.length).toBeGreaterThanOrEqual(2)
+    expect(res.body.stats).toHaveProperty("totalTasks")
+    expect(res.body.stats).toHaveProperty("totalReward")
+    expect(res.body.characters).toBeDefined()
+  })
+
+  it("月度故事：完成任務後 characters.topPerformer 有值", async () => {
+    const kidObj = (await createKid({ displayName: "故事主角" })) as { id: number }
+    const myKidId = kidObj.id
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId: myKidId, title: "本月任務", rewardAmount: 100 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`).send({})
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`).send({})
+    const res = await request(app).get("/api/family/family-story")
+    expect(res.status).toBe(200)
+    expect(res.body.stats.totalTasks).toBeGreaterThanOrEqual(1)
+    expect(res.body.characters.topPerformer).toBeTruthy()
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
+  it("月度故事：非法 month → 400", async () => {
+    const res = await request(app).get("/api/family/family-story?month=invalid")
+    expect(res.status).toBe(400)
+  })
+
+  it("月度故事：未來月份 → totalTasks=0", async () => {
+    const future = new Date()
+    future.setFullYear(future.getFullYear() + 1)
+    const monthStr = future.toISOString().slice(0, 7)
+    const res = await request(app).get(`/api/family/family-story?month=${monthStr}`)
+    expect(res.status).toBe(200)
+    expect(res.body.stats.totalTasks).toBe(0)
+  })
+
   it("難度演進：months=6 → 6 個月資料 + trend", async () => {
     const kidObj = (await createKid()) as { id: number }
     const myKidId = kidObj.id
