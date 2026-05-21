@@ -2279,6 +2279,44 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(r.status).toBe(400)
   })
 
+  it("全家活動 feed：聚合所有小孩、含 kidName + kidAvatar", async () => {
+    // 第一個小孩
+    await createKid({ displayName: "小明", spendRatio: 70, saveRatio: 20, giveRatio: 10 })
+    const kid1 = kidId
+    const t1 = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId: kid1, title: "倒垃圾", rewardAmount: 50 })
+    await request(app).post(`/api/family/tasks/${t1.body.id}/submit`)
+    await request(app).post(`/api/family/tasks/${t1.body.id}/approve`)
+
+    // 第二個小孩
+    await createKid({ displayName: "小華", spendRatio: 50, saveRatio: 50, giveRatio: 0 })
+    const kid2 = kidId
+    await request(app).post("/api/family/wishes").send({ kidId: kid2, title: "新書包" })
+
+    const res = await request(app).get("/api/family/activity?limit=20")
+    expect(res.status).toBe(200)
+    expect(Array.isArray(res.body.activities)).toBe(true)
+    expect(res.body.activities.length).toBeGreaterThanOrEqual(2)
+
+    const kidNames = new Set(res.body.activities.map((a: { kidName: string }) => a.kidName))
+    expect(kidNames.has("小明")).toBe(true)
+    expect(kidNames.has("小華")).toBe(true)
+
+    // 每筆都有 kidAvatar
+    for (const a of res.body.activities as Array<{ kidAvatar: string; label: string }>) {
+      expect(a.kidAvatar).toBeTruthy()
+      expect(a.label).toBeTruthy()
+    }
+
+    // 時間倒序
+    if (res.body.activities.length >= 2) {
+      const t1At = new Date(res.body.activities[0].at).getTime()
+      const t2At = new Date(res.body.activities[1].at).getTime()
+      expect(t1At).toBeGreaterThanOrEqual(t2At)
+    }
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)

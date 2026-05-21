@@ -443,6 +443,9 @@ export default function FamilyPage() {
       {/* 跨域搜尋 */}
       <FamilySearch />
 
+      {/* 全家活動 feed */}
+      <FamilyActivityFeed />
+
       {/* 家長提醒中心 */}
       <ParentReminders />
 
@@ -1867,6 +1870,95 @@ function DifficultyInsights() {
         ))}
       </CardContent>
     </Card>
+  )
+}
+
+function FamilyActivityFeed() {
+  const [expanded, setExpanded] = useState(false)
+  const { data } = useQuery<{
+    activities: Array<{
+      kind: "task" | "spending" | "checkin" | "wish"
+      id: number
+      kidId: number
+      kidName: string
+      kidAvatar: string
+      label: string
+      amount: string
+      emoji: string | null
+      at: string
+    }>
+  }>({
+    queryKey: ["/api/family/activity"],
+    queryFn: async () => {
+      const res = await fetch("/api/family/activity?limit=30", { credentials: "include" })
+      return res.json()
+    },
+  })
+
+  const acts = data?.activities ?? []
+  if (acts.length === 0) return null
+
+  const visible = expanded ? acts : acts.slice(0, 6)
+
+  const KIND_META: Record<string, { name: string; bg: string; fallback: string }> = {
+    task: { name: "完成任務", bg: "bg-green-50 border-green-200", fallback: "📋" },
+    spending: { name: "花錢", bg: "bg-rose-50 border-rose-200", fallback: "💸" },
+    checkin: { name: "打卡", bg: "bg-amber-50 border-amber-200", fallback: "😊" },
+    wish: { name: "願望", bg: "bg-violet-50 border-violet-200", fallback: "✨" },
+  }
+
+  function timeAgo(iso: string) {
+    const diff = Date.now() - new Date(iso).getTime()
+    const min = Math.floor(diff / 60000)
+    if (min < 1) return "剛剛"
+    if (min < 60) return `${min} 分鐘前`
+    const hr = Math.floor(min / 60)
+    if (hr < 24) return `${hr} 小時前`
+    const day = Math.floor(hr / 24)
+    if (day < 30) return `${day} 天前`
+    return new Date(iso).toLocaleDateString("zh-TW")
+  }
+
+  return (
+    <div className="mb-4 rounded-lg border border-gray-200 bg-white p-3 shadow-sm">
+      <div className="flex items-center justify-between mb-2 px-1">
+        <h3 className="font-bold text-gray-700">🌟 全家最近動態</h3>
+        <span className="text-xs text-gray-400">{acts.length} 筆</span>
+      </div>
+      <div className="space-y-1">
+        {visible.map((a) => {
+          const meta = KIND_META[a.kind]
+          return (
+            <div
+              key={`${a.kind}-${a.id}`}
+              className={`flex items-center gap-2 p-2 rounded border ${meta.bg}`}
+            >
+              <span className="text-xl shrink-0">{a.kidAvatar}</span>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm">
+                  <span className="font-bold">{a.kidName}</span>{" "}
+                  <span className="text-gray-600 text-xs">{meta.name}</span>{" "}
+                  <span className="font-medium">{a.label}</span>
+                </div>
+                <div className="text-xs text-gray-500">
+                  {a.emoji || meta.fallback} {a.amount}
+                </div>
+              </div>
+              <span className="text-xs text-gray-400 shrink-0">{timeAgo(a.at)}</span>
+            </div>
+          )
+        })}
+      </div>
+      {acts.length > 6 && (
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="mt-2 w-full text-center text-sm text-blue-600 hover:text-blue-800"
+        >
+          {expanded ? "收起" : `看更多 (${acts.length - 6} 筆)`}
+        </button>
+      )}
+    </div>
   )
 }
 

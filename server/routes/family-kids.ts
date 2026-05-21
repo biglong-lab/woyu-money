@@ -2804,6 +2804,112 @@ router.get(
 )
 
 /**
+ * GET /api/family/activity?limit=30
+ * 全家活動 feed（家長端、不指定 kidId）
+ * 一次看全家最近動態：task / spending / checkin / wish
+ * 每筆含 kidName + kidAvatar
+ */
+router.get(
+  "/api/family/activity",
+  asyncHandler(async (req, res) => {
+    const limit = Math.min(Number(req.query.limit) || 30, 100)
+
+    const result = await db.execute(sql`
+      SELECT * FROM (
+        SELECT
+          'task'::text AS kind,
+          kt.id::int AS id,
+          kt.kid_id::int AS kid_id,
+          ka.display_name AS kid_name,
+          ka.avatar AS kid_avatar,
+          kt.title AS label,
+          (kt.reward_amount::text || ' 元') AS amount,
+          kt.emoji AS emoji,
+          kt.completed_at AS at
+        FROM kids_tasks kt
+        JOIN kids_accounts ka ON ka.id = kt.kid_id
+        WHERE kt.status = 'approved' AND kt.completed_at IS NOT NULL
+
+        UNION ALL
+
+        SELECT
+          'spending'::text AS kind,
+          ks.id::int AS id,
+          ks.kid_id::int AS kid_id,
+          ka.display_name AS kid_name,
+          ka.avatar AS kid_avatar,
+          ks.description AS label,
+          ('-' || ks.amount::text || ' (' || ks.jar || ')') AS amount,
+          ks.emoji AS emoji,
+          ks.created_at AS at
+        FROM kids_spendings ks
+        JOIN kids_accounts ka ON ka.id = ks.kid_id
+
+        UNION ALL
+
+        SELECT
+          'checkin'::text AS kind,
+          kc.id::int AS id,
+          kc.kid_id::int AS kid_id,
+          ka.display_name AS kid_name,
+          ka.avatar AS kid_avatar,
+          COALESCE(kc.note, '今日打卡') AS label,
+          kc.mood::text AS amount,
+          NULL::varchar AS emoji,
+          kc.created_at AS at
+        FROM kids_checkins kc
+        JOIN kids_accounts ka ON ka.id = kc.kid_id
+
+        UNION ALL
+
+        SELECT
+          'wish'::text AS kind,
+          kw.id::int AS id,
+          kw.kid_id::int AS kid_id,
+          ka.display_name AS kid_name,
+          ka.avatar AS kid_avatar,
+          kw.title AS label,
+          (COALESCE(kw.estimated_price::text, '?') || ' 元・' || kw.status::text) AS amount,
+          kw.emoji AS emoji,
+          kw.created_at AS at
+        FROM kids_wishes kw
+        JOIN kids_accounts ka ON ka.id = kw.kid_id
+      ) u
+      ORDER BY at DESC NULLS LAST
+      LIMIT ${limit}
+    `)
+    const rows = (
+      result as unknown as {
+        rows: {
+          kind: string
+          id: number
+          kid_id: number
+          kid_name: string
+          kid_avatar: string
+          label: string
+          amount: string | null
+          emoji: string | null
+          at: Date | null
+        }[]
+      }
+    ).rows
+    res.json({
+      activities: rows.map((r) => ({
+        kind: r.kind,
+        id: r.id,
+        kidId: r.kid_id,
+        kidName: r.kid_name,
+        kidAvatar: r.kid_avatar,
+        label: r.label,
+        amount: r.amount,
+        emoji: r.emoji,
+        at: r.at,
+      })),
+    })
+  })
+)
+
+/**
  * GET /api/family/kid-bests?kidId=
  * 小孩終生統計 + 個人最佳紀錄
  * 培養長期成就感（看見一路走來的軌跡）
