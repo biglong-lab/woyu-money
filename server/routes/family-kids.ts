@@ -1214,6 +1214,55 @@ router.post(
 )
 
 /**
+ * POST /api/family/jars/internal-transfer
+ * 小孩自己在三罐之間移錢（不影響 totalReceived/totalSpent）
+ * Body: { kidId, fromJar, toJar, amount }
+ * 培養理財調整能力（多存錢、多花錢都可調整）
+ */
+router.post(
+  "/api/family/jars/internal-transfer",
+  asyncHandler(async (req, res) => {
+    const kidIdN = Number(req.body?.kidId)
+    const fromJar = String(req.body?.fromJar ?? "")
+    const toJar = String(req.body?.toJar ?? "")
+    const amount = Number(req.body?.amount ?? 0)
+    if (!kidIdN) throw new AppError(400, "kidId 必填")
+    if (!["spend", "save", "give"].includes(fromJar))
+      throw new AppError(400, "fromJar 須為 spend / save / give")
+    if (!["spend", "save", "give"].includes(toJar))
+      throw new AppError(400, "toJar 須為 spend / save / give")
+    if (fromJar === toJar) throw new AppError(400, "來源與目標罐相同")
+    if (!(amount > 0)) throw new AppError(400, "金額需為正數")
+
+    await ensureJarsRow(kidIdN)
+    const [jar] = await db.select().from(kidsJars).where(eq(kidsJars.kidId, kidIdN)).limit(1)
+    if (!jar) throw new AppError(404, "小孩罐子不存在")
+    const balMap = {
+      spend: parseFloat(jar.spendBalance),
+      save: parseFloat(jar.saveBalance),
+      give: parseFloat(jar.giveBalance),
+    }
+    if (balMap[fromJar as keyof typeof balMap] < amount) {
+      throw new AppError(
+        400,
+        `${fromJar} 罐餘額 $${balMap[fromJar as keyof typeof balMap]} 不足 $${amount}`
+      )
+    }
+
+    const fromCol = `${fromJar}_balance`
+    const toCol = `${toJar}_balance`
+    await db.execute(sql`
+      UPDATE kids_jars
+      SET ${sql.raw(fromCol)} = ${sql.raw(fromCol)} - ${amount.toFixed(2)}::numeric,
+          ${sql.raw(toCol)} = ${sql.raw(toCol)} + ${amount.toFixed(2)}::numeric,
+          updated_at = NOW()
+      WHERE kid_id = ${kidIdN}
+    `)
+    res.json({ ok: true, kidId: kidIdN, fromJar, toJar, amount })
+  })
+)
+
+/**
  * POST /api/family/jars/transfer
  * 兄弟姊妹互贈零用金
  * Body: { fromKidId, toKidId, amount, jar?, message? }

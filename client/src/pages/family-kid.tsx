@@ -522,7 +522,7 @@ function KidDashboard({
       )}
 
       {/* 三罐（最大、最顯眼） */}
-      <div className="grid grid-cols-3 gap-2 mb-4">
+      <div className="grid grid-cols-3 gap-2 mb-1">
         <JarCard
           label="花用"
           emoji="💸"
@@ -547,6 +547,9 @@ function KidDashboard({
           bg="bg-sky-100"
           text="text-sky-700"
         />
+      </div>
+      <div className="flex justify-center mb-3">
+        <InternalTransferButton kidId={kidId} jar={jar} toast={toast} onSuccess={invalidate} />
       </div>
 
       {/* 三個大按鈕：花錢 + 提任務 + 送禮 */}
@@ -2033,6 +2036,83 @@ function DonationsSection({ kidId }: { kidId: number }) {
         </div>
       )}
     </div>
+  )
+}
+
+function InternalTransferButton({
+  kidId,
+  jar,
+  toast,
+  onSuccess,
+}: {
+  kidId: number
+  jar: Jar
+  toast: (opts: {
+    title: string
+    description?: string
+    variant?: "default" | "destructive"
+  }) => void
+  onSuccess: () => void
+}) {
+  const mut = useMutation({
+    mutationFn: (vars: { fromJar: string; toJar: string; amount: number }) =>
+      apiRequest("POST", "/api/family/jars/internal-transfer", {
+        kidId,
+        ...vars,
+      }),
+    onSuccess: () => {
+      toast({ title: "✅ 已調整罐子" })
+      vibrate(30)
+      onSuccess()
+    },
+    onError: (e: Error) => toast({ title: "失敗", description: e.message, variant: "destructive" }),
+  })
+
+  const handleClick = () => {
+    const JARS = [
+      { v: "spend", label: "💸 花用" },
+      { v: "save", label: "🐷 存錢" },
+      { v: "give", label: "❤️ 捐獻" },
+    ]
+    const balMap: Record<string, number> = {
+      spend: parseFloat(jar.spendBalance),
+      save: parseFloat(jar.saveBalance),
+      give: parseFloat(jar.giveBalance),
+    }
+    const fromPrompt = window.prompt(
+      `從哪個罐？輸入：\n1 = 💸 花用 ($${balMap.spend})\n2 = 🐷 存錢 ($${balMap.save})\n3 = ❤️ 捐獻 ($${balMap.give})`,
+      ""
+    )
+    const fromIdx = parseInt(fromPrompt ?? "0") - 1
+    if (fromIdx < 0 || fromIdx > 2) return
+    const fromJar = JARS[fromIdx].v
+    const toPrompt = window.prompt(`移到哪個罐？（不可選 ${JARS[fromIdx].label}）`, "")
+    const toIdx = parseInt(toPrompt ?? "0") - 1
+    if (toIdx < 0 || toIdx > 2 || toIdx === fromIdx) return
+    const toJar = JARS[toIdx].v
+    const amountStr = window.prompt(
+      `從 ${JARS[fromIdx].label} 移多少到 ${JARS[toIdx].label}？（最多 $${balMap[fromJar]}）`,
+      ""
+    )
+    const amount = parseFloat(amountStr ?? "0")
+    if (!(amount > 0)) return
+    if (amount > balMap[fromJar]) {
+      toast({ title: "餘額不足", variant: "destructive" })
+      return
+    }
+    mut.mutate({ fromJar, toJar, amount })
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      disabled={mut.isPending}
+      className="text-xs text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded px-2 py-0.5"
+      title="在三罐之間移錢調整"
+    >
+      ⇄ 調整罐子
+    </button>
   )
 }
 

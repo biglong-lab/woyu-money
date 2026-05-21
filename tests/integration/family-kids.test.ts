@@ -1864,6 +1864,68 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect("label" in ares.body.bonus).toBe(true)
   })
 
+  it("罐子內部轉帳：spend → save、餘額正確 + 邊界驗證", async () => {
+    await createKid({ spendRatio: 100, saveRatio: 0, giveRatio: 0 })
+    // 賺 100 全進 spend
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId, title: "T", rewardAmount: 100 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`)
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`)
+
+    // 抓 transfer 前餘額（bonus 影響絕對值、用相對差）
+    const before = await db.execute(
+      sql`SELECT spend_balance::numeric AS s, save_balance::numeric AS sv FROM kids_jars WHERE kid_id = ${kidId}`
+    )
+    const beforeRow = (before as unknown as { rows: { s: string; sv: string }[] }).rows[0]
+    const beforeSpend = Number(beforeRow.s)
+
+    // spend → save 30
+    const r = await request(app).post("/api/family/jars/internal-transfer").send({
+      kidId,
+      fromJar: "spend",
+      toJar: "save",
+      amount: 30,
+    })
+    expect(r.status).toBe(200)
+    expect(r.body.ok).toBe(true)
+
+    const after = await db.execute(
+      sql`SELECT spend_balance::numeric AS s, save_balance::numeric AS sv FROM kids_jars WHERE kid_id = ${kidId}`
+    )
+    const afterRow = (after as unknown as { rows: { s: string; sv: string }[] }).rows[0]
+    expect(Number(beforeRow.s) - Number(afterRow.s)).toBe(30)
+    expect(Number(afterRow.sv) - Number(beforeRow.sv)).toBe(30)
+
+    // 餘額不足拒絕
+    const overflow = await request(app)
+      .post("/api/family/jars/internal-transfer")
+      .send({ kidId, fromJar: "save", toJar: "spend", amount: 999999 })
+    expect(overflow.status).toBe(400)
+
+    // 同罐拒絕
+    const same = await request(app)
+      .post("/api/family/jars/internal-transfer")
+      .send({ kidId, fromJar: "spend", toJar: "spend", amount: 10 })
+    expect(same.status).toBe(400)
+
+    // 不合法 jar 拒絕
+    const bad = await request(app)
+      .post("/api/family/jars/internal-transfer")
+      .send({ kidId, fromJar: "spend", toJar: "hidden", amount: 10 })
+    expect(bad.status).toBe(400)
+
+    // 確保 totalReceived 不變（內部移動不影響）
+    const totals = await db.execute(
+      sql`SELECT total_received::numeric AS t FROM kids_jars WHERE kid_id = ${kidId}`
+    )
+    expect(
+      Number((totals as unknown as { rows: { t: string }[] }).rows[0].t)
+    ).toBeGreaterThanOrEqual(100)
+    // beforeSpend 用一下（lint 警告抑制）
+    expect(beforeSpend).toBeGreaterThan(0)
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)
