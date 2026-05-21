@@ -1972,6 +1972,59 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     }
   })
 
+  it("家庭共同存錢罐：CRUD + contribute + 達標 + 邊界", async () => {
+    await createKid({ spendRatio: 0, saveRatio: 100, giveRatio: 0 })
+    // 賺 200 全進 save 罐
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId, title: "T", rewardAmount: 200 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`)
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`)
+
+    // 建罐
+    const r1 = await request(app)
+      .post("/api/family/pots")
+      .send({ name: "家庭旅行", emoji: "✈️", targetAmount: 100 })
+    expect(r1.status).toBe(201)
+    expect(r1.body.name).toBe("家庭旅行")
+    const potId = r1.body.id
+
+    try {
+      // 貢獻 60（未達標）
+      const c1 = await request(app)
+        .post(`/api/family/pots/${potId}/contribute`)
+        .send({ kidId, amount: 60 })
+      expect(c1.status).toBe(200)
+      expect(c1.body.reached).toBe(false)
+      expect(parseFloat(c1.body.pot.currentAmount)).toBe(60)
+
+      // 貢獻 40 → 達標
+      const c2 = await request(app)
+        .post(`/api/family/pots/${potId}/contribute`)
+        .send({ kidId, amount: 40 })
+      expect(c2.status).toBe(200)
+      expect(c2.body.reached).toBe(true)
+      expect(c2.body.pot.status).toBe("completed")
+
+      // 列表含貢獻明細
+      const list = await request(app).get("/api/family/pots")
+      const me = list.body.find((p: { id: number }) => p.id === potId)
+      expect(me.contributions.length).toBe(2)
+
+      // 已完成不能再貢獻
+      const c3 = await request(app)
+        .post(`/api/family/pots/${potId}/contribute`)
+        .send({ kidId, amount: 10 })
+      expect(c3.status).toBe(400)
+
+      // 缺 name 拒絕
+      const bad = await request(app).post("/api/family/pots").send({ targetAmount: 100 })
+      expect(bad.status).toBe(400)
+    } finally {
+      await request(app).delete(`/api/family/pots/${potId}`)
+    }
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)

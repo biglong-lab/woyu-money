@@ -37,6 +37,8 @@ import {
   kidsDailyMessages,
   familyTaskTemplates,
   familyRecipients,
+  familyPots,
+  familyPotContributions,
   kidsWishes,
   kidsTaskComments,
   kidsCheckins,
@@ -3328,6 +3330,138 @@ router.get(
     const items = (rows as unknown as { rows: Array<{ checkin_date: string }> }).rows
     const todayCheckin = items.find((x) => x.checkin_date === today) ?? null
     res.json({ kidId: kidIdQ, days, items, today: todayCheckin })
+  })
+)
+
+/**
+ * 家庭共同存錢罐
+ *   GET    /api/family/pots                     列出（active + 最近 5 個 completed）
+ *   POST   /api/family/pots                     新增（name + targetAmount 必填）
+ *   POST   /api/family/pots/:id/contribute      小孩貢獻（從 save 罐扣）
+ *   POST   /api/family/pots/:id/complete        家長宣告完成
+ *   DELETE /api/family/pots/:id                 刪除（abandoned 或誤建）
+ */
+router.get(
+  "/api/family/pots",
+  asyncHandler(async (_req, res) => {
+    const pots = await db
+      .select()
+      .from(familyPots)
+      .orderBy(desc(familyPots.status), desc(familyPots.id))
+      .limit(50)
+
+    // 補貢獻明細
+    const result = await Promise.all(
+      pots.map(async (p) => {
+        const contributions = await db
+          .select()
+          .from(familyPotContributions)
+          .where(eq(familyPotContributions.potId, p.id))
+          .orderBy(desc(familyPotContributions.createdAt))
+        return { ...p, contributions }
+      })
+    )
+    res.json(result)
+  })
+)
+
+router.post(
+  "/api/family/pots",
+  asyncHandler(async (req, res) => {
+    const name = String(req.body?.name ?? "").trim()
+    if (!name) throw new AppError(400, "name 必填")
+    const targetAmount = Number(req.body?.targetAmount ?? 0)
+    if (!(targetAmount > 0)) throw new AppError(400, "targetAmount 需為正數")
+    const emoji = String(req.body?.emoji ?? "🏆").slice(0, 8)
+    const description = req.body?.description ? String(req.body.description).slice(0, 500) : null
+    const [created] = await db
+      .insert(familyPots)
+      .values({
+        name,
+        emoji,
+        targetAmount: targetAmount.toFixed(2),
+        description,
+      })
+      .returning()
+    res.status(201).json(created)
+  })
+)
+
+router.post(
+  "/api/family/pots/:id/contribute",
+  asyncHandler(async (req, res) => {
+    const id = Number(req.params.id)
+    const kidIdN = Number(req.body?.kidId)
+    const amount = Number(req.body?.amount)
+    if (!Number.isInteger(id) || id < 1) throw new AppError(400, "無效 potId")
+    if (!kidIdN) throw new AppError(400, "kidId 必填")
+    if (!(amount > 0)) throw new AppError(400, "amount 需為正數")
+
+    const [pot] = await db.select().from(familyPots).where(eq(familyPots.id, id)).limit(1)
+    if (!pot) throw new AppError(404, "罐子不存在")
+    if (pot.status !== "active") throw new AppError(400, "罐子非進行中")
+
+    const [jar] = await db.select().from(kidsJars).where(eq(kidsJars.kidId, kidIdN)).limit(1)
+    if (!jar) throw new AppError(404, "小孩罐子不存在")
+    const saveBal = parseFloat(jar.saveBalance)
+    if (saveBal < amount) throw new AppError(400, `存錢罐餘額 $${saveBal} 不足 $${amount}`)
+
+    // 扣 save 罐
+    await db.execute(sql`
+      UPDATE kids_jars SET save_balance = save_balance - ${amount.toFixed(2)}::numeric,
+                            updated_at = NOW()
+      WHERE kid_id = ${kidIdN}
+    `)
+    // 加到 pot
+    const newCurrent = parseFloat(pot.currentAmount) + amount
+    const reached = newCurrent >= parseFloat(pot.targetAmount)
+    const [updatedPot] = await db
+      .update(familyPots)
+      .set({
+        currentAmount: newCurrent.toFixed(2),
+        status: reached ? "completed" : "active",
+        completedAt: reached ? new Date() : null,
+        updatedAt: new Date(),
+      })
+      .where(eq(familyPots.id, id))
+      .returning()
+    // 記貢獻
+    await db
+      .insert(familyPotContributions)
+      .values({ potId: id, kidId: kidIdN, amount: amount.toFixed(2) })
+
+    res.json({ ok: true, pot: updatedPot, reached })
+  })
+)
+
+router.post(
+  "/api/family/pots/:id/complete",
+  asyncHandler(async (req, res) => {
+    const id = Number(req.params.id)
+    if (!Number.isInteger(id) || id < 1) throw new AppError(400, "無效 potId")
+    const [pot] = await db.select().from(familyPots).where(eq(familyPots.id, id)).limit(1)
+    if (!pot) throw new AppError(404, "罐子不存在")
+    if (pot.status === "completed") throw new AppError(400, "已完成")
+    const [updated] = await db
+      .update(familyPots)
+      .set({ status: "completed", completedAt: new Date(), updatedAt: new Date() })
+      .where(eq(familyPots.id, id))
+      .returning()
+    res.json({ ok: true, pot: updated })
+  })
+)
+
+router.delete(
+  "/api/family/pots/:id",
+  asyncHandler(async (req, res) => {
+    const id = Number(req.params.id)
+    if (!Number.isInteger(id) || id < 1) throw new AppError(400, "無效 potId")
+    const deleted = await db
+      .delete(familyPots)
+      .where(eq(familyPots.id, id))
+      .returning({ id: familyPots.id })
+    if (deleted.length === 0) throw new AppError(404, "罐子不存在")
+    res.json({ ok: true })
   })
 )
 

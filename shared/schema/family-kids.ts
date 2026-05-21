@@ -280,6 +280,50 @@ export const kidsCheckins = pgTable(
 )
 
 // ============================================================
+// 家庭共同存錢罐（全家為一個目標一起存、家庭儀式感）
+// 每個小孩可貢獻（從 save 罐扣）、完成後家長宣告達成
+// ============================================================
+export const familyPots = pgTable(
+  "family_pots",
+  {
+    id: serial("id").primaryKey(),
+    familyId: integer("family_id").default(1),
+    name: varchar("name", { length: 100 }).notNull(),
+    emoji: varchar("emoji", { length: 8 }).default("🏆"),
+    targetAmount: decimal("target_amount", { precision: 10, scale: 2 }).notNull(),
+    currentAmount: decimal("current_amount", { precision: 10, scale: 2 }).notNull().default("0"),
+    status: varchar("status", { length: 20 }).notNull().default("active"),
+    // active / completed / abandoned
+    description: text("description"),
+    completedAt: timestamp("completed_at"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (table) => ({
+    familyIdx: index("family_pots_family_idx").on(table.familyId, table.status),
+  })
+)
+
+// 家庭共同罐貢獻紀錄（誰貢獻多少）
+export const familyPotContributions = pgTable(
+  "family_pot_contributions",
+  {
+    id: serial("id").primaryKey(),
+    potId: integer("pot_id")
+      .notNull()
+      .references(() => familyPots.id, { onDelete: "cascade" }),
+    kidId: integer("kid_id")
+      .notNull()
+      .references(() => kidsAccounts.id, { onDelete: "cascade" }),
+    amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => ({
+    potIdx: index("family_pot_contributions_pot_idx").on(table.potId),
+  })
+)
+
+// ============================================================
 // 捐贈對象目錄（家長預設常用對象、小孩 give 時下拉選）
 // 培養理財認知：知道錢的去向、誰需要幫助
 // ============================================================
@@ -397,6 +441,8 @@ export type InsertKidsSpending = z.infer<typeof insertKidsSpendingSchema>
 export type KidsDailyMessage = typeof kidsDailyMessages.$inferSelect
 export type FamilyTaskTemplate = typeof familyTaskTemplates.$inferSelect
 export type FamilyRecipient = typeof familyRecipients.$inferSelect
+export type FamilyPot = typeof familyPots.$inferSelect
+export type FamilyPotContribution = typeof familyPotContributions.$inferSelect
 export type KidsCheckin = typeof kidsCheckins.$inferSelect
 export type KidsWish = typeof kidsWishes.$inferSelect
 export type KidsTaskComment = typeof kidsTaskComments.$inferSelect
