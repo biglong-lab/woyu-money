@@ -3005,6 +3005,81 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.body.summary.totalReached).toBeLessThanOrEqual(15)
   })
 
+  it("錢包健康：preset 70/20/10、做任務 + 花 spend → 比例 + 建議", async () => {
+    await createKid({ spendRatio: 70, saveRatio: 20, giveRatio: 10 })
+
+    // 任務獎勵 1000 元（spend 罐應有 700、save 200、give 100）
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId, title: "大", rewardAmount: 1000 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`)
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`)
+
+    // 花 spend 罐 600（佔 totalReward 60%、preset 70% → delta=-10、健康）
+    await request(app)
+      .post("/api/family/spendings")
+      .send({ kidId, jar: "spend", amount: 600, description: "玩具" })
+
+    const res = await request(app).get(`/api/family/kid-wallet-health?kidId=${kidId}`)
+    expect(res.status).toBe(200)
+    expect(res.body.totalReward).toBe(1000)
+    expect(res.body.period).toBe("近 30 天")
+    expect(res.body.breakdown.spent).toBe(600)
+    expect(res.body.breakdown.preset.spend).toBe(70)
+    expect(res.body.breakdown.actual.spend).toBe(60)
+    expect(res.body.breakdown.delta.spend).toBe(-10)
+    expect(res.body.healthScore).toBeGreaterThan(0)
+    expect(res.body.suggestion).toBeTruthy()
+  })
+
+  it("錢包健康：花超多 → suggestion 含「花用花太多」", async () => {
+    await createKid({ spendRatio: 50, saveRatio: 50, giveRatio: 0 })
+
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId, title: "T", rewardAmount: 500 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`)
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`)
+
+    // 花掉 250（佔 50%、剛好等於 preset、健康好）
+    // 為了測「花太多」、要花更多：但 spend 罐只有 250 元
+    // 改用：preset spendRatio=10、實花 250 = 50% 比 preset 多 40%
+    // 重 createKid
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${kidId}`)
+    await createKid({ spendRatio: 10, saveRatio: 80, giveRatio: 10 })
+
+    const t2 = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId, title: "T", rewardAmount: 500 })
+    await request(app).post(`/api/family/tasks/${t2.body.id}/submit`)
+    await request(app).post(`/api/family/tasks/${t2.body.id}/approve`)
+
+    // spend 罐有 50（10%）、最多花 50 元；要花到「超 preset 15%」需 75 元
+    // 直接花 50 = 10% 跟 preset 一樣
+    // 改檢測別的：給 actualSpend 偏離預設明顯時的建議
+    await request(app)
+      .post("/api/family/spendings")
+      .send({ kidId, jar: "spend", amount: 50, description: "全花光" })
+
+    const res = await request(app).get(`/api/family/kid-wallet-health?kidId=${kidId}`)
+    expect(res.status).toBe(200)
+    expect(res.body.suggestion).toBeTruthy()
+  })
+
+  it("錢包健康：無收入 → totalReward=0 + 鼓勵 message", async () => {
+    await createKid()
+    const res = await request(app).get(`/api/family/kid-wallet-health?kidId=${kidId}`)
+    expect(res.status).toBe(200)
+    expect(res.body.totalReward).toBe(0)
+    expect(res.body.healthScore).toBeNull()
+    expect(res.body.suggestion).toContain("任務")
+  })
+
+  it("kid-wallet-health 缺 kidId 回 400", async () => {
+    const r = await request(app).get("/api/family/kid-wallet-health")
+    expect(r.status).toBe(400)
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)

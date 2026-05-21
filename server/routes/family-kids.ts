@@ -2875,6 +2875,133 @@ router.get(
 )
 
 /**
+ * GET /api/family/kid-wallet-health?kidId=
+ * 小孩錢包健康分析：實際支出 vs preset 比較
+ *
+ * 邏輯：
+ *   - 近 30 天 jar=spend 總額（實際花掉）
+ *   - 近 30 天 task reward × preset 各比（理論收入）
+ *   - actualSpendRatio = spentAmount / totalReward × 100
+ *   - presetSpendRatio = kid.spendRatio
+ *   - delta = actualSpendRatio - presetSpendRatio
+ *   - healthScore：偏離 preset 越多扣越多分
+ */
+router.get(
+  "/api/family/kid-wallet-health",
+  asyncHandler(async (req, res) => {
+    const kidIdQ = Number(req.query.kidId)
+    if (!Number.isInteger(kidIdQ) || kidIdQ < 1) throw new AppError(400, "需傳 kidId")
+
+    const [kid] = await db.select().from(kidsAccounts).where(eq(kidsAccounts.id, kidIdQ)).limit(1)
+    if (!kid) throw new AppError(404, "小孩不存在")
+
+    const [rewardRows, spentRows, savedRows, givenRows] = await Promise.all([
+      db.execute(sql`
+        SELECT COALESCE(SUM(reward_amount::numeric), 0)::numeric AS s
+        FROM kids_tasks
+        WHERE kid_id = ${kidIdQ} AND status = 'approved'
+          AND completed_at >= NOW() - INTERVAL '30 days'
+      `),
+      db.execute(sql`
+        SELECT COALESCE(SUM(amount::numeric), 0)::numeric AS s
+        FROM kids_spendings
+        WHERE kid_id = ${kidIdQ} AND jar = 'spend'
+          AND spend_date >= CURRENT_DATE - INTERVAL '30 days'
+      `),
+      db.execute(sql`
+        SELECT COALESCE(SUM(amount::numeric), 0)::numeric AS s
+        FROM kids_spendings
+        WHERE kid_id = ${kidIdQ} AND jar = 'save'
+          AND spend_date >= CURRENT_DATE - INTERVAL '30 days'
+      `),
+      db.execute(sql`
+        SELECT COALESCE(SUM(amount::numeric), 0)::numeric AS s
+        FROM kids_spendings
+        WHERE kid_id = ${kidIdQ} AND jar = 'give'
+          AND spend_date >= CURRENT_DATE - INTERVAL '30 days'
+      `),
+    ])
+
+    const totalReward = Number(
+      String((rewardRows as unknown as { rows: { s: string | number }[] }).rows[0]?.s ?? 0)
+    )
+    const spent = Number(
+      String((spentRows as unknown as { rows: { s: string | number }[] }).rows[0]?.s ?? 0)
+    )
+    const saved = Number(
+      String((savedRows as unknown as { rows: { s: string | number }[] }).rows[0]?.s ?? 0)
+    )
+    const given = Number(
+      String((givenRows as unknown as { rows: { s: string | number }[] }).rows[0]?.s ?? 0)
+    )
+
+    if (totalReward === 0) {
+      return res.json({
+        kidId: kidIdQ,
+        period: "近 30 天",
+        totalReward: 0,
+        breakdown: null,
+        healthScore: null,
+        suggestion: "近 30 天還沒收入、先做任務累積看看吧！",
+      })
+    }
+
+    // 實際比例（佔 totalReward 的百分比）
+    const actualSpend = Math.round((spent / totalReward) * 100)
+    const actualSave = Math.round((saved / totalReward) * 100)
+    const actualGive = Math.round((given / totalReward) * 100)
+
+    const preset = {
+      spend: kid.spendRatio,
+      save: kid.saveRatio,
+      give: kid.giveRatio,
+    }
+    const actual = { spend: actualSpend, save: actualSave, give: actualGive }
+    const delta = {
+      spend: actualSpend - preset.spend,
+      save: actualSave - preset.save,
+      give: actualGive - preset.give,
+    }
+
+    // 健康分數：每個 ratio 偏離超過 preset 的 abs 累加扣分
+    // 100 - sum(|delta|) / 3
+    const totalDeviation = Math.abs(delta.spend) + Math.abs(delta.save) + Math.abs(delta.give)
+    const healthScore = Math.max(0, Math.min(100, 100 - Math.round(totalDeviation / 3)))
+
+    let suggestion: string
+    if (healthScore >= 85) {
+      suggestion = "🌟 完美！實際支出跟預設比例幾乎一致！"
+    } else if (healthScore >= 70) {
+      suggestion = "👍 不錯！偶爾偏一點點正常"
+    } else if (delta.spend > 15) {
+      suggestion = `⚠️ 花用花太多了（多花 ${delta.spend}%）、試試把錢移到存錢罐`
+    } else if (delta.save < -15) {
+      suggestion = `🐷 存得比預設少（少存 ${Math.abs(delta.save)}%）、加油存！`
+    } else if (delta.give < -10) {
+      suggestion = `❤️ 捐贈比預設少（少捐 ${Math.abs(delta.give)}%）、可以多幫助別人`
+    } else {
+      suggestion = "📊 比例偏離一些、調整看看 spend/save/give 比"
+    }
+
+    res.json({
+      kidId: kidIdQ,
+      period: "近 30 天",
+      totalReward,
+      breakdown: {
+        spent,
+        saved,
+        given,
+        preset,
+        actual,
+        delta,
+      },
+      healthScore,
+      suggestion,
+    })
+  })
+)
+
+/**
  * GET /api/family/milestones
  * 家庭里程碑紀錄（全家共同達成）
  * 5 大 tracks × 3 階里程碑、看達成/剩多少

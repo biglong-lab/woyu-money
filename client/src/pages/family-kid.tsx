@@ -1019,6 +1019,9 @@ function KidDashboard({
       {/* 個人最佳紀錄牆 */}
       <KidBestsWall kidId={kidId} />
 
+      {/* 錢包健康分析 */}
+      <KidWalletHealthCard kidId={kidId} />
+
       {/* 能力強項統計 */}
       <KidStrengthsCard kidId={kidId} />
 
@@ -2282,6 +2285,92 @@ function KidStrengthsCard({ kidId }: { kidId: number }) {
           )
         })}
       </div>
+    </div>
+  )
+}
+
+function KidWalletHealthCard({ kidId }: { kidId: number }) {
+  const { data } = useQuery<{
+    totalReward: number
+    breakdown: {
+      spent: number
+      saved: number
+      given: number
+      preset: { spend: number; save: number; give: number }
+      actual: { spend: number; save: number; give: number }
+      delta: { spend: number; save: number; give: number }
+    } | null
+    healthScore: number | null
+    suggestion: string
+  }>({
+    queryKey: ["/api/family/kid-wallet-health", kidId],
+    queryFn: async () => {
+      const res = await fetch(`/api/family/kid-wallet-health?kidId=${kidId}`, {
+        credentials: "include",
+      })
+      return res.json()
+    },
+  })
+  if (!data || data.totalReward === 0 || !data.breakdown) return null
+
+  const { breakdown, healthScore } = data
+  const score = healthScore ?? 0
+  const color =
+    score >= 85
+      ? "text-emerald-700 border-emerald-300 bg-emerald-50"
+      : score >= 70
+        ? "text-blue-700 border-blue-300 bg-blue-50"
+        : score >= 50
+          ? "text-amber-700 border-amber-300 bg-amber-50"
+          : "text-rose-700 border-rose-300 bg-rose-50"
+
+  function deltaTag(d: number) {
+    if (d === 0) return ""
+    return d > 0 ? `+${d}%` : `${d}%`
+  }
+
+  return (
+    <div className={`mb-4 rounded-2xl border-2 p-4 shadow ${color}`}>
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="font-bold flex items-center gap-2">💼 錢包健康</h3>
+        <div className="text-right">
+          <div className="text-xs opacity-70">健康分數</div>
+          <div className="text-2xl font-bold">{score}</div>
+        </div>
+      </div>
+
+      {/* 3 罐：preset vs actual */}
+      <div className="space-y-2 mb-2">
+        {[
+          { key: "spend", emoji: "💸", name: "花用" },
+          { key: "save", emoji: "🐷", name: "存錢" },
+          { key: "give", emoji: "❤️", name: "捐獻" },
+        ].map((j) => {
+          const preset = breakdown.preset[j.key as "spend" | "save" | "give"]
+          const actual = breakdown.actual[j.key as "spend" | "save" | "give"]
+          const delta = breakdown.delta[j.key as "spend" | "save" | "give"]
+          return (
+            <div key={j.key} className="bg-white/70 rounded-lg p-2">
+              <div className="flex items-center justify-between text-sm">
+                <span>
+                  {j.emoji} {j.name}
+                </span>
+                <span className="text-xs">
+                  預設 {preset}% / 實際 {actual}%
+                  {delta !== 0 && (
+                    <b className={delta > 0 ? "text-rose-600 ml-1" : "text-amber-600 ml-1"}>
+                      （{deltaTag(delta)}）
+                    </b>
+                  )}
+                </span>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* 建議 */}
+      <div className="text-sm bg-white/70 rounded px-3 py-2 font-medium">{data.suggestion}</div>
     </div>
   )
 }
