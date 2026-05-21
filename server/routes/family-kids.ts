@@ -8602,6 +8602,96 @@ async function bulkApproveOne(
 }
 
 /**
+ * GET /api/family/time-of-day?days=30
+ * 全家任務過去 N 天的 4 時段分佈（morning/afternoon/evening/late）
+ */
+router.get(
+  "/api/family/time-of-day",
+  asyncHandler(async (req, res) => {
+    const days = Math.min(Math.max(Number(req.query.days) || 30, 1), 90)
+
+    const rows = await db.execute(sql`
+      WITH t AS (
+        SELECT completed_at AT TIME ZONE 'Asia/Taipei' AS ts
+        FROM kids_tasks
+        WHERE status = 'approved'
+          AND completed_at >= CURRENT_DATE - (${days}::int * INTERVAL '1 day')
+      )
+      SELECT
+        SUM(CASE WHEN EXTRACT(HOUR FROM ts) >= 6 AND EXTRACT(HOUR FROM ts) < 12 THEN 1 ELSE 0 END)::int AS morning,
+        SUM(CASE WHEN EXTRACT(HOUR FROM ts) >= 12 AND EXTRACT(HOUR FROM ts) < 18 THEN 1 ELSE 0 END)::int AS afternoon,
+        SUM(CASE WHEN EXTRACT(HOUR FROM ts) >= 18 AND EXTRACT(HOUR FROM ts) < 22 THEN 1 ELSE 0 END)::int AS evening,
+        SUM(CASE WHEN EXTRACT(HOUR FROM ts) >= 22 OR EXTRACT(HOUR FROM ts) < 6 THEN 1 ELSE 0 END)::int AS late,
+        COUNT(*)::int AS total
+      FROM t
+    `)
+    const row = (
+      rows as unknown as {
+        rows: Array<{
+          morning: number
+          afternoon: number
+          evening: number
+          late: number
+          total: number
+        }>
+      }
+    ).rows[0]
+
+    const slots = {
+      morning: row?.morning ?? 0,
+      afternoon: row?.afternoon ?? 0,
+      evening: row?.evening ?? 0,
+      late: row?.late ?? 0,
+    }
+    const total = row?.total ?? 0
+
+    const SLOT_LABELS: Record<string, string> = {
+      morning: "🌅 早晨 6-12",
+      afternoon: "☀️ 下午 12-18",
+      evening: "🌆 晚上 18-22",
+      late: "🌙 深夜 22-6",
+    }
+
+    let dominantSlot: "morning" | "afternoon" | "evening" | "late" | null = null
+    let dominantCount = -1
+    for (const key of Object.keys(slots) as Array<keyof typeof slots>) {
+      if (slots[key] > dominantCount) {
+        dominantCount = slots[key]
+        dominantSlot = key
+      }
+    }
+
+    let message: string
+    if (total === 0) {
+      message = `過去 ${days} 天還沒任務完成、開始第一個吧！`
+      dominantSlot = null
+    } else if (dominantSlot === "morning") {
+      message = `🌅 家裡是早鳥型！${dominantCount} 個任務在早晨完成`
+    } else if (dominantSlot === "afternoon") {
+      message = `☀️ 家裡下午最活躍（${dominantCount} 個任務）`
+    } else if (dominantSlot === "evening") {
+      message = `🌆 家裡晚上是黃金時段（${dominantCount} 個任務）`
+    } else {
+      message = `🌙 家裡深夜還在做任務（${dominantCount} 個）、注意休息`
+    }
+
+    res.json({
+      days,
+      slots,
+      slotsLabeled: {
+        morning: { label: SLOT_LABELS.morning, count: slots.morning },
+        afternoon: { label: SLOT_LABELS.afternoon, count: slots.afternoon },
+        evening: { label: SLOT_LABELS.evening, count: slots.evening },
+        late: { label: SLOT_LABELS.late, count: slots.late },
+      },
+      total,
+      dominantSlot,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/kid-growth-stage?kidId=
  * 個別小孩成長階段（綜合資歷 / 任務 / 打卡 / 目標完成）
  * stage: newbie / learner / regular / veteran / legend

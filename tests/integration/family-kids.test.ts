@@ -4245,6 +4245,39 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.body.weeks).toBe(52)
   })
 
+  it("家庭時段：基本結構 slots/total/dominantSlot/message", async () => {
+    const res = await request(app).get("/api/family/time-of-day")
+    expect(res.status).toBe(200)
+    expect(res.body.slots).toHaveProperty("morning")
+    expect(res.body.slots).toHaveProperty("afternoon")
+    expect(res.body.slots).toHaveProperty("evening")
+    expect(res.body.slots).toHaveProperty("late")
+    expect(res.body.slotsLabeled.morning).toHaveProperty("label")
+    expect(res.body.message).toBeTruthy()
+  })
+
+  it("家庭時段：完成 task 後 total>=1 + 有 dominantSlot", async () => {
+    const kidObj = (await createKid()) as { id: number }
+    const myKidId = kidObj.id
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId: myKidId, title: "時段測試", rewardAmount: 30 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`).send({})
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`).send({})
+    const res = await request(app).get("/api/family/time-of-day?days=7")
+    expect(res.status).toBe(200)
+    expect(res.body.total).toBeGreaterThanOrEqual(1)
+    expect(res.body.dominantSlot).not.toBeNull()
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
+  it("家庭時段：days clamp 1-90", async () => {
+    const r1 = await request(app).get("/api/family/time-of-day?days=200")
+    expect(r1.body.days).toBe(90)
+    const r2 = await request(app).get("/api/family/time-of-day?days=0")
+    expect(r2.body.days).toBe(30)
+  })
+
   it("成長階段：新小孩 → stage=newbie + score=0", async () => {
     const kidObj = (await createKid()) as { id: number }
     const myKidId = kidObj.id

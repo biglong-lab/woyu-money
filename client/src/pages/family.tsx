@@ -499,6 +499,9 @@ export default function FamilyPage() {
       {/* 家庭整體 streak */}
       <FamilyActivityStreakCard />
 
+      {/* 家庭時段熱圖 */}
+      <FamilyTimeOfDayCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3453,6 +3456,51 @@ function ParentTodoList() {
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
       )}
+    </div>
+  )
+}
+
+function FamilyTimeOfDayCard() {
+  const { data } = useQuery<{
+    days: number
+    slotsLabeled: Record<string, { label: string; count: number }>
+    total: number
+    dominantSlot: "morning" | "afternoon" | "evening" | "late" | null
+    message: string
+  }>({
+    queryKey: ["/api/family/time-of-day?days=30"],
+  })
+  if (!data || data.total === 0) return null
+
+  const max = Math.max(...Object.values(data.slotsLabeled).map((s) => s.count), 1)
+
+  const order: Array<keyof typeof data.slotsLabeled> = ["morning", "afternoon", "evening", "late"]
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-indigo-300 bg-gradient-to-br from-indigo-50 to-violet-50 p-3 shadow">
+      <h3 className="font-bold mb-2 flex items-center gap-2">🕐 家庭活躍時段（30 天）</h3>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-2 text-xs">{data.message}</div>
+
+      <div className="space-y-1">
+        {order.map((k) => {
+          const slot = data.slotsLabeled[k]
+          const ratio = (slot.count / max) * 100
+          const isDom = data.dominantSlot === k
+          return (
+            <div key={k} className="flex items-center gap-2">
+              <div className="w-24 text-xs">{slot.label}</div>
+              <div className="flex-1 h-4 bg-white rounded overflow-hidden">
+                <div
+                  className={`h-full ${isDom ? "bg-indigo-600" : "bg-indigo-400"}`}
+                  style={{ width: `${Math.max(ratio, 2)}%` }}
+                />
+              </div>
+              <div className="w-8 text-right text-xs font-bold">{slot.count}</div>
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }
