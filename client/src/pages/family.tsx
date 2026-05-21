@@ -440,6 +440,9 @@ export default function FamilyPage() {
         </div>
       )}
 
+      {/* 家庭今日重點（最頂部）*/}
+      <FamilyTodaySummary />
+
       {/* 跨域搜尋 */}
       <FamilySearch />
 
@@ -2482,6 +2485,107 @@ function FamilyActivityFeed() {
         >
           {expanded ? "收起" : `看更多 (${acts.length - 6} 筆)`}
         </button>
+      )}
+    </div>
+  )
+}
+
+function FamilyTodaySummary() {
+  const { data } = useQuery<{
+    date: string
+    stats: {
+      approvedToday: number
+      rewardToday: number
+      spentToday: number
+      givenToday: number
+      pendingTasks: number
+      checkinsToday: number
+      newWishes: number
+    }
+    kids: Array<{
+      kidId: number
+      kidName: string
+      avatar: string
+      tasks: number
+      spent: number
+      checkedIn: boolean
+    }>
+    highlights: string[]
+  }>({
+    queryKey: ["/api/family/today-summary"],
+    queryFn: async () => {
+      const res = await fetch("/api/family/today-summary", { credentials: "include" })
+      return res.json()
+    },
+  })
+  if (!data) return null
+
+  const hasActivity =
+    data.stats.approvedToday > 0 ||
+    data.stats.pendingTasks > 0 ||
+    data.stats.checkinsToday > 0 ||
+    data.kids.length > 0
+  if (!hasActivity) return null
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-violet-300 bg-gradient-to-br from-violet-50 to-fuchsia-50 p-4 shadow">
+      <h3 className="font-bold text-violet-900 mb-3 flex items-center gap-2">🌅 今日重點</h3>
+
+      {/* 4 個快速 KPI */}
+      <div className="grid grid-cols-4 gap-2 mb-3">
+        <div className="bg-white rounded-lg p-2 text-center shadow-sm">
+          <div className="text-xl font-bold text-emerald-700">{data.stats.approvedToday}</div>
+          <div className="text-xs text-gray-500">已完成</div>
+        </div>
+        <div
+          className={`rounded-lg p-2 text-center shadow-sm ${
+            data.stats.pendingTasks > 0 ? "bg-amber-100" : "bg-white"
+          }`}
+        >
+          <div className="text-xl font-bold text-amber-700">{data.stats.pendingTasks}</div>
+          <div className="text-xs text-gray-500">待審核</div>
+        </div>
+        <div className="bg-white rounded-lg p-2 text-center shadow-sm">
+          <div className="text-xl font-bold text-blue-700">${data.stats.rewardToday}</div>
+          <div className="text-xs text-gray-500">今日獎勵</div>
+        </div>
+        <div className="bg-white rounded-lg p-2 text-center shadow-sm">
+          <div className="text-xl font-bold text-pink-700">{data.stats.checkinsToday}</div>
+          <div className="text-xs text-gray-500">打卡數</div>
+        </div>
+      </div>
+
+      {/* highlights */}
+      {data.highlights.length > 0 && (
+        <div className="space-y-1 mb-3">
+          {data.highlights.map((h, i) => (
+            <div
+              key={i}
+              className="text-sm bg-white/70 rounded px-2 py-1 text-violet-800 font-medium"
+            >
+              {h}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* 每個 kid 今日狀態 */}
+      {data.kids.length > 0 && (
+        <div className="flex gap-1 flex-wrap">
+          {data.kids.map((k) => (
+            <div
+              key={k.kidId}
+              className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs ${
+                k.checkedIn ? "bg-emerald-100 text-emerald-700" : "bg-gray-100 text-gray-600"
+              }`}
+            >
+              <span className="text-base">{k.avatar}</span>
+              <span className="font-bold">{k.kidName}</span>
+              <span>{k.tasks} 任務</span>
+              {k.checkedIn && <span>✓</span>}
+            </div>
+          ))}
+        </div>
       )}
     </div>
   )

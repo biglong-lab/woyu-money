@@ -2875,6 +2875,130 @@ router.get(
 )
 
 /**
+ * GET /api/family/today-summary
+ * 家庭今日重點（家長端、一頁看今日全家動態）
+ * 今日全家：完成任務數 / 收入 / 花費 / 待審核 / 打卡數 / 各小孩活動
+ */
+router.get(
+  "/api/family/today-summary",
+  asyncHandler(async (_req, res) => {
+    const [
+      approvedToday,
+      rewardToday,
+      spentToday,
+      givenToday,
+      pendingTasks,
+      checkinsToday,
+      newWishes,
+      perKid,
+    ] = await Promise.all([
+      db.execute(sql`
+        SELECT COUNT(*)::int AS n FROM kids_tasks
+        WHERE status = 'approved' AND DATE(completed_at) = CURRENT_DATE
+      `),
+      db.execute(sql`
+        SELECT COALESCE(SUM(reward_amount::numeric), 0)::numeric AS s
+        FROM kids_tasks
+        WHERE status = 'approved' AND DATE(completed_at) = CURRENT_DATE
+      `),
+      db.execute(sql`
+        SELECT COALESCE(SUM(amount::numeric), 0)::numeric AS s
+        FROM kids_spendings WHERE jar = 'spend' AND spend_date = CURRENT_DATE
+      `),
+      db.execute(sql`
+        SELECT COALESCE(SUM(amount::numeric), 0)::numeric AS s
+        FROM kids_spendings WHERE jar = 'give' AND spend_date = CURRENT_DATE
+      `),
+      db.execute(sql`
+        SELECT COUNT(*)::int AS n FROM kids_tasks WHERE status = 'submitted'
+      `),
+      db.execute(sql`
+        SELECT COUNT(DISTINCT kid_id)::int AS n FROM kids_checkins
+        WHERE checkin_date = CURRENT_DATE
+      `),
+      db.execute(sql`
+        SELECT COUNT(*)::int AS n FROM kids_wishes
+        WHERE DATE(created_at) = CURRENT_DATE
+      `),
+      db.execute(sql`
+        SELECT
+          ka.id::int AS kid_id,
+          ka.display_name AS kid_name,
+          ka.avatar,
+          COALESCE((
+            SELECT COUNT(*)::int FROM kids_tasks
+            WHERE kid_id = ka.id AND status = 'approved'
+              AND DATE(completed_at) = CURRENT_DATE
+          ), 0) AS tasks,
+          COALESCE((
+            SELECT SUM(amount::numeric)::numeric FROM kids_spendings
+            WHERE kid_id = ka.id AND spend_date = CURRENT_DATE
+          ), 0) AS spent,
+          CASE WHEN EXISTS (
+            SELECT 1 FROM kids_checkins
+            WHERE kid_id = ka.id AND checkin_date = CURRENT_DATE
+          ) THEN true ELSE false END AS checked_in
+        FROM kids_accounts ka
+        WHERE ka.is_active = true
+        ORDER BY tasks DESC, ka.id ASC
+      `),
+    ])
+
+    const stats = {
+      approvedToday: (approvedToday as unknown as { rows: { n: number }[] }).rows[0]?.n ?? 0,
+      rewardToday: Number(
+        String((rewardToday as unknown as { rows: { s: string | number }[] }).rows[0]?.s ?? 0)
+      ),
+      spentToday: Number(
+        String((spentToday as unknown as { rows: { s: string | number }[] }).rows[0]?.s ?? 0)
+      ),
+      givenToday: Number(
+        String((givenToday as unknown as { rows: { s: string | number }[] }).rows[0]?.s ?? 0)
+      ),
+      pendingTasks: (pendingTasks as unknown as { rows: { n: number }[] }).rows[0]?.n ?? 0,
+      checkinsToday: (checkinsToday as unknown as { rows: { n: number }[] }).rows[0]?.n ?? 0,
+      newWishes: (newWishes as unknown as { rows: { n: number }[] }).rows[0]?.n ?? 0,
+    }
+
+    const kids = (
+      perKid as unknown as {
+        rows: {
+          kid_id: number
+          kid_name: string
+          avatar: string
+          tasks: number
+          spent: string | number
+          checked_in: boolean
+        }[]
+      }
+    ).rows.map((r) => ({
+      kidId: r.kid_id,
+      kidName: r.kid_name,
+      avatar: r.avatar,
+      tasks: r.tasks ?? 0,
+      spent: Number(r.spent ?? 0),
+      checkedIn: r.checked_in ?? false,
+    }))
+
+    // 「今日亮點」自動偵測（給家長 quick scan）
+    const highlights: string[] = []
+    if (stats.pendingTasks > 0) highlights.push(`⏳ 有 ${stats.pendingTasks} 個任務待您審核`)
+    if (stats.approvedToday >= 5)
+      highlights.push(`🌟 今天家裡好忙！${stats.approvedToday} 個任務完成`)
+    if (stats.givenToday > 0) highlights.push(`❤️ 今日家庭捐贈 $${stats.givenToday}`)
+    if (stats.checkinsToday === kids.length && kids.length > 0) highlights.push("📅 全家都打卡了！")
+    if (stats.newWishes > 0) highlights.push(`✨ 新增 ${stats.newWishes} 個願望`)
+
+    res.json({
+      date: new Date().toISOString().slice(0, 10),
+      stats,
+      kids,
+      highlights,
+    })
+  })
+)
+
+/**
  * GET /api/family/kid-donation-recipients?kidId=
  * 小孩捐贈受贈方統計（看給誰最多、培養同理心）
  * 從 kids_spendings WHERE jar='give' AND recipient IS NOT NULL GROUP BY

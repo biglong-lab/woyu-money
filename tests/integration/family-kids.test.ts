@@ -3311,6 +3311,54 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(r.status).toBe(400)
   })
 
+  it("今日重點：今日任務 + spending + 打卡 → stats + highlights", async () => {
+    // 清乾淨
+    await db.execute(sql`DELETE FROM kids_accounts WHERE pin = ${TEST_PIN}`)
+    await createKid()
+
+    // 今日做 2 個任務（其中 1 個 submitted 等審核）
+    const t1 = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId, title: "T1", rewardAmount: 50 })
+    await request(app).post(`/api/family/tasks/${t1.body.id}/submit`)
+    await request(app).post(`/api/family/tasks/${t1.body.id}/approve`)
+
+    const t2 = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId, title: "T2", rewardAmount: 30 })
+    await request(app).post(`/api/family/tasks/${t2.body.id}/submit`) // submitted 但不 approve
+
+    // 今日打卡
+    await request(app).post("/api/family/checkins").send({ kidId, mood: "😄 開心" })
+
+    const res = await request(app).get("/api/family/today-summary")
+    expect(res.status).toBe(200)
+    expect(res.body.date).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+
+    expect(res.body.stats.approvedToday).toBeGreaterThanOrEqual(1)
+    expect(res.body.stats.rewardToday).toBeGreaterThanOrEqual(50)
+    expect(res.body.stats.pendingTasks).toBeGreaterThanOrEqual(1)
+    expect(res.body.stats.checkinsToday).toBeGreaterThanOrEqual(1)
+
+    // highlights 含「待審核」
+    expect(res.body.highlights.join("|")).toContain("待您審核")
+
+    // 每個 kid 有 checkedIn / tasks
+    const kid = res.body.kids.find((k: { kidId: number }) => k.kidId === kidId)
+    expect(kid).toBeTruthy()
+    expect(kid.tasks).toBeGreaterThanOrEqual(1)
+    expect(kid.checkedIn).toBe(true)
+  })
+
+  it("今日重點：無活動 → stats 全 0、highlights 可空", async () => {
+    await db.execute(sql`DELETE FROM kids_accounts WHERE pin = ${TEST_PIN}`)
+    const res = await request(app).get("/api/family/today-summary")
+    expect(res.status).toBe(200)
+    expect(res.body.stats.approvedToday).toBe(0)
+    expect(res.body.kids).toEqual([])
+    expect(Array.isArray(res.body.highlights)).toBe(true)
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)
