@@ -4245,6 +4245,31 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.body.weeks).toBe(52)
   })
 
+  it("目標直方圖：基本結構 buckets/stats/pattern", async () => {
+    const res = await request(app).get("/api/family/goal-amount-histogram")
+    expect(res.status).toBe(200)
+    expect(res.body.buckets).toHaveLength(5)
+    expect(res.body.stats).toHaveProperty("total")
+    expect(["modest", "balanced", "ambitious", "no_data"]).toContain(res.body.pattern)
+    expect(res.body.message).toBeTruthy()
+  })
+
+  it("目標直方圖：建 1 個 $500 goal → bucket medium=1", async () => {
+    const kidObj = (await createKid()) as { id: number }
+    const myKidId = kidObj.id
+    await request(app).post("/api/family/goals").send({
+      kidId: myKidId,
+      name: "中等目標",
+      targetAmount: 500,
+    })
+    const res = await request(app).get("/api/family/goal-amount-histogram")
+    expect(res.status).toBe(200)
+    const medium = res.body.buckets.find((b: { range: string }) => b.range === "medium")
+    expect(medium.count).toBeGreaterThanOrEqual(1)
+    expect(res.body.stats.active).toBeGreaterThanOrEqual(1)
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
   it("Task 處理時長：基本結構 kids/familyAvg/message", async () => {
     const res = await request(app).get("/api/family/task-duration")
     expect(res.status).toBe(200)

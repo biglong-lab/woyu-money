@@ -556,6 +556,9 @@ export default function FamilyPage() {
       {/* 家庭 task 處理時長 */}
       <FamilyTaskDurationCard />
 
+      {/* 家庭目標金額直方圖 */}
+      <FamilyGoalAmountHistogramCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3510,6 +3513,61 @@ function ParentTodoList() {
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
       )}
+    </div>
+  )
+}
+
+function FamilyGoalAmountHistogramCard() {
+  const { data } = useQuery<{
+    buckets: Array<{ label: string; range: string; count: number }>
+    stats: { total: number; active: number; completed: number; avg: number; max: number }
+    dominantBucket: string
+    pattern: "modest" | "balanced" | "ambitious" | "no_data"
+    message: string
+  }>({
+    queryKey: ["/api/family/goal-amount-histogram"],
+  })
+  if (!data || data.stats.total === 0) return null
+
+  const maxCount = Math.max(...data.buckets.map((b) => b.count), 1)
+
+  const PATTERN_BG: Record<string, string> = {
+    modest: "from-blue-50 to-cyan-50 border-blue-300",
+    balanced: "from-emerald-50 to-green-50 border-emerald-400",
+    ambitious: "from-violet-50 to-purple-50 border-violet-500",
+    no_data: "from-gray-50 to-slate-50 border-gray-300",
+  }
+
+  return (
+    <div
+      className={`mb-4 rounded-2xl border-2 bg-gradient-to-br ${PATTERN_BG[data.pattern]} p-3 shadow`}
+    >
+      <h3 className="font-bold mb-2 flex items-center gap-2">🎯 目標金額分佈</h3>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-2 text-xs">
+        {data.message}
+        <div className="text-gray-600 mt-1">
+          總共 {data.stats.total} 個 · 進行中 {data.stats.active} · 已達成 {data.stats.completed} ·
+          最高 ${data.stats.max}
+        </div>
+      </div>
+
+      <div className="space-y-1">
+        {data.buckets.map((b) => (
+          <div key={b.range} className="flex items-center gap-2 text-xs">
+            <div className="w-20 text-right text-gray-600">{b.label}</div>
+            <div className="flex-1 h-3 bg-white rounded overflow-hidden">
+              {b.count > 0 && (
+                <div
+                  className={`h-full ${b.label === data.dominantBucket ? "bg-violet-600" : "bg-violet-400"}`}
+                  style={{ width: `${(b.count / maxCount) * 100}%` }}
+                />
+              )}
+            </div>
+            <div className="w-8 text-right font-bold">{b.count}</div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

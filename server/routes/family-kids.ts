@@ -8602,6 +8602,96 @@ async function bulkApproveOne(
 }
 
 /**
+ * GET /api/family/goal-amount-histogram
+ * 家庭目標金額分佈（active + completed）
+ * 5 桶：$1-100 / $101-500 / $501-1000 / $1001-5000 / $5000+
+ */
+router.get(
+  "/api/family/goal-amount-histogram",
+  asyncHandler(async (_req, res) => {
+    const rows = await db.execute(sql`
+      WITH g AS (
+        SELECT target_amount::numeric AS amount, status
+        FROM kids_goals
+        WHERE status IN ('active', 'completed')
+      )
+      SELECT
+        COUNT(*) FILTER (WHERE amount <= 100)::int AS small,
+        COUNT(*) FILTER (WHERE amount > 100 AND amount <= 500)::int AS medium,
+        COUNT(*) FILTER (WHERE amount > 500 AND amount <= 1000)::int AS large,
+        COUNT(*) FILTER (WHERE amount > 1000 AND amount <= 5000)::int AS xlarge,
+        COUNT(*) FILTER (WHERE amount > 5000)::int AS huge,
+        COUNT(*) FILTER (WHERE status = 'active')::int AS active_count,
+        COUNT(*) FILTER (WHERE status = 'completed')::int AS completed_count,
+        COUNT(*)::int AS total,
+        COALESCE(AVG(amount), 0)::numeric AS avg_amount,
+        COALESCE(MAX(amount), 0)::numeric AS max_amount
+      FROM g
+    `)
+
+    const row = (
+      rows as unknown as {
+        rows: Array<{
+          small: number
+          medium: number
+          large: number
+          xlarge: number
+          huge: number
+          active_count: number
+          completed_count: number
+          total: number
+          avg_amount: string | number
+          max_amount: string | number
+        }>
+      }
+    ).rows[0]
+
+    const total = row?.total ?? 0
+    const buckets = [
+      { label: "$1-100", range: "small", count: row?.small ?? 0 },
+      { label: "$101-500", range: "medium", count: row?.medium ?? 0 },
+      { label: "$501-1000", range: "large", count: row?.large ?? 0 },
+      { label: "$1001-5000", range: "xlarge", count: row?.xlarge ?? 0 },
+      { label: "$5000+", range: "huge", count: row?.huge ?? 0 },
+    ]
+
+    const dominant = buckets.reduce((best, b) => (b.count > best.count ? b : best), buckets[0])
+    const avgAmount = Math.round(Number(row?.avg_amount ?? 0))
+    const maxAmount = Math.round(Number(row?.max_amount ?? 0))
+
+    let pattern: "modest" | "balanced" | "ambitious" | "no_data"
+    let message: string
+    if (total === 0) {
+      pattern = "no_data"
+      message = "還沒設定目標、開始第一個吧 🎯"
+    } else if (dominant.range === "small" || dominant.range === "medium") {
+      pattern = "modest"
+      message = `🌱 家庭目標偏小（平均 $${avgAmount}）、適合小孩練習達成感`
+    } else if (dominant.range === "large") {
+      pattern = "balanced"
+      message = `⚖️ 家庭目標適中（平均 $${avgAmount}）、有挑戰也有可達成性`
+    } else {
+      pattern = "ambitious"
+      message = `🚀 家庭有大目標（平均 $${avgAmount}、最高 $${maxAmount}）、野心十足`
+    }
+
+    res.json({
+      buckets,
+      stats: {
+        total,
+        active: row?.active_count ?? 0,
+        completed: row?.completed_count ?? 0,
+        avg: avgAmount,
+        max: maxAmount,
+      },
+      dominantBucket: dominant.label,
+      pattern,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/task-duration?days=60
  * 每個 active kid 過去 N 天 approved task 從 created_at 到 approved_at 平均天數
  * 看處理速度：fastest vs slowest
