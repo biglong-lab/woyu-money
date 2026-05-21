@@ -583,6 +583,9 @@ export default function FamilyPage() {
       {/* 家庭徽章排名 */}
       <FamilyBadgeLeaderboardCard />
 
+      {/* 家庭分類熱度趨勢 */}
+      <FamilyCategoryHeatTrendCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3537,6 +3540,64 @@ function ParentTodoList() {
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
       )}
+    </div>
+  )
+}
+
+function FamilyCategoryHeatTrendCard() {
+  const { data } = useQuery<{
+    months: Array<{
+      month: string
+      housework: number
+      study: number
+      self_care: number
+      kindness: number
+      other: number
+    }>
+    totals: Record<string, number>
+    topCategory: string | null
+    topCategoryLabel: string | null
+    grandTotal: number
+    message: string
+  }>({
+    queryKey: ["/api/family/category-heat-trend?months=6"],
+  })
+  if (!data || data.grandTotal === 0) return null
+
+  const CAT_INFO: Array<{ key: string; label: string; color: string }> = [
+    { key: "housework", label: "🧹 家事", color: "bg-blue-400" },
+    { key: "study", label: "📚 學習", color: "bg-purple-400" },
+    { key: "self_care", label: "🧴 自我照顧", color: "bg-pink-400" },
+    { key: "kindness", label: "💝 善行", color: "bg-rose-400" },
+    { key: "other", label: "📋 其他", color: "bg-gray-400" },
+  ]
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-purple-300 bg-gradient-to-br from-purple-50 to-pink-50 p-3 shadow">
+      <h3 className="font-bold mb-2 flex items-center gap-2">🎨 任務分類熱度（6 月）</h3>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-2 text-xs">{data.message}</div>
+
+      <div className="space-y-1.5">
+        {CAT_INFO.map((c) => {
+          const count = data.totals[c.key]
+          const pct = data.grandTotal > 0 ? Math.round((count / data.grandTotal) * 100) : 0
+          if (count === 0) return null
+          return (
+            <div key={c.key} className="bg-white rounded-lg p-2">
+              <div className="flex items-center justify-between text-xs mb-1">
+                <span>{c.label}</span>
+                <span className="font-bold">
+                  {count}（{pct}%）
+                </span>
+              </div>
+              <div className="h-1.5 bg-gray-100 rounded overflow-hidden">
+                <div className={`h-full ${c.color}`} style={{ width: `${pct}%` }} />
+              </div>
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }

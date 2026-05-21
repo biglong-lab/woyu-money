@@ -4245,6 +4245,41 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.body.weeks).toBe(52)
   })
 
+  it("分類熱度趨勢：基本結構 months/totals/topCategory", async () => {
+    const res = await request(app).get("/api/family/category-heat-trend")
+    expect(res.status).toBe(200)
+    expect(res.body.months).toHaveLength(6)
+    expect(res.body.totals).toHaveProperty("housework")
+    expect(res.body.totals).toHaveProperty("study")
+    expect(res.body).toHaveProperty("grandTotal")
+    expect(res.body.message).toBeTruthy()
+  })
+
+  it("分類熱度趨勢：建 housework category 任務 → totals.housework>=1", async () => {
+    const kidObj = (await createKid()) as { id: number }
+    const myKidId = kidObj.id
+    const t = await request(app).post("/api/family/tasks").send({
+      kidId: myKidId,
+      title: "洗碗",
+      rewardAmount: 30,
+      category: "housework",
+    })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`).send({})
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`).send({})
+    const res = await request(app).get("/api/family/category-heat-trend?months=3")
+    expect(res.status).toBe(200)
+    expect(res.body.totals.housework).toBeGreaterThanOrEqual(1)
+    expect(res.body.topCategory).toBe("housework")
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
+  it("分類熱度趨勢：months clamp 2-24", async () => {
+    const r1 = await request(app).get("/api/family/category-heat-trend?months=100")
+    expect(r1.body.months).toHaveLength(24)
+    const r2 = await request(app).get("/api/family/category-heat-trend?months=1")
+    expect(r2.body.months).toHaveLength(2)
+  })
+
   it("徽章排名：基本結構 kids/totalBadges/message", async () => {
     const res = await request(app).get("/api/family/badge-leaderboard")
     expect(res.status).toBe(200)

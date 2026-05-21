@@ -8602,6 +8602,104 @@ async function bulkApproveOne(
 }
 
 /**
+ * GET /api/family/category-heat-trend?months=6
+ * 過去 N 月各 task category 月度變化
+ * 5 category: housework / study / self_care / kindness / other
+ */
+router.get(
+  "/api/family/category-heat-trend",
+  asyncHandler(async (req, res) => {
+    const months = Math.min(Math.max(Number(req.query.months) || 6, 2), 24)
+
+    const rows = await db.execute(sql`
+      WITH months AS (
+        SELECT generate_series(
+          DATE_TRUNC('month', CURRENT_DATE) - ((${months}::int - 1) * INTERVAL '1 month'),
+          DATE_TRUNC('month', CURRENT_DATE),
+          INTERVAL '1 month'
+        )::date AS m_start
+      )
+      SELECT
+        TO_CHAR(m.m_start, 'YYYY-MM') AS month,
+        COALESCE(SUM(CASE WHEN t.category = 'housework' THEN 1 ELSE 0 END), 0)::int AS housework,
+        COALESCE(SUM(CASE WHEN t.category = 'study' THEN 1 ELSE 0 END), 0)::int AS study,
+        COALESCE(SUM(CASE WHEN t.category = 'self_care' THEN 1 ELSE 0 END), 0)::int AS self_care,
+        COALESCE(SUM(CASE WHEN t.category = 'kindness' THEN 1 ELSE 0 END), 0)::int AS kindness,
+        COALESCE(SUM(CASE WHEN t.category = 'other' THEN 1 ELSE 0 END), 0)::int AS other
+      FROM months m
+      LEFT JOIN kids_tasks t ON
+        t.status = 'approved'
+        AND t.completed_at >= m.m_start
+        AND t.completed_at < m.m_start + INTERVAL '1 month'
+      GROUP BY m.m_start
+      ORDER BY m.m_start ASC
+    `)
+
+    const monthsArr = (
+      rows as unknown as {
+        rows: Array<{
+          month: string
+          housework: number
+          study: number
+          self_care: number
+          kindness: number
+          other: number
+        }>
+      }
+    ).rows
+
+    // 加總每 category
+    const totals: Record<string, number> = {
+      housework: 0,
+      study: 0,
+      self_care: 0,
+      kindness: 0,
+      other: 0,
+    }
+    for (const m of monthsArr) {
+      totals.housework += m.housework
+      totals.study += m.study
+      totals.self_care += m.self_care
+      totals.kindness += m.kindness
+      totals.other += m.other
+    }
+
+    const grandTotal = Object.values(totals).reduce((s, n) => s + n, 0)
+
+    // 找最熱 category
+    const sortedCats = Object.entries(totals).sort((a, b) => b[1] - a[1])
+    const topCategory = sortedCats[0][1] > 0 ? sortedCats[0][0] : null
+
+    const CAT_LABEL: Record<string, string> = {
+      housework: "🧹 家事",
+      study: "📚 學習",
+      self_care: "🧴 自我照顧",
+      kindness: "💝 善行",
+      other: "📋 其他",
+    }
+
+    let message: string
+    if (grandTotal === 0) {
+      message = `過去 ${months} 個月還沒任務、開始累積吧 🌱`
+    } else if (topCategory) {
+      const pct = Math.round((totals[topCategory] / grandTotal) * 100)
+      message = `🔥 最熱類別：${CAT_LABEL[topCategory]}（${totals[topCategory]} 個、占 ${pct}%）`
+    } else {
+      message = "全家任務分類多元"
+    }
+
+    res.json({
+      months: monthsArr,
+      totals,
+      topCategory,
+      topCategoryLabel: topCategory ? CAT_LABEL[topCategory] : null,
+      grandTotal,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/badge-leaderboard
  * 各 active kid 累計徽章數 ranked + 最新徽章
  */
