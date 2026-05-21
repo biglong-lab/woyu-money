@@ -652,6 +652,9 @@ export default function FamilyPage() {
       {/* 最常支持對象 ranking */}
       <FamilyTopRecipientsCard />
 
+      {/* 行善里程碑 */}
+      <FamilyKindnessMilestoneCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3605,6 +3608,62 @@ function ParentTodoList() {
         >
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
+      )}
+    </div>
+  )
+}
+
+function FamilyKindnessMilestoneCard() {
+  const { data } = useQuery<{
+    total: number
+    currentMilestone: { tier: string; amount: number; emoji: string } | null
+    nextMilestone: { tier: string; amount: number; emoji: string } | null
+    progressToNext: number
+    amountToNext: number
+    message: string
+  }>({
+    queryKey: ["/api/family/kindness-milestone"],
+  })
+  if (!data || data.total === 0) return null
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-amber-300 bg-gradient-to-br from-amber-50 via-yellow-50 to-orange-50 p-3 shadow">
+      <h3 className="font-bold mb-2 flex items-center gap-2">
+        {data.currentMilestone?.emoji ?? "❤️"} 家庭行善里程碑
+      </h3>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-2 text-xs">{data.message}</div>
+
+      <div className="bg-white rounded-lg p-3 text-center mb-2">
+        <div className="text-[10px] text-gray-600">累積行善</div>
+        <div className="text-2xl font-bold text-amber-700">
+          ${Math.round(data.total).toLocaleString()}
+        </div>
+        {data.currentMilestone && (
+          <div className="text-xs text-amber-600 mt-1">
+            目前等級：{data.currentMilestone.emoji} {data.currentMilestone.tier}
+          </div>
+        )}
+      </div>
+
+      {data.nextMilestone && (
+        <div className="bg-white rounded-lg p-2">
+          <div className="flex justify-between text-xs mb-1">
+            <span className="text-gray-600">
+              距離 {data.nextMilestone.emoji} {data.nextMilestone.tier}
+            </span>
+            <span className="font-bold text-amber-700">{data.progressToNext}%</span>
+          </div>
+          <div className="w-full bg-amber-100 rounded-full h-2 overflow-hidden">
+            <div
+              className="bg-gradient-to-r from-amber-400 to-orange-500 h-2 transition-all"
+              style={{ width: `${data.progressToNext}%` }}
+            />
+          </div>
+          <div className="text-[10px] text-gray-500 mt-1 text-center">
+            還差 ${Math.round(data.amountToNext)}
+          </div>
+        </div>
       )}
     </div>
   )

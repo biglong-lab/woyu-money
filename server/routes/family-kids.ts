@@ -8822,6 +8822,63 @@ router.get(
 )
 
 /**
+ * GET /api/family/kindness-milestone
+ * 家庭 give jar 累積總額 + 里程碑進度（慶祝感）
+ */
+router.get(
+  "/api/family/kindness-milestone",
+  asyncHandler(async (_req, res) => {
+    const rows = await db.execute(sql`
+      SELECT COALESCE(SUM(s.amount), 0)::numeric AS total
+      FROM kids_spendings s
+      JOIN kids_accounts ka ON ka.id = s.kid_id
+      WHERE s.jar = 'give' AND ka.is_active = true
+    `)
+    const total = Number(
+      (rows as unknown as { rows: Array<{ total: string }> }).rows[0]?.total ?? 0
+    )
+
+    const milestones = [
+      { tier: "Bronze 銅", amount: 100, emoji: "🥉" },
+      { tier: "Silver 銀", amount: 300, emoji: "🥈" },
+      { tier: "Gold 金", amount: 500, emoji: "🥇" },
+      { tier: "Hero 英雄", amount: 1000, emoji: "🦸" },
+      { tier: "Champion 冠軍", amount: 3000, emoji: "🏆" },
+      { tier: "Legend 傳奇", amount: 5000, emoji: "🌟" },
+      { tier: "Saint 聖者", amount: 10000, emoji: "👑" },
+    ]
+
+    const currentMilestone = [...milestones].reverse().find((m) => total >= m.amount) ?? null
+    const nextMilestone = milestones.find((m) => total < m.amount) ?? null
+    const progressToNext = nextMilestone
+      ? Math.min(100, Math.round((total / nextMilestone.amount) * 100))
+      : 100
+    const amountToNext = nextMilestone ? Math.max(0, nextMilestone.amount - total) : 0
+
+    let message: string
+    if (total === 0) {
+      message = "家裡還沒有 give jar 行善紀錄、從第一筆開始吧 ❤️"
+    } else if (nextMilestone) {
+      message = currentMilestone
+        ? `${currentMilestone.emoji} 已達 ${currentMilestone.tier}、再 $${Math.round(amountToNext)} 升等 ${nextMilestone.emoji} ${nextMilestone.tier}`
+        : `❤️ 再 $${Math.round(amountToNext)} 達 ${nextMilestone.emoji} ${nextMilestone.tier}`
+    } else {
+      message = `👑 已達最高 ${currentMilestone?.tier ?? "Saint"} 等級、家庭善心傳奇！`
+    }
+
+    res.json({
+      total: Math.round(total * 100) / 100,
+      currentMilestone,
+      nextMilestone,
+      progressToNext,
+      amountToNext: Math.round(amountToNext * 100) / 100,
+      milestones,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/top-recipients?days=30&limit=5
  * 家裡 give jar 最常支持的對象 ranking、培養家庭價值觀
  */

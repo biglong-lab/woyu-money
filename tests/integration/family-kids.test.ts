@@ -4315,6 +4315,56 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.status).toBe(404)
   })
 
+  it("行善里程碑：基本結構 total/currentMilestone/nextMilestone/progressToNext", async () => {
+    const res = await request(app).get("/api/family/kindness-milestone")
+    expect(res.status).toBe(200)
+    expect(res.body).toHaveProperty("total")
+    expect(res.body).toHaveProperty("currentMilestone")
+    expect(res.body).toHaveProperty("nextMilestone")
+    expect(res.body).toHaveProperty("progressToNext")
+    expect(Array.isArray(res.body.milestones)).toBe(true)
+    expect(res.body.milestones.length).toBeGreaterThanOrEqual(7)
+    expect(res.body.message).toBeTruthy()
+  })
+
+  it("行善里程碑：捐 $150 後 currentMilestone=Bronze(100)、nextMilestone=Silver(300)", async () => {
+    await db.execute(sql`DELETE FROM kids_accounts`)
+    const kidObj = (await createKid({ giveRatio: 100, spendRatio: 0, saveRatio: 0 })) as {
+      id: number
+    }
+    const myKidId = kidObj.id
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId: myKidId, title: "公益存", rewardAmount: 300 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`).send({})
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`).send({})
+    await request(app).post("/api/family/spendings").send({
+      kidId: myKidId,
+      jar: "give",
+      amount: 150,
+      description: "里程碑測試捐款",
+    })
+    const res = await request(app).get("/api/family/kindness-milestone")
+    expect(res.status).toBe(200)
+    expect(res.body.total).toBeGreaterThanOrEqual(150)
+    expect(res.body.currentMilestone).not.toBeNull()
+    expect(res.body.currentMilestone.amount).toBe(100)
+    expect(res.body.nextMilestone).not.toBeNull()
+    expect(res.body.nextMilestone.amount).toBe(300)
+    expect(res.body.progressToNext).toBeGreaterThanOrEqual(50)
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
+  it("行善里程碑：無紀錄 currentMilestone=null、progressToNext=0", async () => {
+    await db.execute(sql`DELETE FROM kids_accounts`)
+    const res = await request(app).get("/api/family/kindness-milestone")
+    expect(res.body.total).toBe(0)
+    expect(res.body.currentMilestone).toBeNull()
+    expect(res.body.nextMilestone).not.toBeNull()
+    expect(res.body.nextMilestone.amount).toBe(100)
+    expect(res.body.progressToNext).toBe(0)
+  })
+
   it("最常支持對象：基本結構 recipients/topPick/grandTotal/message", async () => {
     const res = await request(app).get("/api/family/top-recipients")
     expect(res.status).toBe(200)
