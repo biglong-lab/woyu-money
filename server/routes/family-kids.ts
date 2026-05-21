@@ -8602,6 +8602,98 @@ async function bulkApproveOne(
 }
 
 /**
+ * GET /api/family/goals-progress-rank?limit=10
+ * 家庭 active goals 按 progress% 排名（誰快達標）
+ * stage: near_complete(>=80%) / midway(50-80%) / starting(<50%)
+ */
+router.get(
+  "/api/family/goals-progress-rank",
+  asyncHandler(async (req, res) => {
+    const limit = Math.min(Math.max(Number(req.query.limit) || 10, 1), 50)
+
+    const rows = await db.execute(sql`
+      SELECT
+        g.id::int AS goal_id,
+        g.name AS goal_name,
+        g.emoji AS goal_emoji,
+        g.target_amount::numeric AS target_amount,
+        g.current_amount::numeric AS current_amount,
+        g.deadline,
+        ka.id::int AS kid_id,
+        ka.display_name AS kid_name,
+        ka.avatar AS kid_avatar,
+        CASE
+          WHEN g.deadline IS NOT NULL THEN
+            (g.deadline - CURRENT_DATE)::int
+          ELSE NULL
+        END AS days_until_deadline
+      FROM kids_goals g
+      JOIN kids_accounts ka ON ka.id = g.kid_id
+      WHERE g.status = 'active'
+        AND ka.is_active = true
+      ORDER BY (g.current_amount::numeric / NULLIF(g.target_amount::numeric, 0)) DESC NULLS LAST
+      LIMIT ${limit}
+    `)
+
+    const goals = (
+      rows as unknown as {
+        rows: Array<{
+          goal_id: number
+          goal_name: string
+          goal_emoji: string
+          target_amount: string | number
+          current_amount: string | number
+          deadline: string | null
+          kid_id: number
+          kid_name: string
+          kid_avatar: string
+          days_until_deadline: number | null
+        }>
+      }
+    ).rows.map((r) => {
+      const target = Number(r.target_amount)
+      const current = Number(r.current_amount)
+      const progress = target > 0 ? Math.min(100, Math.round((current / target) * 100)) : 0
+      let stage: "near_complete" | "midway" | "starting"
+      if (progress >= 80) stage = "near_complete"
+      else if (progress >= 50) stage = "midway"
+      else stage = "starting"
+      return {
+        goalId: r.goal_id,
+        goalName: r.goal_name,
+        goalEmoji: r.goal_emoji,
+        target,
+        current,
+        progress,
+        deadline: r.deadline,
+        daysUntilDeadline: r.days_until_deadline,
+        kidId: r.kid_id,
+        kidName: r.kid_name,
+        kidAvatar: r.kid_avatar,
+        stage,
+      }
+    })
+
+    const nearCompleteCount = goals.filter((g) => g.stage === "near_complete").length
+    let message: string
+    if (goals.length === 0) {
+      message = "還沒進行中的目標、建立第一個吧 🎯"
+    } else if (nearCompleteCount > 0) {
+      message = `🔥 有 ${nearCompleteCount} 個目標即將達成（>=80%）、加油衝刺！`
+    } else {
+      message = `🌱 共 ${goals.length} 個進行中目標、繼續累積`
+    }
+
+    res.json({
+      goals,
+      total: goals.length,
+      nearCompleteCount,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/goals-vs-wishes
  * 家庭自律度：goals 數 vs wishes 數 + promotion rate
  * 高 promotion rate = 小孩會把願望變成有計畫的目標

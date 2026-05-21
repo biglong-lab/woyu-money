@@ -532,6 +532,9 @@ export default function FamilyPage() {
       {/* 家庭目標 vs 願望 */}
       <FamilyGoalsVsWishesCard />
 
+      {/* 家庭目標進度排名 */}
+      <FamilyGoalsProgressRankCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3486,6 +3489,75 @@ function ParentTodoList() {
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
       )}
+    </div>
+  )
+}
+
+function FamilyGoalsProgressRankCard() {
+  const { data } = useQuery<{
+    goals: Array<{
+      goalId: number
+      goalName: string
+      goalEmoji: string
+      target: number
+      current: number
+      progress: number
+      deadline: string | null
+      daysUntilDeadline: number | null
+      kidName: string
+      kidAvatar: string
+      stage: "near_complete" | "midway" | "starting"
+    }>
+    total: number
+    nearCompleteCount: number
+    message: string
+  }>({
+    queryKey: ["/api/family/goals-progress-rank?limit=10"],
+  })
+  if (!data || data.total === 0) return null
+
+  const STAGE_COLOR: Record<string, string> = {
+    near_complete: "bg-emerald-500",
+    midway: "bg-blue-500",
+    starting: "bg-amber-400",
+  }
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-emerald-300 bg-gradient-to-br from-emerald-50 to-green-50 p-3 shadow">
+      <h3 className="font-bold mb-2 flex items-center gap-2">🎯 目標進度排名（即將達成）</h3>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-2 text-xs">{data.message}</div>
+
+      <div className="space-y-1.5">
+        {data.goals.slice(0, 6).map((g) => (
+          <div key={g.goalId} className="bg-white rounded-lg p-2">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-lg">{g.goalEmoji}</span>
+              <span className="text-xs flex-1 font-medium truncate">{g.goalName}</span>
+              <span className="text-xs text-gray-500">
+                {g.kidAvatar} {g.kidName}
+              </span>
+              <span className="text-sm font-bold">{g.progress}%</span>
+            </div>
+            <div className="h-2 bg-gray-100 rounded overflow-hidden">
+              <div
+                className={`h-full ${STAGE_COLOR[g.stage]}`}
+                style={{ width: `${g.progress}%` }}
+              />
+            </div>
+            <div className="flex justify-between text-[10px] text-gray-500 mt-1">
+              <span>
+                ${g.current} / ${g.target}
+              </span>
+              {g.daysUntilDeadline !== null && (
+                <span className={g.daysUntilDeadline < 7 ? "text-red-600 font-bold" : ""}>
+                  剩 {g.daysUntilDeadline} 天
+                </span>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

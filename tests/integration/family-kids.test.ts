@@ -4245,6 +4245,44 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.body.weeks).toBe(52)
   })
 
+  it("目標排名：基本結構 goals/total/message", async () => {
+    const res = await request(app).get("/api/family/goals-progress-rank")
+    expect(res.status).toBe(200)
+    expect(Array.isArray(res.body.goals)).toBe(true)
+    expect(res.body).toHaveProperty("total")
+    expect(res.body.message).toBeTruthy()
+  })
+
+  it("目標排名：建 2 個 goal → goals 含 progress + stage", async () => {
+    const kidObj = (await createKid()) as { id: number }
+    const myKidId = kidObj.id
+    await request(app).post("/api/family/goals").send({
+      kidId: myKidId,
+      name: "目標 A",
+      targetAmount: 100,
+    })
+    await request(app).post("/api/family/goals").send({
+      kidId: myKidId,
+      name: "目標 B",
+      targetAmount: 200,
+    })
+    const res = await request(app).get("/api/family/goals-progress-rank")
+    expect(res.status).toBe(200)
+    expect(res.body.total).toBeGreaterThanOrEqual(2)
+    const myGoal = res.body.goals.find((g: { kidId: number }) => g.kidId === myKidId)
+    expect(myGoal).toBeDefined()
+    expect(myGoal).toHaveProperty("progress")
+    expect(myGoal).toHaveProperty("stage")
+    expect(["near_complete", "midway", "starting"]).toContain(myGoal.stage)
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
+  it("目標排名：limit clamp 1-50", async () => {
+    const r1 = await request(app).get("/api/family/goals-progress-rank?limit=100")
+    expect(r1.status).toBe(200)
+    expect(r1.body.goals.length).toBeLessThanOrEqual(50)
+  })
+
   it("目標願望：基本結構 goals/wishes/promotionRate/discipline", async () => {
     const res = await request(app).get("/api/family/goals-vs-wishes")
     expect(res.status).toBe(200)
