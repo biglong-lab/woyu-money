@@ -53,6 +53,7 @@ import { useToast } from "@/hooks/use-toast"
 import { apiRequest, queryClient } from "@/lib/queryClient"
 import { useDocumentTitle } from "@/hooks/use-document-title"
 import { BackToTop } from "@/components/back-to-top"
+import { useInstallPrompt } from "@/hooks/use-install-prompt"
 import {
   LineChart,
   Line,
@@ -378,6 +379,7 @@ export default function FamilyPage() {
             <Plus className="h-4 w-4 mr-1" />
             新增小孩
           </Button>
+          <FamilyInstallChip />
         </div>
       </div>
 
@@ -1014,6 +1016,22 @@ function TaskStatusBadge({ status }: { status: string }) {
   }
   const s = map[status] ?? { label: status, cls: "bg-gray-100 text-gray-700" }
   return <Badge className={`${s.cls} text-[10px]`}>{s.label}</Badge>
+}
+
+function FamilyInstallChip() {
+  const { canInstall, install } = useInstallPrompt()
+  if (!canInstall) return null
+  return (
+    <Button
+      size="sm"
+      variant="outline"
+      onClick={install}
+      className="border-indigo-300 text-indigo-700 hover:bg-indigo-50"
+      title="把家庭記帳加到主畫面、像原生 app"
+    >
+      📱 安裝
+    </Button>
+  )
 }
 
 function FamilyYearSummary() {

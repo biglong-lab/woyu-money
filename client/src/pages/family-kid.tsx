@@ -60,6 +60,7 @@ import {
 import { useToast } from "@/hooks/use-toast"
 import { apiRequest, queryClient } from "@/lib/queryClient"
 import { useDocumentTitle } from "@/hooks/use-document-title"
+import { useInstallPrompt } from "@/hooks/use-install-prompt"
 
 interface Kid {
   id: number
@@ -459,6 +460,7 @@ function KidDashboard({
             完成 {recentApprovedCount} 個任務 · {badges.length} 個徽章
           </p>
         </div>
+        <InstallChip />
         {data.streak > 0 && (
           <motion.div
             animate={{ scale: [1, 1.05, 1] }}
@@ -2031,6 +2033,21 @@ function DonationsSection({ kidId }: { kidId: number }) {
         </div>
       )}
     </div>
+  )
+}
+
+function InstallChip() {
+  const { canInstall, install } = useInstallPrompt()
+  if (!canInstall) return null
+  return (
+    <button
+      type="button"
+      onClick={install}
+      className="text-xs bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-full px-2.5 py-1 shadow hover:shadow-md transition"
+      title="把這個 app 加到主畫面、像原生 app 一樣用"
+    >
+      📱 安裝
+    </button>
   )
 }
 
