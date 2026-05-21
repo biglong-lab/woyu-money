@@ -3650,6 +3650,187 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.body.weeks).toBe(52)
   })
 
+  it("家庭氛圍：今日打卡 → checkinCount + avgScore + atmosphere", async () => {
+    await db.execute(sql`DELETE FROM kids_accounts WHERE pin = ${TEST_PIN}`)
+    await createKid()
+
+    // 打卡開心 = 5
+    await request(app).post("/api/family/checkins").send({ kidId, mood: "😄 開心" })
+
+    const res = await request(app).get("/api/family/family-mood-today")
+    expect(res.status).toBe(200)
+    expect(res.body.totalKids).toBe(1)
+    expect(res.body.checkinCount).toBe(1)
+    expect(res.body.avgScore).toBe(5)
+    expect(res.body.atmosphere).toBeTruthy()
+    expect(res.body.atmosphereEmoji).toBeTruthy()
+
+    expect(res.body.kids[0].mood).toBe("😄 開心")
+    expect(res.body.kids[0].score).toBe(5)
+    expect(res.body.kids[0].checkedIn).toBe(true)
+  })
+
+  it("家庭氛圍：無打卡 → atmosphere=還沒人打卡", async () => {
+    await db.execute(sql`DELETE FROM kids_accounts WHERE pin = ${TEST_PIN}`)
+    await createKid()
+    const res = await request(app).get("/api/family/family-mood-today")
+    expect(res.status).toBe(200)
+    expect(res.body.checkinCount).toBe(0)
+    expect(res.body.atmosphere).toContain("還沒")
+    expect(res.body.kids[0].checkedIn).toBe(false)
+  })
+
+  it("emoji 雲：3 個 🧹 + 1 個 🍳 → 按 count DESC、mostUsed=🧹", async () => {
+    await createKid()
+
+    // 3 個 🧹
+    for (let i = 0; i < 3; i++) {
+      const t = await request(app)
+        .post("/api/family/tasks")
+        .send({ kidId, title: `掃 ${i}`, rewardAmount: 30, emoji: "🧹" })
+      await request(app).post(`/api/family/tasks/${t.body.id}/submit`)
+      await request(app).post(`/api/family/tasks/${t.body.id}/approve`)
+    }
+    // 1 個 🍳
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId, title: "煮", rewardAmount: 30, emoji: "🍳" })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`)
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`)
+
+    const res = await request(app).get(`/api/family/kid-emoji-cloud?kidId=${kidId}`)
+    expect(res.status).toBe(200)
+    expect(res.body.total).toBe(4)
+    expect(res.body.uniqueEmojis).toBe(2)
+
+    const e = res.body.emojis as Array<{ emoji: string; count: number; sizeRem: number }>
+    expect(e[0].emoji).toBe("🧹")
+    expect(e[0].count).toBe(3)
+    expect(e[0].sizeRem).toBeGreaterThan(e[1].sizeRem) // 最常做的最大字
+
+    expect(e[1].emoji).toBe("🍳")
+    expect(e[1].count).toBe(1)
+
+    expect(res.body.mostUsed.emoji).toBe("🧹")
+  })
+
+  it("emoji 雲：無 task → emojis=[]、mostUsed=null", async () => {
+    await createKid()
+    const res = await request(app).get(`/api/family/kid-emoji-cloud?kidId=${kidId}`)
+    expect(res.status).toBe(200)
+    expect(res.body.total).toBe(0)
+    expect(res.body.emojis).toEqual([])
+    expect(res.body.mostUsed).toBeNull()
+  })
+
+  it("kid-emoji-cloud 缺 kidId 回 400", async () => {
+    const r = await request(app).get("/api/family/kid-emoji-cloud")
+    expect(r.status).toBe(400)
+  })
+
+  it("Pot 貢獻者：建 pot + 2 kid 貢獻 → topContributor 排第一", async () => {
+    await db.execute(sql`DELETE FROM kids_accounts WHERE pin = ${TEST_PIN}`)
+
+    // 建小華（多貢獻）+ 任務拿錢
+    await createKid({ displayName: "小華", spendRatio: 0, saveRatio: 100, giveRatio: 0 })
+    const huaId = kidId
+    const th = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId: huaId, title: "T", rewardAmount: 1000 })
+    await request(app).post(`/api/family/tasks/${th.body.id}/submit`)
+    await request(app).post(`/api/family/tasks/${th.body.id}/approve`)
+
+    // 建小明
+    await createKid({ displayName: "小明", spendRatio: 0, saveRatio: 100, giveRatio: 0 })
+    const mingId = kidId
+    const tm = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId: mingId, title: "T", rewardAmount: 1000 })
+    await request(app).post(`/api/family/tasks/${tm.body.id}/submit`)
+    await request(app).post(`/api/family/tasks/${tm.body.id}/approve`)
+
+    // 建家庭目標
+    const potRes = await request(app)
+      .post("/api/family/pots")
+      .send({ name: "全家露營", targetAmount: 2000 })
+    expect(potRes.status).toBe(201)
+    const potId = potRes.body.id
+
+    // 小華貢獻 300、小明 100
+    await request(app)
+      .post(`/api/family/pots/${potId}/contribute`)
+      .send({ kidId: huaId, amount: 300 })
+    await request(app)
+      .post(`/api/family/pots/${potId}/contribute`)
+      .send({ kidId: mingId, amount: 100 })
+
+    const res = await request(app).get(`/api/family/pot-top-contributors?potId=${potId}`)
+    expect(res.status).toBe(200)
+    expect(res.body.total).toBe(2)
+    expect(res.body.totalAmount).toBe(400)
+    expect(res.body.topContributor.kidName).toBe("小華")
+    expect(res.body.topContributor.totalAmount).toBe(300)
+
+    // 清姐姐
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${huaId}`)
+  })
+
+  it("Pot 貢獻者：不指定 potId → 跨所有 pots 統計", async () => {
+    const res = await request(app).get("/api/family/pot-top-contributors")
+    expect(res.status).toBe(200)
+    expect(Array.isArray(res.body.contributors)).toBe(true)
+  })
+
+  it("Pot 貢獻者：potId 無效 → 400", async () => {
+    const r = await request(app).get("/api/family/pot-top-contributors?potId=-1")
+    expect(r.status).toBe(400)
+  })
+
+  it("目標達成歷史：完成 goal → goals 包含 daysTaken + 統計", async () => {
+    await createKid({ spendRatio: 0, saveRatio: 100, giveRatio: 0 })
+
+    // 任務 1000、存到 save 罐
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId, title: "T", rewardAmount: 1000 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`)
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`)
+
+    // 建目標 + 撥到滿（達成）
+    const goalRes = await request(app)
+      .post("/api/family/goals")
+      .send({ kidId, name: "小目標", targetAmount: 100 })
+    const goalId = goalRes.body.id
+    await request(app).post(`/api/family/goals/${goalId}/save`).send({ amount: 100 })
+
+    const res = await request(app).get("/api/family/completed-goals-history")
+    expect(res.status).toBe(200)
+    expect(res.body.total).toBeGreaterThanOrEqual(1)
+
+    const goals = res.body.goals as Array<{
+      name: string
+      kidName: string
+      daysTaken: number
+      targetAmount: number
+    }>
+    const myGoal = goals.find((g) => g.name === "小目標")
+    expect(myGoal).toBeTruthy()
+    expect(myGoal!.daysTaken).toBeGreaterThanOrEqual(0)
+    expect(myGoal!.targetAmount).toBe(100)
+    expect(myGoal!.kidName).toBe("測試小孩")
+
+    expect(res.body.avgDaysTaken).toBeGreaterThanOrEqual(0)
+    expect(res.body.fastestGoal).toBeTruthy()
+    expect(res.body.largestGoal).toBeTruthy()
+  })
+
+  it("目標達成歷史：limit 範圍 1-50", async () => {
+    const res = await request(app).get("/api/family/completed-goals-history?limit=100")
+    expect(res.status).toBe(200)
+    // 一定不超過 50（沒這麼多達成目標也 OK）
+    expect(res.body.goals.length).toBeLessThanOrEqual(50)
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)

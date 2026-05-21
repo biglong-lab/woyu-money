@@ -498,7 +498,17 @@ function KidDashboard({
           {kid.avatar}
         </button>
         <div className="flex-1">
-          <h1 className="text-xl font-bold">嗨 {kid.displayName}！</h1>
+          <h1 className="text-xl font-bold">
+            {(() => {
+              const h = new Date().getHours()
+              if (h < 6) return "🌙 還沒睡？"
+              if (h < 12) return "🌅 早安"
+              if (h < 18) return "☀️ 午安"
+              if (h < 22) return "🌆 晚安"
+              return "🌙 該睡了"
+            })()}
+            、{kid.displayName}！
+          </h1>
           <p className="text-xs text-gray-500">
             完成 {recentApprovedCount} 個任務 · {badges.length} 個徽章
           </p>
@@ -1045,6 +1055,9 @@ function KidDashboard({
 
       {/* 能力強項統計 */}
       <KidStrengthsCard kidId={kidId} />
+
+      {/* Emoji 雲 */}
+      <KidEmojiCloudCard kidId={kidId} />
 
       {/* 任務難度分佈 */}
       <KidDifficultyCard kidId={kidId} />
@@ -2387,6 +2400,62 @@ function GoalEtaBadge({ goalId }: { goalId: number }) {
     >
       <span className="shrink-0">⏱️</span>
       <span className="flex-1">{data.suggestion}</span>
+    </div>
+  )
+}
+
+function KidEmojiCloudCard({ kidId }: { kidId: number }) {
+  const { data } = useQuery<{
+    total: number
+    uniqueEmojis: number
+    mostUsed: { emoji: string; count: number } | null
+    emojis: Array<{
+      emoji: string
+      count: number
+      sampleTitle: string
+      sizeRem: number
+      percentage: number
+    }>
+  }>({
+    queryKey: ["/api/family/kid-emoji-cloud", kidId],
+    queryFn: async () => {
+      const res = await fetch(`/api/family/kid-emoji-cloud?kidId=${kidId}&limit=15`, {
+        credentials: "include",
+      })
+      return res.json()
+    },
+  })
+  if (!data || data.total === 0) return null
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-fuchsia-300 bg-gradient-to-br from-fuchsia-50 to-pink-50 p-4 shadow">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="font-bold text-fuchsia-900 flex items-center gap-2">🎨 我的成就雲</h3>
+        <span className="text-xs text-gray-500">
+          {data.uniqueEmojis} 種・{data.total} 個任務
+        </span>
+      </div>
+
+      {data.mostUsed && (
+        <div className="bg-white rounded-lg p-3 mb-3 text-center">
+          <div className="text-5xl mb-1">{data.mostUsed.emoji}</div>
+          <div className="text-xs text-gray-500">最常做的（{data.mostUsed.count} 次）</div>
+        </div>
+      )}
+
+      {/* Emoji 雲：依 sizeRem 動態大小 */}
+      <div className="bg-white/70 rounded-lg p-3 flex flex-wrap gap-2 items-center justify-center">
+        {data.emojis.map((e) => (
+          <span
+            key={e.emoji}
+            className="leading-none"
+            style={{ fontSize: `${e.sizeRem}rem` }}
+            title={`${e.emoji} ${e.count} 次（${e.percentage}%）`}
+          >
+            {e.emoji}
+          </span>
+        ))}
+      </div>
     </div>
   )
 }

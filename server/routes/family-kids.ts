@@ -2875,6 +2875,327 @@ router.get(
 )
 
 /**
+ * GET /api/family/completed-goals-history?limit=20
+ * 家庭目標達成歷史（家長端、看過去達成的目標）
+ *
+ * 從 kids_goals WHERE status='completed' 取近期達成
+ * 算每個 goal：建立到完成的天數
+ * 統計：平均達成天數、最快達成、總達成數
+ */
+router.get(
+  "/api/family/completed-goals-history",
+  asyncHandler(async (req, res) => {
+    const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 50)
+
+    const result = await db.execute(sql`
+      SELECT
+        kg.id::int AS id,
+        kg.name,
+        kg.emoji,
+        kg.target_amount::numeric AS target,
+        kg.current_amount::numeric AS current,
+        kg.created_at,
+        kg.completed_at,
+        ka.id::int AS kid_id,
+        ka.display_name AS kid_name,
+        ka.avatar,
+        (DATE(kg.completed_at) - DATE(kg.created_at))::int AS days_taken,
+        kg.reflection
+      FROM kids_goals kg
+      JOIN kids_accounts ka ON ka.id = kg.kid_id
+      WHERE kg.status = 'completed'
+      ORDER BY kg.completed_at DESC NULLS LAST
+      LIMIT ${limit}
+    `)
+    const rows = (
+      result as unknown as {
+        rows: {
+          id: number
+          name: string
+          emoji: string | null
+          target: string | number
+          current: string | number
+          created_at: Date
+          completed_at: Date | null
+          kid_id: number
+          kid_name: string
+          avatar: string
+          days_taken: number | null
+          reflection: string | null
+        }[]
+      }
+    ).rows
+
+    const goals = rows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      emoji: r.emoji ?? "🎯",
+      targetAmount: Number(r.target ?? 0),
+      currentAmount: Number(r.current ?? 0),
+      createdAt: r.created_at,
+      completedAt: r.completed_at,
+      kidId: r.kid_id,
+      kidName: r.kid_name,
+      avatar: r.avatar,
+      daysTaken: r.days_taken ?? 0,
+      reflection: r.reflection,
+    }))
+
+    const total = goals.length
+    const totalTarget = goals.reduce((s, g) => s + g.targetAmount, 0)
+    const avgDaysTaken =
+      total > 0 ? Math.round(goals.reduce((s, g) => s + g.daysTaken, 0) / total) : 0
+    let fastestGoal: (typeof goals)[0] | null = null
+    let largestGoal: (typeof goals)[0] | null = null
+    for (const g of goals) {
+      if (!fastestGoal || g.daysTaken < fastestGoal.daysTaken) fastestGoal = g
+      if (!largestGoal || g.targetAmount > largestGoal.targetAmount) largestGoal = g
+    }
+
+    res.json({
+      total,
+      totalTarget,
+      avgDaysTaken,
+      fastestGoal,
+      largestGoal,
+      goals,
+    })
+  })
+)
+
+/**
+ * GET /api/family/pot-top-contributors?potId=&limit=10
+ * 家庭 pot 貢獻者排行（看誰捐最多）
+ * 不指定 potId 則跨所有 active pots 統計
+ */
+router.get(
+  "/api/family/pot-top-contributors",
+  asyncHandler(async (req, res) => {
+    const potIdQ = req.query.potId ? Number(req.query.potId) : null
+    const limit = Math.min(Math.max(Number(req.query.limit) || 10, 1), 30)
+    if (potIdQ !== null && (!Number.isInteger(potIdQ) || potIdQ < 1)) {
+      throw new AppError(400, "potId 無效")
+    }
+
+    const result = potIdQ
+      ? await db.execute(sql`
+          SELECT
+            fpc.kid_id::int AS kid_id,
+            ka.display_name AS kid_name,
+            ka.avatar,
+            SUM(fpc.amount::numeric)::numeric AS total_amount,
+            COUNT(*)::int AS contribution_count,
+            MAX(fpc.created_at) AS last_at
+          FROM family_pot_contributions fpc
+          JOIN kids_accounts ka ON ka.id = fpc.kid_id
+          WHERE fpc.pot_id = ${potIdQ}
+          GROUP BY fpc.kid_id, ka.display_name, ka.avatar
+          ORDER BY total_amount DESC
+          LIMIT ${limit}
+        `)
+      : await db.execute(sql`
+          SELECT
+            fpc.kid_id::int AS kid_id,
+            ka.display_name AS kid_name,
+            ka.avatar,
+            SUM(fpc.amount::numeric)::numeric AS total_amount,
+            COUNT(*)::int AS contribution_count,
+            MAX(fpc.created_at) AS last_at
+          FROM family_pot_contributions fpc
+          JOIN kids_accounts ka ON ka.id = fpc.kid_id
+          GROUP BY fpc.kid_id, ka.display_name, ka.avatar
+          ORDER BY total_amount DESC
+          LIMIT ${limit}
+        `)
+    const rows = (
+      result as unknown as {
+        rows: {
+          kid_id: number
+          kid_name: string
+          avatar: string
+          total_amount: string | number
+          contribution_count: number
+          last_at: Date | null
+        }[]
+      }
+    ).rows
+
+    const contributors = rows.map((r) => ({
+      kidId: r.kid_id,
+      kidName: r.kid_name,
+      avatar: r.avatar,
+      totalAmount: Number(r.total_amount ?? 0),
+      contributionCount: r.contribution_count,
+      lastAt: r.last_at,
+    }))
+
+    const totalAmount = contributors.reduce((s, c) => s + c.totalAmount, 0)
+    const topContributor = contributors[0] ?? null
+
+    res.json({
+      potId: potIdQ,
+      total: contributors.length,
+      totalAmount,
+      topContributor,
+      contributors,
+    })
+  })
+)
+
+/**
+ * GET /api/family/kid-emoji-cloud?kidId=&limit=15
+ * 小孩任務 emoji 雲：統計做最多的 task emoji
+ * 視覺化「我做過什麼」、培養回顧感
+ */
+router.get(
+  "/api/family/kid-emoji-cloud",
+  asyncHandler(async (req, res) => {
+    const kidIdQ = Number(req.query.kidId)
+    if (!Number.isInteger(kidIdQ) || kidIdQ < 1) throw new AppError(400, "需傳 kidId")
+    const limit = Math.min(Math.max(Number(req.query.limit) || 15, 1), 30)
+
+    const result = await db.execute(sql`
+      SELECT
+        emoji,
+        COUNT(*)::int AS count,
+        MAX(title) AS sample_title
+      FROM kids_tasks
+      WHERE kid_id = ${kidIdQ}
+        AND status = 'approved'
+        AND emoji IS NOT NULL
+        AND emoji != ''
+      GROUP BY emoji
+      ORDER BY count DESC
+      LIMIT ${limit}
+    `)
+    const rows = (
+      result as unknown as {
+        rows: { emoji: string; count: number; sample_title: string }[]
+      }
+    ).rows
+
+    const total = rows.reduce((s, r) => s + r.count, 0)
+    const peak = rows[0]?.count ?? 0
+
+    // 算每個 emoji 的相對大小（用 0.6x ~ 2.4x）
+    const emojis = rows.map((r) => {
+      const ratio = peak > 0 ? r.count / peak : 0
+      const sizeRem = 0.6 + ratio * 1.8 // 0.6 ~ 2.4 rem
+      return {
+        emoji: r.emoji,
+        count: r.count,
+        sampleTitle: r.sample_title,
+        sizeRem: Math.round(sizeRem * 100) / 100,
+        percentage: total > 0 ? Math.round((r.count / total) * 100) : 0,
+      }
+    })
+
+    res.json({
+      kidId: kidIdQ,
+      total,
+      uniqueEmojis: rows.length,
+      mostUsed: emojis[0] ?? null,
+      emojis,
+    })
+  })
+)
+
+/**
+ * GET /api/family/family-mood-today
+ * 家庭今日氛圍：今日所有打卡的 mood 平均
+ *
+ * mood 對應分數（基於既有 VALID_MOODS）：
+ *   😄 開心 = 5 / 🙂 還好 = 4 / 😐 普通 = 3 / 😢 難過 = 2 / 😡 生氣 = 1
+ * 平均算家庭整體氛圍
+ */
+router.get(
+  "/api/family/family-mood-today",
+  asyncHandler(async (_req, res) => {
+    const result = await db.execute(sql`
+      SELECT
+        ka.id::int AS kid_id,
+        ka.display_name AS kid_name,
+        ka.avatar,
+        kc.mood,
+        kc.note
+      FROM kids_accounts ka
+      LEFT JOIN kids_checkins kc ON kc.kid_id = ka.id AND kc.checkin_date = CURRENT_DATE
+      WHERE ka.is_active = true
+      ORDER BY ka.id ASC
+    `)
+    const rows = (
+      result as unknown as {
+        rows: {
+          kid_id: number
+          kid_name: string
+          avatar: string
+          mood: string | null
+          note: string | null
+        }[]
+      }
+    ).rows
+
+    const MOOD_SCORE: Record<string, number> = {
+      "😄 開心": 5,
+      "🙂 還好": 4,
+      "😐 普通": 3,
+      "😢 難過": 2,
+      "😡 生氣": 1,
+    }
+
+    const kids = rows.map((r) => ({
+      kidId: r.kid_id,
+      kidName: r.kid_name,
+      avatar: r.avatar,
+      mood: r.mood,
+      note: r.note,
+      score: r.mood ? (MOOD_SCORE[r.mood] ?? 3) : null,
+      checkedIn: !!r.mood,
+    }))
+
+    const moodScores = kids.filter((k) => k.score !== null).map((k) => k.score as number)
+    const checkinCount = moodScores.length
+    const totalKids = kids.length
+    const avgScore =
+      moodScores.length > 0
+        ? Math.round((moodScores.reduce((s, v) => s + v, 0) / moodScores.length) * 100) / 100
+        : 0
+
+    let atmosphere: string
+    let atmosphereEmoji: string
+    if (checkinCount === 0) {
+      atmosphere = "還沒人打卡"
+      atmosphereEmoji = "🌫️"
+    } else if (avgScore >= 4.5) {
+      atmosphere = "全家超開心！"
+      atmosphereEmoji = "🌞"
+    } else if (avgScore >= 3.5) {
+      atmosphere = "家裡氣氛不錯"
+      atmosphereEmoji = "😊"
+    } else if (avgScore >= 2.5) {
+      atmosphere = "家裡平穩"
+      atmosphereEmoji = "🌤️"
+    } else if (avgScore >= 1.5) {
+      atmosphere = "有人需要關心"
+      atmosphereEmoji = "🌧️"
+    } else {
+      atmosphere = "今天情緒比較重、來個家庭聚會吧"
+      atmosphereEmoji = "⛈️"
+    }
+
+    res.json({
+      date: new Date().toISOString().slice(0, 10),
+      totalKids,
+      checkinCount,
+      avgScore,
+      atmosphere,
+      atmosphereEmoji,
+      kids,
+    })
+  })
+)
+
+/**
  * GET /api/family/weekly-heatmap?weeks=12
  * 家庭週曆熱度：按星期幾統計 approved task 數
  */
@@ -3752,11 +4073,29 @@ router.get(
     if (stats.checkinsToday === kids.length && kids.length > 0) highlights.push("📅 全家都打卡了！")
     if (stats.newWishes > 0) highlights.push(`✨ 新增 ${stats.newWishes} 個願望`)
 
+    // 生成可分享文字（一句總結、適合貼 LINE）
+    const today = new Date().toISOString().slice(0, 10)
+    const lines: string[] = [`📊 ${today} 全家成就：`]
+    if (stats.approvedToday > 0)
+      lines.push(`✅ 完成 ${stats.approvedToday} 個任務（獎勵 $${stats.rewardToday}）`)
+    if (stats.spentToday > 0) lines.push(`💸 花費 $${stats.spentToday}`)
+    if (stats.givenToday > 0) lines.push(`❤️ 捐贈 $${stats.givenToday}`)
+    if (stats.checkinsToday > 0) lines.push(`📅 打卡 ${stats.checkinsToday} 人`)
+    if (stats.pendingTasks > 0) lines.push(`⏳ 待審核 ${stats.pendingTasks} 個`)
+    if (kids.length > 0) {
+      const top = kids[0]
+      if (top.tasks > 0)
+        lines.push(`🏆 今日最積極：${top.avatar} ${top.kidName}（${top.tasks} 任務）`)
+    }
+    const shareableText =
+      lines.length > 1 ? lines.join("\n") : `📊 ${today} 還沒有家庭活動、來開始吧！`
+
     res.json({
-      date: new Date().toISOString().slice(0, 10),
+      date: today,
       stats,
       kids,
       highlights,
+      shareableText,
     })
   })
 )

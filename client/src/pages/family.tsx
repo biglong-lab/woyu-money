@@ -443,6 +443,9 @@ export default function FamilyPage() {
       {/* 家庭今日重點（最頂部）*/}
       <FamilyTodaySummary />
 
+      {/* 家庭今日氛圍 */}
+      <FamilyMoodToday />
+
       {/* 家長待辦清單 */}
       <ParentTodoList />
 
@@ -454,6 +457,9 @@ export default function FamilyPage() {
 
       {/* 家庭目標進度看板 */}
       <FamilyGoalsBoard />
+
+      {/* 目標達成歷史 */}
+      <CompletedGoalsHistory />
 
       {/* 熱門任務 TOP 5 */}
       <PopularTasksCard />
@@ -493,6 +499,9 @@ export default function FamilyPage() {
 
       {/* 家庭共同存錢罐 */}
       <FamilyPotsManager />
+
+      {/* 家庭目標貢獻者排行 */}
+      <PotContributorsCard />
 
       {/* 捐贈對象目錄 */}
       <RecipientsManager />
@@ -1605,6 +1614,76 @@ function MoodTrends() {
   )
 }
 
+function PotContributorsCard() {
+  const { data } = useQuery<{
+    total: number
+    totalAmount: number
+    topContributor: { kidName: string; avatar: string; totalAmount: number } | null
+    contributors: Array<{
+      kidId: number
+      kidName: string
+      avatar: string
+      totalAmount: number
+      contributionCount: number
+    }>
+  }>({
+    queryKey: ["/api/family/pot-top-contributors"],
+    queryFn: async () => {
+      const res = await fetch("/api/family/pot-top-contributors?limit=10", {
+        credentials: "include",
+      })
+      return res.json()
+    },
+  })
+  if (!data || data.total === 0) return null
+
+  const medals = ["🥇", "🥈", "🥉", "🏅", "🏅"]
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-purple-300 bg-gradient-to-br from-purple-50 to-fuchsia-50 p-4 shadow">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="font-bold text-purple-900 flex items-center gap-2">🏆 家庭目標貢獻者</h3>
+        <span className="text-xs text-gray-500">總計 ${data.totalAmount}</span>
+      </div>
+
+      {data.topContributor && (
+        <div className="bg-white rounded-lg p-3 mb-3 text-center">
+          <div className="text-4xl mb-1">{data.topContributor.avatar}</div>
+          <div className="text-sm font-bold text-purple-900">
+            最大功臣：{data.topContributor.kidName}
+          </div>
+          <div className="text-xs text-gray-600">累積貢獻 ${data.topContributor.totalAmount}</div>
+        </div>
+      )}
+
+      <div className="space-y-1">
+        {data.contributors.map((c, i) => {
+          const percentage =
+            data.totalAmount > 0 ? Math.round((c.totalAmount / data.totalAmount) * 100) : 0
+          return (
+            <div key={c.kidId} className="bg-white rounded-lg p-2">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-xl">{medals[i] ?? "🏅"}</span>
+                <span className="text-lg">{c.avatar}</span>
+                <span className="text-sm font-bold flex-1">{c.kidName}</span>
+                <span className="text-xs font-bold text-purple-700">
+                  ${c.totalAmount}（{c.contributionCount} 次）
+                </span>
+              </div>
+              <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-purple-400 to-fuchsia-500"
+                  style={{ width: `${percentage}%` }}
+                />
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 function FamilyPotsManager() {
   const { toast } = useToast()
   const [open, setOpen] = useState(false)
@@ -2350,6 +2429,103 @@ function FamilyWealthTrend() {
   )
 }
 
+function CompletedGoalsHistory() {
+  const { data } = useQuery<{
+    total: number
+    totalTarget: number
+    avgDaysTaken: number
+    fastestGoal: {
+      name: string
+      emoji: string
+      daysTaken: number
+      kidName: string
+      avatar: string
+    } | null
+    largestGoal: {
+      name: string
+      emoji: string
+      targetAmount: number
+      kidName: string
+      avatar: string
+    } | null
+    goals: Array<{
+      id: number
+      name: string
+      emoji: string
+      targetAmount: number
+      kidName: string
+      avatar: string
+      daysTaken: number
+      reflection: string | null
+      completedAt: string | null
+    }>
+  }>({
+    queryKey: ["/api/family/completed-goals-history"],
+    queryFn: async () => {
+      const res = await fetch("/api/family/completed-goals-history?limit=20", {
+        credentials: "include",
+      })
+      return res.json()
+    },
+  })
+  if (!data || data.total === 0) return null
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-green-300 bg-gradient-to-br from-green-50 to-emerald-50 p-4 shadow">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="font-bold text-green-900 flex items-center gap-2">
+          🎊 達成的目標（{data.total}）
+        </h3>
+        <span className="text-xs text-gray-500">累積 ${data.totalTarget}</span>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2 mb-3">
+        {data.fastestGoal && (
+          <div className="bg-white rounded-lg p-2 text-center">
+            <div className="text-xs text-gray-500">最快達成</div>
+            <div className="text-2xl">{data.fastestGoal.emoji}</div>
+            <div className="text-xs font-bold truncate">{data.fastestGoal.name}</div>
+            <div className="text-xs text-emerald-700 font-bold">
+              {data.fastestGoal.daysTaken} 天
+            </div>
+          </div>
+        )}
+        {data.largestGoal && (
+          <div className="bg-white rounded-lg p-2 text-center">
+            <div className="text-xs text-gray-500">最大金額</div>
+            <div className="text-2xl">{data.largestGoal.emoji}</div>
+            <div className="text-xs font-bold truncate">{data.largestGoal.name}</div>
+            <div className="text-xs text-emerald-700 font-bold">
+              ${data.largestGoal.targetAmount}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="space-y-1 max-h-72 overflow-y-auto">
+        {data.goals.map((g) => (
+          <div key={g.id} className="bg-white rounded-lg p-2 flex items-center gap-2">
+            <span className="text-2xl shrink-0">{g.avatar}</span>
+            <span className="text-xl shrink-0">{g.emoji}</span>
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-medium truncate">{g.name}</div>
+              <div className="text-xs text-gray-500">
+                {g.kidName}・${g.targetAmount}・{g.daysTaken} 天達成
+              </div>
+              {g.reflection && (
+                <div className="text-[11px] text-emerald-700 italic mt-0.5">💭 {g.reflection}</div>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="text-xs text-green-700 mt-2 text-center">
+        平均達成時間：{data.avgDaysTaken} 天
+      </div>
+    </div>
+  )
+}
+
 function PopularTasksCard() {
   const { data } = useQuery<{
     total: number
@@ -2739,6 +2915,81 @@ function ParentTodoList() {
   )
 }
 
+function FamilyMoodToday() {
+  const { data } = useQuery<{
+    totalKids: number
+    checkinCount: number
+    avgScore: number
+    atmosphere: string
+    atmosphereEmoji: string
+    kids: Array<{
+      kidId: number
+      kidName: string
+      avatar: string
+      mood: string | null
+      note: string | null
+      score: number | null
+      checkedIn: boolean
+    }>
+  }>({
+    queryKey: ["/api/family/family-mood-today"],
+    queryFn: async () => {
+      const res = await fetch("/api/family/family-mood-today", { credentials: "include" })
+      return res.json()
+    },
+  })
+  if (!data || data.totalKids === 0) return null
+
+  const bg =
+    data.checkinCount === 0
+      ? "from-gray-50 to-slate-50 border-gray-300"
+      : data.avgScore >= 4.5
+        ? "from-yellow-50 to-orange-50 border-yellow-400"
+        : data.avgScore >= 3.5
+          ? "from-emerald-50 to-green-50 border-emerald-300"
+          : data.avgScore >= 2.5
+            ? "from-blue-50 to-sky-50 border-blue-300"
+            : data.avgScore >= 1.5
+              ? "from-indigo-50 to-purple-50 border-indigo-300"
+              : "from-rose-50 to-red-50 border-rose-400"
+
+  return (
+    <div className={`mb-4 rounded-2xl border-2 bg-gradient-to-br ${bg} p-4 shadow`}>
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="font-bold flex items-center gap-2">{data.atmosphereEmoji} 今日家庭氛圍</h3>
+        <span className="text-xs text-gray-500">
+          {data.checkinCount} / {data.totalKids} 打卡
+        </span>
+      </div>
+
+      {/* 大字氛圍評語 */}
+      <div className="text-center bg-white/70 rounded-lg p-3 mb-3">
+        <div className="text-3xl mb-1">{data.atmosphereEmoji}</div>
+        <div className="text-base font-bold">{data.atmosphere}</div>
+        {data.checkinCount > 0 && (
+          <div className="text-xs text-gray-500 mt-1">平均分數 {data.avgScore.toFixed(2)} / 5</div>
+        )}
+      </div>
+
+      {/* 每個 kid 的 mood */}
+      <div className="flex flex-wrap gap-1">
+        {data.kids.map((k) => (
+          <div
+            key={k.kidId}
+            className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs ${
+              k.checkedIn ? "bg-white" : "bg-gray-200 opacity-60"
+            }`}
+          >
+            <span className="text-base">{k.avatar}</span>
+            <span className="font-bold">{k.kidName}</span>
+            {k.checkedIn ? <span>{k.mood}</span> : <span className="text-gray-500">未打卡</span>}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function FamilyTodaySummary() {
   const { data } = useQuery<{
     date: string
@@ -2760,6 +3011,7 @@ function FamilyTodaySummary() {
       checkedIn: boolean
     }>
     highlights: string[]
+    shareableText: string
   }>({
     queryKey: ["/api/family/today-summary"],
     queryFn: async () => {
@@ -2835,6 +3087,24 @@ function FamilyTodaySummary() {
             </div>
           ))}
         </div>
+      )}
+
+      {/* 分享按鈕：複製今日總結到剪貼簿 */}
+      {data.shareableText && (
+        <button
+          type="button"
+          onClick={async () => {
+            try {
+              await navigator.clipboard.writeText(data.shareableText)
+              alert("✅ 今日總結已複製到剪貼簿、可以貼到 LINE 分享了")
+            } catch {
+              alert("複製失敗、請手動複製")
+            }
+          }}
+          className="mt-3 w-full text-center text-sm py-2 rounded bg-violet-500 text-white hover:bg-violet-600 transition-colors"
+        >
+          📋 複製今日總結（分享到 LINE）
+        </button>
       )}
     </div>
   )
