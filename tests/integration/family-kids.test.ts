@@ -4245,6 +4245,32 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.body.weeks).toBe(52)
   })
 
+  it("每日平均：基本結構 kids/familyAvgPerDay/message", async () => {
+    const res = await request(app).get("/api/family/kid-daily-avg-tasks")
+    expect(res.status).toBe(200)
+    expect(Array.isArray(res.body.kids)).toBe(true)
+    expect(res.body).toHaveProperty("familyAvgPerDay")
+    expect(res.body.message).toBeTruthy()
+  })
+
+  it("每日平均：approve 1 task → kid.taskCount>=1 + avgPerDay>0", async () => {
+    const kidObj = (await createKid()) as { id: number }
+    const myKidId = kidObj.id
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId: myKidId, title: "平均測試", rewardAmount: 30 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`).send({})
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`).send({})
+    const res = await request(app).get("/api/family/kid-daily-avg-tasks?days=7")
+    expect(res.status).toBe(200)
+    const myKid = res.body.kids.find((k: { kidId: number }) => k.kidId === myKidId)
+    expect(myKid).toBeDefined()
+    expect(myKid.taskCount).toBeGreaterThanOrEqual(1)
+    expect(myKid.avgPerDay).toBeGreaterThan(0)
+    expect(["power", "steady", "occasional", "idle"]).toContain(myKid.pace)
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
   it("分類偏好：基本結構 kids/message", async () => {
     const res = await request(app).get("/api/family/task-category-by-kid")
     expect(res.status).toBe(200)

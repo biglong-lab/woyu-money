@@ -8602,6 +8602,84 @@ async function bulkApproveOne(
 }
 
 /**
+ * GET /api/family/kid-daily-avg-tasks?days=30
+ * 每個 active kid 過去 N 天平均每天完成 task 數
+ * pace: power(>=2/day) / steady(>=0.5) / occasional(>=0.1) / idle
+ */
+router.get(
+  "/api/family/kid-daily-avg-tasks",
+  asyncHandler(async (req, res) => {
+    const days = Math.min(Math.max(Number(req.query.days) || 30, 7), 90)
+
+    const rows = await db.execute(sql`
+      SELECT
+        ka.id::int AS kid_id,
+        ka.display_name AS kid_name,
+        ka.avatar,
+        COUNT(t.id)::int AS task_count
+      FROM kids_accounts ka
+      LEFT JOIN kids_tasks t ON
+        t.kid_id = ka.id
+        AND t.status = 'approved'
+        AND t.completed_at >= CURRENT_DATE - (${days}::int * INTERVAL '1 day')
+      WHERE ka.is_active = true
+      GROUP BY ka.id, ka.display_name, ka.avatar
+      ORDER BY task_count DESC
+    `)
+
+    const kids = (
+      rows as unknown as {
+        rows: Array<{ kid_id: number; kid_name: string; avatar: string; task_count: number }>
+      }
+    ).rows.map((r) => {
+      const avgPerDay = Math.round((r.task_count / days) * 10) / 10
+      let pace: "power" | "steady" | "occasional" | "idle"
+      if (avgPerDay >= 2) pace = "power"
+      else if (avgPerDay >= 0.5) pace = "steady"
+      else if (avgPerDay >= 0.1) pace = "occasional"
+      else pace = "idle"
+      return {
+        kidId: r.kid_id,
+        kidName: r.kid_name,
+        avatar: r.avatar,
+        taskCount: r.task_count,
+        avgPerDay,
+        pace,
+      }
+    })
+
+    const topAchiever = kids.length > 0 && kids[0].taskCount > 0 ? kids[0] : null
+    const familyAvg =
+      kids.length > 0
+        ? Math.round((kids.reduce((s, k) => s + k.taskCount, 0) / kids.length / days) * 10) / 10
+        : 0
+
+    let message: string
+    if (kids.length === 0) {
+      message = "還沒有小孩"
+    } else if (!topAchiever) {
+      message = `過去 ${days} 天還沒任務、開始累積吧 🌱`
+    } else {
+      message = `🏃 最積極：${topAchiever.avatar} ${topAchiever.kidName}（每天 ${topAchiever.avgPerDay} 個）`
+    }
+
+    res.json({
+      days,
+      kids,
+      topAchiever: topAchiever
+        ? {
+            kidName: topAchiever.kidName,
+            avatar: topAchiever.avatar,
+            avgPerDay: topAchiever.avgPerDay,
+          }
+        : null,
+      familyAvgPerDay: familyAvg,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/task-category-by-kid?days=90
  * 每個 active kid 過去 N 天 5 category 任務數 + topCategory
  */

@@ -598,6 +598,9 @@ export default function FamilyPage() {
       {/* 家庭兒童分類偏好 */}
       <FamilyTaskCategoryByKidCard />
 
+      {/* 家庭兒童每日平均任務 */}
+      <FamilyKidDailyAvgTasksCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3552,6 +3555,72 @@ function ParentTodoList() {
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
       )}
+    </div>
+  )
+}
+
+function FamilyKidDailyAvgTasksCard() {
+  const { data } = useQuery<{
+    days: number
+    kids: Array<{
+      kidId: number
+      kidName: string
+      avatar: string
+      taskCount: number
+      avgPerDay: number
+      pace: "power" | "steady" | "occasional" | "idle"
+    }>
+    topAchiever: { kidName: string; avatar: string; avgPerDay: number } | null
+    familyAvgPerDay: number
+    message: string
+  }>({
+    queryKey: ["/api/family/kid-daily-avg-tasks?days=30"],
+  })
+  if (!data || data.kids.length === 0) return null
+  const withTasks = data.kids.filter((k) => k.taskCount > 0)
+  if (withTasks.length === 0) return null
+
+  const PACE_LABEL: Record<string, string> = {
+    power: "🚀 全力",
+    steady: "💪 穩定",
+    occasional: "🌱 偶爾",
+    idle: "💤 停滯",
+  }
+  const PACE_COLOR: Record<string, string> = {
+    power: "bg-emerald-500 text-white",
+    steady: "bg-blue-400 text-white",
+    occasional: "bg-amber-400 text-white",
+    idle: "bg-gray-400 text-white",
+  }
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-teal-400 bg-gradient-to-br from-teal-50 to-cyan-50 p-3 shadow">
+      <h3 className="font-bold mb-2 flex items-center gap-2">🏃 每日平均（30 天）</h3>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-2 text-xs">
+        {data.message}
+        <div className="text-gray-600 mt-1">全家平均每天 {data.familyAvgPerDay} 個任務</div>
+      </div>
+
+      <div className="space-y-1.5">
+        {data.kids.map((k, i) => (
+          <div key={k.kidId} className="bg-white rounded-lg p-2 flex items-center gap-2">
+            <div className="w-4 text-center text-gray-500">{i + 1}</div>
+            <div className="text-lg">{k.avatar}</div>
+            <div className="flex-1">
+              <div className="text-sm font-medium">{k.kidName}</div>
+              <div className="text-[10px] text-gray-500">共 {k.taskCount} 個</div>
+            </div>
+            <div className="text-right">
+              <div className="text-lg font-bold text-teal-600">{k.avgPerDay}</div>
+              <div className="text-[9px] text-gray-500">/天</div>
+            </div>
+            <div className={`text-[10px] px-1.5 py-0.5 rounded ${PACE_COLOR[k.pace]}`}>
+              {PACE_LABEL[k.pace]}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
