@@ -1945,6 +1945,33 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(notFound.status).toBe(404)
   })
 
+  it("任務廣播：對所有 active 小孩各建一份", async () => {
+    await createKid({ displayName: "甲" })
+    const r2 = await request(app).post("/api/family/kids").send({
+      displayName: "乙",
+      avatar: "👧",
+      color: "pink",
+      pin: "8721",
+      spendRatio: 70,
+      saveRatio: 20,
+      giveRatio: 10,
+    })
+    const yiId = r2.body.id
+
+    try {
+      const broadcast = await request(app)
+        .post("/api/family/tasks/broadcast")
+        .send({ title: "刷牙", emoji: "🪥", rewardAmount: 5 })
+      expect(broadcast.status).toBe(201)
+      expect(broadcast.body.count).toBeGreaterThanOrEqual(2)
+      const kidIds = broadcast.body.tasks.map((t: { kidId: number }) => t.kidId)
+      expect(kidIds).toContain(kidId)
+      expect(kidIds).toContain(yiId)
+    } finally {
+      await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${yiId}`)
+    }
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)

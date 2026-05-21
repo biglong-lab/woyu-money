@@ -647,6 +647,41 @@ router.post(
 )
 
 /**
+ * POST /api/family/tasks/broadcast
+ * 對所有 active 小孩各建一份相同任務（家長一鍵派全家）
+ */
+router.post(
+  "/api/family/tasks/broadcast",
+  asyncHandler(async (req, res) => {
+    const activeKids = await db
+      .select({ id: kidsAccounts.id })
+      .from(kidsAccounts)
+      .where(eq(kidsAccounts.isActive, true))
+    if (activeKids.length === 0) throw new AppError(400, "目前沒有任何 active 小孩")
+
+    const baseFields: Record<string, unknown> = {
+      ...req.body,
+      status: "pending",
+    }
+    delete baseFields.kidId
+
+    const created = []
+    for (const k of activeKids) {
+      const parsed = insertKidsTaskSchema.safeParse({ ...baseFields, kidId: k.id })
+      if (!parsed.success) {
+        throw new AppError(
+          400,
+          "資料格式錯誤：" + parsed.error.errors.map((e) => e.message).join(", ")
+        )
+      }
+      const [t] = await db.insert(kidsTasks).values(parsed.data).returning()
+      created.push(t)
+    }
+    res.status(201).json({ count: created.length, tasks: created })
+  })
+)
+
+/**
  * POST /api/family/tasks/:id/claim
  * 小孩搶無主任務（kidId IS NULL 且 status='pending'）
  * 培養主動性：家長派公開任務、誰先做誰拿

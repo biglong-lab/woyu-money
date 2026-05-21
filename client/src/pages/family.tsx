@@ -2313,20 +2313,30 @@ function TaskDialog({
   >("other")
 
   const mut = useMutation({
-    mutationFn: () =>
-      apiRequest("POST", "/api/family/tasks", {
+    mutationFn: () => {
+      const body = {
         title: title.trim(),
         emoji,
         rewardAmount: parseFloat(rewardAmount),
-        kidId: kidId === "__public__" || !kidId ? null : parseInt(kidId),
         notes: notes.trim() || null,
         dueDate: dueDate || null,
         recurringInterval: recurringInterval === "none" ? null : recurringInterval,
         difficulty,
         category,
-      }),
-    onSuccess: () => {
-      toast({ title: "✅ 已派任務" })
+      }
+      if (kidId === "__broadcast__") {
+        return apiRequest<{ count: number }>("POST", "/api/family/tasks/broadcast", body)
+      }
+      return apiRequest("POST", "/api/family/tasks", {
+        ...body,
+        kidId: kidId === "__public__" || !kidId ? null : parseInt(kidId),
+      })
+    },
+    onSuccess: (r: unknown) => {
+      const broadcastCount = kidId === "__broadcast__" ? (r as { count?: number })?.count : null
+      toast({
+        title: broadcastCount ? `📣 已派給 ${broadcastCount} 個小孩` : "✅ 已派任務",
+      })
       onSuccess()
     },
     onError: (e: Error) => toast({ title: "失敗", description: e.message, variant: "destructive" }),
@@ -2446,6 +2456,7 @@ function TaskDialog({
                 <SelectValue placeholder="選擇小孩" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="__broadcast__">📣 派給全家（每人各一份）</SelectItem>
                 <SelectItem value="__public__">🙋 公開任務（誰先做誰拿）</SelectItem>
                 {kids.map((k) => (
                   <SelectItem key={k.id} value={k.id.toString()}>
