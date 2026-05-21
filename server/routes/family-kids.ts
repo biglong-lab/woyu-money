@@ -8601,6 +8601,153 @@ async function bulkApproveOne(
   return { taskId, kidName: kid.displayName, reward, spendAdd, saveAdd, giveAdd }
 }
 
+/**
+ * GET /api/family/weekly-summary
+ * 全家本週 vs 上週 metrics 對比 + highlights
+ * 起：本週一 00:00（PostgreSQL DATE_TRUNC('week', ...) 對應 ISO 週、週一為起）
+ * 對比指標：tasks_approved / total_reward / total_spent / checkins / new_wishes
+ */
+router.get(
+  "/api/family/weekly-summary",
+  asyncHandler(async (_req, res) => {
+    const stats = await db.execute(sql`
+      WITH this_week AS (
+        SELECT
+          COALESCE((
+            SELECT COUNT(*)::int FROM kids_tasks
+            WHERE status = 'approved'
+              AND completed_at >= DATE_TRUNC('week', CURRENT_DATE)
+              AND completed_at < DATE_TRUNC('week', CURRENT_DATE) + INTERVAL '7 days'
+          ), 0) AS tasks_approved,
+          COALESCE((
+            SELECT SUM(reward_amount::numeric)::numeric FROM kids_tasks
+            WHERE status = 'approved'
+              AND completed_at >= DATE_TRUNC('week', CURRENT_DATE)
+              AND completed_at < DATE_TRUNC('week', CURRENT_DATE) + INTERVAL '7 days'
+          ), 0) AS total_reward,
+          COALESCE((
+            SELECT SUM(amount::numeric)::numeric FROM kids_spendings
+            WHERE spend_date >= DATE_TRUNC('week', CURRENT_DATE)::date
+              AND spend_date < (DATE_TRUNC('week', CURRENT_DATE) + INTERVAL '7 days')::date
+          ), 0) AS total_spent,
+          COALESCE((
+            SELECT COUNT(*)::int FROM kids_checkins
+            WHERE checkin_date >= DATE_TRUNC('week', CURRENT_DATE)::date
+              AND checkin_date < (DATE_TRUNC('week', CURRENT_DATE) + INTERVAL '7 days')::date
+          ), 0) AS checkins,
+          COALESCE((
+            SELECT COUNT(*)::int FROM kids_wishes
+            WHERE created_at >= DATE_TRUNC('week', CURRENT_DATE)
+              AND created_at < DATE_TRUNC('week', CURRENT_DATE) + INTERVAL '7 days'
+          ), 0) AS new_wishes
+      ),
+      last_week AS (
+        SELECT
+          COALESCE((
+            SELECT COUNT(*)::int FROM kids_tasks
+            WHERE status = 'approved'
+              AND completed_at >= DATE_TRUNC('week', CURRENT_DATE) - INTERVAL '7 days'
+              AND completed_at < DATE_TRUNC('week', CURRENT_DATE)
+          ), 0) AS tasks_approved,
+          COALESCE((
+            SELECT SUM(reward_amount::numeric)::numeric FROM kids_tasks
+            WHERE status = 'approved'
+              AND completed_at >= DATE_TRUNC('week', CURRENT_DATE) - INTERVAL '7 days'
+              AND completed_at < DATE_TRUNC('week', CURRENT_DATE)
+          ), 0) AS total_reward,
+          COALESCE((
+            SELECT SUM(amount::numeric)::numeric FROM kids_spendings
+            WHERE spend_date >= (DATE_TRUNC('week', CURRENT_DATE) - INTERVAL '7 days')::date
+              AND spend_date < DATE_TRUNC('week', CURRENT_DATE)::date
+          ), 0) AS total_spent,
+          COALESCE((
+            SELECT COUNT(*)::int FROM kids_checkins
+            WHERE checkin_date >= (DATE_TRUNC('week', CURRENT_DATE) - INTERVAL '7 days')::date
+              AND checkin_date < DATE_TRUNC('week', CURRENT_DATE)::date
+          ), 0) AS checkins,
+          COALESCE((
+            SELECT COUNT(*)::int FROM kids_wishes
+            WHERE created_at >= DATE_TRUNC('week', CURRENT_DATE) - INTERVAL '7 days'
+              AND created_at < DATE_TRUNC('week', CURRENT_DATE)
+          ), 0) AS new_wishes
+      )
+      SELECT
+        (SELECT row_to_json(this_week.*) FROM this_week) AS this_week_json,
+        (SELECT row_to_json(last_week.*) FROM last_week) AS last_week_json
+    `)
+    const row = (
+      stats as unknown as {
+        rows: Array<{
+          this_week_json: Record<string, number | string>
+          last_week_json: Record<string, number | string>
+        }>
+      }
+    ).rows[0]
+
+    const toNum = (v: string | number | undefined): number =>
+      v === undefined || v === null ? 0 : Number(v)
+
+    const thisWeek = {
+      tasksApproved: toNum(row?.this_week_json?.tasks_approved),
+      totalReward: toNum(row?.this_week_json?.total_reward),
+      totalSpent: toNum(row?.this_week_json?.total_spent),
+      checkins: toNum(row?.this_week_json?.checkins),
+      newWishes: toNum(row?.this_week_json?.new_wishes),
+    }
+    const lastWeek = {
+      tasksApproved: toNum(row?.last_week_json?.tasks_approved),
+      totalReward: toNum(row?.last_week_json?.total_reward),
+      totalSpent: toNum(row?.last_week_json?.total_spent),
+      checkins: toNum(row?.last_week_json?.checkins),
+      newWishes: toNum(row?.last_week_json?.new_wishes),
+    }
+
+    const deltas: Record<string, { abs: number; pct: number | null; arrow: "↑" | "↓" | "→" }> = {}
+    for (const key of Object.keys(thisWeek) as Array<keyof typeof thisWeek>) {
+      const t = thisWeek[key]
+      const l = lastWeek[key]
+      const abs = t - l
+      const pct = l > 0 ? Math.round((abs / l) * 100) : null
+      deltas[key as string] = {
+        abs,
+        pct,
+        arrow: abs > 0 ? "↑" : abs < 0 ? "↓" : "→",
+      }
+    }
+
+    const highlights: string[] = []
+    if (thisWeek.tasksApproved > lastWeek.tasksApproved) {
+      highlights.push(`🚀 任務完成數比上週多 ${thisWeek.tasksApproved - lastWeek.tasksApproved} 個`)
+    }
+    if (thisWeek.totalReward > lastWeek.totalReward) {
+      highlights.push(
+        `💰 本週入帳 $${thisWeek.totalReward}（多 $${thisWeek.totalReward - lastWeek.totalReward}）`
+      )
+    }
+    if (thisWeek.checkins > lastWeek.checkins && thisWeek.checkins > 0) {
+      highlights.push(`📅 本週打卡 ${thisWeek.checkins} 次（成長中）`)
+    }
+    if (thisWeek.totalSpent > 0 && thisWeek.totalSpent < lastWeek.totalSpent) {
+      highlights.push(`💡 花用比上週少 $${lastWeek.totalSpent - thisWeek.totalSpent}（更節制了）`)
+    }
+    if (highlights.length === 0) {
+      if (thisWeek.tasksApproved === 0) {
+        highlights.push("📝 本週還沒任務通過、加油！")
+      } else {
+        highlights.push("💪 本週持續努力中、繼續保持！")
+      }
+    }
+
+    res.json({
+      thisWeek,
+      lastWeek,
+      deltas,
+      highlights,
+      generatedAt: new Date().toISOString(),
+    })
+  })
+)
+
 router.post(
   "/api/family/tasks/bulk-approve",
   asyncHandler(async (req, res) => {

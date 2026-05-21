@@ -475,6 +475,9 @@ export default function FamilyPage() {
       {/* 家庭累計總成就 */}
       <FamilyLifetimeCard />
 
+      {/* 全家本週摘要 vs 上週 */}
+      <FamilyWeeklySummaryCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3429,6 +3432,82 @@ function ParentTodoList() {
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
       )}
+    </div>
+  )
+}
+
+function FamilyWeeklySummaryCard() {
+  const { data } = useQuery<{
+    thisWeek: {
+      tasksApproved: number
+      totalReward: number
+      totalSpent: number
+      checkins: number
+      newWishes: number
+    }
+    lastWeek: {
+      tasksApproved: number
+      totalReward: number
+      totalSpent: number
+      checkins: number
+      newWishes: number
+    }
+    deltas: Record<string, { abs: number; pct: number | null; arrow: "↑" | "↓" | "→" }>
+    highlights: string[]
+  }>({
+    queryKey: ["/api/family/weekly-summary"],
+  })
+  if (!data) return null
+
+  const ARROW_COLOR: Record<string, string> = {
+    "↑": "text-emerald-600",
+    "↓": "text-red-500",
+    "→": "text-gray-400",
+  }
+
+  const metrics: Array<{ key: keyof typeof data.thisWeek; label: string; emoji: string }> = [
+    { key: "tasksApproved", label: "任務完成", emoji: "✅" },
+    { key: "totalReward", label: "入帳", emoji: "💰" },
+    { key: "totalSpent", label: "花費", emoji: "🛒" },
+    { key: "checkins", label: "打卡", emoji: "📅" },
+    { key: "newWishes", label: "新願望", emoji: "🎁" },
+  ]
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-blue-300 bg-gradient-to-br from-blue-50 to-cyan-50 p-4 shadow">
+      <h3 className="font-bold mb-3 flex items-center gap-2">📊 本週 vs 上週</h3>
+
+      {data.highlights.length > 0 && (
+        <div className="bg-white/70 rounded-lg p-2 mb-3 space-y-1">
+          {data.highlights.map((h, i) => (
+            <div key={i} className="text-sm">
+              {h}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="grid grid-cols-5 gap-1.5">
+        {metrics.map((m) => {
+          const t = data.thisWeek[m.key]
+          const l = data.lastWeek[m.key]
+          const d = data.deltas[m.key]
+          return (
+            <div key={m.key} className="bg-white rounded-lg p-2 text-center">
+              <div className="text-xs text-gray-500">
+                {m.emoji} {m.label}
+              </div>
+              <div className="text-lg font-bold">{t}</div>
+              <div className={`text-xs ${ARROW_COLOR[d?.arrow ?? "→"]}`}>
+                {d?.arrow} {d?.abs > 0 ? "+" : ""}
+                {d?.abs}
+                {d?.pct !== null && d?.pct !== undefined ? ` (${d.pct}%)` : ""}
+              </div>
+              <div className="text-[10px] text-gray-400">上週 {l}</div>
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }

@@ -4245,6 +4245,36 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.body.weeks).toBe(52)
   })
 
+  it("本週摘要：基本結構 thisWeek/lastWeek/deltas/highlights", async () => {
+    const res = await request(app).get("/api/family/weekly-summary")
+    expect(res.status).toBe(200)
+    expect(res.body.thisWeek).toBeDefined()
+    expect(res.body.thisWeek).toHaveProperty("tasksApproved")
+    expect(res.body.thisWeek).toHaveProperty("totalReward")
+    expect(res.body.thisWeek).toHaveProperty("checkins")
+    expect(res.body.lastWeek).toBeDefined()
+    expect(res.body.deltas).toBeDefined()
+    expect(res.body.deltas.tasksApproved).toHaveProperty("arrow")
+    expect(["↑", "↓", "→"]).toContain(res.body.deltas.tasksApproved.arrow)
+    expect(Array.isArray(res.body.highlights)).toBe(true)
+    expect(res.body.highlights.length).toBeGreaterThanOrEqual(1)
+  })
+
+  it("本週摘要：完成任務後 thisWeek.tasksApproved >= 1", async () => {
+    const kidObj = (await createKid()) as { id: number }
+    const myKidId = kidObj.id
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId: myKidId, title: "本週任務", rewardAmount: 50 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`).send({})
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`).send({})
+    const res = await request(app).get("/api/family/weekly-summary")
+    expect(res.status).toBe(200)
+    expect(res.body.thisWeek.tasksApproved).toBeGreaterThanOrEqual(1)
+    expect(res.body.thisWeek.totalReward).toBeGreaterThanOrEqual(50)
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
   it("批量批准：3 個 submitted → 全 approved + totalReward", async () => {
     const kidObj = (await createKid()) as { id: number }
     const myKidId = kidObj.id
