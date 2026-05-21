@@ -446,6 +446,9 @@ export default function FamilyPage() {
       {/* 全家月度統計 */}
       <FamilyMonthlyStats />
 
+      {/* 家庭目標進度看板 */}
+      <FamilyGoalsBoard />
+
       {/* 全家活動 feed */}
       <FamilyActivityFeed />
 
@@ -1873,6 +1876,101 @@ function DifficultyInsights() {
         ))}
       </CardContent>
     </Card>
+  )
+}
+
+function FamilyGoalsBoard() {
+  const { data } = useQuery<{
+    total: number
+    nearComplete: number
+    completedReady: number
+    goals: Array<{
+      id: number
+      kidId: number
+      kidName: string
+      kidAvatar: string
+      name: string
+      emoji: string
+      currentAmount: number
+      targetAmount: number
+      remaining: number
+      progress: number
+      deadline: string | null
+    }>
+  }>({
+    queryKey: ["/api/family/all-goals-summary"],
+    queryFn: async () => {
+      const res = await fetch("/api/family/all-goals-summary", { credentials: "include" })
+      return res.json()
+    },
+  })
+  if (!data || data.total === 0) return null
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-purple-300 bg-gradient-to-br from-purple-50 to-pink-50 p-4 shadow">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="font-bold text-purple-900 flex items-center gap-2">
+          🎯 家庭目標進度（{data.total}）
+        </h3>
+        <div className="flex gap-1 text-xs">
+          {data.completedReady > 0 && (
+            <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold">
+              ✅ {data.completedReady} 達成
+            </span>
+          )}
+          {data.nearComplete > 0 && (
+            <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-bold">
+              🔥 {data.nearComplete} 接近
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div className="space-y-2 max-h-96 overflow-y-auto">
+        {data.goals.map((g) => {
+          const isReady = g.progress >= 100
+          const isNear = g.progress >= 80 && !isReady
+          return (
+            <div
+              key={g.id}
+              className={`rounded-lg p-2 bg-white shadow-sm border-l-4 ${
+                isReady ? "border-green-500" : isNear ? "border-amber-500" : "border-purple-200"
+              }`}
+            >
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-2xl">{g.kidAvatar}</span>
+                <span className="text-xl">{g.emoji}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium text-sm truncate">{g.name}</div>
+                  <div className="text-xs text-gray-500">
+                    {g.kidName}・${g.currentAmount} / ${g.targetAmount}
+                  </div>
+                </div>
+                <span
+                  className={`text-sm font-bold ${
+                    isReady ? "text-green-700" : isNear ? "text-amber-700" : "text-purple-700"
+                  }`}
+                >
+                  {g.progress}%
+                </span>
+              </div>
+              <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
+                <div
+                  className={
+                    isReady
+                      ? "h-full bg-gradient-to-r from-green-400 to-emerald-500"
+                      : isNear
+                        ? "h-full bg-gradient-to-r from-amber-400 to-orange-500"
+                        : "h-full bg-gradient-to-r from-purple-400 to-pink-400"
+                  }
+                  style={{ width: `${g.progress}%` }}
+                />
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
   )
 }
 

@@ -2875,6 +2875,79 @@ router.get(
 )
 
 /**
+ * GET /api/family/all-goals-summary
+ * 家長端：所有 active 目標一覽（按進度降序）
+ */
+router.get(
+  "/api/family/all-goals-summary",
+  asyncHandler(async (_req, res) => {
+    const result = await db.execute(sql`
+      SELECT
+        kg.id::int AS id,
+        kg.kid_id::int AS kid_id,
+        ka.display_name AS kid_name,
+        ka.avatar AS kid_avatar,
+        kg.name AS name,
+        kg.emoji AS emoji,
+        kg.current_amount::numeric AS current_amount,
+        kg.target_amount::numeric AS target_amount,
+        kg.status::text AS status,
+        kg.deadline AS deadline
+      FROM kids_goals kg
+      JOIN kids_accounts ka ON ka.id = kg.kid_id
+      WHERE kg.status = 'active' AND ka.is_active = true
+    `)
+    const rows = (
+      result as unknown as {
+        rows: {
+          id: number
+          kid_id: number
+          kid_name: string
+          kid_avatar: string
+          name: string
+          emoji: string | null
+          current_amount: string | number
+          target_amount: string | number
+          status: string
+          deadline: Date | null
+        }[]
+      }
+    ).rows
+
+    const goals = rows
+      .map((r) => {
+        const current = Number(r.current_amount ?? 0)
+        const target = Number(r.target_amount ?? 0)
+        const progress = target > 0 ? Math.min(100, Math.round((current / target) * 100)) : 0
+        return {
+          id: r.id,
+          kidId: r.kid_id,
+          kidName: r.kid_name,
+          kidAvatar: r.kid_avatar,
+          name: r.name,
+          emoji: r.emoji ?? "🎯",
+          currentAmount: current,
+          targetAmount: target,
+          remaining: Math.max(0, target - current),
+          progress,
+          deadline: r.deadline,
+        }
+      })
+      .sort((a, b) => b.progress - a.progress)
+
+    const nearComplete = goals.filter((g) => g.progress >= 80).length
+    const completedReady = goals.filter((g) => g.progress >= 100).length
+
+    res.json({
+      total: goals.length,
+      nearComplete,
+      completedReady,
+      goals,
+    })
+  })
+)
+
+/**
  * GET /api/family/kid-next-badge?kidId=
  * 找小孩最接近解鎖的徽章（unlocked=false 且 remaining 最小）
  * 激勵感極強：大字顯示「再 N 個任務就解鎖 XXX 徽章！」

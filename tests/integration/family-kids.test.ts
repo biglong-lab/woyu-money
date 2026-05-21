@@ -2676,6 +2676,70 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(r.status).toBe(400)
   })
 
+  it("家庭目標進度看板：按 progress 降序、含 kidName/kidAvatar", async () => {
+    // 清乾淨避免污染
+    await db.execute(sql`DELETE FROM kids_accounts WHERE pin = ${TEST_PIN}`)
+
+    await createKid({ displayName: "小華", spendRatio: 0, saveRatio: 100, giveRatio: 0 })
+
+    // 任務獎勵 1000 元（全到 save 罐）
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId, title: "大任務", rewardAmount: 1000 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`)
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`)
+
+    // 建 3 個目標、撥不同金額
+    const g1 = await request(app)
+      .post("/api/family/goals")
+      .send({ kidId, name: "玩具 A", targetAmount: 100, emoji: "🧸" })
+    const g2 = await request(app)
+      .post("/api/family/goals")
+      .send({ kidId, name: "樂高 B", targetAmount: 500, emoji: "🧱" })
+    const g3 = await request(app)
+      .post("/api/family/goals")
+      .send({ kidId, name: "腳踏車 C", targetAmount: 5000, emoji: "🚲" })
+
+    // g1 撥 100（達成 100%），g2 撥 400（80%），g3 撥 100（2%）
+    await request(app).post(`/api/family/goals/${g1.body.id}/save`).send({ amount: 100 })
+    await request(app).post(`/api/family/goals/${g2.body.id}/save`).send({ amount: 400 })
+    await request(app).post(`/api/family/goals/${g3.body.id}/save`).send({ amount: 100 })
+
+    const res = await request(app).get("/api/family/all-goals-summary")
+    expect(res.status).toBe(200)
+    // g1 達成後可能被 status=completed 移除、只剩 g2 g3 active
+    expect(res.body.total).toBeGreaterThanOrEqual(2)
+    expect(res.body.nearComplete).toBeGreaterThanOrEqual(1) // g2 達 80%
+
+    const goals = res.body.goals as Array<{
+      id: number
+      kidName: string
+      kidAvatar: string
+      name: string
+      progress: number
+    }>
+
+    // 確認按 progress 降序
+    for (let i = 1; i < goals.length; i++) {
+      expect(goals[i - 1].progress).toBeGreaterThanOrEqual(goals[i].progress)
+    }
+
+    // 每筆都有 kidName 跟 kidAvatar
+    for (const g of goals) {
+      expect(g.kidName).toBe("小華")
+      expect(g.kidAvatar).toBeTruthy()
+    }
+  })
+
+  it("家庭目標進度看板：無 active 目標 → total=0", async () => {
+    await db.execute(sql`DELETE FROM kids_accounts WHERE pin = ${TEST_PIN}`)
+    await createKid()
+    const res = await request(app).get("/api/family/all-goals-summary")
+    expect(res.status).toBe(200)
+    expect(res.body.total).toBe(0)
+    expect(res.body.goals).toEqual([])
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)
