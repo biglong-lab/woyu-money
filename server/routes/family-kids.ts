@@ -2875,6 +2875,86 @@ router.get(
 )
 
 /**
+ * GET /api/family/weekly-heatmap?weeks=12
+ * 家庭週曆熱度：按星期幾統計 approved task 數
+ */
+router.get(
+  "/api/family/weekly-heatmap",
+  asyncHandler(async (req, res) => {
+    const weeks = Math.min(Math.max(Number(req.query.weeks) || 12, 1), 52)
+
+    const result = await db.execute(sql`
+      SELECT
+        EXTRACT(DOW FROM completed_at)::int AS dow,
+        COUNT(*)::int AS n,
+        COALESCE(SUM(reward_amount::numeric), 0)::numeric AS total_reward
+      FROM kids_tasks
+      WHERE status = 'approved'
+        AND completed_at >= NOW() - (${weeks * 7}::int || ' days')::interval
+      GROUP BY dow
+      ORDER BY dow ASC
+    `)
+    const rows = (
+      result as unknown as { rows: { dow: number; n: number; total_reward: string | number }[] }
+    ).rows
+
+    const DAY_META = ["週日", "週一", "週二", "週三", "週四", "週五", "週六"]
+    const DAY_EMOJI = ["☀️", "💼", "📚", "🎯", "📖", "🎉", "🌟"]
+    const byDow = new Map(rows.map((r) => [r.dow, r]))
+
+    const days = Array.from({ length: 7 }, (_, i) => {
+      const r = byDow.get(i)
+      const count = r?.n ?? 0
+      const total = Number(r?.total_reward ?? 0)
+      return {
+        dow: i,
+        name: DAY_META[i],
+        emoji: DAY_EMOJI[i],
+        count,
+        totalReward: total,
+      }
+    })
+
+    const totalTasks = days.reduce((s, d) => s + d.count, 0)
+    const peak = days.reduce((m, d) => Math.max(m, d.count), 0)
+
+    let busiestDay: (typeof days)[0] | null = null
+    let quietestDay: (typeof days)[0] | null = null
+    for (const d of days) {
+      if (!busiestDay || d.count > busiestDay.count) busiestDay = d
+      if (!quietestDay || d.count < quietestDay.count) quietestDay = d
+    }
+
+    let insight: string
+    if (totalTasks === 0) {
+      insight = "📊 還沒夠資料、做幾個任務後再看吧"
+    } else if (busiestDay && peak > 0) {
+      const weekendCount = (days[0]?.count ?? 0) + (days[6]?.count ?? 0)
+      const weekdayCount = totalTasks - weekendCount
+      if (weekendCount > weekdayCount) {
+        insight = `🎉 週末家事比較多（${busiestDay.name} 最忙）`
+      } else if (weekdayCount > weekendCount * 2) {
+        insight = `💼 平日做得多（${busiestDay.name} 最忙）`
+      } else {
+        insight = `📊 整週分散、${busiestDay.name} 最忙`
+      }
+    } else {
+      insight = "📊 全週分散"
+    }
+
+    res.json({
+      weeks,
+      totalTasks,
+      peak,
+      busiestDay,
+      quietestDay,
+      days,
+      insight,
+    })
+  })
+)
+
+/**
  * GET /api/family/kid-education-report?kidId=
  * 小孩教育成果報告（家長端、評估 4 大金融素養面向）
  *

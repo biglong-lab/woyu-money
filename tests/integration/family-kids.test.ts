@@ -3611,6 +3611,45 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(r.status).toBe(400)
   })
 
+  it("週曆熱度：完成 task → 7 days + busiestDay + insight", async () => {
+    await createKid()
+
+    // 做 2 個任務（今天）
+    for (let i = 0; i < 2; i++) {
+      const t = await request(app)
+        .post("/api/family/tasks")
+        .send({ kidId, title: `T${i}`, rewardAmount: 30 })
+      await request(app).post(`/api/family/tasks/${t.body.id}/submit`)
+      await request(app).post(`/api/family/tasks/${t.body.id}/approve`)
+    }
+
+    const res = await request(app).get("/api/family/weekly-heatmap")
+    expect(res.status).toBe(200)
+    expect(res.body.weeks).toBe(12)
+    expect(res.body.days.length).toBe(7)
+    expect(res.body.totalTasks).toBeGreaterThanOrEqual(2)
+
+    // busiestDay 存在
+    expect(res.body.busiestDay).toBeTruthy()
+    expect(res.body.busiestDay.count).toBeGreaterThanOrEqual(2)
+
+    // insight 字串
+    expect(res.body.insight).toBeTruthy()
+  })
+
+  it("週曆熱度 weeks=4 → 24h × 4w 內 OK", async () => {
+    const res = await request(app).get("/api/family/weekly-heatmap?weeks=4")
+    expect(res.status).toBe(200)
+    expect(res.body.weeks).toBe(4)
+    expect(res.body.days.length).toBe(7)
+  })
+
+  it("週曆熱度 weeks 超範圍 → clamp 52", async () => {
+    const res = await request(app).get("/api/family/weekly-heatmap?weeks=100")
+    expect(res.status).toBe(200)
+    expect(res.body.weeks).toBe(52)
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)

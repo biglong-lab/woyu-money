@@ -470,6 +470,9 @@ export default function FamilyPage() {
       {/* 教育成果報告（每個 kid 一份）*/}
       <FamilyEducationReports />
 
+      {/* 週曆熱度 */}
+      <FamilyWeeklyHeatmap />
+
       {/* 全家活動 feed */}
       <FamilyActivityFeed />
 
@@ -1968,6 +1971,70 @@ function KidEducationCard({
             <div className="text-[10px] text-gray-400 mt-0.5">{d.detail}</div>
           </div>
         ))}
+      </div>
+    </div>
+  )
+}
+
+function FamilyWeeklyHeatmap() {
+  const { data } = useQuery<{
+    weeks: number
+    totalTasks: number
+    peak: number
+    busiestDay: { dow: number; name: string; emoji: string; count: number } | null
+    quietestDay: { dow: number; name: string; emoji: string; count: number } | null
+    days: Array<{
+      dow: number
+      name: string
+      emoji: string
+      count: number
+      totalReward: number
+    }>
+    insight: string
+  }>({
+    queryKey: ["/api/family/weekly-heatmap"],
+    queryFn: async () => {
+      const res = await fetch("/api/family/weekly-heatmap?weeks=12", { credentials: "include" })
+      return res.json()
+    },
+  })
+  if (!data || data.totalTasks === 0) return null
+
+  const peak = data.peak
+
+  function intensity(c: number) {
+    if (c === 0) return "bg-gray-100 text-gray-400"
+    if (peak <= 1) return "bg-emerald-200 text-emerald-900"
+    if (c <= Math.ceil(peak * 0.33)) return "bg-emerald-200 text-emerald-900"
+    if (c <= Math.ceil(peak * 0.66)) return "bg-emerald-400 text-white"
+    return "bg-emerald-700 text-white"
+  }
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-emerald-300 bg-gradient-to-br from-emerald-50 to-green-50 p-4 shadow">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="font-bold text-emerald-900 flex items-center gap-2">
+          📊 週曆熱度（近 {data.weeks} 週）
+        </h3>
+        <span className="text-xs text-gray-500">{data.totalTasks} 個任務</span>
+      </div>
+
+      <div className="grid grid-cols-7 gap-1 mb-3">
+        {data.days.map((d) => (
+          <div
+            key={d.dow}
+            className={`rounded-lg p-2 text-center transition-colors ${intensity(d.count)}`}
+            title={`${d.name}：${d.count} 個任務、$${d.totalReward}`}
+          >
+            <div className="text-lg">{d.emoji}</div>
+            <div className="text-xs font-bold">{d.name.slice(1)}</div>
+            <div className="text-lg font-bold mt-0.5">{d.count}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="bg-white/70 rounded px-3 py-2 text-sm text-emerald-900 font-medium">
+        💡 {data.insight}
       </div>
     </div>
   )
