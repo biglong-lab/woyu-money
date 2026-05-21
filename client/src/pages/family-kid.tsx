@@ -997,6 +997,9 @@ function KidDashboard({
         </div>
       )}
 
+      {/* 等級徽章（累積分數升 level）*/}
+      <KidLevelBadge kidId={kidId} />
+
       {/* 成就牆（含未解鎖徽章 + 進度條）*/}
       <AchievementWall kidId={kidId} />
 
@@ -1749,6 +1752,56 @@ function WishesSection({
             </div>
           ))}
         </div>
+      )}
+    </div>
+  )
+}
+
+function KidLevelBadge({ kidId }: { kidId: number }) {
+  const { data } = useQuery<{
+    totalScore: number
+    current: { level: number; title: string; emoji: string; threshold: number }
+    next: { level: number; title: string; emoji: string; threshold: number } | null
+    progress: number
+    scoreToNext: number
+  }>({
+    queryKey: ["/api/family/kid-level", kidId],
+    queryFn: async () => {
+      const res = await fetch(`/api/family/kid-level?kidId=${kidId}`, { credentials: "include" })
+      return res.json()
+    },
+  })
+  if (!data) return null
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-amber-300 bg-gradient-to-r from-amber-50 to-yellow-50 p-4 shadow">
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-3">
+          <div className="text-4xl">{data.current.emoji}</div>
+          <div>
+            <div className="text-xs text-amber-700 font-bold">Lv {data.current.level}</div>
+            <div className="text-lg font-bold text-amber-900">{data.current.title}</div>
+          </div>
+        </div>
+        <div className="text-right">
+          <div className="text-xs text-gray-500">累積分數</div>
+          <div className="text-2xl font-bold text-amber-700">{data.totalScore}</div>
+        </div>
+      </div>
+      {data.next ? (
+        <>
+          <div className="h-3 w-full bg-amber-100 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-gradient-to-r from-amber-400 to-orange-500 transition-all"
+              style={{ width: `${data.progress}%` }}
+            />
+          </div>
+          <div className="mt-1 text-xs text-amber-700 text-center">
+            還差 <b>{data.scoreToNext}</b> 分升到 Lv {data.next.level}・{data.next.emoji}{" "}
+            {data.next.title}
+          </div>
+        </>
+      ) : (
+        <div className="text-center text-sm text-amber-700 font-bold">🎉 已達最高等級！🎉</div>
       )}
     </div>
   )

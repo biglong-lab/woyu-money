@@ -2731,6 +2731,79 @@ router.get(
 )
 
 /**
+ * GET /api/family/kid-level?kidId=
+ * 用累積 weighted score（任務難度加權）算等級 + 頭銜
+ * 培養長期動力（小孩越做越強）
+ *
+ * 等級表（指數成長、後期難升）：
+ *   Lv1 菜鳥小幫手     0
+ *   Lv2 家事新手     20
+ *   Lv3 家事學徒     50
+ *   Lv4 家事達人     100
+ *   Lv5 家事高手     200
+ *   Lv6 家事專家     400
+ *   Lv7 家事大師     800
+ *   Lv8 家事傳奇    1500
+ *   Lv9 家事神話    3000
+ *   Lv10 家事之神   5000
+ */
+router.get(
+  "/api/family/kid-level",
+  asyncHandler(async (req, res) => {
+    const kidIdQ = Number(req.query.kidId)
+    if (!Number.isInteger(kidIdQ) || kidIdQ < 1) throw new AppError(400, "需傳 kidId")
+
+    const result = await db.execute(sql`
+      SELECT COALESCE(SUM(CASE difficulty
+        WHEN 'hard' THEN 3
+        WHEN 'medium' THEN 2
+        ELSE 1
+      END), 0)::int AS total_score
+      FROM kids_tasks
+      WHERE kid_id = ${kidIdQ} AND status = 'approved'
+    `)
+    const totalScore =
+      (result as unknown as { rows: { total_score: number }[] }).rows[0]?.total_score ?? 0
+
+    const LEVELS = [
+      { level: 1, title: "菜鳥小幫手", emoji: "🌱", threshold: 0 },
+      { level: 2, title: "家事新手", emoji: "🌿", threshold: 20 },
+      { level: 3, title: "家事學徒", emoji: "🌳", threshold: 50 },
+      { level: 4, title: "家事達人", emoji: "💪", threshold: 100 },
+      { level: 5, title: "家事高手", emoji: "⭐", threshold: 200 },
+      { level: 6, title: "家事專家", emoji: "🎯", threshold: 400 },
+      { level: 7, title: "家事大師", emoji: "🏆", threshold: 800 },
+      { level: 8, title: "家事傳奇", emoji: "👑", threshold: 1500 },
+      { level: 9, title: "家事神話", emoji: "🌟", threshold: 3000 },
+      { level: 10, title: "家事之神", emoji: "🐉", threshold: 5000 },
+    ]
+
+    let current = LEVELS[0]
+    let next: (typeof LEVELS)[0] | null = LEVELS[1] ?? null
+    for (let i = LEVELS.length - 1; i >= 0; i--) {
+      if (totalScore >= LEVELS[i].threshold) {
+        current = LEVELS[i]
+        next = LEVELS[i + 1] ?? null
+        break
+      }
+    }
+    const progress = next
+      ? Math.round(((totalScore - current.threshold) / (next.threshold - current.threshold)) * 100)
+      : 100
+    const scoreToNext = next ? next.threshold - totalScore : 0
+
+    res.json({
+      kidId: kidIdQ,
+      totalScore,
+      current,
+      next,
+      progress: Math.min(100, Math.max(0, progress)),
+      scoreToNext,
+    })
+  })
+)
+
+/**
  * GET /api/family/badges-catalog?kidId=
  * 所有可達徽章的目錄 + 該小孩進度（含未解鎖）
  * 培養目標感：「再做 N 個就解鎖」激勵

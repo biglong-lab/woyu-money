@@ -2063,6 +2063,60 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(notFound.status).toBe(404)
   })
 
+  it("小孩等級系統：approved 任務累積分數、升 level、回 next + progress", async () => {
+    await createKid()
+
+    // 沒任務 → Lv1
+    const r0 = await request(app).get(`/api/family/kid-level?kidId=${kidId}`)
+    expect(r0.status).toBe(200)
+    expect(r0.body.current.level).toBe(1)
+    expect(r0.body.current.title).toBe("菜鳥小幫手")
+    expect(r0.body.totalScore).toBe(0)
+    expect(r0.body.next.level).toBe(2)
+    expect(r0.body.scoreToNext).toBe(20)
+    expect(r0.body.progress).toBe(0)
+
+    // 完成 15 個 easy 任務（score=1 各，總 15）→ 仍 Lv1，但進度 ~75%
+    for (let i = 0; i < 15; i++) {
+      const t = await request(app)
+        .post("/api/family/tasks")
+        .send({ kidId, title: `E${i}`, rewardAmount: 10, difficulty: "easy" })
+      await request(app).post(`/api/family/tasks/${t.body.id}/submit`)
+      await request(app).post(`/api/family/tasks/${t.body.id}/approve`)
+    }
+    const r1 = await request(app).get(`/api/family/kid-level?kidId=${kidId}`)
+    expect(r1.body.totalScore).toBe(15)
+    expect(r1.body.current.level).toBe(1)
+    expect(r1.body.progress).toBe(75)
+
+    // 再 1 個 hard（+3 = 18）→ 進度 90%、仍 Lv1
+    const th1 = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId, title: "H1", rewardAmount: 50, difficulty: "hard" })
+    await request(app).post(`/api/family/tasks/${th1.body.id}/submit`)
+    await request(app).post(`/api/family/tasks/${th1.body.id}/approve`)
+    const r2 = await request(app).get(`/api/family/kid-level?kidId=${kidId}`)
+    expect(r2.body.totalScore).toBe(18)
+    expect(r2.body.current.level).toBe(1)
+
+    // 再 1 個 hard（+3 = 21）→ 升 Lv2
+    const th2 = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId, title: "H2", rewardAmount: 50, difficulty: "hard" })
+    await request(app).post(`/api/family/tasks/${th2.body.id}/submit`)
+    await request(app).post(`/api/family/tasks/${th2.body.id}/approve`)
+    const r3 = await request(app).get(`/api/family/kid-level?kidId=${kidId}`)
+    expect(r3.body.totalScore).toBe(21)
+    expect(r3.body.current.level).toBe(2)
+    expect(r3.body.current.title).toBe("家事新手")
+    expect(r3.body.next.level).toBe(3)
+  })
+
+  it("kid-level 缺 kidId 回 400", async () => {
+    const r = await request(app).get("/api/family/kid-level")
+    expect(r.status).toBe(400)
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)
