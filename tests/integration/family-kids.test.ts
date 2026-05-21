@@ -2783,6 +2783,59 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(r.status).toBe(400)
   })
 
+  it("家長誇獎回顧：approve 帶 parentFeedback → praises 拿到", async () => {
+    await createKid()
+
+    // 3 個任務、其中 2 個有家長誇獎
+    const t1 = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId, title: "倒垃圾", rewardAmount: 30 })
+    await request(app).post(`/api/family/tasks/${t1.body.id}/submit`)
+    await request(app)
+      .post(`/api/family/tasks/${t1.body.id}/approve`)
+      .send({ parentFeedback: "做得超棒、繼續加油！" })
+
+    const t2 = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId, title: "掃地", rewardAmount: 20 })
+    await request(app).post(`/api/family/tasks/${t2.body.id}/submit`)
+    await request(app)
+      .post(`/api/family/tasks/${t2.body.id}/approve`)
+      .send({ parentFeedback: "你真細心！" })
+
+    // 第 3 個沒誇獎
+    const t3 = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId, title: "洗碗", rewardAmount: 15 })
+    await request(app).post(`/api/family/tasks/${t3.body.id}/submit`)
+    await request(app).post(`/api/family/tasks/${t3.body.id}/approve`)
+
+    const res = await request(app).get(`/api/family/kid-praises?kidId=${kidId}`)
+    expect(res.status).toBe(200)
+    expect(res.body.kidId).toBe(kidId)
+    expect(res.body.total).toBe(2) // 只有 2 個有 feedback
+
+    const praises = res.body.praises as Array<{ message: string; title: string; reward: number }>
+    expect(praises.length).toBe(2)
+    expect(praises.map((p) => p.message)).toContain("做得超棒、繼續加油！")
+    expect(praises.map((p) => p.message)).toContain("你真細心！")
+    expect(praises.every((p) => p.title)).toBe(true)
+    expect(praises.every((p) => p.reward > 0)).toBe(true)
+  })
+
+  it("家長誇獎回顧：無誇獎 → total=0", async () => {
+    await createKid()
+    const res = await request(app).get(`/api/family/kid-praises?kidId=${kidId}`)
+    expect(res.status).toBe(200)
+    expect(res.body.total).toBe(0)
+    expect(res.body.praises).toEqual([])
+  })
+
+  it("kid-praises 缺 kidId 回 400", async () => {
+    const r = await request(app).get("/api/family/kid-praises")
+    expect(r.status).toBe(400)
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)

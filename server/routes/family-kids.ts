@@ -2875,6 +2875,62 @@ router.get(
 )
 
 /**
+ * GET /api/family/kid-praises?kidId=&limit=10
+ * 小孩端：家長誇獎回顧
+ * 從 kids_tasks.parent_feedback 拉非空的、按時間倒序
+ */
+router.get(
+  "/api/family/kid-praises",
+  asyncHandler(async (req, res) => {
+    const kidIdQ = Number(req.query.kidId)
+    if (!Number.isInteger(kidIdQ) || kidIdQ < 1) throw new AppError(400, "需傳 kidId")
+    const limit = Math.min(Math.max(Number(req.query.limit) || 10, 1), 50)
+
+    const result = await db.execute(sql`
+      SELECT
+        id::int AS id,
+        title,
+        emoji,
+        reward_amount::numeric AS reward,
+        parent_feedback,
+        approved_at
+      FROM kids_tasks
+      WHERE kid_id = ${kidIdQ}
+        AND status = 'approved'
+        AND parent_feedback IS NOT NULL
+        AND TRIM(parent_feedback) != ''
+      ORDER BY approved_at DESC NULLS LAST
+      LIMIT ${limit}
+    `)
+    const rows = (
+      result as unknown as {
+        rows: {
+          id: number
+          title: string
+          emoji: string | null
+          reward: string | number
+          parent_feedback: string
+          approved_at: Date | null
+        }[]
+      }
+    ).rows
+
+    res.json({
+      kidId: kidIdQ,
+      total: rows.length,
+      praises: rows.map((r) => ({
+        id: r.id,
+        title: r.title,
+        emoji: r.emoji ?? "📋",
+        reward: Number(r.reward ?? 0),
+        message: r.parent_feedback,
+        at: r.approved_at,
+      })),
+    })
+  })
+)
+
+/**
  * GET /api/family/kid-activity-heatmap?kidId=&weeks=12
  * 小孩活動 heatmap（近 N 週每天 task count + spending count）
  * GitHub 風小方塊視覺化、培養日常感

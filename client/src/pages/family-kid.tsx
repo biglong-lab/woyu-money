@@ -1010,6 +1010,9 @@ function KidDashboard({
       {/* 下一個徽章提示 */}
       <KidNextBadgeCard kidId={kidId} />
 
+      {/* 家長誇獎回顧（暖心）*/}
+      <KidPraisesCard kidId={kidId} />
+
       {/* 最近活動時間軸 */}
       <KidActivityTimeline kidId={kidId} />
 
@@ -1774,6 +1777,70 @@ function WishesSection({
             </div>
           ))}
         </div>
+      )}
+    </div>
+  )
+}
+
+function KidPraisesCard({ kidId }: { kidId: number }) {
+  const [expanded, setExpanded] = useState(false)
+  const { data } = useQuery<{
+    total: number
+    praises: Array<{
+      id: number
+      title: string
+      emoji: string
+      reward: number
+      message: string
+      at: string | null
+    }>
+  }>({
+    queryKey: ["/api/family/kid-praises", kidId],
+    queryFn: async () => {
+      const res = await fetch(`/api/family/kid-praises?kidId=${kidId}&limit=20`, {
+        credentials: "include",
+      })
+      return res.json()
+    },
+  })
+  if (!data || data.total === 0) return null
+
+  const visible = expanded ? data.praises : data.praises.slice(0, 3)
+
+  function fmtDate(iso: string | null) {
+    if (!iso) return ""
+    return new Date(iso).toLocaleDateString("zh-TW")
+  }
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-pink-300 bg-gradient-to-br from-pink-50 to-rose-50 p-4 shadow">
+      <h3 className="font-bold text-pink-900 mb-3 flex items-center gap-2">
+        💖 家長最近誇我（{data.total}）
+      </h3>
+
+      <div className="space-y-2">
+        {visible.map((p) => (
+          <div key={p.id} className="bg-white rounded-lg p-3 shadow-sm">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-xl">{p.emoji}</span>
+              <span className="text-sm font-medium flex-1 truncate">{p.title}</span>
+              <span className="text-xs text-gray-500">{fmtDate(p.at)}</span>
+            </div>
+            <div className="text-sm text-pink-800 bg-pink-50 rounded px-2 py-1.5 italic">
+              💬 「{p.message}」
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {data.praises.length > 3 && (
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="mt-2 w-full text-center text-sm text-pink-600 hover:text-pink-800"
+        >
+          {expanded ? "收起" : `看更多 (${data.praises.length - 3} 則)`}
+        </button>
       )}
     </div>
   )
