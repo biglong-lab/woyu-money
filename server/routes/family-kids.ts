@@ -8602,6 +8602,84 @@ async function bulkApproveOne(
 }
 
 /**
+ * GET /api/family/initiative-rate?days=90
+ * 家庭主動性比例：小孩自提任務（proposedByKid=true）vs 家長派的比例
+ * + topProposer（最主動的小孩）
+ */
+router.get(
+  "/api/family/initiative-rate",
+  asyncHandler(async (req, res) => {
+    const days = Math.min(Math.max(Number(req.query.days) || 90, 7), 365)
+
+    const stats = await db.execute(sql`
+      SELECT
+        COUNT(*) FILTER (WHERE proposed_by_kid = true)::int AS proposed,
+        COUNT(*) FILTER (WHERE proposed_by_kid = false)::int AS assigned,
+        COUNT(*)::int AS total
+      FROM kids_tasks
+      WHERE status = 'approved'
+        AND completed_at >= CURRENT_DATE - (${days}::int * INTERVAL '1 day')
+    `)
+    const s = (
+      stats as unknown as {
+        rows: Array<{ proposed: number; assigned: number; total: number }>
+      }
+    ).rows[0]
+
+    const proposed = s?.proposed ?? 0
+    const assigned = s?.assigned ?? 0
+    const total = s?.total ?? 0
+    const initiativeRate = total > 0 ? Math.round((proposed / total) * 100) : 0
+
+    // top proposer
+    const topRows = await db.execute(sql`
+      SELECT ka.display_name AS kid_name, ka.avatar, COUNT(*)::int AS n
+      FROM kids_tasks t
+      JOIN kids_accounts ka ON ka.id = t.kid_id
+      WHERE t.status = 'approved'
+        AND t.proposed_by_kid = true
+        AND t.completed_at >= CURRENT_DATE - (${days}::int * INTERVAL '1 day')
+      GROUP BY ka.id, ka.display_name, ka.avatar
+      ORDER BY n DESC
+      LIMIT 1
+    `)
+    const topProposer =
+      (topRows as unknown as { rows: Array<{ kid_name: string; avatar: string; n: number }> })
+        .rows[0] ?? null
+
+    let level: "high_initiative" | "good_initiative" | "moderate" | "low" | "no_data"
+    let message: string
+    if (total === 0) {
+      level = "no_data"
+      message = `過去 ${days} 天還沒任務完成、開始活動吧 🌱`
+    } else if (initiativeRate >= 50) {
+      level = "high_initiative"
+      message = `🚀 ${initiativeRate}% 自提任務、超主動！家長省心`
+    } else if (initiativeRate >= 25) {
+      level = "good_initiative"
+      message = `💪 ${initiativeRate}% 自提、不錯的主動性`
+    } else if (initiativeRate >= 10) {
+      level = "moderate"
+      message = `🌱 ${initiativeRate}% 自提、可以鼓勵更多自主`
+    } else {
+      level = "low"
+      message = `📋 ${initiativeRate}% 自提、多家長派、可以鼓勵小孩自己提想做的`
+    }
+
+    res.json({
+      days,
+      stats: { proposed, assigned, total },
+      initiativeRate,
+      topProposer: topProposer
+        ? { kidName: topProposer.kid_name, avatar: topProposer.avatar, count: topProposer.n }
+        : null,
+      level,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/weekend-vs-weekday?days=60
  * 全家過去 N 天「週末」vs「工作日」task 完成 + spending 對比
  * 用 EXTRACT(DOW)：0=Sun 1=Mon ... 6=Sat、週末 = 0/6

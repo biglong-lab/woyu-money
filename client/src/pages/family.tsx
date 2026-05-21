@@ -517,6 +517,9 @@ export default function FamilyPage() {
       {/* 家庭周末 vs 工作日 */}
       <FamilyWeekendVsWeekdayCard />
 
+      {/* 家庭主動性比例 */}
+      <FamilyInitiativeRateCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3470,6 +3473,60 @@ function ParentTodoList() {
         >
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
+      )}
+    </div>
+  )
+}
+
+function FamilyInitiativeRateCard() {
+  const { data } = useQuery<{
+    days: number
+    stats: { proposed: number; assigned: number; total: number }
+    initiativeRate: number
+    topProposer: { kidName: string; avatar: string; count: number } | null
+    level: "high_initiative" | "good_initiative" | "moderate" | "low" | "no_data"
+    message: string
+  }>({
+    queryKey: ["/api/family/initiative-rate?days=90"],
+  })
+  if (!data || data.stats.total === 0) return null
+
+  const LEVEL_BG: Record<string, string> = {
+    high_initiative: "from-violet-50 to-purple-50 border-violet-500",
+    good_initiative: "from-emerald-50 to-green-50 border-emerald-400",
+    moderate: "from-blue-50 to-sky-50 border-blue-300",
+    low: "from-amber-50 to-yellow-50 border-amber-300",
+    no_data: "from-gray-50 to-slate-50 border-gray-300",
+  }
+
+  return (
+    <div
+      className={`mb-4 rounded-2xl border-2 bg-gradient-to-br ${LEVEL_BG[data.level]} p-3 shadow`}
+    >
+      <h3 className="font-bold mb-2 flex items-center gap-2">🚀 家庭主動性</h3>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-2 text-xs">{data.message}</div>
+
+      <div className="grid grid-cols-3 gap-2 mb-2">
+        <div className="bg-white rounded-lg p-2 text-center">
+          <div className="text-xl font-bold text-violet-600">{data.stats.proposed}</div>
+          <div className="text-[10px] text-gray-500">小孩自提</div>
+        </div>
+        <div className="bg-white rounded-lg p-2 text-center">
+          <div className="text-xl font-bold text-blue-600">{data.stats.assigned}</div>
+          <div className="text-[10px] text-gray-500">家長派</div>
+        </div>
+        <div className="bg-white rounded-lg p-2 text-center">
+          <div className="text-xl font-bold text-emerald-600">{data.initiativeRate}%</div>
+          <div className="text-[10px] text-gray-500">主動率</div>
+        </div>
+      </div>
+
+      {data.topProposer && (
+        <div className="bg-white/40 rounded p-2 text-center text-xs">
+          🥇 最主動：{data.topProposer.avatar} {data.topProposer.kidName}（{data.topProposer.count}{" "}
+          個）
+        </div>
       )}
     </div>
   )

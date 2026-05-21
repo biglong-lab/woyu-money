@@ -4245,6 +4245,26 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.body.weeks).toBe(52)
   })
 
+  it("主動性比例：基本結構 stats/initiativeRate/level", async () => {
+    const res = await request(app).get("/api/family/initiative-rate")
+    expect(res.status).toBe(200)
+    expect(res.body.stats).toHaveProperty("proposed")
+    expect(res.body.stats).toHaveProperty("assigned")
+    expect(res.body.stats).toHaveProperty("total")
+    expect(res.body).toHaveProperty("initiativeRate")
+    expect(["high_initiative", "good_initiative", "moderate", "low", "no_data"]).toContain(
+      res.body.level
+    )
+    expect(res.body.message).toBeTruthy()
+  })
+
+  it("主動性比例：days clamp 7-365", async () => {
+    const r1 = await request(app).get("/api/family/initiative-rate?days=500")
+    expect(r1.body.days).toBe(365)
+    const r2 = await request(app).get("/api/family/initiative-rate?days=3")
+    expect(r2.body.days).toBe(7)
+  })
+
   it("周末工作日：基本結構 weekend/weekday/pattern/message", async () => {
     const res = await request(app).get("/api/family/weekend-vs-weekday")
     expect(res.status).toBe(200)
