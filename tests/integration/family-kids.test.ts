@@ -4245,6 +4245,32 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.body.weeks).toBe(52)
   })
 
+  it("難度分佈對比：基本結構 kids/boldCount/message", async () => {
+    const res = await request(app).get("/api/family/difficulty-by-kid")
+    expect(res.status).toBe(200)
+    expect(Array.isArray(res.body.kids)).toBe(true)
+    expect(res.body).toHaveProperty("boldCount")
+    expect(res.body.message).toBeTruthy()
+  })
+
+  it("難度分佈對比：approve hard task → kid.hard>=1 + challengeLevel=bold", async () => {
+    const kidObj = (await createKid()) as { id: number }
+    const myKidId = kidObj.id
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId: myKidId, title: "難度測試", rewardAmount: 30, difficulty: "hard" })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`).send({})
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`).send({})
+    const res = await request(app).get("/api/family/difficulty-by-kid?days=7")
+    expect(res.status).toBe(200)
+    const myKid = res.body.kids.find((k: { kidId: number }) => k.kidId === myKidId)
+    expect(myKid).toBeDefined()
+    expect(myKid.hard).toBeGreaterThanOrEqual(1)
+    expect(myKid.challengeLevel).toBe("bold")
+    expect(res.body.boldCount).toBeGreaterThanOrEqual(1)
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
   it("速度榮譽榜：基本結構 tasks/message", async () => {
     const res = await request(app).get("/api/family/task-speed-mvp")
     expect(res.status).toBe(200)

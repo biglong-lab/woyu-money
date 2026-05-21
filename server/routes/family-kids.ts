@@ -8602,6 +8602,92 @@ async function bulkApproveOne(
 }
 
 /**
+ * GET /api/family/difficulty-by-kid?days=90
+ * 每個 active kid 過去 N 天 easy/medium/hard 任務數
+ * challengeLevel: bold(hard>=30%) / balanced / safe / no_data
+ */
+router.get(
+  "/api/family/difficulty-by-kid",
+  asyncHandler(async (req, res) => {
+    const days = Math.min(Math.max(Number(req.query.days) || 90, 7), 365)
+
+    const rows = await db.execute(sql`
+      SELECT
+        ka.id::int AS kid_id,
+        ka.display_name AS kid_name,
+        ka.avatar,
+        COUNT(*) FILTER (WHERE t.difficulty = 'easy')::int AS easy,
+        COUNT(*) FILTER (WHERE t.difficulty = 'medium')::int AS medium,
+        COUNT(*) FILTER (WHERE t.difficulty = 'hard')::int AS hard,
+        COUNT(t.id)::int AS total
+      FROM kids_accounts ka
+      LEFT JOIN kids_tasks t ON
+        t.kid_id = ka.id
+        AND t.status = 'approved'
+        AND t.completed_at >= CURRENT_DATE - (${days}::int * INTERVAL '1 day')
+      WHERE ka.is_active = true
+      GROUP BY ka.id, ka.display_name, ka.avatar
+      ORDER BY ka.id ASC
+    `)
+
+    const kids = (
+      rows as unknown as {
+        rows: Array<{
+          kid_id: number
+          kid_name: string
+          avatar: string
+          easy: number
+          medium: number
+          hard: number
+          total: number
+        }>
+      }
+    ).rows.map((r) => {
+      const hardRatio = r.total > 0 ? Math.round((r.hard / r.total) * 100) : 0
+      let challengeLevel: "bold" | "balanced" | "safe" | "no_data"
+      if (r.total === 0) challengeLevel = "no_data"
+      else if (hardRatio >= 30) challengeLevel = "bold"
+      else if (hardRatio >= 10) challengeLevel = "balanced"
+      else challengeLevel = "safe"
+      return {
+        kidId: r.kid_id,
+        kidName: r.kid_name,
+        avatar: r.avatar,
+        easy: r.easy,
+        medium: r.medium,
+        hard: r.hard,
+        total: r.total,
+        hardRatio,
+        challengeLevel,
+      }
+    })
+
+    const boldCount = kids.filter((k) => k.challengeLevel === "bold").length
+
+    let message: string
+    if (kids.length === 0) {
+      message = "還沒有小孩"
+    } else if (boldCount > 0) {
+      message = `🚀 ${boldCount} 個小孩勇敢挑戰困難任務（hard>=30%）`
+    } else {
+      const withTasks = kids.filter((k) => k.total > 0).length
+      if (withTasks === 0) {
+        message = "過去都沒任務、開始累積"
+      } else {
+        message = "可以鼓勵小孩試試更困難的任務"
+      }
+    }
+
+    res.json({
+      days,
+      kids,
+      boldCount,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/task-speed-mvp?days=30&limit=5
  * 過去 N 天 submitted→approved 最快的 top N 任務
  */

@@ -604,6 +604,9 @@ export default function FamilyPage() {
       {/* 家庭任務速度榮譽榜 */}
       <FamilyTaskSpeedMvpCard />
 
+      {/* 家庭兒童難度分佈對比 */}
+      <FamilyDifficultyByKidCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3558,6 +3561,82 @@ function ParentTodoList() {
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
       )}
+    </div>
+  )
+}
+
+function FamilyDifficultyByKidCard() {
+  const { data } = useQuery<{
+    days: number
+    kids: Array<{
+      kidId: number
+      kidName: string
+      avatar: string
+      easy: number
+      medium: number
+      hard: number
+      total: number
+      hardRatio: number
+      challengeLevel: "bold" | "balanced" | "safe" | "no_data"
+    }>
+    boldCount: number
+    message: string
+  }>({
+    queryKey: ["/api/family/difficulty-by-kid?days=90"],
+  })
+  if (!data || data.kids.length === 0) return null
+  const withTasks = data.kids.filter((k) => k.total > 0)
+  if (withTasks.length === 0) return null
+
+  const LEVEL_LABEL: Record<string, string> = {
+    bold: "🚀 勇敢",
+    balanced: "⚖️ 平衡",
+    safe: "🛡️ 保守",
+    no_data: "—",
+  }
+  const LEVEL_COLOR: Record<string, string> = {
+    bold: "bg-rose-500 text-white",
+    balanced: "bg-emerald-500 text-white",
+    safe: "bg-blue-400 text-white",
+    no_data: "bg-gray-300 text-gray-700",
+  }
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-orange-400 bg-gradient-to-br from-orange-50 to-amber-50 p-3 shadow">
+      <h3 className="font-bold mb-2 flex items-center gap-2">⭐ 難度分佈對比（90 天）</h3>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-2 text-xs">{data.message}</div>
+
+      <div className="space-y-1.5">
+        {withTasks.map((k) => (
+          <div key={k.kidId} className="bg-white rounded-lg p-2">
+            <div className="flex items-center gap-2 mb-1">
+              <div className="text-lg">{k.avatar}</div>
+              <div className="flex-1 text-sm font-medium">{k.kidName}</div>
+              <div className="text-[10px] text-gray-500">hard {k.hardRatio}%</div>
+              <div className={`text-[10px] px-1.5 py-0.5 rounded ${LEVEL_COLOR[k.challengeLevel]}`}>
+                {LEVEL_LABEL[k.challengeLevel]}
+              </div>
+            </div>
+            <div className="flex h-2 rounded-full overflow-hidden bg-gray-100">
+              {k.easy > 0 && (
+                <div className="bg-green-400" style={{ width: `${(k.easy / k.total) * 100}%` }} />
+              )}
+              {k.medium > 0 && (
+                <div className="bg-amber-400" style={{ width: `${(k.medium / k.total) * 100}%` }} />
+              )}
+              {k.hard > 0 && (
+                <div className="bg-red-500" style={{ width: `${(k.hard / k.total) * 100}%` }} />
+              )}
+            </div>
+            <div className="flex justify-between text-[10px] text-gray-500 mt-0.5">
+              <span>⭐ easy {k.easy}</span>
+              <span>⭐⭐ medium {k.medium}</span>
+              <span>⭐⭐⭐ hard {k.hard}</span>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
