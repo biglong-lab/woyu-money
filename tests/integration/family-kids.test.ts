@@ -2881,6 +2881,52 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.body.tasks).toEqual([])
   })
 
+  it("任務時段分析：3 個任務不同時段、dominantSlot + 4 slots 結構", async () => {
+    await createKid()
+
+    // 完成 3 個任務、手動改 completed_at 到不同小時
+    const hours = [8, 8, 14] // 2 個 morning + 1 個 afternoon
+    for (let i = 0; i < hours.length; i++) {
+      const t = await request(app)
+        .post("/api/family/tasks")
+        .send({ kidId, title: `T${i}`, rewardAmount: 10 })
+      await request(app).post(`/api/family/tasks/${t.body.id}/submit`)
+      await request(app).post(`/api/family/tasks/${t.body.id}/approve`)
+      // 改 completed_at 為今天的指定小時
+      await db.execute(
+        sql`UPDATE kids_tasks SET completed_at = CURRENT_DATE + INTERVAL '${sql.raw(String(hours[i]))} hours' WHERE id = ${t.body.id}`
+      )
+    }
+
+    const res = await request(app).get(`/api/family/kid-time-of-day?kidId=${kidId}`)
+    expect(res.status).toBe(200)
+    expect(res.body.totalTasks).toBe(3)
+
+    const slots = res.body.slots as Array<{ slot: string; count: number; percentage: number }>
+    expect(slots.length).toBe(4)
+    expect(slots.find((s) => s.slot === "morning")!.count).toBe(2)
+    expect(slots.find((s) => s.slot === "afternoon")!.count).toBe(1)
+    expect(slots.find((s) => s.slot === "evening")!.count).toBe(0)
+    expect(slots.find((s) => s.slot === "night")!.count).toBe(0)
+
+    // dominantSlot = morning
+    expect(res.body.dominantSlot.slot).toBe("morning")
+    expect(res.body.dominantSlot.personality).toContain("早起型")
+  })
+
+  it("時段分析：無任務 → totalTasks=0、dominantSlot=null", async () => {
+    await createKid()
+    const res = await request(app).get(`/api/family/kid-time-of-day?kidId=${kidId}`)
+    expect(res.status).toBe(200)
+    expect(res.body.totalTasks).toBe(0)
+    expect(res.body.dominantSlot).toBeNull()
+  })
+
+  it("kid-time-of-day 缺 kidId 回 400", async () => {
+    const r = await request(app).get("/api/family/kid-time-of-day")
+    expect(r.status).toBe(400)
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)

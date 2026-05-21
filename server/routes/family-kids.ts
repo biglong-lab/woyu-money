@@ -2875,6 +2875,100 @@ router.get(
 )
 
 /**
+ * GET /api/family/kid-time-of-day?kidId=
+ * 小孩任務完成時段分析（看是早起型/午後型/夜貓型）
+ *
+ * 4 時段：
+ *   morning（06-11）/ afternoon（12-17）/ evening（18-21）/ night（22-05）
+ * 回 totalTasks + slots + dominantSlot
+ */
+router.get(
+  "/api/family/kid-time-of-day",
+  asyncHandler(async (req, res) => {
+    const kidIdQ = Number(req.query.kidId)
+    if (!Number.isInteger(kidIdQ) || kidIdQ < 1) throw new AppError(400, "需傳 kidId")
+
+    const result = await db.execute(sql`
+      SELECT EXTRACT(HOUR FROM completed_at)::int AS h, COUNT(*)::int AS n
+      FROM kids_tasks
+      WHERE kid_id = ${kidIdQ}
+        AND status = 'approved'
+        AND completed_at IS NOT NULL
+      GROUP BY h
+    `)
+    const rows = (result as unknown as { rows: { h: number; n: number }[] }).rows
+
+    const counts = { morning: 0, afternoon: 0, evening: 0, night: 0 }
+    for (const r of rows) {
+      const h = r.h
+      if (h >= 6 && h < 12) counts.morning += r.n
+      else if (h >= 12 && h < 18) counts.afternoon += r.n
+      else if (h >= 18 && h < 22) counts.evening += r.n
+      else counts.night += r.n
+    }
+
+    const total = counts.morning + counts.afternoon + counts.evening + counts.night
+
+    const SLOT_META: Record<
+      string,
+      { name: string; emoji: string; range: string; personality: string }
+    > = {
+      morning: {
+        name: "早晨",
+        emoji: "🌅",
+        range: "06-11",
+        personality: "早起型 — 一日之計在於晨！",
+      },
+      afternoon: {
+        name: "下午",
+        emoji: "☀️",
+        range: "12-17",
+        personality: "午後型 — 下午精力旺盛！",
+      },
+      evening: {
+        name: "傍晚",
+        emoji: "🌆",
+        range: "18-21",
+        personality: "傍晚型 — 晚餐前的家事達人！",
+      },
+      night: { name: "深夜", emoji: "🌙", range: "22-05", personality: "夜貓型 — 夜晚的勞動者！" },
+    }
+
+    const slots = (["morning", "afternoon", "evening", "night"] as const).map((key) => {
+      const count = counts[key]
+      const percentage = total > 0 ? Math.round((count / total) * 100) : 0
+      return {
+        slot: key,
+        name: SLOT_META[key].name,
+        emoji: SLOT_META[key].emoji,
+        range: SLOT_META[key].range,
+        count,
+        percentage,
+      }
+    })
+
+    let dominantSlot: (typeof slots)[0] & { personality: string } = {
+      ...slots[0],
+      personality: "",
+    }
+    let topCount = -1
+    for (const s of slots) {
+      if (s.count > topCount) {
+        topCount = s.count
+        dominantSlot = { ...s, personality: SLOT_META[s.slot].personality }
+      }
+    }
+
+    res.json({
+      kidId: kidIdQ,
+      totalTasks: total,
+      slots,
+      dominantSlot: total > 0 ? dominantSlot : null,
+    })
+  })
+)
+
+/**
  * GET /api/family/popular-tasks?limit=5
  * 家庭最常做的任務 TOP N（按 title 分組統計）
  * 看哪些任務最熱門、totalReward 多少、最近一次完成日

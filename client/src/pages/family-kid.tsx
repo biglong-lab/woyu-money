@@ -1025,6 +1025,9 @@ function KidDashboard({
       {/* 任務難度分佈 */}
       <KidDifficultyCard kidId={kidId} />
 
+      {/* 任務時段分析 */}
+      <KidTimeOfDayCard kidId={kidId} />
+
       {/* 成就牆（含未解鎖徽章 + 進度條）*/}
       <AchievementWall kidId={kidId} />
 
@@ -2028,6 +2031,72 @@ function KidTaskStreakCard({ kidId }: { kidId: number }) {
             <div className="text-xl font-bold text-amber-700">{data.longestStreak}</div>
           </div>
         )}
+      </div>
+    </div>
+  )
+}
+
+function KidTimeOfDayCard({ kidId }: { kidId: number }) {
+  const { data } = useQuery<{
+    totalTasks: number
+    slots: Array<{
+      slot: "morning" | "afternoon" | "evening" | "night"
+      name: string
+      emoji: string
+      range: string
+      count: number
+      percentage: number
+    }>
+    dominantSlot: { name: string; emoji: string; personality: string } | null
+  }>({
+    queryKey: ["/api/family/kid-time-of-day", kidId],
+    queryFn: async () => {
+      const res = await fetch(`/api/family/kid-time-of-day?kidId=${kidId}`, {
+        credentials: "include",
+      })
+      return res.json()
+    },
+  })
+  if (!data || data.totalTasks === 0) return null
+
+  const SLOT_COLOR: Record<string, string> = {
+    morning: "bg-yellow-400",
+    afternoon: "bg-orange-400",
+    evening: "bg-purple-400",
+    night: "bg-indigo-400",
+  }
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-slate-300 bg-gradient-to-br from-slate-50 to-blue-50 p-4 shadow">
+      <h3 className="font-bold text-slate-900 mb-3 flex items-center gap-2">⏰ 我什麼時候做最多</h3>
+
+      {data.dominantSlot && (
+        <div className="bg-white rounded-lg p-3 mb-3 text-center shadow-sm">
+          <div className="text-4xl mb-1">{data.dominantSlot.emoji}</div>
+          <div className="text-sm font-bold text-slate-900">{data.dominantSlot.name}型</div>
+          <div className="text-xs text-gray-600 mt-1">{data.dominantSlot.personality}</div>
+        </div>
+      )}
+
+      <div className="space-y-2">
+        {data.slots.map((s) => (
+          <div key={s.slot} className="bg-white/70 rounded-lg p-2">
+            <div className="flex items-center justify-between mb-1 text-sm">
+              <span>
+                {s.emoji} {s.name} <span className="text-xs text-gray-500">（{s.range}）</span>
+              </span>
+              <span className="font-bold">
+                {s.count} 次 ({s.percentage}%)
+              </span>
+            </div>
+            <div className="h-2 w-full bg-white rounded-full overflow-hidden">
+              <div
+                className={`h-full ${SLOT_COLOR[s.slot]}`}
+                style={{ width: `${s.percentage}%` }}
+              />
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   )
