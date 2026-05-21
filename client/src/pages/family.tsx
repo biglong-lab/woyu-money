@@ -476,6 +476,9 @@ export default function FamilyPage() {
       {/* 家庭 emoji 雲 */}
       <FamilyEmojiCloudCard />
 
+      {/* 家庭日曆熱度 */}
+      <FamilyCalendarHeatmap />
+
       {/* 家庭財富趨勢（6 個月）*/}
       <FamilyWealthTrend />
 
@@ -2672,6 +2675,95 @@ function CompletedGoalsHistory() {
       </div>
       <div className="text-xs text-green-700 mt-2 text-center">
         平均達成時間：{data.avgDaysTaken} 天
+      </div>
+    </div>
+  )
+}
+
+function FamilyCalendarHeatmap() {
+  const { data } = useQuery<{
+    month: string
+    peak: number
+    activeDays: number
+    totalActivity: number
+    days: Array<{
+      date: string
+      tasks: number
+      spendings: number
+      checkins: number
+      total: number
+    }>
+  }>({
+    queryKey: ["/api/family/calendar-month"],
+    queryFn: async () => {
+      const res = await fetch("/api/family/calendar-month", { credentials: "include" })
+      return res.json()
+    },
+  })
+  if (!data || data.activeDays === 0) return null
+
+  const peak = data.peak
+  function intensity(total: number) {
+    if (total === 0) return "bg-gray-100 text-gray-400"
+    if (peak <= 1) return "bg-emerald-200 text-emerald-900"
+    if (total <= Math.ceil(peak * 0.33)) return "bg-emerald-200 text-emerald-900"
+    if (total <= Math.ceil(peak * 0.66)) return "bg-emerald-400 text-white"
+    return "bg-emerald-700 text-white"
+  }
+
+  // 第一天是星期幾（補空格）
+  const firstDay = new Date(data.days[0].date)
+  const firstDow = firstDay.getDay() // 0=週日
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-teal-300 bg-gradient-to-br from-teal-50 to-cyan-50 p-4 shadow">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="font-bold text-teal-900 flex items-center gap-2">
+          📅 {data.month} 日曆熱度
+        </h3>
+        <span className="text-xs text-gray-500">
+          {data.activeDays} 活躍日・{data.totalActivity} 活動
+        </span>
+      </div>
+
+      {/* 星期 header */}
+      <div className="grid grid-cols-7 gap-1 mb-1 text-xs text-center text-gray-500">
+        <div>日</div>
+        <div>一</div>
+        <div>二</div>
+        <div>三</div>
+        <div>四</div>
+        <div>五</div>
+        <div>六</div>
+      </div>
+
+      <div className="grid grid-cols-7 gap-1">
+        {/* 空格補齊 */}
+        {Array.from({ length: firstDow }).map((_, i) => (
+          <div key={`pad-${i}`} />
+        ))}
+        {data.days.map((d) => {
+          const day = parseInt(d.date.slice(8, 10), 10)
+          return (
+            <div
+              key={d.date}
+              className={`aspect-square rounded p-1 text-center text-xs flex flex-col items-center justify-center ${intensity(d.total)}`}
+              title={`${d.date}：${d.tasks} 任務・${d.spendings} 花費・${d.checkins} 打卡`}
+            >
+              <div className="font-bold">{day}</div>
+              {d.total > 0 && <div className="text-[10px] opacity-80">{d.total}</div>}
+            </div>
+          )
+        })}
+      </div>
+
+      <div className="flex items-center justify-end gap-1 mt-2 text-xs text-gray-500">
+        <span>少</span>
+        <div className="w-3 h-3 rounded bg-gray-100" />
+        <div className="w-3 h-3 rounded bg-emerald-200" />
+        <div className="w-3 h-3 rounded bg-emerald-400" />
+        <div className="w-3 h-3 rounded bg-emerald-700" />
+        <span>多</span>
       </div>
     </div>
   )

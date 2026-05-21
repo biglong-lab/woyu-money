@@ -2875,6 +2875,82 @@ router.get(
 )
 
 /**
+ * GET /api/family/calendar-month?month=YYYY-MM
+ * 家庭日曆熱度（每月每天活動數）
+ *
+ * 對指定月份每天統計：tasks + spendings + checkins
+ * 預設當月、範圍 2000-2100
+ */
+router.get(
+  "/api/family/calendar-month",
+  asyncHandler(async (req, res) => {
+    const monthQ = String(req.query.month ?? "").trim()
+    const monthRegex = /^\d{4}-\d{2}$/
+    const month = monthRegex.test(monthQ) ? monthQ : new Date().toISOString().slice(0, 7)
+
+    const [y, m] = month.split("-").map(Number)
+    if (y < 2000 || y > 2100) throw new AppError(400, "month 超出範圍")
+
+    const result = await db.execute(sql`
+      WITH date_series AS (
+        SELECT generate_series(
+          MAKE_DATE(${y}, ${m}, 1),
+          (MAKE_DATE(${y}, ${m}, 1) + INTERVAL '1 month' - INTERVAL '1 day')::date,
+          INTERVAL '1 day'
+        )::date AS d
+      )
+      SELECT
+        ds.d AS date,
+        COALESCE((
+          SELECT COUNT(*)::int FROM kids_tasks
+          WHERE status = 'approved' AND DATE(completed_at) = ds.d
+        ), 0) AS tasks,
+        COALESCE((
+          SELECT COUNT(*)::int FROM kids_spendings
+          WHERE spend_date = ds.d
+        ), 0) AS spendings,
+        COALESCE((
+          SELECT COUNT(*)::int FROM kids_checkins
+          WHERE checkin_date = ds.d
+        ), 0) AS checkins
+      FROM date_series ds
+      ORDER BY ds.d ASC
+    `)
+    const rows = (
+      result as unknown as {
+        rows: { date: Date | string; tasks: number; spendings: number; checkins: number }[]
+      }
+    ).rows
+
+    const days = rows.map((r) => {
+      const dateStr =
+        typeof r.date === "string"
+          ? r.date.slice(0, 10)
+          : new Date(r.date).toISOString().slice(0, 10)
+      return {
+        date: dateStr,
+        tasks: r.tasks,
+        spendings: r.spendings,
+        checkins: r.checkins,
+        total: r.tasks + r.spendings + r.checkins,
+      }
+    })
+
+    const peak = days.reduce((m, d) => Math.max(m, d.total), 0)
+    const activeDays = days.filter((d) => d.total > 0).length
+    const totalActivity = days.reduce((s, d) => s + d.total, 0)
+
+    res.json({
+      month,
+      peak,
+      activeDays,
+      totalActivity,
+      days,
+    })
+  })
+)
+
+/**
  * GET /api/family/emoji-cloud?limit=20
  * 全家 task emoji 雲（家長端、整體家庭視角）
  */

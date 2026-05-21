@@ -4153,6 +4153,40 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.body.emojis.length).toBeLessThanOrEqual(50)
   })
 
+  it("家庭日曆熱度：當月每天都有 day entry + 統計", async () => {
+    const res = await request(app).get("/api/family/calendar-month")
+    expect(res.status).toBe(200)
+    expect(res.body.month).toMatch(/^\d{4}-\d{2}$/)
+    // 至少 28 天（2 月）、最多 31 天
+    expect(res.body.days.length).toBeGreaterThanOrEqual(28)
+    expect(res.body.days.length).toBeLessThanOrEqual(31)
+    expect(res.body.activeDays).toBeGreaterThanOrEqual(0)
+    expect(res.body.totalActivity).toBeGreaterThanOrEqual(0)
+
+    // 每天有 date / tasks / spendings / checkins / total
+    for (const d of res.body.days as Array<{
+      date: string
+      tasks: number
+      total: number
+    }>) {
+      expect(d.date).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+      expect(typeof d.tasks).toBe("number")
+      expect(typeof d.total).toBe("number")
+    }
+  })
+
+  it("家庭日曆熱度：指定 month=2024-02 → 29 天（閏年）", async () => {
+    const res = await request(app).get("/api/family/calendar-month?month=2024-02")
+    expect(res.status).toBe(200)
+    expect(res.body.month).toBe("2024-02")
+    expect(res.body.days.length).toBe(29) // 2024 是閏年
+  })
+
+  it("家庭日曆熱度：超範圍 month → 400", async () => {
+    const r = await request(app).get("/api/family/calendar-month?month=1999-01")
+    expect(r.status).toBe(400)
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)
