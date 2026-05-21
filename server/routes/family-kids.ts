@@ -2875,6 +2875,72 @@ router.get(
 )
 
 /**
+ * GET /api/family/kid-spending-keywords?kidId=&limit=10
+ * 小孩消費分類分析：按 description 分群、看錢花在哪
+ *
+ * 回：
+ *   totalSpent / totalCount
+ *   keywords: [{ description, count, totalAmount, lastSpentAt }]
+ *   topKeyword: 花最多錢那個
+ */
+router.get(
+  "/api/family/kid-spending-keywords",
+  asyncHandler(async (req, res) => {
+    const kidIdQ = Number(req.query.kidId)
+    if (!Number.isInteger(kidIdQ) || kidIdQ < 1) throw new AppError(400, "需傳 kidId")
+    const limit = Math.min(Math.max(Number(req.query.limit) || 10, 1), 30)
+
+    const result = await db.execute(sql`
+      SELECT
+        description,
+        MAX(emoji) AS emoji,
+        MAX(jar) AS jar,
+        COUNT(*)::int AS count,
+        SUM(amount::numeric)::numeric AS total_amount,
+        MAX(spend_date) AS last_spent_at
+      FROM kids_spendings
+      WHERE kid_id = ${kidIdQ}
+      GROUP BY description
+      ORDER BY total_amount DESC, count DESC
+      LIMIT ${limit}
+    `)
+    const rows = (
+      result as unknown as {
+        rows: {
+          description: string
+          emoji: string | null
+          jar: string
+          count: number
+          total_amount: string | number
+          last_spent_at: Date | null
+        }[]
+      }
+    ).rows
+
+    const keywords = rows.map((r) => ({
+      description: r.description,
+      emoji: r.emoji ?? "💰",
+      jar: r.jar,
+      count: r.count,
+      totalAmount: Number(r.total_amount ?? 0),
+      lastSpentAt: r.last_spent_at,
+    }))
+
+    const totalSpent = keywords.reduce((s, k) => s + k.totalAmount, 0)
+    const totalCount = keywords.reduce((s, k) => s + k.count, 0)
+    const topKeyword = keywords[0] ?? null
+
+    res.json({
+      kidId: kidIdQ,
+      totalSpent,
+      totalCount,
+      keywords,
+      topKeyword,
+    })
+  })
+)
+
+/**
  * GET /api/family/sibling-comparison
  * 兄弟姊妹比較（家長端、看公平性）
  * 每個 active kid 相對家庭平均的 ratio（任務數/獎勵/儲蓄/花費/捐贈）

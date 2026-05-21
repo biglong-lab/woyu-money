@@ -1025,6 +1025,9 @@ function KidDashboard({
       {/* 錢包健康分析 */}
       <KidWalletHealthCard kidId={kidId} />
 
+      {/* 消費分類 */}
+      <KidSpendingKeywordsCard kidId={kidId} />
+
       {/* 能力強項統計 */}
       <KidStrengthsCard kidId={kidId} />
 
@@ -2282,6 +2285,85 @@ function KidStrengthsCard({ kidId }: { kidId: number }) {
                 <div
                   className={`h-full ${color.text.replace("text-", "bg-")}`}
                   style={{ width: `${c.percentage}%` }}
+                />
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function KidSpendingKeywordsCard({ kidId }: { kidId: number }) {
+  const { data } = useQuery<{
+    totalSpent: number
+    totalCount: number
+    keywords: Array<{
+      description: string
+      emoji: string
+      jar: string
+      count: number
+      totalAmount: number
+      lastSpentAt: string | null
+    }>
+    topKeyword: { description: string; totalAmount: number } | null
+  }>({
+    queryKey: ["/api/family/kid-spending-keywords", kidId],
+    queryFn: async () => {
+      const res = await fetch(`/api/family/kid-spending-keywords?kidId=${kidId}&limit=10`, {
+        credentials: "include",
+      })
+      return res.json()
+    },
+  })
+  if (!data || data.totalCount === 0) return null
+
+  const JAR_COLOR: Record<string, string> = {
+    spend: "bg-rose-100 text-rose-700",
+    save: "bg-blue-100 text-blue-700",
+    give: "bg-pink-100 text-pink-700",
+  }
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-orange-300 bg-gradient-to-br from-orange-50 to-amber-50 p-4 shadow">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="font-bold text-orange-900 flex items-center gap-2">🛒 我花錢買什麼</h3>
+        <span className="text-xs text-gray-500">
+          ${data.totalSpent}・{data.totalCount} 次
+        </span>
+      </div>
+
+      {data.topKeyword && (
+        <div className="bg-white rounded-lg p-2 mb-3 text-center text-sm">
+          🏆 最常買：<b>{data.topKeyword.description}</b>（共 ${data.topKeyword.totalAmount}）
+        </div>
+      )}
+
+      <div className="space-y-1">
+        {data.keywords.map((k) => {
+          const percentage =
+            data.totalSpent > 0 ? Math.round((k.totalAmount / data.totalSpent) * 100) : 0
+          return (
+            <div key={k.description} className="bg-white rounded-lg p-2">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-sm flex items-center gap-1">
+                  <span>{k.emoji}</span>
+                  <span className="font-medium">{k.description}</span>
+                  <span
+                    className={`text-[10px] px-1.5 py-0.5 rounded ${JAR_COLOR[k.jar] || JAR_COLOR.spend}`}
+                  >
+                    {k.jar}
+                  </span>
+                </span>
+                <span className="text-xs font-bold text-orange-700">
+                  ${k.totalAmount}（{k.count} 次）
+                </span>
+              </div>
+              <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-orange-400 to-amber-500"
+                  style={{ width: `${percentage}%` }}
                 />
               </div>
             </div>

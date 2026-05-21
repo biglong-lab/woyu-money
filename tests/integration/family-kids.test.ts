@@ -3193,6 +3193,65 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.body.message).toContain("至少 2")
   })
 
+  it("消費分類：3 筆同 description「零食」 + 2 筆「玩具」 → 按 totalAmount DESC", async () => {
+    await createKid({ spendRatio: 100, saveRatio: 0, giveRatio: 0 })
+
+    // 任務 1000 元、spend 罐 1000
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId, title: "大", rewardAmount: 1000 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`)
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`)
+
+    // 3 筆「零食」 30 each = 90、2 筆「玩具」100 each = 200
+    for (let i = 0; i < 3; i++) {
+      await request(app)
+        .post("/api/family/spendings")
+        .send({ kidId, jar: "spend", amount: 30, description: "零食" })
+    }
+    for (let i = 0; i < 2; i++) {
+      await request(app)
+        .post("/api/family/spendings")
+        .send({ kidId, jar: "spend", amount: 100, description: "玩具" })
+    }
+
+    const res = await request(app).get(`/api/family/kid-spending-keywords?kidId=${kidId}`)
+    expect(res.status).toBe(200)
+    expect(res.body.totalSpent).toBe(290) // 90 + 200
+    expect(res.body.totalCount).toBe(5)
+
+    const kw = res.body.keywords as Array<{
+      description: string
+      count: number
+      totalAmount: number
+    }>
+    // 玩具總額多、應該排第一
+    expect(kw[0].description).toBe("玩具")
+    expect(kw[0].count).toBe(2)
+    expect(kw[0].totalAmount).toBe(200)
+
+    expect(kw[1].description).toBe("零食")
+    expect(kw[1].count).toBe(3)
+    expect(kw[1].totalAmount).toBe(90)
+
+    expect(res.body.topKeyword.description).toBe("玩具")
+  })
+
+  it("消費分類：無支出 → keywords=[]、topKeyword=null", async () => {
+    await createKid()
+    const res = await request(app).get(`/api/family/kid-spending-keywords?kidId=${kidId}`)
+    expect(res.status).toBe(200)
+    expect(res.body.totalSpent).toBe(0)
+    expect(res.body.totalCount).toBe(0)
+    expect(res.body.keywords).toEqual([])
+    expect(res.body.topKeyword).toBeNull()
+  })
+
+  it("kid-spending-keywords 缺 kidId 回 400", async () => {
+    const r = await request(app).get("/api/family/kid-spending-keywords")
+    expect(r.status).toBe(400)
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)
