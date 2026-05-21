@@ -8602,6 +8602,102 @@ async function bulkApproveOne(
 }
 
 /**
+ * GET /api/family/jars-current-balance
+ * 全家三罐當前餘額總和 + 比例 + 每罐 topKid
+ * 健康度：save 占比 ≥ 25% = healthy / 15-25% = ok / <15% = unhealthy
+ */
+router.get(
+  "/api/family/jars-current-balance",
+  asyncHandler(async (_req, res) => {
+    const totals = await db.execute(sql`
+      SELECT
+        COALESCE(SUM(j.spend_balance::numeric), 0)::numeric AS spend_total,
+        COALESCE(SUM(j.save_balance::numeric), 0)::numeric AS save_total,
+        COALESCE(SUM(j.give_balance::numeric), 0)::numeric AS give_total
+      FROM kids_jars j
+      JOIN kids_accounts ka ON ka.id = j.kid_id
+      WHERE ka.is_active = true
+    `)
+    const t = (
+      totals as unknown as {
+        rows: Array<{
+          spend_total: string | number
+          save_total: string | number
+          give_total: string | number
+        }>
+      }
+    ).rows[0]
+
+    const spend = Number(t?.spend_total ?? 0)
+    const save = Number(t?.save_total ?? 0)
+    const give = Number(t?.give_total ?? 0)
+    const total = spend + save + give
+
+    const topPerJar = await db.execute(sql`
+      SELECT
+        (
+          SELECT json_build_object('kidName', ka.display_name, 'balance', j.spend_balance::numeric, 'avatar', ka.avatar)
+          FROM kids_jars j JOIN kids_accounts ka ON ka.id = j.kid_id
+          WHERE ka.is_active = true
+          ORDER BY j.spend_balance::numeric DESC LIMIT 1
+        ) AS top_spend,
+        (
+          SELECT json_build_object('kidName', ka.display_name, 'balance', j.save_balance::numeric, 'avatar', ka.avatar)
+          FROM kids_jars j JOIN kids_accounts ka ON ka.id = j.kid_id
+          WHERE ka.is_active = true
+          ORDER BY j.save_balance::numeric DESC LIMIT 1
+        ) AS top_save,
+        (
+          SELECT json_build_object('kidName', ka.display_name, 'balance', j.give_balance::numeric, 'avatar', ka.avatar)
+          FROM kids_jars j JOIN kids_accounts ka ON ka.id = j.kid_id
+          WHERE ka.is_active = true
+          ORDER BY j.give_balance::numeric DESC LIMIT 1
+        ) AS top_give
+    `)
+    const topRow = (
+      topPerJar as unknown as {
+        rows: Array<{
+          top_spend: { kidName: string; balance: number; avatar: string } | null
+          top_save: { kidName: string; balance: number; avatar: string } | null
+          top_give: { kidName: string; balance: number; avatar: string } | null
+        }>
+      }
+    ).rows[0]
+
+    const ratio = (n: number) => (total > 0 ? Math.round((n / total) * 100) : 0)
+
+    const saveRatio = ratio(save)
+    let health: "healthy" | "ok" | "unhealthy" | "no_data"
+    let message: string
+
+    if (total === 0) {
+      health = "no_data"
+      message = "全家還沒收入、開始完成任務累積吧 🌱"
+    } else if (saveRatio >= 25) {
+      health = "healthy"
+      message = `💎 全家儲蓄健康（save 占 ${saveRatio}%）`
+    } else if (saveRatio >= 15) {
+      health = "ok"
+      message = `💰 全家平衡（save 占 ${saveRatio}%）、可以多存一點`
+    } else {
+      health = "unhealthy"
+      message = `⚠️ 全家偏花用（save 只占 ${saveRatio}%）、建議多存錢`
+    }
+
+    res.json({
+      jars: {
+        spend: { total: spend, ratio: ratio(spend), topKid: topRow?.top_spend ?? null },
+        save: { total: save, ratio: saveRatio, topKid: topRow?.top_save ?? null },
+        give: { total: give, ratio: ratio(give), topKid: topRow?.top_give ?? null },
+      },
+      total,
+      health,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/goals-completion-rate
  * 家庭目標達成率分析：active / completed / abandoned 統計 + 平均達成天數
  */

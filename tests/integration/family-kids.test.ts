@@ -4245,6 +4245,36 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.body.weeks).toBe(52)
   })
 
+  it("三罐當前餘額：基本結構 jars + total + health", async () => {
+    const res = await request(app).get("/api/family/jars-current-balance")
+    expect(res.status).toBe(200)
+    expect(res.body.jars).toHaveProperty("spend")
+    expect(res.body.jars).toHaveProperty("save")
+    expect(res.body.jars).toHaveProperty("give")
+    expect(res.body.jars.spend).toHaveProperty("total")
+    expect(res.body.jars.spend).toHaveProperty("ratio")
+    expect(["healthy", "ok", "unhealthy", "no_data"]).toContain(res.body.health)
+    expect(res.body.message).toBeTruthy()
+  })
+
+  it("三罐當前餘額：approve 任務 100 (50/30/20) → total>=100、有 topKid", async () => {
+    const kidObj = (await createKid({ spendRatio: 50, saveRatio: 30, giveRatio: 20 })) as {
+      id: number
+    }
+    const myKidId = kidObj.id
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId: myKidId, title: "三罐測試", rewardAmount: 100 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`).send({})
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`).send({})
+    const res = await request(app).get("/api/family/jars-current-balance")
+    expect(res.status).toBe(200)
+    expect(res.body.total).toBeGreaterThanOrEqual(100)
+    expect(res.body.jars.spend.topKid).not.toBeNull()
+    expect(res.body.jars.save.topKid).not.toBeNull()
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
   it("目標達成率：基本結構 stats + completionRate + level", async () => {
     const res = await request(app).get("/api/family/goals-completion-rate")
     expect(res.status).toBe(200)

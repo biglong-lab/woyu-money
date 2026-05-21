@@ -508,6 +508,9 @@ export default function FamilyPage() {
       {/* 家庭目標達成率 */}
       <FamilyGoalsCompletionRateCard />
 
+      {/* 家庭三罐當前餘額 */}
+      <FamilyJarsCurrentCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3462,6 +3465,88 @@ function ParentTodoList() {
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
       )}
+    </div>
+  )
+}
+
+function FamilyJarsCurrentCard() {
+  const { data } = useQuery<{
+    jars: {
+      spend: {
+        total: number
+        ratio: number
+        topKid: { kidName: string; balance: number; avatar: string } | null
+      }
+      save: {
+        total: number
+        ratio: number
+        topKid: { kidName: string; balance: number; avatar: string } | null
+      }
+      give: {
+        total: number
+        ratio: number
+        topKid: { kidName: string; balance: number; avatar: string } | null
+      }
+    }
+    total: number
+    health: "healthy" | "ok" | "unhealthy" | "no_data"
+    message: string
+  }>({
+    queryKey: ["/api/family/jars-current-balance"],
+  })
+  if (!data || data.total === 0) return null
+
+  const HEALTH_BG: Record<string, string> = {
+    healthy: "from-emerald-50 to-green-50 border-emerald-400",
+    ok: "from-blue-50 to-sky-50 border-blue-300",
+    unhealthy: "from-amber-50 to-orange-50 border-amber-400",
+    no_data: "from-gray-50 to-slate-50 border-gray-300",
+  }
+
+  const items = [
+    { key: "spend", label: "🛒 花用罐", color: "bg-rose-500", data: data.jars.spend },
+    { key: "save", label: "💎 儲蓄罐", color: "bg-emerald-500", data: data.jars.save },
+    { key: "give", label: "💝 捐贈罐", color: "bg-violet-500", data: data.jars.give },
+  ]
+
+  return (
+    <div
+      className={`mb-4 rounded-2xl border-2 bg-gradient-to-br ${HEALTH_BG[data.health]} p-3 shadow`}
+    >
+      <h3 className="font-bold mb-2 flex items-center gap-2">🏺 全家三罐 ${data.total}</h3>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-2 text-xs">{data.message}</div>
+
+      <div className="flex h-3 rounded-full overflow-hidden mb-3 bg-white/50">
+        {items.map((it) => (
+          <div
+            key={it.key}
+            className={it.color}
+            style={{ width: `${it.data.ratio}%` }}
+            title={`${it.label}: ${it.data.ratio}%`}
+          />
+        ))}
+      </div>
+
+      <div className="space-y-1.5">
+        {items.map((it) => (
+          <div key={it.key} className="bg-white/80 rounded-lg p-2 flex items-center gap-2">
+            <div className="w-24 text-xs">{it.label}</div>
+            <div className="flex-1">
+              <div className="text-sm font-bold">${it.data.total}</div>
+              <div className="text-[10px] text-gray-500">{it.data.ratio}%</div>
+            </div>
+            {it.data.topKid && (
+              <div className="text-right text-[10px] text-gray-600">
+                <div>
+                  🥇 {it.data.topKid.avatar} {it.data.topKid.kidName}
+                </div>
+                <div>${it.data.topKid.balance}</div>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
