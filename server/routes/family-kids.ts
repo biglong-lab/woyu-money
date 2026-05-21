@@ -8822,6 +8822,82 @@ router.get(
 )
 
 /**
+ * GET /api/family/proof-image-wall?days=7
+ * 過去 N 天 approved + 有 proof_image_url 任務的縮圖牆
+ */
+router.get(
+  "/api/family/proof-image-wall",
+  asyncHandler(async (req, res) => {
+    const days = Math.min(Math.max(Number(req.query.days) || 7, 1), 30)
+
+    const rows = await db.execute(sql`
+      SELECT
+        t.id::int AS task_id,
+        t.title,
+        t.emoji,
+        t.reward_amount::numeric AS reward,
+        t.proof_image_url,
+        t.approved_at,
+        ka.id::int AS kid_id,
+        ka.display_name AS kid_name,
+        ka.avatar
+      FROM kids_tasks t
+      JOIN kids_accounts ka ON ka.id = t.kid_id
+      WHERE t.status = 'approved'
+        AND t.proof_image_url IS NOT NULL
+        AND length(trim(t.proof_image_url)) > 0
+        AND t.approved_at >= NOW() - (${days} || ' days')::interval
+        AND ka.is_active = true
+      ORDER BY t.approved_at DESC
+      LIMIT 30
+    `)
+
+    const photos = (
+      rows as unknown as {
+        rows: Array<{
+          task_id: number
+          title: string
+          emoji: string
+          reward: string
+          proof_image_url: string
+          approved_at: string
+          kid_id: number
+          kid_name: string
+          avatar: string
+        }>
+      }
+    ).rows.map((r) => ({
+      taskId: r.task_id,
+      title: r.title,
+      emoji: r.emoji,
+      reward: Number(r.reward),
+      proofImageUrl: r.proof_image_url,
+      approvedAt: r.approved_at,
+      kidId: r.kid_id,
+      kidName: r.kid_name,
+      kidAvatar: r.avatar,
+    }))
+
+    const uniqueKids = new Set(photos.map((p) => p.kidId)).size
+
+    let message: string
+    if (photos.length === 0) {
+      message = `過去 ${days} 天還沒有附上證明照片的任務`
+    } else {
+      message = `📸 過去 ${days} 天家裡 ${uniqueKids} 位小孩留下了 ${photos.length} 張努力證明`
+    }
+
+    res.json({
+      days,
+      photos,
+      photoCount: photos.length,
+      uniqueKids,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/stale-pending-tasks?days=3
  * 小孩 submit 後家長 N 天未 approve 的任務（被遺忘的獎勵）
  * 排序 waitingDays DESC

@@ -4315,6 +4315,51 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.status).toBe(404)
   })
 
+  it("證明照片牆：基本結構 photos/photoCount/uniqueKids/message", async () => {
+    const res = await request(app).get("/api/family/proof-image-wall")
+    expect(res.status).toBe(200)
+    expect(Array.isArray(res.body.photos)).toBe(true)
+    expect(res.body.days).toBe(7)
+    expect(res.body).toHaveProperty("photoCount")
+    expect(res.body).toHaveProperty("uniqueKids")
+    expect(res.body.message).toBeTruthy()
+  })
+
+  it("證明照片牆：approved + proof_image 任務出現於牆上", async () => {
+    const kidObj = (await createKid({ displayName: "拍照小子" })) as { id: number }
+    const myKidId = kidObj.id
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId: myKidId, title: "洗碗證明", rewardAmount: 25 })
+    await request(app)
+      .post(`/api/family/tasks/${t.body.id}/submit`)
+      .send({ proofImageUrl: "/uploads/proof-test.jpg" })
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`).send({})
+    const res = await request(app).get("/api/family/proof-image-wall")
+    expect(res.status).toBe(200)
+    const mine = res.body.photos.find((x: { taskId: number }) => x.taskId === t.body.id)
+    expect(mine).toBeDefined()
+    expect(mine.title).toBe("洗碗證明")
+    expect(mine.proofImageUrl).toBe("/uploads/proof-test.jpg")
+    expect(mine.kidName).toBe("拍照小子")
+    expect(mine.reward).toBe(25)
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
+  it("證明照片牆：無 proof_image 的 approved 不上牆", async () => {
+    const kidObj = (await createKid()) as { id: number }
+    const myKidId = kidObj.id
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId: myKidId, title: "無照片任務", rewardAmount: 10 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`).send({})
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`).send({})
+    const res = await request(app).get("/api/family/proof-image-wall")
+    const found = res.body.photos.find((x: { taskId: number }) => x.taskId === t.body.id)
+    expect(found).toBeUndefined()
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
   it("未批准提醒：基本結構 tasks/totalForgotten/severity/message", async () => {
     const res = await request(app).get("/api/family/stale-pending-tasks")
     expect(res.status).toBe(200)

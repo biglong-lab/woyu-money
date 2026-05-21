@@ -646,6 +646,9 @@ export default function FamilyPage() {
       {/* 未批准提醒（家長忘記 approve）*/}
       <FamilyStalePendingTasksCard />
 
+      {/* 證明照片牆 */}
+      <FamilyProofImageWallCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3600,6 +3603,66 @@ function ParentTodoList() {
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
       )}
+    </div>
+  )
+}
+
+function FamilyProofImageWallCard() {
+  const { data } = useQuery<{
+    days: number
+    photos: Array<{
+      taskId: number
+      title: string
+      emoji: string
+      reward: number
+      proofImageUrl: string
+      approvedAt: string
+      kidName: string
+      kidAvatar: string
+    }>
+    photoCount: number
+    uniqueKids: number
+    message: string
+  }>({
+    queryKey: ["/api/family/proof-image-wall?days=7"],
+  })
+  if (!data || data.photos.length === 0) return null
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-sky-300 bg-gradient-to-br from-sky-50 to-cyan-50 p-3 shadow">
+      <h3 className="font-bold mb-2 flex items-center gap-2">📸 努力證明照片牆</h3>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-2 text-xs">{data.message}</div>
+
+      <div className="grid grid-cols-3 gap-2">
+        {data.photos.map((p) => (
+          <a
+            key={p.taskId}
+            href={p.proofImageUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="relative block rounded-lg overflow-hidden bg-white shadow-sm hover:shadow-md transition-shadow"
+          >
+            <img
+              src={p.proofImageUrl}
+              alt={p.title}
+              className="w-full h-24 object-cover"
+              loading="lazy"
+            />
+            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-1">
+              <div className="text-[9px] text-white truncate">
+                {p.kidAvatar} {p.kidName}
+              </div>
+              <div className="text-[9px] text-white truncate">
+                {p.emoji} {p.title}
+              </div>
+            </div>
+            <div className="absolute top-1 right-1 bg-amber-400 text-[9px] font-bold px-1 rounded">
+              ${p.reward}
+            </div>
+          </a>
+        ))}
+      </div>
     </div>
   )
 }
