@@ -2804,6 +2804,95 @@ router.get(
 )
 
 /**
+ * GET /api/family/kid-activity?kidId=&limit=20
+ * 小孩個人活動時間軸：tasks（approved）/ spendings / checkins / wishes
+ * 提升黏著度（看自己最近做了什麼）
+ */
+router.get(
+  "/api/family/kid-activity",
+  asyncHandler(async (req, res) => {
+    const kidIdQ = Number(req.query.kidId)
+    if (!Number.isInteger(kidIdQ) || kidIdQ < 1) throw new AppError(400, "需傳 kidId")
+    const limit = Math.min(Number(req.query.limit) || 20, 50)
+
+    const result = await db.execute(sql`
+      SELECT * FROM (
+        SELECT
+          'task'::text AS kind,
+          kt.id::int AS id,
+          kt.title AS label,
+          (kt.reward_amount::text || ' 元') AS amount,
+          kt.emoji AS emoji,
+          kt.completed_at AS at
+        FROM kids_tasks kt
+        WHERE kt.kid_id = ${kidIdQ} AND kt.status = 'approved' AND kt.completed_at IS NOT NULL
+
+        UNION ALL
+
+        SELECT
+          'spending'::text AS kind,
+          ks.id::int AS id,
+          ks.description AS label,
+          ('-' || ks.amount::text || ' (' || ks.jar || ')') AS amount,
+          ks.emoji AS emoji,
+          ks.created_at AS at
+        FROM kids_spendings ks
+        WHERE ks.kid_id = ${kidIdQ}
+
+        UNION ALL
+
+        SELECT
+          'checkin'::text AS kind,
+          kc.id::int AS id,
+          COALESCE(kc.note, '今日打卡') AS label,
+          kc.mood::text AS amount,
+          NULL::varchar AS emoji,
+          kc.created_at AS at
+        FROM kids_checkins kc
+        WHERE kc.kid_id = ${kidIdQ}
+
+        UNION ALL
+
+        SELECT
+          'wish'::text AS kind,
+          kw.id::int AS id,
+          kw.title AS label,
+          (COALESCE(kw.estimated_price::text, '?') || ' 元・' || kw.status::text) AS amount,
+          kw.emoji AS emoji,
+          kw.created_at AS at
+        FROM kids_wishes kw
+        WHERE kw.kid_id = ${kidIdQ}
+      ) u
+      ORDER BY at DESC NULLS LAST
+      LIMIT ${limit}
+    `)
+    const rows = (
+      result as unknown as {
+        rows: {
+          kind: string
+          id: number
+          label: string
+          amount: string | null
+          emoji: string | null
+          at: Date | null
+        }[]
+      }
+    ).rows
+    res.json({
+      kidId: kidIdQ,
+      activities: rows.map((r) => ({
+        kind: r.kind,
+        id: r.id,
+        label: r.label,
+        amount: r.amount,
+        emoji: r.emoji,
+        at: r.at,
+      })),
+    })
+  })
+)
+
+/**
  * GET /api/family/search?q=&limit=20
  * 跨域搜尋：tasks（title）/ goals（title）/ comments（body）/ wishes（title）
  * 家長一次找全部、ILIKE 不分大小寫

@@ -2161,6 +2161,62 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(r.status).toBe(400)
   })
 
+  it("小孩活動時間軸：聚合 task / spending / checkin / wish、按時間倒序", async () => {
+    await createKid({ spendRatio: 70, saveRatio: 20, giveRatio: 10 })
+
+    // 1) 完成任務（approved → completed_at 有值、spend 罐 70%=140 元）
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId, title: "倒垃圾", rewardAmount: 200 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`)
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`)
+
+    // 2) 花錢（spend 罐有 140 元、花 50 元 OK）
+    const sp = await request(app)
+      .post("/api/family/spendings")
+      .send({ kidId, jar: "spend", amount: 50, description: "買零食" })
+    expect(sp.status).toBeLessThan(300)
+
+    // 3) 打卡（mood 必須是完整 emoji + 文字）
+    const ck = await request(app)
+      .post("/api/family/checkins")
+      .send({ kidId, mood: "😄 開心", note: "今天很棒" })
+    expect(ck.status).toBeLessThan(300)
+
+    // 4) 願望
+    await request(app)
+      .post("/api/family/wishes")
+      .send({ kidId, title: "新玩具", estimatedPrice: 500 })
+
+    const res = await request(app).get(`/api/family/kid-activity?kidId=${kidId}`)
+    expect(res.status).toBe(200)
+    expect(res.body.kidId).toBe(kidId)
+
+    const kinds = res.body.activities.map((a: { kind: string }) => a.kind)
+    expect(kinds).toContain("task")
+    expect(kinds).toContain("spending")
+    expect(kinds).toContain("checkin")
+    expect(kinds).toContain("wish")
+
+    // 每筆都有 label + amount
+    for (const a of res.body.activities as Array<{ label: string; amount: string }>) {
+      expect(a.label).toBeTruthy()
+      expect(a.amount).toBeTruthy()
+    }
+
+    // 時間倒序：第一筆 .at >= 第二筆
+    if (res.body.activities.length >= 2) {
+      const t1 = new Date(res.body.activities[0].at).getTime()
+      const t2 = new Date(res.body.activities[1].at).getTime()
+      expect(t1).toBeGreaterThanOrEqual(t2)
+    }
+  })
+
+  it("kid-activity 缺 kidId 回 400", async () => {
+    const r = await request(app).get("/api/family/kid-activity")
+    expect(r.status).toBe(400)
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)

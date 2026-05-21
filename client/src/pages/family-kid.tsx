@@ -1000,6 +1000,9 @@ function KidDashboard({
       {/* 等級徽章（累積分數升 level）*/}
       <KidLevelBadge kidId={kidId} />
 
+      {/* 最近活動時間軸 */}
+      <KidActivityTimeline kidId={kidId} />
+
       {/* 成就牆（含未解鎖徽章 + 進度條）*/}
       <AchievementWall kidId={kidId} />
 
@@ -1753,6 +1756,76 @@ function WishesSection({
           ))}
         </div>
       )}
+    </div>
+  )
+}
+
+function KidActivityTimeline({ kidId }: { kidId: number }) {
+  const { data } = useQuery<{
+    activities: Array<{
+      kind: "task" | "spending" | "checkin" | "wish"
+      id: number
+      label: string
+      amount: string
+      emoji: string | null
+      at: string
+    }>
+  }>({
+    queryKey: ["/api/family/kid-activity", kidId],
+    queryFn: async () => {
+      const res = await fetch(`/api/family/kid-activity?kidId=${kidId}&limit=15`, {
+        credentials: "include",
+      })
+      return res.json()
+    },
+  })
+  if (!data?.activities?.length) return null
+
+  const KIND_LABEL: Record<string, { name: string; color: string; fallback: string }> = {
+    task: { name: "完成任務", color: "text-green-700 bg-green-50", fallback: "📋" },
+    spending: { name: "花錢", color: "text-rose-700 bg-rose-50", fallback: "💸" },
+    checkin: { name: "打卡", color: "text-amber-700 bg-amber-50", fallback: "😊" },
+    wish: { name: "願望", color: "text-violet-700 bg-violet-50", fallback: "✨" },
+  }
+
+  function timeAgo(iso: string) {
+    const diff = Date.now() - new Date(iso).getTime()
+    const min = Math.floor(diff / 60000)
+    if (min < 1) return "剛剛"
+    if (min < 60) return `${min} 分鐘前`
+    const hr = Math.floor(min / 60)
+    if (hr < 24) return `${hr} 小時前`
+    const day = Math.floor(hr / 24)
+    if (day < 30) return `${day} 天前`
+    return new Date(iso).toLocaleDateString("zh-TW")
+  }
+
+  return (
+    <div className="mb-4 rounded-2xl border border-gray-200 bg-white p-3 shadow-sm">
+      <div className="flex items-center justify-between mb-2 px-1">
+        <h3 className="font-bold text-gray-700">📜 最近活動</h3>
+        <span className="text-xs text-gray-400">最新 {data.activities.length} 筆</span>
+      </div>
+      <div className="space-y-1 max-h-64 overflow-y-auto">
+        {data.activities.map((a) => {
+          const meta = KIND_LABEL[a.kind]
+          return (
+            <div
+              key={`${a.kind}-${a.id}`}
+              className={`flex items-center gap-2 p-2 rounded-lg ${meta.color}`}
+            >
+              <span className="text-xl">{a.emoji || meta.fallback}</span>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium truncate">{a.label}</div>
+                <div className="text-xs opacity-75">
+                  {meta.name}・{a.amount}
+                </div>
+              </div>
+              <span className="text-xs opacity-60 shrink-0">{timeAgo(a.at)}</span>
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }
