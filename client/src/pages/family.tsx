@@ -487,6 +487,9 @@ export default function FamilyPage() {
       {/* 家庭多月趨勢 */}
       <FamilyMultiMonthTrendCard />
 
+      {/* 家庭儲蓄留存率 */}
+      <FamilySavingsRetentionCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3441,6 +3444,85 @@ function ParentTodoList() {
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
       )}
+    </div>
+  )
+}
+
+function FamilySavingsRetentionCard() {
+  const { data } = useQuery<{
+    kids: Array<{
+      kidId: number
+      kidName: string
+      avatar: string
+      lifetimeEarned: number
+      retentionRatio: number
+      level: "super_saver" | "good_saver" | "spender" | "heavy_spender" | "no_data"
+      levelLabel: string
+    }>
+    summary: {
+      totalKids: number
+      kidsWithData: number
+      avgRetention: number
+      topSaver: { kidName: string; retentionRatio: number } | null
+    }
+    familyLevel: "super_saver" | "good_saver" | "spender" | "heavy_spender" | "no_data"
+    message: string
+  }>({
+    queryKey: ["/api/family/savings-retention"],
+  })
+  if (!data) return null
+  if (data.summary.kidsWithData === 0) return null
+
+  const FAMILY_BG: Record<string, string> = {
+    super_saver: "from-yellow-50 to-amber-50 border-yellow-400",
+    good_saver: "from-emerald-50 to-green-50 border-emerald-300",
+    spender: "from-blue-50 to-sky-50 border-blue-300",
+    heavy_spender: "from-rose-50 to-red-50 border-rose-300",
+    no_data: "from-gray-50 to-slate-50 border-gray-300",
+  }
+
+  const LEVEL_COLOR: Record<string, string> = {
+    super_saver: "bg-yellow-400 text-yellow-900",
+    good_saver: "bg-emerald-400 text-emerald-900",
+    spender: "bg-blue-400 text-white",
+    heavy_spender: "bg-rose-400 text-white",
+    no_data: "bg-gray-300 text-gray-700",
+  }
+
+  return (
+    <div
+      className={`mb-4 rounded-2xl border-2 bg-gradient-to-br ${FAMILY_BG[data.familyLevel]} p-3 shadow`}
+    >
+      <h3 className="font-bold mb-2 flex items-center gap-2">💎 儲蓄留存率</h3>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-2 text-xs">
+        {data.message}
+        {data.summary.topSaver && (
+          <div className="text-gray-600 mt-1">
+            👑 留存王：{data.summary.topSaver.kidName}（{data.summary.topSaver.retentionRatio}%）
+          </div>
+        )}
+      </div>
+
+      <div className="space-y-1.5">
+        {data.kids.map((k) => (
+          <div key={k.kidId} className="flex items-center gap-2 bg-white/80 rounded-lg p-2">
+            <div className="text-lg">{k.avatar}</div>
+            <div className="flex-1">
+              <div className="text-sm font-medium">{k.kidName}</div>
+              <div className="text-[10px] text-gray-500">累計 ${k.lifetimeEarned}</div>
+            </div>
+            <div className="text-right">
+              <div className="text-lg font-bold">{k.retentionRatio}%</div>
+              <div
+                className={`text-[10px] px-1.5 py-0.5 rounded ${LEVEL_COLOR[k.level]} inline-block`}
+              >
+                {k.levelLabel}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

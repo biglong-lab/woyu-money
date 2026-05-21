@@ -8602,6 +8602,130 @@ async function bulkApproveOne(
 }
 
 /**
+ * GET /api/family/savings-retention
+ * 每個 active 小孩存款留存率分析
+ * 留存率 = (save_balance + give_balance) / total_received（spend 罐已花用）
+ * level: super_saver(>=70%) / good_saver(>=50%) / spender(>=25%) / heavy_spender(<25%)
+ */
+router.get(
+  "/api/family/savings-retention",
+  asyncHandler(async (_req, res) => {
+    const rows = await db.execute(sql`
+      SELECT
+        ka.id::int AS kid_id,
+        ka.display_name AS kid_name,
+        ka.avatar,
+        COALESCE(j.total_received::numeric, 0) AS lifetime_earned,
+        COALESCE(j.save_balance::numeric, 0) AS save_balance,
+        COALESCE(j.give_balance::numeric, 0) AS give_balance,
+        COALESCE(j.spend_balance::numeric, 0) AS spend_balance
+      FROM kids_accounts ka
+      LEFT JOIN kids_jars j ON j.kid_id = ka.id
+      WHERE ka.is_active = true
+      ORDER BY ka.id ASC
+    `)
+
+    const kids = (
+      rows as unknown as {
+        rows: Array<{
+          kid_id: number
+          kid_name: string
+          avatar: string
+          lifetime_earned: string | number
+          save_balance: string | number
+          give_balance: string | number
+          spend_balance: string | number
+        }>
+      }
+    ).rows.map((r) => {
+      const earned = Number(r.lifetime_earned)
+      const save = Number(r.save_balance)
+      const give = Number(r.give_balance)
+      const spend = Number(r.spend_balance)
+      const retained = save + give
+      const ratio = earned > 0 ? retained / earned : 0
+      let level: "super_saver" | "good_saver" | "spender" | "heavy_spender" | "no_data"
+      let levelLabel: string
+      if (earned === 0) {
+        level = "no_data"
+        levelLabel = "尚無收入"
+      } else if (ratio >= 0.7) {
+        level = "super_saver"
+        levelLabel = "🏆 超級存錢家"
+      } else if (ratio >= 0.5) {
+        level = "good_saver"
+        levelLabel = "💎 會理財"
+      } else if (ratio >= 0.25) {
+        level = "spender"
+        levelLabel = "💰 一般花用"
+      } else {
+        level = "heavy_spender"
+        levelLabel = "🛒 偏向花用"
+      }
+      return {
+        kidId: r.kid_id,
+        kidName: r.kid_name,
+        avatar: r.avatar,
+        lifetimeEarned: earned,
+        saveBalance: save,
+        giveBalance: give,
+        spendBalance: spend,
+        retentionRatio: Math.round(ratio * 100),
+        level,
+        levelLabel,
+      }
+    })
+
+    const sortedKids = [...kids].sort((a, b) => {
+      if (a.lifetimeEarned === 0 && b.lifetimeEarned === 0) return 0
+      if (a.lifetimeEarned === 0) return 1
+      if (b.lifetimeEarned === 0) return -1
+      return b.retentionRatio - a.retentionRatio
+    })
+
+    const withData = kids.filter((k) => k.lifetimeEarned > 0)
+    const topSaver = withData.length > 0 ? sortedKids[0] : null
+    const avgRetention =
+      withData.length > 0
+        ? Math.round(withData.reduce((s, k) => s + k.retentionRatio, 0) / withData.length)
+        : 0
+
+    let familyLevel: "super_saver" | "good_saver" | "spender" | "heavy_spender" | "no_data"
+    let message: string
+    if (withData.length === 0) {
+      familyLevel = "no_data"
+      message = "還沒有人開始賺零用金、加油！"
+    } else if (avgRetention >= 70) {
+      familyLevel = "super_saver"
+      message = `🏆 全家平均留存 ${avgRetention}%、超會存的！`
+    } else if (avgRetention >= 50) {
+      familyLevel = "good_saver"
+      message = `💎 全家平均留存 ${avgRetention}%、理財觀念不錯`
+    } else if (avgRetention >= 25) {
+      familyLevel = "spender"
+      message = `💰 全家平均留存 ${avgRetention}%、可以更節制`
+    } else {
+      familyLevel = "heavy_spender"
+      message = `🛒 全家平均留存 ${avgRetention}%、花太多了、試試 50/30/20 分配`
+    }
+
+    res.json({
+      kids: sortedKids,
+      summary: {
+        totalKids: kids.length,
+        kidsWithData: withData.length,
+        avgRetention,
+        topSaver: topSaver
+          ? { kidName: topSaver.kidName, retentionRatio: topSaver.retentionRatio }
+          : null,
+      },
+      familyLevel,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/multi-month-trend?months=12
  * 過去 N 個月每月：任務數 / 入帳 / 花用 / 打卡天數
  * 用 generate_series 確保每月都有資料、從舊到新排序

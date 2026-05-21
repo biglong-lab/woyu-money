@@ -4245,6 +4245,38 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.body.weeks).toBe(52)
   })
 
+  it("儲蓄留存：基本結構 kids + summary + familyLevel", async () => {
+    const res = await request(app).get("/api/family/savings-retention")
+    expect(res.status).toBe(200)
+    expect(Array.isArray(res.body.kids)).toBe(true)
+    expect(res.body.summary).toHaveProperty("totalKids")
+    expect(res.body.summary).toHaveProperty("avgRetention")
+    expect(["super_saver", "good_saver", "spender", "heavy_spender", "no_data"]).toContain(
+      res.body.familyLevel
+    )
+    expect(res.body.message).toBeTruthy()
+  })
+
+  it("儲蓄留存：賺 100 全進 save → ratio=100 → super_saver", async () => {
+    const kidObj = (await createKid({ spendRatio: 0, saveRatio: 100, giveRatio: 0 })) as {
+      id: number
+    }
+    const myKidId = kidObj.id
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId: myKidId, title: "全存", rewardAmount: 100 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`).send({})
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`).send({})
+    const res = await request(app).get("/api/family/savings-retention")
+    expect(res.status).toBe(200)
+    const myKid = res.body.kids.find((k: { kidId: number }) => k.kidId === myKidId)
+    expect(myKid).toBeDefined()
+    expect(myKid.lifetimeEarned).toBeGreaterThanOrEqual(100)
+    expect(myKid.retentionRatio).toBeGreaterThanOrEqual(70)
+    expect(myKid.level).toBe("super_saver")
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
   it("多月趨勢：12 個月 + summary + trend", async () => {
     const res = await request(app).get("/api/family/multi-month-trend")
     expect(res.status).toBe(200)
