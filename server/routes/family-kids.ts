@@ -8602,6 +8602,102 @@ async function bulkApproveOne(
 }
 
 /**
+ * GET /api/family/kid-weekend-vs-weekday?days=60
+ * 每個 active kid 過去 N 天週末 vs 平日 task 完成數對比
+ * type: weekend_warrior(週末日均>1.5x平日) / weekday_focused(<0.67x) / balanced
+ */
+router.get(
+  "/api/family/kid-weekend-vs-weekday",
+  asyncHandler(async (req, res) => {
+    const days = Math.min(Math.max(Number(req.query.days) || 60, 14), 180)
+
+    const rows = await db.execute(sql`
+      WITH days_set AS (
+        SELECT generate_series(
+          CURRENT_DATE - (${days - 1}::int * INTERVAL '1 day'),
+          CURRENT_DATE,
+          INTERVAL '1 day'
+        )::date AS d, EXTRACT(DOW FROM
+          generate_series(CURRENT_DATE - (${days - 1}::int * INTERVAL '1 day'),
+            CURRENT_DATE, INTERVAL '1 day')::date)::int AS dow
+      )
+      SELECT
+        ka.id::int AS kid_id,
+        ka.display_name AS kid_name,
+        ka.avatar,
+        COUNT(*) FILTER (WHERE EXTRACT(DOW FROM t.completed_at) IN (0, 6))::int AS weekend_tasks,
+        COUNT(*) FILTER (WHERE EXTRACT(DOW FROM t.completed_at) NOT IN (0, 6))::int AS weekday_tasks
+      FROM kids_accounts ka
+      LEFT JOIN kids_tasks t ON
+        t.kid_id = ka.id AND t.status = 'approved'
+        AND t.completed_at >= CURRENT_DATE - (${days}::int * INTERVAL '1 day')
+      WHERE ka.is_active = true
+      GROUP BY ka.id, ka.display_name, ka.avatar
+      ORDER BY ka.id ASC
+    `)
+
+    // 計算 weekend / weekday days 數
+    const weekendDays = Math.floor(days / 7) * 2 + Math.min(days % 7, 2)
+    const weekdayDays = days - weekendDays
+
+    const kids = (
+      rows as unknown as {
+        rows: Array<{
+          kid_id: number
+          kid_name: string
+          avatar: string
+          weekend_tasks: number
+          weekday_tasks: number
+        }>
+      }
+    ).rows.map((r) => {
+      const weekendAvg = weekendDays > 0 ? r.weekend_tasks / weekendDays : 0
+      const weekdayAvg = weekdayDays > 0 ? r.weekday_tasks / weekdayDays : 0
+      const total = r.weekend_tasks + r.weekday_tasks
+      let type: "weekend_warrior" | "weekday_focused" | "balanced" | "no_data"
+      if (total === 0) type = "no_data"
+      else if (weekendAvg > weekdayAvg * 1.5) type = "weekend_warrior"
+      else if (weekdayAvg > weekendAvg * 1.5 && weekendAvg < weekdayAvg) type = "weekday_focused"
+      else type = "balanced"
+      return {
+        kidId: r.kid_id,
+        kidName: r.kid_name,
+        avatar: r.avatar,
+        weekendTasks: r.weekend_tasks,
+        weekdayTasks: r.weekday_tasks,
+        weekendAvg: Math.round(weekendAvg * 10) / 10,
+        weekdayAvg: Math.round(weekdayAvg * 10) / 10,
+        type,
+      }
+    })
+
+    const counts = {
+      weekend_warrior: kids.filter((k) => k.type === "weekend_warrior").length,
+      weekday_focused: kids.filter((k) => k.type === "weekday_focused").length,
+      balanced: kids.filter((k) => k.type === "balanced").length,
+    }
+
+    let message: string
+    if (kids.length === 0) {
+      message = "還沒有小孩"
+    } else if (counts.weekend_warrior > 0) {
+      message = `🏖️ ${counts.weekend_warrior} 個小孩是週末戰士`
+    } else if (counts.weekday_focused > 0) {
+      message = `💼 ${counts.weekday_focused} 個小孩平日專注`
+    } else {
+      message = "全家做事都很均衡"
+    }
+
+    res.json({
+      days,
+      kids,
+      typeCounts: counts,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/all-goals-eta
  * 全家 active goals 批量 ETA 預估（基於過去 30 天 save 速度）
  * sort by etaDays ASC（最快達成的在前）

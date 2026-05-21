@@ -628,6 +628,9 @@ export default function FamilyPage() {
       {/* 家庭所有目標 ETA */}
       <FamilyAllGoalsEtaCard />
 
+      {/* 家庭兒童週末 vs 平日 */}
+      <FamilyKidWeekendVsWeekdayCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3582,6 +3585,72 @@ function ParentTodoList() {
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
       )}
+    </div>
+  )
+}
+
+function FamilyKidWeekendVsWeekdayCard() {
+  const { data } = useQuery<{
+    days: number
+    kids: Array<{
+      kidId: number
+      kidName: string
+      avatar: string
+      weekendTasks: number
+      weekdayTasks: number
+      weekendAvg: number
+      weekdayAvg: number
+      type: "weekend_warrior" | "weekday_focused" | "balanced" | "no_data"
+    }>
+    typeCounts: { weekend_warrior: number; weekday_focused: number; balanced: number }
+    message: string
+  }>({
+    queryKey: ["/api/family/kid-weekend-vs-weekday?days=60"],
+  })
+  if (!data || data.kids.length === 0) return null
+  const withTasks = data.kids.filter((k) => k.type !== "no_data")
+  if (withTasks.length === 0) return null
+
+  const TYPE_LABEL: Record<string, string> = {
+    weekend_warrior: "🏖️ 週末戰士",
+    weekday_focused: "💼 平日專注",
+    balanced: "⚖️ 平衡",
+    no_data: "—",
+  }
+  const TYPE_COLOR: Record<string, string> = {
+    weekend_warrior: "bg-purple-100 text-purple-700",
+    weekday_focused: "bg-blue-100 text-blue-700",
+    balanced: "bg-emerald-100 text-emerald-700",
+    no_data: "bg-gray-100 text-gray-500",
+  }
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-purple-300 bg-gradient-to-br from-purple-50 to-blue-50 p-3 shadow">
+      <h3 className="font-bold mb-2 flex items-center gap-2">📆 週末 vs 平日（60 天）</h3>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-2 text-xs">{data.message}</div>
+
+      <div className="space-y-1.5">
+        {withTasks.map((k) => (
+          <div key={k.kidId} className="bg-white rounded-lg p-2">
+            <div className="flex items-center gap-2 mb-1">
+              <div className="text-lg">{k.avatar}</div>
+              <div className="flex-1 text-sm font-medium">{k.kidName}</div>
+              <div className={`text-[10px] px-1.5 py-0.5 rounded ${TYPE_COLOR[k.type]}`}>
+                {TYPE_LABEL[k.type]}
+              </div>
+            </div>
+            <div className="text-[10px] text-gray-500 flex justify-between">
+              <span>
+                🏖️ 週末 {k.weekendTasks}（日均 {k.weekendAvg}）
+              </span>
+              <span>
+                💼 平日 {k.weekdayTasks}（日均 {k.weekdayAvg}）
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
