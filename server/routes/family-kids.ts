@@ -8602,6 +8602,79 @@ async function bulkApproveOne(
 }
 
 /**
+ * GET /api/family/badge-leaderboard
+ * 各 active kid 累計徽章數 ranked + 最新徽章
+ */
+router.get(
+  "/api/family/badge-leaderboard",
+  asyncHandler(async (_req, res) => {
+    const rows = await db.execute(sql`
+      SELECT
+        ka.id::int AS kid_id,
+        ka.display_name AS kid_name,
+        ka.avatar,
+        COUNT(b.id)::int AS badge_count,
+        (
+          SELECT json_build_object('title', title, 'emoji', emoji, 'earnedAt', earned_at)
+          FROM kids_badges
+          WHERE kid_id = ka.id
+          ORDER BY earned_at DESC LIMIT 1
+        ) AS latest_badge
+      FROM kids_accounts ka
+      LEFT JOIN kids_badges b ON b.kid_id = ka.id
+      WHERE ka.is_active = true
+      GROUP BY ka.id, ka.display_name, ka.avatar
+      ORDER BY badge_count DESC, ka.id ASC
+    `)
+
+    const kids = (
+      rows as unknown as {
+        rows: Array<{
+          kid_id: number
+          kid_name: string
+          avatar: string
+          badge_count: number
+          latest_badge: { title: string; emoji: string; earnedAt: string } | null
+        }>
+      }
+    ).rows.map((r) => ({
+      kidId: r.kid_id,
+      kidName: r.kid_name,
+      avatar: r.avatar,
+      badgeCount: r.badge_count,
+      latestBadge: r.latest_badge,
+    }))
+
+    const totalBadges = kids.reduce((s, k) => s + k.badgeCount, 0)
+    const topAchiever = kids.length > 0 && kids[0].badgeCount > 0 ? kids[0] : null
+
+    let message: string
+    if (kids.length === 0) {
+      message = "還沒有小孩"
+    } else if (!topAchiever) {
+      message = "全家還沒解鎖徽章、完成任務就會自動獲得 🏅"
+    } else if (totalBadges >= 20) {
+      message = `🎖️ 全家累計 ${totalBadges} 個徽章、收藏家！${topAchiever.kidName} 領先`
+    } else {
+      message = `🏆 徽章王：${topAchiever.avatar} ${topAchiever.kidName}（${topAchiever.badgeCount} 個）`
+    }
+
+    res.json({
+      kids,
+      totalBadges,
+      topAchiever: topAchiever
+        ? {
+            kidName: topAchiever.kidName,
+            avatar: topAchiever.avatar,
+            badgeCount: topAchiever.badgeCount,
+          }
+        : null,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/kid-spending-habits?days=30
  * 每個 active kid 過去 N 天 spend vs give 對比
  * habit: generous / spender / saver / balanced / no_data

@@ -4245,6 +4245,31 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.body.weeks).toBe(52)
   })
 
+  it("徽章排名：基本結構 kids/totalBadges/message", async () => {
+    const res = await request(app).get("/api/family/badge-leaderboard")
+    expect(res.status).toBe(200)
+    expect(Array.isArray(res.body.kids)).toBe(true)
+    expect(res.body).toHaveProperty("totalBadges")
+    expect(res.body.message).toBeTruthy()
+  })
+
+  it("徽章排名：approve task 觸發 first_task → topAchiever 是該 kid", async () => {
+    const kidObj = (await createKid()) as { id: number }
+    const myKidId = kidObj.id
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId: myKidId, title: "徽章測試", rewardAmount: 30 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`).send({})
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`).send({})
+    const res = await request(app).get("/api/family/badge-leaderboard")
+    expect(res.status).toBe(200)
+    const myKid = res.body.kids.find((k: { kidId: number }) => k.kidId === myKidId)
+    expect(myKid).toBeDefined()
+    expect(myKid.badgeCount).toBeGreaterThanOrEqual(1)
+    expect(res.body.topAchiever).not.toBeNull()
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
   it("花用習慣：基本結構 kids/habitCounts/message", async () => {
     const res = await request(app).get("/api/family/kid-spending-habits")
     expect(res.status).toBe(200)

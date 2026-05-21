@@ -580,6 +580,9 @@ export default function FamilyPage() {
       {/* 家庭兒童花用習慣 */}
       <FamilyKidSpendingHabitsCard />
 
+      {/* 家庭徽章排名 */}
+      <FamilyBadgeLeaderboardCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3534,6 +3537,53 @@ function ParentTodoList() {
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
       )}
+    </div>
+  )
+}
+
+function FamilyBadgeLeaderboardCard() {
+  const { data } = useQuery<{
+    kids: Array<{
+      kidId: number
+      kidName: string
+      avatar: string
+      badgeCount: number
+      latestBadge: { title: string; emoji: string; earnedAt: string } | null
+    }>
+    totalBadges: number
+    topAchiever: { kidName: string; avatar: string; badgeCount: number } | null
+    message: string
+  }>({
+    queryKey: ["/api/family/badge-leaderboard"],
+  })
+  if (!data || data.kids.length === 0 || data.totalBadges === 0) return null
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-amber-400 bg-gradient-to-br from-amber-50 to-yellow-50 p-3 shadow">
+      <h3 className="font-bold mb-2 flex items-center gap-2">🎖️ 徽章排名</h3>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-2 text-xs">{data.message}</div>
+
+      <div className="space-y-1.5">
+        {data.kids.map((k, i) => (
+          <div key={k.kidId} className="bg-white rounded-lg p-2 flex items-center gap-2">
+            <div className="w-4 text-center text-gray-500">{i + 1}</div>
+            <div className="text-lg">{k.avatar}</div>
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-medium">{k.kidName}</div>
+              {k.latestBadge && (
+                <div className="text-[10px] text-gray-500 truncate">
+                  最新：{k.latestBadge.emoji} {k.latestBadge.title}
+                </div>
+              )}
+            </div>
+            <div className="text-right">
+              <div className="text-2xl font-bold text-amber-600">{k.badgeCount}</div>
+              <div className="text-[9px] text-gray-500">徽章</div>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
