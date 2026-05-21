@@ -625,6 +625,9 @@ export default function FamilyPage() {
       {/* 家庭今日排行榜 */}
       <FamilyTodayLeaderboardCard />
 
+      {/* 家庭所有目標 ETA */}
+      <FamilyAllGoalsEtaCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3579,6 +3582,65 @@ function ParentTodoList() {
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
       )}
+    </div>
+  )
+}
+
+function FamilyAllGoalsEtaCard() {
+  const { data } = useQuery<{
+    goals: Array<{
+      goalId: number
+      goalName: string
+      goalEmoji: string
+      target: number
+      current: number
+      remaining: number
+      kidName: string
+      kidAvatar: string
+      velocity: number
+      etaDays: number | null
+      etaDate: string | null
+      predictable: boolean
+    }>
+    predictableCount: number
+    message: string
+  }>({
+    queryKey: ["/api/family/all-goals-eta"],
+  })
+  if (!data || data.goals.length === 0) return null
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-blue-300 bg-gradient-to-br from-blue-50 to-cyan-50 p-3 shadow">
+      <h3 className="font-bold mb-2 flex items-center gap-2">⏱️ 所有目標 ETA</h3>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-2 text-xs">{data.message}</div>
+
+      <div className="space-y-1.5">
+        {data.goals.slice(0, 6).map((g) => (
+          <div key={g.goalId} className="bg-white rounded-lg p-2">
+            <div className="flex items-center gap-2 mb-1 text-xs">
+              <span className="text-lg">{g.goalEmoji}</span>
+              <span className="flex-1 truncate font-medium">{g.goalName}</span>
+              <span className="text-[10px] text-gray-500">
+                {g.kidAvatar} {g.kidName}
+              </span>
+            </div>
+            <div className="flex justify-between text-[10px] text-gray-600">
+              <span>
+                ${g.current}/${g.target}（差 ${g.remaining}）
+              </span>
+              {g.predictable && g.etaDays !== null ? (
+                <span className="font-bold text-blue-600">
+                  {g.etaDays === 0 ? "已達成" : `${g.etaDays} 天後`}
+                  {g.etaDate && g.etaDays > 0 ? `（${g.etaDate.slice(5)}）` : ""}
+                </span>
+              ) : (
+                <span className="text-amber-600">無法預估</span>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

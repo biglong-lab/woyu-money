@@ -8602,6 +8602,123 @@ async function bulkApproveOne(
 }
 
 /**
+ * GET /api/family/all-goals-eta
+ * 全家 active goals 批量 ETA 預估（基於過去 30 天 save 速度）
+ * sort by etaDays ASC（最快達成的在前）
+ */
+router.get(
+  "/api/family/all-goals-eta",
+  asyncHandler(async (_req, res) => {
+    const rows = await db.execute(sql`
+      WITH kid_velocity AS (
+        SELECT
+          ka.id AS kid_id,
+          ka.save_ratio,
+          COALESCE((
+            SELECT SUM(reward_amount::numeric)::numeric / 30.0 * (ka.save_ratio / 100.0)
+            FROM kids_tasks
+            WHERE kid_id = ka.id AND status = 'approved'
+              AND completed_at >= CURRENT_DATE - INTERVAL '30 days'
+          ), 0) AS daily_save_velocity
+        FROM kids_accounts ka
+        WHERE ka.is_active = true
+      )
+      SELECT
+        g.id::int AS goal_id,
+        g.name AS goal_name,
+        g.emoji AS goal_emoji,
+        g.target_amount::numeric AS target,
+        g.current_amount::numeric AS current,
+        g.deadline,
+        ka.id::int AS kid_id,
+        ka.display_name AS kid_name,
+        ka.avatar,
+        kv.daily_save_velocity::numeric AS velocity
+      FROM kids_goals g
+      JOIN kids_accounts ka ON ka.id = g.kid_id
+      LEFT JOIN kid_velocity kv ON kv.kid_id = g.kid_id
+      WHERE g.status = 'active' AND ka.is_active = true
+      ORDER BY ka.id ASC, g.created_at ASC
+    `)
+
+    const goals = (
+      rows as unknown as {
+        rows: Array<{
+          goal_id: number
+          goal_name: string
+          goal_emoji: string
+          target: string | number
+          current: string | number
+          deadline: string | null
+          kid_id: number
+          kid_name: string
+          avatar: string
+          velocity: string | number
+        }>
+      }
+    ).rows.map((r) => {
+      const target = Number(r.target)
+      const current = Number(r.current)
+      const velocity = Number(r.velocity)
+      const remaining = Math.max(0, target - current)
+      let etaDays: number | null = null
+      let etaDate: string | null = null
+      let predictable = false
+      if (current >= target) {
+        etaDays = 0
+        etaDate = new Date().toISOString().slice(0, 10)
+        predictable = true
+      } else if (velocity > 0) {
+        etaDays = Math.ceil(remaining / velocity)
+        const eta = new Date(Date.now() + etaDays * 86400000)
+        etaDate = eta.toISOString().slice(0, 10)
+        predictable = true
+      }
+      return {
+        goalId: r.goal_id,
+        goalName: r.goal_name,
+        goalEmoji: r.goal_emoji,
+        target,
+        current,
+        remaining,
+        deadline: r.deadline,
+        kidName: r.kid_name,
+        kidAvatar: r.avatar,
+        velocity: Math.round(velocity * 10) / 10,
+        etaDays,
+        etaDate,
+        predictable,
+      }
+    })
+
+    const sorted = [...goals].sort((a, b) => {
+      if (a.etaDays === null && b.etaDays === null) return 0
+      if (a.etaDays === null) return 1
+      if (b.etaDays === null) return -1
+      return a.etaDays - b.etaDays
+    })
+
+    const predictableCount = goals.filter((g) => g.predictable).length
+
+    let message: string
+    if (goals.length === 0) {
+      message = "沒有進行中目標"
+    } else if (predictableCount === 0) {
+      message = `${goals.length} 個目標、但小孩還沒存錢、無法預估完成時間`
+    } else {
+      const fastest = sorted[0]
+      message = `⏱️ 最快達成：${fastest.goalEmoji} ${fastest.goalName}（${fastest.etaDays} 天）`
+    }
+
+    res.json({
+      goals: sorted,
+      predictableCount,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/today-leaderboard
  * 今日每 active kid task / reward / checkin 排名
  */

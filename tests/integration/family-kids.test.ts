@@ -4245,6 +4245,40 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.body.weeks).toBe(52)
   })
 
+  it("所有目標 ETA：基本結構 goals/predictableCount/message", async () => {
+    const res = await request(app).get("/api/family/all-goals-eta")
+    expect(res.status).toBe(200)
+    expect(Array.isArray(res.body.goals)).toBe(true)
+    expect(res.body).toHaveProperty("predictableCount")
+    expect(res.body.message).toBeTruthy()
+  })
+
+  it("所有目標 ETA：approve task + active goal → etaDays 預估", async () => {
+    const kidObj = (await createKid({
+      spendRatio: 50,
+      saveRatio: 50,
+      giveRatio: 0,
+    })) as { id: number }
+    const myKidId = kidObj.id
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId: myKidId, title: "賺錢", rewardAmount: 600 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`).send({})
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`).send({})
+    await request(app).post("/api/family/goals").send({
+      kidId: myKidId,
+      name: "ETA 測試",
+      targetAmount: 1000,
+    })
+    const res = await request(app).get("/api/family/all-goals-eta")
+    expect(res.status).toBe(200)
+    const myGoal = res.body.goals.find((g: { goalName: string }) => g.goalName === "ETA 測試")
+    expect(myGoal).toBeDefined()
+    expect(myGoal.predictable).toBe(true)
+    expect(myGoal.etaDays).toBeGreaterThan(0)
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
   it("今日排行榜：基本結構 kids/totalTasks/totalReward/message", async () => {
     const res = await request(app).get("/api/family/today-leaderboard")
     expect(res.status).toBe(200)
