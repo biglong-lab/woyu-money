@@ -538,6 +538,9 @@ export default function FamilyPage() {
       {/* 家庭高峰時刻 */}
       <FamilyPeakMomentCard />
 
+      {/* 家庭今日提示 */}
+      <FamilyTodayTipCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3492,6 +3495,44 @@ function ParentTodoList() {
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
       )}
+    </div>
+  )
+}
+
+function FamilyTodayTipCard() {
+  const { data } = useQuery<{
+    tipType:
+      | "pending_overflow"
+      | "no_recent_activity"
+      | "save_too_low"
+      | "goal_stalled"
+      | "encourage_checkin"
+      | "positive"
+      | "no_data"
+    message: string
+    action: string | null
+  }>({
+    queryKey: ["/api/family/today-tip"],
+  })
+  if (!data) return null
+  if (data.tipType === "no_data") return null
+
+  const TYPE_BG: Record<string, string> = {
+    pending_overflow: "from-amber-50 to-orange-50 border-amber-400",
+    no_recent_activity: "from-rose-50 to-red-50 border-rose-400",
+    save_too_low: "from-violet-50 to-purple-50 border-violet-400",
+    goal_stalled: "from-blue-50 to-sky-50 border-blue-400",
+    encourage_checkin: "from-cyan-50 to-blue-50 border-cyan-400",
+    positive: "from-emerald-50 to-green-50 border-emerald-400",
+    no_data: "from-gray-50 to-slate-50 border-gray-300",
+  }
+
+  return (
+    <div
+      className={`mb-4 rounded-2xl border-2 bg-gradient-to-br ${TYPE_BG[data.tipType]} p-3 shadow`}
+    >
+      <h3 className="font-bold mb-2 flex items-center gap-2">💡 今日智能提示</h3>
+      <div className="bg-white/70 rounded-lg p-2 text-sm">{data.message}</div>
     </div>
   )
 }

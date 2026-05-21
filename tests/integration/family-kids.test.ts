@@ -4245,6 +4245,38 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.body.weeks).toBe(52)
   })
 
+  it("今日提示：基本結構 tipType + message", async () => {
+    const res = await request(app).get("/api/family/today-tip")
+    expect(res.status).toBe(200)
+    expect([
+      "pending_overflow",
+      "no_recent_activity",
+      "save_too_low",
+      "goal_stalled",
+      "encourage_checkin",
+      "positive",
+      "no_data",
+    ]).toContain(res.body.tipType)
+    expect(res.body.message).toBeTruthy()
+    expect(res.body.stats).toHaveProperty("activeKids")
+  })
+
+  it("今日提示：5+ submitted task → tipType=pending_overflow", async () => {
+    const kidObj = (await createKid()) as { id: number }
+    const myKidId = kidObj.id
+    for (let i = 0; i < 5; i++) {
+      const t = await request(app)
+        .post("/api/family/tasks")
+        .send({ kidId: myKidId, title: `pending ${i}`, rewardAmount: 30 })
+      await request(app).post(`/api/family/tasks/${t.body.id}/submit`).send({})
+    }
+    const res = await request(app).get("/api/family/today-tip")
+    expect(res.status).toBe(200)
+    expect(res.body.stats.pending).toBeGreaterThanOrEqual(5)
+    expect(res.body.tipType).toBe("pending_overflow")
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
   it("高峰時刻：基本結構 top3/avgScore/totalScore", async () => {
     const res = await request(app).get("/api/family/peak-moment")
     expect(res.status).toBe(200)

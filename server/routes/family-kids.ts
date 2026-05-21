@@ -8602,6 +8602,113 @@ async function bulkApproveOne(
 }
 
 /**
+ * GET /api/family/today-tip
+ * 家庭今日智能提示（根據多 source 動態給家長 actionable advice）
+ * tipType: pending_overflow / no_recent_activity / save_too_low / goal_stalled / encourage_checkin / positive
+ */
+router.get(
+  "/api/family/today-tip",
+  asyncHandler(async (_req, res) => {
+    const rows = await db.execute(sql`
+      SELECT
+        (SELECT COUNT(*)::int FROM kids_tasks WHERE status = 'submitted') AS pending_count,
+        (SELECT COUNT(*)::int FROM kids_tasks
+          WHERE status = 'approved' AND DATE(completed_at) >= CURRENT_DATE - INTERVAL '3 days'
+        ) AS recent_tasks,
+        (SELECT COUNT(*)::int FROM kids_checkins WHERE checkin_date = CURRENT_DATE) AS today_checkins,
+        (SELECT COUNT(*)::int FROM kids_accounts WHERE is_active = true) AS active_kids,
+        (SELECT COUNT(*)::int FROM kids_goals WHERE status = 'active') AS active_goals,
+        (SELECT COUNT(*)::int FROM kids_tasks
+          WHERE status = 'approved' AND DATE(completed_at) = CURRENT_DATE
+        ) AS today_tasks,
+        COALESCE((SELECT SUM(save_balance::numeric)::numeric FROM kids_jars j
+          JOIN kids_accounts ka ON ka.id = j.kid_id WHERE ka.is_active = true), 0) AS total_save,
+        COALESCE((SELECT SUM(spend_balance::numeric)::numeric FROM kids_jars j
+          JOIN kids_accounts ka ON ka.id = j.kid_id WHERE ka.is_active = true), 0) AS total_spend,
+        COALESCE((SELECT SUM(give_balance::numeric)::numeric FROM kids_jars j
+          JOIN kids_accounts ka ON ka.id = j.kid_id WHERE ka.is_active = true), 0) AS total_give
+    `)
+
+    const row = (
+      rows as unknown as {
+        rows: Array<{
+          pending_count: number
+          recent_tasks: number
+          today_checkins: number
+          active_kids: number
+          active_goals: number
+          today_tasks: number
+          total_save: string | number
+          total_spend: string | number
+          total_give: string | number
+        }>
+      }
+    ).rows[0]
+
+    const pending = row?.pending_count ?? 0
+    const recentTasks = row?.recent_tasks ?? 0
+    const todayCheckins = row?.today_checkins ?? 0
+    const activeKids = row?.active_kids ?? 0
+    const activeGoals = row?.active_goals ?? 0
+    const todayTasks = row?.today_tasks ?? 0
+    const save = Number(row?.total_save ?? 0)
+    const spend = Number(row?.total_spend ?? 0)
+    const give = Number(row?.total_give ?? 0)
+    const totalJar = save + spend + give
+
+    // 按優先序判斷
+    let tipType:
+      | "pending_overflow"
+      | "no_recent_activity"
+      | "save_too_low"
+      | "goal_stalled"
+      | "encourage_checkin"
+      | "positive"
+      | "no_data"
+    let message: string
+    let action: string | null
+
+    if (activeKids === 0) {
+      tipType = "no_data"
+      message = "還沒加入小孩、先建立第一個帳戶"
+      action = "/family/kids"
+    } else if (pending >= 5) {
+      tipType = "pending_overflow"
+      message = `📋 有 ${pending} 個任務等批准、家長可以一鍵批量批准節省時間`
+      action = "/family"
+    } else if (recentTasks === 0) {
+      tipType = "no_recent_activity"
+      message = `💤 過去 3 天家裡都沒任務通過、可以派幾個簡單任務啟動`
+      action = "/family"
+    } else if (totalJar > 0 && save / totalJar < 0.15) {
+      tipType = "save_too_low"
+      message = `💸 儲蓄罐占比低於 15%、可以調整三罐分配多存一點`
+      action = "/family/kids"
+    } else if (activeGoals > 0 && todayTasks === 0) {
+      tipType = "goal_stalled"
+      message = `🎯 有 ${activeGoals} 個進行中目標但今天沒任務、鼓勵小孩做任務存錢買目標`
+      action = "/family"
+    } else if (todayCheckins < activeKids) {
+      const needCheckin = activeKids - todayCheckins
+      tipType = "encourage_checkin"
+      message = `📅 今天還有 ${needCheckin} 個小孩沒打卡、提醒一下吧`
+      action = "/family"
+    } else {
+      tipType = "positive"
+      message = `🌟 家裡運轉順暢、家長 ${activeKids} 個小孩都活躍中、繼續保持！`
+      action = null
+    }
+
+    res.json({
+      tipType,
+      message,
+      action,
+      stats: { pending, recentTasks, todayCheckins, activeKids, activeGoals, todayTasks },
+    })
+  })
+)
+
+/**
  * GET /api/family/peak-moment?days=30
  * 過去 N 天 top 3 活動最高的日子（task + checkin + spending count 加總）
  */
