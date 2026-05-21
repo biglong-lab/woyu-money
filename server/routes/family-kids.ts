@@ -2875,6 +2875,107 @@ router.get(
 )
 
 /**
+ * GET /api/family/lifetime-stats
+ * 家庭累計總成就（家庭一路走來）
+ */
+router.get(
+  "/api/family/lifetime-stats",
+  asyncHandler(async (_req, res) => {
+    const result = await db.execute(sql`
+      SELECT
+        COALESCE((SELECT COUNT(*)::int FROM kids_tasks WHERE status = 'approved'), 0) AS tasks_approved,
+        COALESCE((
+          SELECT SUM(reward_amount::numeric)::numeric FROM kids_tasks WHERE status = 'approved'
+        ), 0) AS total_reward,
+        COALESCE((
+          SELECT SUM(amount::numeric)::numeric FROM kids_spendings WHERE jar = 'spend'
+        ), 0) AS total_spent,
+        COALESCE((
+          SELECT SUM(amount::numeric)::numeric FROM kids_spendings WHERE jar = 'give'
+        ), 0) AS total_given,
+        COALESCE((
+          SELECT SUM(save_balance::numeric)::numeric FROM kids_jars
+        ), 0) AS total_saved,
+        COALESCE((
+          SELECT COUNT(DISTINCT checkin_date)::int FROM kids_checkins
+        ), 0) AS checkin_days,
+        COALESCE((
+          SELECT COUNT(DISTINCT category)::int FROM kids_tasks WHERE status = 'approved'
+        ), 0) AS unique_categories,
+        COALESCE((
+          SELECT COUNT(*)::int FROM kids_wishes WHERE status = 'promoted'
+        ), 0) AS wishes_promoted,
+        COALESCE((
+          SELECT COUNT(*)::int FROM kids_goals WHERE status = 'completed'
+        ), 0) AS goals_completed,
+        (SELECT MIN(completed_at) FROM kids_tasks WHERE status = 'approved') AS first_task_at,
+        (SELECT MAX(completed_at) FROM kids_tasks WHERE status = 'approved') AS last_task_at
+    `)
+    const row = (
+      result as unknown as {
+        rows: {
+          tasks_approved: number
+          total_reward: string | number
+          total_spent: string | number
+          total_given: string | number
+          total_saved: string | number
+          checkin_days: number
+          unique_categories: number
+          wishes_promoted: number
+          goals_completed: number
+          first_task_at: Date | null
+          last_task_at: Date | null
+        }[]
+      }
+    ).rows[0]!
+
+    const stats = {
+      tasksApproved: row.tasks_approved,
+      totalReward: Number(row.total_reward ?? 0),
+      totalSpent: Number(row.total_spent ?? 0),
+      totalGiven: Number(row.total_given ?? 0),
+      totalSaved: Number(row.total_saved ?? 0),
+      checkinDays: row.checkin_days,
+      uniqueCategories: row.unique_categories,
+      wishesPromoted: row.wishes_promoted,
+      goalsCompleted: row.goals_completed,
+    }
+
+    let familyDays: number | null = null
+    if (row.first_task_at) {
+      const start = new Date(row.first_task_at)
+      const now = new Date()
+      familyDays = Math.floor((now.getTime() - start.getTime()) / 86_400_000) + 1
+    }
+
+    let level: "newborn" | "growing" | "established" | "legendary"
+    let message: string
+    if (stats.tasksApproved === 0) {
+      level = "newborn"
+      message = "🌱 家庭剛起步、來建立第一個任務吧"
+    } else if (stats.tasksApproved < 50) {
+      level = "growing"
+      message = `🌟 家庭累積 ${stats.tasksApproved} 個任務、好的開始！`
+    } else if (stats.tasksApproved < 500) {
+      level = "established"
+      message = `🏆 家庭已完成 ${stats.tasksApproved} 個任務、超棒紀錄！`
+    } else {
+      level = "legendary"
+      message = `🐉 家庭已完成 ${stats.tasksApproved}+ 任務、傳奇等級！`
+    }
+
+    res.json({
+      stats,
+      familyDays,
+      firstTaskAt: row.first_task_at,
+      lastTaskAt: row.last_task_at,
+      level,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/peak-week?weeks=12
  * 家庭高潮週：找近 N 週活動最多那週 + 明細
  *

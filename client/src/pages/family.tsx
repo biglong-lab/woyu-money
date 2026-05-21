@@ -446,6 +446,9 @@ export default function FamilyPage() {
       {/* 家庭健康儀表板 */}
       <FamilyHealthDashboard />
 
+      {/* 家庭累計總成就 */}
+      <FamilyLifetimeCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3381,6 +3384,78 @@ function ParentTodoList() {
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
       )}
+    </div>
+  )
+}
+
+function FamilyLifetimeCard() {
+  const { data } = useQuery<{
+    stats: {
+      tasksApproved: number
+      totalReward: number
+      totalSpent: number
+      totalGiven: number
+      totalSaved: number
+      checkinDays: number
+      uniqueCategories: number
+      wishesPromoted: number
+      goalsCompleted: number
+    }
+    familyDays: number | null
+    level: "newborn" | "growing" | "established" | "legendary"
+    message: string
+  }>({
+    queryKey: ["/api/family/lifetime-stats"],
+    queryFn: async () => {
+      const res = await fetch("/api/family/lifetime-stats", { credentials: "include" })
+      return res.json()
+    },
+  })
+  if (!data || data.stats.tasksApproved === 0) return null
+
+  const LEVEL_BG: Record<string, string> = {
+    newborn: "from-gray-50 to-slate-50 border-gray-300",
+    growing: "from-blue-50 to-cyan-50 border-blue-300",
+    established: "from-emerald-50 to-green-50 border-emerald-400",
+    legendary: "from-purple-50 to-pink-50 border-purple-500",
+  }
+
+  return (
+    <div
+      className={`mb-4 rounded-2xl border-2 bg-gradient-to-br ${LEVEL_BG[data.level]} p-4 shadow`}
+    >
+      <h3 className="font-bold mb-3 flex items-center gap-2">🏛️ 家庭一路走來</h3>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-3 text-center font-medium text-sm">
+        {data.message}
+      </div>
+
+      <div className="grid grid-cols-3 gap-2">
+        <div className="bg-white rounded-lg p-2 text-center">
+          <div className="text-lg font-bold text-emerald-700">{data.stats.tasksApproved}</div>
+          <div className="text-xs text-gray-500">完成任務</div>
+        </div>
+        <div className="bg-white rounded-lg p-2 text-center">
+          <div className="text-lg font-bold text-blue-700">${data.stats.totalReward}</div>
+          <div className="text-xs text-gray-500">總獎勵</div>
+        </div>
+        <div className="bg-white rounded-lg p-2 text-center">
+          <div className="text-lg font-bold text-pink-700">${data.stats.totalGiven}</div>
+          <div className="text-xs text-gray-500">總捐贈</div>
+        </div>
+        <div className="bg-white rounded-lg p-2 text-center">
+          <div className="text-lg font-bold text-amber-700">{data.stats.checkinDays}</div>
+          <div className="text-xs text-gray-500">打卡天數</div>
+        </div>
+        <div className="bg-white rounded-lg p-2 text-center">
+          <div className="text-lg font-bold text-violet-700">{data.stats.goalsCompleted}</div>
+          <div className="text-xs text-gray-500">完成目標</div>
+        </div>
+        <div className="bg-white rounded-lg p-2 text-center">
+          <div className="text-lg font-bold text-indigo-700">{data.familyDays ?? 0}</div>
+          <div className="text-xs text-gray-500">家庭天數</div>
+        </div>
+      </div>
     </div>
   )
 }

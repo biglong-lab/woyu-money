@@ -4245,6 +4245,18 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.body.weeks).toBe(52)
   })
 
+  it("家庭累計總成就：stats + level + message", async () => {
+    const res = await request(app).get("/api/family/lifetime-stats")
+    expect(res.status).toBe(200)
+    expect(res.body.stats).toBeDefined()
+    expect(res.body.stats.tasksApproved).toBeGreaterThanOrEqual(0)
+    expect(res.body.stats).toHaveProperty("totalReward")
+    expect(res.body.stats).toHaveProperty("totalGiven")
+    expect(res.body.stats).toHaveProperty("checkinDays")
+    expect(["newborn", "growing", "established", "legendary"]).toContain(res.body.level)
+    expect(res.body.message).toBeTruthy()
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)
