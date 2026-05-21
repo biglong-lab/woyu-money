@@ -8602,6 +8602,90 @@ async function bulkApproveOne(
 }
 
 /**
+ * GET /api/family/task-repeat-by-kid?days=90
+ * 每個 active kid 過去 N 天 task 重複率（1 - unique/total）
+ * pattern: routine(>=60% repeat) / mixed / variety(<20% repeat) / no_data
+ */
+router.get(
+  "/api/family/task-repeat-by-kid",
+  asyncHandler(async (req, res) => {
+    const days = Math.min(Math.max(Number(req.query.days) || 90, 7), 365)
+
+    const rows = await db.execute(sql`
+      SELECT
+        ka.id::int AS kid_id,
+        ka.display_name AS kid_name,
+        ka.avatar,
+        COUNT(t.id)::int AS total,
+        COUNT(DISTINCT t.title)::int AS unique_titles
+      FROM kids_accounts ka
+      LEFT JOIN kids_tasks t ON
+        t.kid_id = ka.id
+        AND t.status = 'approved'
+        AND t.completed_at >= CURRENT_DATE - (${days}::int * INTERVAL '1 day')
+      WHERE ka.is_active = true
+      GROUP BY ka.id, ka.display_name, ka.avatar
+      ORDER BY ka.id ASC
+    `)
+
+    const kids = (
+      rows as unknown as {
+        rows: Array<{
+          kid_id: number
+          kid_name: string
+          avatar: string
+          total: number
+          unique_titles: number
+        }>
+      }
+    ).rows.map((r) => {
+      const total = r.total
+      const unique = r.unique_titles
+      const repeatRate = total > 0 ? Math.round((1 - unique / total) * 100) : 0
+      let pattern: "routine" | "mixed" | "variety" | "no_data"
+      if (total === 0) pattern = "no_data"
+      else if (repeatRate >= 60) pattern = "routine"
+      else if (repeatRate < 20) pattern = "variety"
+      else pattern = "mixed"
+      return {
+        kidId: r.kid_id,
+        kidName: r.kid_name,
+        avatar: r.avatar,
+        total,
+        uniqueTitles: unique,
+        repeatRate,
+        pattern,
+      }
+    })
+
+    const counts = {
+      routine: kids.filter((k) => k.pattern === "routine").length,
+      mixed: kids.filter((k) => k.pattern === "mixed").length,
+      variety: kids.filter((k) => k.pattern === "variety").length,
+    }
+
+    let message: string
+    const withTasks = kids.filter((k) => k.total > 0)
+    if (withTasks.length === 0) {
+      message = `過去 ${days} 天還沒任務`
+    } else if (counts.routine > 0) {
+      message = `📋 ${counts.routine} 個小孩日常型（高重複）、有固定生活節奏`
+    } else if (counts.variety === withTasks.length) {
+      message = `🎨 全家都愛嘗鮮、各種任務都試試看`
+    } else {
+      message = "家庭任務組合多元"
+    }
+
+    res.json({
+      days,
+      kids,
+      patternCounts: counts,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/first-task-timeline
  * 每 active kid 加入後到第一個 approved task 的天數
  * 看小孩接受系統的速度

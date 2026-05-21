@@ -4245,6 +4245,35 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.body.weeks).toBe(52)
   })
 
+  it("任務重複率：基本結構 kids/patternCounts/message", async () => {
+    const res = await request(app).get("/api/family/task-repeat-by-kid")
+    expect(res.status).toBe(200)
+    expect(Array.isArray(res.body.kids)).toBe(true)
+    expect(res.body.patternCounts).toHaveProperty("routine")
+    expect(res.body.message).toBeTruthy()
+  })
+
+  it("任務重複率：建 3 個同 title task → pattern=routine", async () => {
+    const kidObj = (await createKid()) as { id: number }
+    const myKidId = kidObj.id
+    for (let i = 0; i < 3; i++) {
+      const t = await request(app)
+        .post("/api/family/tasks")
+        .send({ kidId: myKidId, title: "洗碗", rewardAmount: 30 })
+      await request(app).post(`/api/family/tasks/${t.body.id}/submit`).send({})
+      await request(app).post(`/api/family/tasks/${t.body.id}/approve`).send({})
+    }
+    const res = await request(app).get("/api/family/task-repeat-by-kid?days=7")
+    expect(res.status).toBe(200)
+    const myKid = res.body.kids.find((k: { kidId: number }) => k.kidId === myKidId)
+    expect(myKid).toBeDefined()
+    expect(myKid.total).toBe(3)
+    expect(myKid.uniqueTitles).toBe(1)
+    expect(myKid.repeatRate).toBeGreaterThanOrEqual(60)
+    expect(myKid.pattern).toBe("routine")
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
   it("首次任務時間軸：基本結構 kids/neverCount/message", async () => {
     const res = await request(app).get("/api/family/first-task-timeline")
     expect(res.status).toBe(200)

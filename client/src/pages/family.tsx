@@ -634,6 +634,9 @@ export default function FamilyPage() {
       {/* 家庭首次任務時間軸 */}
       <FamilyFirstTaskTimelineCard />
 
+      {/* 家庭兒童任務重複率 */}
+      <FamilyTaskRepeatByKidCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3588,6 +3591,66 @@ function ParentTodoList() {
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
       )}
+    </div>
+  )
+}
+
+function FamilyTaskRepeatByKidCard() {
+  const { data } = useQuery<{
+    days: number
+    kids: Array<{
+      kidId: number
+      kidName: string
+      avatar: string
+      total: number
+      uniqueTitles: number
+      repeatRate: number
+      pattern: "routine" | "mixed" | "variety" | "no_data"
+    }>
+    patternCounts: { routine: number; mixed: number; variety: number }
+    message: string
+  }>({
+    queryKey: ["/api/family/task-repeat-by-kid?days=90"],
+  })
+  if (!data || data.kids.length === 0) return null
+  const withTasks = data.kids.filter((k) => k.total > 0)
+  if (withTasks.length === 0) return null
+
+  const PATTERN_LABEL: Record<string, string> = {
+    routine: "📋 日常型",
+    mixed: "⚖️ 混合型",
+    variety: "🎨 嘗鮮型",
+    no_data: "—",
+  }
+  const PATTERN_COLOR: Record<string, string> = {
+    routine: "bg-blue-100 text-blue-700",
+    mixed: "bg-emerald-100 text-emerald-700",
+    variety: "bg-purple-100 text-purple-700",
+    no_data: "bg-gray-100 text-gray-500",
+  }
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-indigo-300 bg-gradient-to-br from-indigo-50 to-purple-50 p-3 shadow">
+      <h3 className="font-bold mb-2 flex items-center gap-2">🔁 任務重複率（90 天）</h3>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-2 text-xs">{data.message}</div>
+
+      <div className="space-y-1.5">
+        {withTasks.map((k) => (
+          <div key={k.kidId} className="bg-white rounded-lg p-2 flex items-center gap-2">
+            <div className="text-lg">{k.avatar}</div>
+            <div className="flex-1">
+              <div className="text-sm font-medium">{k.kidName}</div>
+              <div className="text-[10px] text-gray-500">
+                {k.uniqueTitles} 種 / 共 {k.total} 個 · 重複率 {k.repeatRate}%
+              </div>
+            </div>
+            <div className={`text-[10px] px-1.5 py-0.5 rounded ${PATTERN_COLOR[k.pattern]}`}>
+              {PATTERN_LABEL[k.pattern]}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
