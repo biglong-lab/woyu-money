@@ -4245,6 +4245,38 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.body.weeks).toBe(52)
   })
 
+  it("目標緊急度：基本結構 goals/overdueCount/message", async () => {
+    const res = await request(app).get("/api/family/goal-urgency-rank")
+    expect(res.status).toBe(200)
+    expect(Array.isArray(res.body.goals)).toBe(true)
+    expect(res.body).toHaveProperty("overdueCount")
+    expect(res.body).toHaveProperty("criticalCount")
+    expect(res.body.message).toBeTruthy()
+  })
+
+  it("目標緊急度：建 deadline=3 天後 goal → urgency=critical", async () => {
+    const kidObj = (await createKid()) as { id: number }
+    const myKidId = kidObj.id
+    const inThreeDays = new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10)
+    await request(app).post("/api/family/goals").send({
+      kidId: myKidId,
+      name: "緊急目標",
+      targetAmount: 500,
+      deadline: inThreeDays,
+    })
+    const res = await request(app).get("/api/family/goal-urgency-rank")
+    expect(res.status).toBe(200)
+    expect(res.body.goals.length).toBeGreaterThanOrEqual(1)
+    const myGoal = res.body.goals.find(
+      (g: { kidName: string }) => g.kidName === kidObj.kidName || true
+    )
+    const found = res.body.goals.find((g: { goalName: string }) => g.goalName === "緊急目標")
+    expect(found).toBeDefined()
+    expect(found.urgency).toBe("critical")
+    expect(res.body.criticalCount).toBeGreaterThanOrEqual(1)
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
   it("兒童入帳趨勢：基本結構 kids/topEarner/familyTotal", async () => {
     const res = await request(app).get("/api/family/kid-earnings-trend")
     expect(res.status).toBe(200)

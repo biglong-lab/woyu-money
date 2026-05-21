@@ -8602,6 +8602,101 @@ async function bulkApproveOne(
 }
 
 /**
+ * GET /api/family/goal-urgency-rank?limit=10
+ * 有 deadline 的 active goals 按距離截止日 ASC 排序
+ * urgency: overdue / critical(<7d) / warning(<30d) / safe
+ */
+router.get(
+  "/api/family/goal-urgency-rank",
+  asyncHandler(async (req, res) => {
+    const limit = Math.min(Math.max(Number(req.query.limit) || 10, 1), 50)
+
+    const rows = await db.execute(sql`
+      SELECT
+        g.id::int AS goal_id,
+        g.name AS goal_name,
+        g.emoji AS goal_emoji,
+        g.target_amount::numeric AS target,
+        g.current_amount::numeric AS current,
+        g.deadline,
+        (g.deadline - CURRENT_DATE)::int AS days_until,
+        ka.id::int AS kid_id,
+        ka.display_name AS kid_name,
+        ka.avatar
+      FROM kids_goals g
+      JOIN kids_accounts ka ON ka.id = g.kid_id
+      WHERE g.status = 'active'
+        AND g.deadline IS NOT NULL
+        AND ka.is_active = true
+      ORDER BY (g.deadline - CURRENT_DATE) ASC
+      LIMIT ${limit}
+    `)
+
+    const goals = (
+      rows as unknown as {
+        rows: Array<{
+          goal_id: number
+          goal_name: string
+          goal_emoji: string
+          target: string | number
+          current: string | number
+          deadline: string
+          days_until: number
+          kid_id: number
+          kid_name: string
+          avatar: string
+        }>
+      }
+    ).rows.map((r) => {
+      const target = Number(r.target)
+      const current = Number(r.current)
+      const progress = target > 0 ? Math.min(100, Math.round((current / target) * 100)) : 0
+      const daysUntil = r.days_until
+      let urgency: "overdue" | "critical" | "warning" | "safe"
+      if (daysUntil < 0) urgency = "overdue"
+      else if (daysUntil < 7) urgency = "critical"
+      else if (daysUntil < 30) urgency = "warning"
+      else urgency = "safe"
+      return {
+        goalId: r.goal_id,
+        goalName: r.goal_name,
+        goalEmoji: r.goal_emoji,
+        target,
+        current,
+        progress,
+        deadline: r.deadline,
+        daysUntil,
+        kidName: r.kid_name,
+        kidAvatar: r.avatar,
+        urgency,
+      }
+    })
+
+    const overdueCount = goals.filter((g) => g.urgency === "overdue").length
+    const criticalCount = goals.filter((g) => g.urgency === "critical").length
+
+    let message: string
+    if (goals.length === 0) {
+      message = "沒有設 deadline 的進行中目標"
+    } else if (overdueCount > 0) {
+      message = `🚨 ${overdueCount} 個目標已過期、立即關注`
+    } else if (criticalCount > 0) {
+      message = `⏰ ${criticalCount} 個目標即將到期（<7 天）`
+    } else {
+      message = `✅ 進行中 deadline 目標都還有時間`
+    }
+
+    res.json({
+      goals,
+      total: goals.length,
+      overdueCount,
+      criticalCount,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/kid-earnings-trend?months=6
  * 每個 active kid 過去 N 月每月 task reward sum + topEarner
  */

@@ -592,6 +592,9 @@ export default function FamilyPage() {
       {/* 家庭兒童入帳趨勢 */}
       <FamilyKidEarningsTrendCard />
 
+      {/* 家庭目標緊急度排名 */}
+      <FamilyGoalUrgencyRankCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3546,6 +3549,72 @@ function ParentTodoList() {
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
       )}
+    </div>
+  )
+}
+
+function FamilyGoalUrgencyRankCard() {
+  const { data } = useQuery<{
+    goals: Array<{
+      goalId: number
+      goalName: string
+      goalEmoji: string
+      target: number
+      current: number
+      progress: number
+      deadline: string
+      daysUntil: number
+      kidName: string
+      kidAvatar: string
+      urgency: "overdue" | "critical" | "warning" | "safe"
+    }>
+    total: number
+    overdueCount: number
+    criticalCount: number
+    message: string
+  }>({
+    queryKey: ["/api/family/goal-urgency-rank?limit=10"],
+  })
+  if (!data || data.total === 0) return null
+
+  const URGENCY_BG: Record<string, string> = {
+    overdue: "bg-rose-100 border-rose-400",
+    critical: "bg-amber-100 border-amber-400",
+    warning: "bg-yellow-100 border-yellow-400",
+    safe: "bg-emerald-100 border-emerald-300",
+  }
+  const URGENCY_LABEL: Record<string, string> = {
+    overdue: "🚨 過期",
+    critical: "⏰ 緊急",
+    warning: "⚠️ 注意",
+    safe: "✅ 安全",
+  }
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-amber-300 bg-gradient-to-br from-amber-50 to-orange-50 p-3 shadow">
+      <h3 className="font-bold mb-2 flex items-center gap-2">⏳ 目標 deadline 緊急度</h3>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-2 text-xs">{data.message}</div>
+
+      <div className="space-y-1.5">
+        {data.goals.slice(0, 6).map((g) => (
+          <div key={g.goalId} className={`rounded-lg p-2 border ${URGENCY_BG[g.urgency]}`}>
+            <div className="flex items-center gap-2 mb-1 text-xs">
+              <span className="text-lg">{g.goalEmoji}</span>
+              <span className="flex-1 truncate font-medium">{g.goalName}</span>
+              <span className="text-[10px]">{URGENCY_LABEL[g.urgency]}</span>
+            </div>
+            <div className="flex justify-between text-[10px] text-gray-600">
+              <span>
+                {g.kidAvatar} {g.kidName} · ${g.current}/${g.target}（{g.progress}%）
+              </span>
+              <span className={g.daysUntil < 0 ? "text-red-600 font-bold" : ""}>
+                {g.daysUntil < 0 ? `逾期 ${Math.abs(g.daysUntil)} 天` : `剩 ${g.daysUntil} 天`}
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
