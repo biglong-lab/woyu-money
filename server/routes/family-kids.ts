@@ -8602,6 +8602,77 @@ async function bulkApproveOne(
 }
 
 /**
+ * GET /api/family/feedback-rate?days=90
+ * 家庭親子互動深度：approve 任務中 parentFeedback 帶率 + submissionNote 帶率
+ * 鼓勵更多 feedback 與描述
+ */
+router.get(
+  "/api/family/feedback-rate",
+  asyncHandler(async (req, res) => {
+    const days = Math.min(Math.max(Number(req.query.days) || 90, 7), 365)
+
+    const rows = await db.execute(sql`
+      SELECT
+        COUNT(*)::int AS total_approved,
+        COUNT(*) FILTER (WHERE parent_feedback IS NOT NULL AND TRIM(parent_feedback) != '')::int AS with_parent_feedback,
+        COUNT(*) FILTER (WHERE submission_note IS NOT NULL AND TRIM(submission_note) != '')::int AS with_submission_note
+      FROM kids_tasks
+      WHERE status = 'approved'
+        AND completed_at >= CURRENT_DATE - (${days}::int * INTERVAL '1 day')
+    `)
+
+    const row = (
+      rows as unknown as {
+        rows: Array<{
+          total_approved: number
+          with_parent_feedback: number
+          with_submission_note: number
+        }>
+      }
+    ).rows[0]
+
+    const total = row?.total_approved ?? 0
+    const withParentFb = row?.with_parent_feedback ?? 0
+    const withSubmissionNote = row?.with_submission_note ?? 0
+
+    const parentRate = total > 0 ? Math.round((withParentFb / total) * 100) : 0
+    const kidRate = total > 0 ? Math.round((withSubmissionNote / total) * 100) : 0
+    const interactionScore = Math.round((parentRate + kidRate) / 2)
+
+    let level: "highly_engaged" | "engaged" | "moderate" | "passive" | "no_data"
+    let message: string
+    if (total === 0) {
+      level = "no_data"
+      message = `過去 ${days} 天還沒任務、開始活動累積互動吧`
+    } else if (interactionScore >= 70) {
+      level = "highly_engaged"
+      message = `🤝 親子互動深度很棒！家長 ${parentRate}% 給 feedback、小孩 ${kidRate}% 寫描述`
+    } else if (interactionScore >= 40) {
+      level = "engaged"
+      message = `💬 親子有在交流（家長 ${parentRate}% / 小孩 ${kidRate}%）、再多一點更好`
+    } else if (interactionScore >= 15) {
+      level = "moderate"
+      message = `📝 互動偏少（家長 ${parentRate}% / 小孩 ${kidRate}%）、試試 approve 時誇獎 + 小孩 submit 寫做了什麼`
+    } else {
+      level = "passive"
+      message = `⚠️ 缺乏互動（家長 ${parentRate}% / 小孩 ${kidRate}%）、家庭記帳不只是入帳、更是親子對話的機會`
+    }
+
+    res.json({
+      days,
+      totalApproved: total,
+      withParentFeedback: withParentFb,
+      withSubmissionNote,
+      parentFeedbackRate: parentRate,
+      kidSubmissionNoteRate: kidRate,
+      interactionScore,
+      level,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/reward-stats?days=90
  * 家庭任務獎勵金額統計：avg/median/min/max + 分桶
  * 5 桶：(0,10] / (10,50] / (50,100] / (100,500] / (500+]

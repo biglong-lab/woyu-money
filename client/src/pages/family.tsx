@@ -523,6 +523,9 @@ export default function FamilyPage() {
       {/* 家庭獎勵統計 */}
       <FamilyRewardStatsCard />
 
+      {/* 家庭親子互動 */}
+      <FamilyFeedbackRateCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3477,6 +3480,54 @@ function ParentTodoList() {
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
       )}
+    </div>
+  )
+}
+
+function FamilyFeedbackRateCard() {
+  const { data } = useQuery<{
+    days: number
+    totalApproved: number
+    parentFeedbackRate: number
+    kidSubmissionNoteRate: number
+    interactionScore: number
+    level: "highly_engaged" | "engaged" | "moderate" | "passive" | "no_data"
+    message: string
+  }>({
+    queryKey: ["/api/family/feedback-rate?days=90"],
+  })
+  if (!data || data.totalApproved === 0) return null
+
+  const LEVEL_BG: Record<string, string> = {
+    highly_engaged: "from-violet-50 to-pink-50 border-violet-500",
+    engaged: "from-emerald-50 to-green-50 border-emerald-400",
+    moderate: "from-blue-50 to-sky-50 border-blue-300",
+    passive: "from-amber-50 to-orange-50 border-amber-400",
+    no_data: "from-gray-50 to-slate-50 border-gray-300",
+  }
+
+  return (
+    <div
+      className={`mb-4 rounded-2xl border-2 bg-gradient-to-br ${LEVEL_BG[data.level]} p-3 shadow`}
+    >
+      <h3 className="font-bold mb-2 flex items-center gap-2">🤝 親子互動深度（90 天）</h3>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-2 text-xs">{data.message}</div>
+
+      <div className="grid grid-cols-3 gap-2">
+        <div className="bg-white rounded-lg p-2 text-center">
+          <div className="text-2xl font-bold text-violet-600">{data.parentFeedbackRate}%</div>
+          <div className="text-[10px] text-gray-500">家長 feedback</div>
+        </div>
+        <div className="bg-white rounded-lg p-2 text-center">
+          <div className="text-2xl font-bold text-emerald-600">{data.kidSubmissionNoteRate}%</div>
+          <div className="text-[10px] text-gray-500">小孩描述</div>
+        </div>
+        <div className="bg-white rounded-lg p-2 text-center">
+          <div className="text-2xl font-bold text-blue-600">{data.interactionScore}</div>
+          <div className="text-[10px] text-gray-500">互動分</div>
+        </div>
+      </div>
     </div>
   )
 }

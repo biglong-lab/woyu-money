@@ -4245,6 +4245,39 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.body.weeks).toBe(52)
   })
 
+  it("Feedback 比例：基本結構 + parentRate/kidRate/interactionScore", async () => {
+    const res = await request(app).get("/api/family/feedback-rate")
+    expect(res.status).toBe(200)
+    expect(res.body).toHaveProperty("totalApproved")
+    expect(res.body).toHaveProperty("parentFeedbackRate")
+    expect(res.body).toHaveProperty("kidSubmissionNoteRate")
+    expect(res.body).toHaveProperty("interactionScore")
+    expect(["highly_engaged", "engaged", "moderate", "passive", "no_data"]).toContain(
+      res.body.level
+    )
+    expect(res.body.message).toBeTruthy()
+  })
+
+  it("Feedback 比例：帶 parentFeedback 後 parentFeedbackRate=100", async () => {
+    const kidObj = (await createKid()) as { id: number }
+    const myKidId = kidObj.id
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId: myKidId, title: "feedback 測試", rewardAmount: 30 })
+    await request(app)
+      .post(`/api/family/tasks/${t.body.id}/submit`)
+      .send({ submissionNote: "做完啦" })
+    await request(app)
+      .post(`/api/family/tasks/${t.body.id}/approve`)
+      .send({ parentFeedback: "做得好" })
+    const res = await request(app).get("/api/family/feedback-rate?days=7")
+    expect(res.status).toBe(200)
+    expect(res.body.totalApproved).toBeGreaterThanOrEqual(1)
+    expect(res.body.parentFeedbackRate).toBeGreaterThanOrEqual(50)
+    expect(res.body.kidSubmissionNoteRate).toBeGreaterThanOrEqual(50)
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
   it("獎勵統計：基本結構 stats/buckets/pattern", async () => {
     const res = await request(app).get("/api/family/reward-stats")
     expect(res.status).toBe(200)
