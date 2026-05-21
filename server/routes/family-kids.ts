@@ -8602,6 +8602,76 @@ async function bulkApproveOne(
 }
 
 /**
+ * GET /api/family/task-monthly-growth?months=6
+ * 過去 N 個月 task 完成數 + 環比成長率
+ */
+router.get(
+  "/api/family/task-monthly-growth",
+  asyncHandler(async (req, res) => {
+    const months = Math.min(Math.max(Number(req.query.months) || 6, 2), 24)
+
+    const rows = await db.execute(sql`
+      WITH months AS (
+        SELECT generate_series(
+          DATE_TRUNC('month', CURRENT_DATE) - ((${months}::int - 1) * INTERVAL '1 month'),
+          DATE_TRUNC('month', CURRENT_DATE),
+          INTERVAL '1 month'
+        )::date AS m_start
+      )
+      SELECT
+        TO_CHAR(m.m_start, 'YYYY-MM') AS month,
+        (SELECT COUNT(*)::int FROM kids_tasks
+          WHERE status = 'approved'
+            AND completed_at >= m.m_start
+            AND completed_at < m.m_start + INTERVAL '1 month'
+        ) AS tasks
+      FROM months m
+      ORDER BY m.m_start ASC
+    `)
+
+    const monthsArr = (rows as unknown as { rows: Array<{ month: string; tasks: number }> }).rows
+
+    const withGrowth = monthsArr.map((m, i) => {
+      if (i === 0) {
+        return { month: m.month, tasks: m.tasks, growth: null as number | null }
+      }
+      const prev = monthsArr[i - 1].tasks
+      const growth = prev > 0 ? Math.round(((m.tasks - prev) / prev) * 100) : m.tasks > 0 ? 100 : 0
+      return { month: m.month, tasks: m.tasks, growth }
+    })
+
+    const totalTasks = withGrowth.reduce((s, m) => s + m.tasks, 0)
+    const growths = withGrowth.filter((m) => m.growth !== null).map((m) => m.growth!)
+    const avgGrowth =
+      growths.length > 0 ? Math.round(growths.reduce((s, g) => s + g, 0) / growths.length) : 0
+
+    let trend: "rising" | "steady" | "declining" | "no_data"
+    let message: string
+    if (totalTasks === 0) {
+      trend = "no_data"
+      message = `過去 ${months} 個月還沒任務、開始第一個吧 🌱`
+    } else if (avgGrowth >= 20) {
+      trend = "rising"
+      message = `📈 平均月成長 ${avgGrowth}%、家裡越來越活躍！`
+    } else if (avgGrowth <= -20) {
+      trend = "declining"
+      message = `📉 平均月衰退 ${Math.abs(avgGrowth)}%、近期較少任務`
+    } else {
+      trend = "steady"
+      message = `📊 平均月成長 ${avgGrowth}%、穩定中`
+    }
+
+    res.json({
+      months: withGrowth,
+      totalTasks,
+      avgGrowth,
+      trend,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/goal-amount-histogram
  * 家庭目標金額分佈（active + completed）
  * 5 桶：$1-100 / $101-500 / $501-1000 / $1001-5000 / $5000+

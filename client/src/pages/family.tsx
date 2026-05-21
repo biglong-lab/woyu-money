@@ -559,6 +559,9 @@ export default function FamilyPage() {
       {/* 家庭目標金額直方圖 */}
       <FamilyGoalAmountHistogramCard />
 
+      {/* 家庭月度任務成長率 */}
+      <FamilyTaskMonthlyGrowthCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3513,6 +3516,66 @@ function ParentTodoList() {
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
       )}
+    </div>
+  )
+}
+
+function FamilyTaskMonthlyGrowthCard() {
+  const { data } = useQuery<{
+    months: Array<{ month: string; tasks: number; growth: number | null }>
+    totalTasks: number
+    avgGrowth: number
+    trend: "rising" | "steady" | "declining" | "no_data"
+    message: string
+  }>({
+    queryKey: ["/api/family/task-monthly-growth?months=6"],
+  })
+  if (!data || data.totalTasks === 0) return null
+
+  const TREND_BG: Record<string, string> = {
+    rising: "from-emerald-50 to-green-50 border-emerald-500",
+    steady: "from-blue-50 to-sky-50 border-blue-300",
+    declining: "from-rose-50 to-red-50 border-rose-400",
+    no_data: "from-gray-50 to-slate-50 border-gray-300",
+  }
+
+  const maxTasks = Math.max(...data.months.map((m) => m.tasks), 1)
+
+  return (
+    <div
+      className={`mb-4 rounded-2xl border-2 bg-gradient-to-br ${TREND_BG[data.trend]} p-3 shadow`}
+    >
+      <h3 className="font-bold mb-2 flex items-center gap-2">📈 月度成長率（6 月）</h3>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-2 text-xs">{data.message}</div>
+
+      <div className="flex items-end gap-1.5 h-20 bg-white/40 rounded p-2">
+        {data.months.map((m) => {
+          const h = (m.tasks / maxTasks) * 100
+          return (
+            <div
+              key={m.month}
+              className="flex-1 flex flex-col items-center justify-end"
+              title={`${m.month}: ${m.tasks} 個${m.growth !== null ? `（${m.growth >= 0 ? "+" : ""}${m.growth}%）` : ""}`}
+            >
+              <div className="text-[9px] text-gray-600 font-bold">{m.tasks}</div>
+              <div
+                className={`w-full rounded-t ${m.growth !== null && m.growth >= 0 ? "bg-emerald-500" : m.growth !== null && m.growth < 0 ? "bg-rose-400" : "bg-blue-400"}`}
+                style={{ height: `${Math.max(h, 2)}%` }}
+              />
+              <div className="text-[9px] text-gray-500 mt-1">{m.month.slice(5)}</div>
+              {m.growth !== null && (
+                <div
+                  className={`text-[9px] font-bold ${m.growth >= 0 ? "text-emerald-600" : "text-rose-500"}`}
+                >
+                  {m.growth >= 0 ? "+" : ""}
+                  {m.growth}%
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }

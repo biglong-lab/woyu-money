@@ -4245,6 +4245,30 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.body.weeks).toBe(52)
   })
 
+  it("月度成長率：基本結構 months/trend/avgGrowth", async () => {
+    const res = await request(app).get("/api/family/task-monthly-growth")
+    expect(res.status).toBe(200)
+    expect(res.body.months).toHaveLength(6)
+    expect(res.body).toHaveProperty("totalTasks")
+    expect(res.body).toHaveProperty("avgGrowth")
+    expect(["rising", "steady", "declining", "no_data"]).toContain(res.body.trend)
+    expect(res.body.message).toBeTruthy()
+  })
+
+  it("月度成長率：months clamp 2-24", async () => {
+    const r1 = await request(app).get("/api/family/task-monthly-growth?months=100")
+    expect(r1.body.months).toHaveLength(24)
+    const r2 = await request(app).get("/api/family/task-monthly-growth?months=1")
+    expect(r2.body.months).toHaveLength(2)
+  })
+
+  it("月度成長率：第一個月 growth=null", async () => {
+    const res = await request(app).get("/api/family/task-monthly-growth?months=3")
+    expect(res.status).toBe(200)
+    expect(res.body.months[0].growth).toBeNull()
+    expect(res.body.months[1]).toHaveProperty("growth")
+  })
+
   it("目標直方圖：基本結構 buckets/stats/pattern", async () => {
     const res = await request(app).get("/api/family/goal-amount-histogram")
     expect(res.status).toBe(200)
