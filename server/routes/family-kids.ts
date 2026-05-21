@@ -8602,6 +8602,82 @@ async function bulkApproveOne(
 }
 
 /**
+ * GET /api/family/today-leaderboard
+ * 今日每 active kid task / reward / checkin 排名
+ */
+router.get(
+  "/api/family/today-leaderboard",
+  asyncHandler(async (_req, res) => {
+    const rows = await db.execute(sql`
+      SELECT
+        ka.id::int AS kid_id,
+        ka.display_name AS kid_name,
+        ka.avatar,
+        (SELECT COUNT(*)::int FROM kids_tasks
+          WHERE kid_id = ka.id AND status = 'approved' AND DATE(completed_at) = CURRENT_DATE
+        ) AS today_tasks,
+        COALESCE((SELECT SUM(reward_amount::numeric)::numeric FROM kids_tasks
+          WHERE kid_id = ka.id AND status = 'approved' AND DATE(completed_at) = CURRENT_DATE
+        ), 0) AS today_reward,
+        (SELECT COUNT(*)::int FROM kids_checkins
+          WHERE kid_id = ka.id AND checkin_date = CURRENT_DATE
+        ) AS today_checkin,
+        COALESCE((SELECT SUM(amount::numeric)::numeric FROM kids_spendings
+          WHERE kid_id = ka.id AND spend_date = CURRENT_DATE
+        ), 0) AS today_spent
+      FROM kids_accounts ka
+      WHERE ka.is_active = true
+      ORDER BY today_tasks DESC, today_reward DESC
+    `)
+
+    const kids = (
+      rows as unknown as {
+        rows: Array<{
+          kid_id: number
+          kid_name: string
+          avatar: string
+          today_tasks: number
+          today_reward: string | number
+          today_checkin: number
+          today_spent: string | number
+        }>
+      }
+    ).rows.map((r) => ({
+      kidId: r.kid_id,
+      kidName: r.kid_name,
+      avatar: r.avatar,
+      tasks: r.today_tasks,
+      reward: Math.round(Number(r.today_reward)),
+      checkin: r.today_checkin,
+      spent: Math.round(Number(r.today_spent)),
+    }))
+
+    const topToday = kids.length > 0 && kids[0].tasks > 0 ? kids[0] : null
+    const totalTasks = kids.reduce((s, k) => s + k.tasks, 0)
+    const totalReward = kids.reduce((s, k) => s + k.reward, 0)
+
+    let message: string
+    if (kids.length === 0) {
+      message = "還沒有小孩"
+    } else if (!topToday) {
+      message = "🌅 今天家裡還沒任務、誰先衝？"
+    } else {
+      message = `🌟 今日冠軍：${topToday.avatar} ${topToday.kidName}（${topToday.tasks} 個任務）`
+    }
+
+    res.json({
+      kids,
+      topToday: topToday
+        ? { kidName: topToday.kidName, avatar: topToday.avatar, tasks: topToday.tasks }
+        : null,
+      totalTasks,
+      totalReward,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/today-vs-yesterday
  * 今日 vs 昨日 5 metric 對比：tasks / reward / spent / given / checkins
  */

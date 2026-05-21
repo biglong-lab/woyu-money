@@ -622,6 +622,9 @@ export default function FamilyPage() {
       {/* 家庭今日 vs 昨日 */}
       <FamilyTodayVsYesterdayCard />
 
+      {/* 家庭今日排行榜 */}
+      <FamilyTodayLeaderboardCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3576,6 +3579,64 @@ function ParentTodoList() {
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
       )}
+    </div>
+  )
+}
+
+function FamilyTodayLeaderboardCard() {
+  const { data } = useQuery<{
+    kids: Array<{
+      kidId: number
+      kidName: string
+      avatar: string
+      tasks: number
+      reward: number
+      checkin: number
+      spent: number
+    }>
+    topToday: { kidName: string; avatar: string; tasks: number } | null
+    totalTasks: number
+    totalReward: number
+    message: string
+  }>({
+    queryKey: ["/api/family/today-leaderboard"],
+  })
+  if (!data || data.kids.length === 0) return null
+  if (!data.topToday) return null
+
+  const MEDAL = ["🥇", "🥈", "🥉"]
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-amber-400 bg-gradient-to-br from-amber-50 to-yellow-50 p-3 shadow">
+      <h3 className="font-bold mb-2 flex items-center gap-2">🌟 今日排行榜</h3>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-2 text-xs">
+        {data.message}
+        <div className="text-gray-600 mt-1">
+          全家今日 {data.totalTasks} 個任務 / 入帳 ${data.totalReward}
+        </div>
+      </div>
+
+      <div className="space-y-1.5">
+        {data.kids
+          .filter((k) => k.tasks > 0 || k.checkin > 0)
+          .map((k, i) => (
+            <div key={k.kidId} className="bg-white rounded-lg p-2 flex items-center gap-2">
+              <div className="text-xl">{i < 3 ? MEDAL[i] : `${i + 1}`}</div>
+              <div className="text-lg">{k.avatar}</div>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium">{k.kidName}</div>
+                <div className="text-[10px] text-gray-500">
+                  📋 {k.tasks} · ✅ {k.checkin} · 🛒 ${k.spent}
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-lg font-bold text-amber-600">${k.reward}</div>
+                <div className="text-[9px] text-gray-500">入帳</div>
+              </div>
+            </div>
+          ))}
+      </div>
     </div>
   )
 }
