@@ -4315,6 +4315,56 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.status).toBe(404)
   })
 
+  it("未批准提醒：基本結構 tasks/totalForgotten/severity/message", async () => {
+    const res = await request(app).get("/api/family/stale-pending-tasks")
+    expect(res.status).toBe(200)
+    expect(Array.isArray(res.body.tasks)).toBe(true)
+    expect(res.body).toHaveProperty("totalForgotten")
+    expect(res.body).toHaveProperty("uniqueKids")
+    expect(res.body).toHaveProperty("maxWaitingDays")
+    expect(["ok", "warn", "alert"]).toContain(res.body.severity)
+    expect(res.body.message).toBeTruthy()
+  })
+
+  it("未批准提醒：submit 後超過 N 天的任務上榜 + waitingDays 正確", async () => {
+    const kidObj = (await createKid({ displayName: "等待中" })) as { id: number }
+    const myKidId = kidObj.id
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId: myKidId, title: "忘記批准的任務", rewardAmount: 30 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`).send({})
+    await db.execute(sql`
+      UPDATE kids_tasks SET completed_at = NOW() - INTERVAL '5 days' WHERE id = ${t.body.id}
+    `)
+    const res = await request(app).get("/api/family/stale-pending-tasks?days=3")
+    expect(res.status).toBe(200)
+    const mine = res.body.tasks.find((x: { taskId: number }) => x.taskId === t.body.id)
+    expect(mine).toBeDefined()
+    expect(mine.title).toBe("忘記批准的任務")
+    expect(mine.reward).toBe(30)
+    expect(mine.waitingDays).toBeGreaterThanOrEqual(5)
+    expect(mine.kidName).toBe("等待中")
+    expect(res.body.totalForgotten).toBeGreaterThanOrEqual(30)
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
+  it("未批准提醒：approved task 不上榜", async () => {
+    const kidObj = (await createKid()) as { id: number }
+    const myKidId = kidObj.id
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId: myKidId, title: "已批准", rewardAmount: 20 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`).send({})
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`).send({})
+    await db.execute(sql`
+      UPDATE kids_tasks SET completed_at = NOW() - INTERVAL '5 days' WHERE id = ${t.body.id}
+    `)
+    const res = await request(app).get("/api/family/stale-pending-tasks?days=3")
+    const found = res.body.tasks.find((x: { taskId: number }) => x.taskId === t.body.id)
+    expect(found).toBeUndefined()
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
   it("善心故事：基本結構 stories/totalKindness/uniqueKids/message", async () => {
     const res = await request(app).get("/api/family/weekly-kindness-story")
     expect(res.status).toBe(200)

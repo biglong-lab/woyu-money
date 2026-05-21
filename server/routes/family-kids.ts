@@ -8822,6 +8822,92 @@ router.get(
 )
 
 /**
+ * GET /api/family/stale-pending-tasks?days=3
+ * 小孩 submit 後家長 N 天未 approve 的任務（被遺忘的獎勵）
+ * 排序 waitingDays DESC
+ */
+router.get(
+  "/api/family/stale-pending-tasks",
+  asyncHandler(async (req, res) => {
+    const days = Math.min(Math.max(Number(req.query.days) || 3, 1), 30)
+
+    const rows = await db.execute(sql`
+      SELECT
+        t.id::int AS task_id,
+        t.title,
+        t.emoji,
+        t.reward_amount::numeric AS reward,
+        t.completed_at,
+        ka.id::int AS kid_id,
+        ka.display_name AS kid_name,
+        ka.avatar,
+        EXTRACT(DAY FROM (NOW() - t.completed_at))::int AS waiting_days
+      FROM kids_tasks t
+      JOIN kids_accounts ka ON ka.id = t.kid_id
+      WHERE t.status = 'submitted'
+        AND t.completed_at IS NOT NULL
+        AND t.completed_at < NOW() - (${days} || ' days')::interval
+        AND ka.is_active = true
+      ORDER BY t.completed_at ASC
+      LIMIT 50
+    `)
+
+    const tasks = (
+      rows as unknown as {
+        rows: Array<{
+          task_id: number
+          title: string
+          emoji: string
+          reward: string
+          completed_at: string
+          kid_id: number
+          kid_name: string
+          avatar: string
+          waiting_days: number
+        }>
+      }
+    ).rows.map((r) => ({
+      taskId: r.task_id,
+      title: r.title,
+      emoji: r.emoji,
+      reward: Number(r.reward),
+      completedAt: r.completed_at,
+      kidId: r.kid_id,
+      kidName: r.kid_name,
+      kidAvatar: r.avatar,
+      waitingDays: r.waiting_days,
+    }))
+
+    const totalForgotten = tasks.reduce((s, t) => s + t.reward, 0)
+    const uniqueKids = new Set(tasks.map((t) => t.kidId)).size
+    const maxWait = tasks.length > 0 ? Math.max(...tasks.map((t) => t.waitingDays)) : 0
+
+    let message: string
+    let severity: "ok" | "warn" | "alert"
+    if (tasks.length === 0) {
+      message = `家長很棒！沒有超過 ${days} 天未批准的任務`
+      severity = "ok"
+    } else if (maxWait >= 7) {
+      message = `🚨 有 ${tasks.length} 個任務等了 ${maxWait} 天還沒批准（共 $${Math.round(totalForgotten)}）— 快去看看`
+      severity = "alert"
+    } else {
+      message = `⏳ 有 ${tasks.length} 個任務等了超過 ${days} 天（共 $${Math.round(totalForgotten)}）`
+      severity = "warn"
+    }
+
+    res.json({
+      days,
+      tasks,
+      totalForgotten: Math.round(totalForgotten * 100) / 100,
+      uniqueKids,
+      maxWaitingDays: maxWait,
+      severity,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/weekly-kindness-story?days=7
  * 過去 N 天 give jar 有 reflection 的捐獻故事彙整
  */

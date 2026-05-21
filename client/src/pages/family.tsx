@@ -643,6 +643,9 @@ export default function FamilyPage() {
       {/* 本週家庭善心故事 */}
       <FamilyKindnessStoryCard />
 
+      {/* 未批准提醒（家長忘記 approve）*/}
+      <FamilyStalePendingTasksCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3597,6 +3600,59 @@ function ParentTodoList() {
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
       )}
+    </div>
+  )
+}
+
+function FamilyStalePendingTasksCard() {
+  const { data } = useQuery<{
+    days: number
+    tasks: Array<{
+      taskId: number
+      title: string
+      emoji: string
+      reward: number
+      kidName: string
+      kidAvatar: string
+      waitingDays: number
+    }>
+    totalForgotten: number
+    maxWaitingDays: number
+    severity: "ok" | "warn" | "alert"
+    message: string
+  }>({
+    queryKey: ["/api/family/stale-pending-tasks?days=3"],
+  })
+  if (!data || data.tasks.length === 0) return null
+
+  const borderColor = data.severity === "alert" ? "border-red-500" : "border-orange-400"
+  const bgGradient =
+    data.severity === "alert" ? "from-red-50 to-orange-50" : "from-orange-50 to-amber-50"
+
+  return (
+    <div
+      className={`mb-4 rounded-2xl border-2 ${borderColor} bg-gradient-to-br ${bgGradient} p-3 shadow`}
+    >
+      <h3 className="font-bold mb-2 flex items-center gap-2">
+        {data.severity === "alert" ? "🚨" : "⏳"} 別忘了批准小孩的努力
+      </h3>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-2 text-xs font-medium">{data.message}</div>
+
+      <div className="space-y-1 max-h-64 overflow-y-auto">
+        {data.tasks.map((t) => (
+          <div key={t.taskId} className="bg-white rounded-lg p-2 flex items-center gap-2 text-xs">
+            <div className="text-lg">{t.emoji}</div>
+            <div className="flex-1 min-w-0">
+              <div className="font-medium truncate">{t.title}</div>
+              <div className="text-[10px] text-gray-500">
+                {t.kidAvatar} {t.kidName} · 等了 {t.waitingDays} 天
+              </div>
+            </div>
+            <div className="text-sm font-bold text-red-600">${t.reward}</div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
