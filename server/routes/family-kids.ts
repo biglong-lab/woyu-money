@@ -2875,6 +2875,55 @@ router.get(
 )
 
 /**
+ * GET /api/family/emoji-cloud?limit=20
+ * 全家 task emoji 雲（家長端、整體家庭視角）
+ */
+router.get(
+  "/api/family/emoji-cloud",
+  asyncHandler(async (req, res) => {
+    const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 50)
+
+    const result = await db.execute(sql`
+      SELECT
+        emoji,
+        COUNT(*)::int AS count,
+        COUNT(DISTINCT kid_id)::int AS unique_kids
+      FROM kids_tasks
+      WHERE status = 'approved' AND emoji IS NOT NULL AND emoji != ''
+      GROUP BY emoji
+      ORDER BY count DESC
+      LIMIT ${limit}
+    `)
+    const rows = (
+      result as unknown as {
+        rows: { emoji: string; count: number; unique_kids: number }[]
+      }
+    ).rows
+
+    const total = rows.reduce((s, r) => s + r.count, 0)
+    const peak = rows[0]?.count ?? 0
+
+    const emojis = rows.map((r) => {
+      const ratio = peak > 0 ? r.count / peak : 0
+      return {
+        emoji: r.emoji,
+        count: r.count,
+        uniqueKids: r.unique_kids,
+        sizeRem: Math.round((0.7 + ratio * 2.0) * 100) / 100,
+        percentage: total > 0 ? Math.round((r.count / total) * 100) : 0,
+      }
+    })
+
+    res.json({
+      total,
+      uniqueEmojis: rows.length,
+      mostUsed: emojis[0] ?? null,
+      emojis,
+    })
+  })
+)
+
+/**
  * GET /api/family/kid-strengths-list?kidId=
  * 小孩優點清單：從數據偵測個人化優點
  */

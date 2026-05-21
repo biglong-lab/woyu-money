@@ -473,6 +473,9 @@ export default function FamilyPage() {
       {/* 熱門任務 TOP 5 */}
       <PopularTasksCard />
 
+      {/* 家庭 emoji 雲 */}
+      <FamilyEmojiCloudCard />
+
       {/* 家庭財富趨勢（6 個月）*/}
       <FamilyWealthTrend />
 
@@ -2669,6 +2672,61 @@ function CompletedGoalsHistory() {
       </div>
       <div className="text-xs text-green-700 mt-2 text-center">
         平均達成時間：{data.avgDaysTaken} 天
+      </div>
+    </div>
+  )
+}
+
+function FamilyEmojiCloudCard() {
+  const { data } = useQuery<{
+    total: number
+    uniqueEmojis: number
+    mostUsed: { emoji: string; count: number; uniqueKids: number } | null
+    emojis: Array<{
+      emoji: string
+      count: number
+      uniqueKids: number
+      sizeRem: number
+      percentage: number
+    }>
+  }>({
+    queryKey: ["/api/family/emoji-cloud"],
+    queryFn: async () => {
+      const res = await fetch("/api/family/emoji-cloud?limit=20", { credentials: "include" })
+      return res.json()
+    },
+  })
+  if (!data || data.total === 0) return null
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-pink-300 bg-gradient-to-br from-pink-50 to-rose-50 p-4 shadow">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="font-bold text-pink-900 flex items-center gap-2">🎨 全家任務 emoji 雲</h3>
+        <span className="text-xs text-gray-500">
+          {data.uniqueEmojis} 種・{data.total} 任務
+        </span>
+      </div>
+
+      {data.mostUsed && (
+        <div className="bg-white rounded-lg p-3 mb-3 text-center">
+          <div className="text-5xl mb-1">{data.mostUsed.emoji}</div>
+          <div className="text-xs text-gray-500">
+            最常做（{data.mostUsed.count} 次・{data.mostUsed.uniqueKids} 個小孩）
+          </div>
+        </div>
+      )}
+
+      <div className="bg-white/70 rounded-lg p-3 flex flex-wrap gap-2 items-center justify-center">
+        {data.emojis.map((e) => (
+          <span
+            key={e.emoji}
+            className="leading-none"
+            style={{ fontSize: `${e.sizeRem}rem` }}
+            title={`${e.emoji} ${e.count} 次（${e.percentage}%、${e.uniqueKids} 個小孩）`}
+          >
+            {e.emoji}
+          </span>
+        ))}
       </div>
     </div>
   )

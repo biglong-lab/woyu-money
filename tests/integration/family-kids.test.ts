@@ -4113,6 +4113,45 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(r.status).toBe(400)
   })
 
+  it("家庭 emoji 雲：聚合所有 kid task emoji + uniqueKids", async () => {
+    await db.execute(sql`DELETE FROM kids_accounts WHERE pin = ${TEST_PIN}`)
+    await createKid({ displayName: "小華" })
+    const hua = kidId
+
+    // 小華做 2 個 🧹
+    for (let i = 0; i < 2; i++) {
+      const t = await request(app)
+        .post("/api/family/tasks")
+        .send({ kidId: hua, title: `H${i}`, rewardAmount: 10, emoji: "🧹" })
+      await request(app).post(`/api/family/tasks/${t.body.id}/submit`)
+      await request(app).post(`/api/family/tasks/${t.body.id}/approve`)
+    }
+
+    // 小明做 1 個 🧹
+    await createKid({ displayName: "小明" })
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId, title: "M", rewardAmount: 10, emoji: "🧹" })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`)
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`)
+
+    const res = await request(app).get("/api/family/emoji-cloud")
+    expect(res.status).toBe(200)
+
+    const cleanEmoji = res.body.emojis.find((e: { emoji: string }) => e.emoji === "🧹")
+    expect(cleanEmoji).toBeTruthy()
+    expect(cleanEmoji.count).toBe(3) // 2+1
+    expect(cleanEmoji.uniqueKids).toBe(2)
+
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${hua}`)
+  })
+
+  it("家庭 emoji 雲：limit clamp 50", async () => {
+    const res = await request(app).get("/api/family/emoji-cloud?limit=100")
+    expect(res.status).toBe(200)
+    expect(res.body.emojis.length).toBeLessThanOrEqual(50)
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)
