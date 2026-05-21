@@ -2117,6 +2117,50 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(r.status).toBe(400)
   })
 
+  it("跨域搜尋：找 task / goal / wish title、回 kidName + kind", async () => {
+    await createKid()
+
+    // 建立任務（title 含「掃地」）
+    await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId, title: "掃地專員", rewardAmount: 50 })
+
+    // 建立目標（name 含「掃地」、schema 用 name 欄位）
+    await request(app)
+      .post("/api/family/goals")
+      .send({ kidId, name: "掃地神器存錢罐", targetAmount: 500 })
+
+    // 建立願望（title 含「掃地」）
+    await request(app)
+      .post("/api/family/wishes")
+      .send({ kidId, title: "新掃地機器人", estimatedPrice: 3000 })
+
+    const res = await request(app).get("/api/family/search?q=掃地")
+    expect(res.status).toBe(200)
+    expect(res.body.q).toBe("掃地")
+    const kinds = res.body.results.map((r: { kind: string }) => r.kind)
+    expect(kinds).toContain("task")
+    expect(kinds).toContain("goal")
+    expect(kinds).toContain("wish")
+
+    // 每個結果都有 kidName + label
+    for (const r of res.body.results as Array<{ kidName: string; label: string }>) {
+      expect(r.kidName).toBeTruthy()
+      expect(r.label).toContain("掃地")
+    }
+  })
+
+  it("search 空 q 回空 results", async () => {
+    const r = await request(app).get("/api/family/search?q=")
+    expect(r.status).toBe(200)
+    expect(r.body.results).toEqual([])
+  })
+
+  it("search 過長 q 回 400", async () => {
+    const r = await request(app).get(`/api/family/search?q=${"x".repeat(101)}`)
+    expect(r.status).toBe(400)
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)

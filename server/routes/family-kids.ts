@@ -2804,6 +2804,108 @@ router.get(
 )
 
 /**
+ * GET /api/family/search?q=&limit=20
+ * 跨域搜尋：tasks（title）/ goals（title）/ comments（body）/ wishes（title）
+ * 家長一次找全部、ILIKE 不分大小寫
+ */
+router.get(
+  "/api/family/search",
+  asyncHandler(async (req, res) => {
+    const q = String(req.query.q ?? "").trim()
+    if (!q) return res.json({ q: "", results: [] })
+    if (q.length > 100) throw new AppError(400, "q 過長")
+    const limit = Math.min(Number(req.query.limit) || 20, 50)
+    const pattern = `%${q}%`
+
+    const result = await db.execute(sql`
+      SELECT * FROM (
+        SELECT
+          'task'::text AS kind,
+          kt.id::int AS id,
+          kt.kid_id::int AS kid_id,
+          ka.display_name AS kid_name,
+          kt.title AS label,
+          kt.status::text AS sub,
+          kt.created_at AS at
+        FROM kids_tasks kt
+        JOIN kids_accounts ka ON ka.id = kt.kid_id
+        WHERE kt.title ILIKE ${pattern}
+
+        UNION ALL
+
+        SELECT
+          'goal'::text AS kind,
+          kg.id::int AS id,
+          kg.kid_id::int AS kid_id,
+          ka.display_name AS kid_name,
+          kg.name AS label,
+          (kg.current_amount::text || '/' || kg.target_amount::text) AS sub,
+          kg.created_at AS at
+        FROM kids_goals kg
+        JOIN kids_accounts ka ON ka.id = kg.kid_id
+        WHERE kg.name ILIKE ${pattern}
+
+        UNION ALL
+
+        SELECT
+          'comment'::text AS kind,
+          ktc.id::int AS id,
+          kt.kid_id::int AS kid_id,
+          ka.display_name AS kid_name,
+          ktc.message AS label,
+          ktc.author::text AS sub,
+          ktc.created_at AS at
+        FROM kids_task_comments ktc
+        JOIN kids_tasks kt ON kt.id = ktc.task_id
+        JOIN kids_accounts ka ON ka.id = kt.kid_id
+        WHERE ktc.message ILIKE ${pattern}
+
+        UNION ALL
+
+        SELECT
+          'wish'::text AS kind,
+          kw.id::int AS id,
+          kw.kid_id::int AS kid_id,
+          ka.display_name AS kid_name,
+          kw.title AS label,
+          kw.status::text AS sub,
+          kw.created_at AS at
+        FROM kids_wishes kw
+        JOIN kids_accounts ka ON ka.id = kw.kid_id
+        WHERE kw.title ILIKE ${pattern}
+      ) u
+      ORDER BY at DESC NULLS LAST
+      LIMIT ${limit}
+    `)
+    const rows = (
+      result as unknown as {
+        rows: {
+          kind: string
+          id: number
+          kid_id: number
+          kid_name: string
+          label: string
+          sub: string
+          at: Date | null
+        }[]
+      }
+    ).rows
+    res.json({
+      q,
+      results: rows.map((r) => ({
+        kind: r.kind,
+        id: r.id,
+        kidId: r.kid_id,
+        kidName: r.kid_name,
+        label: r.label,
+        sub: r.sub,
+        at: r.at,
+      })),
+    })
+  })
+)
+
+/**
  * GET /api/family/badges-catalog?kidId=
  * 所有可達徽章的目錄 + 該小孩進度（含未解鎖）
  * 培養目標感：「再做 N 個就解鎖」激勵

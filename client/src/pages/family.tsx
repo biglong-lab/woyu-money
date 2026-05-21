@@ -9,7 +9,7 @@
  *
  * 設計：手機優先、單手拇指區操作、Bottom Sheet 取代 Dialog（手機）
  */
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { useQuery, useMutation } from "@tanstack/react-query"
 import { Link } from "wouter"
 import { motion } from "framer-motion"
@@ -439,6 +439,9 @@ export default function FamilyPage() {
           </Card>
         </div>
       )}
+
+      {/* 跨域搜尋 */}
+      <FamilySearch />
 
       {/* 家長提醒中心 */}
       <ParentReminders />
@@ -1864,6 +1867,96 @@ function DifficultyInsights() {
         ))}
       </CardContent>
     </Card>
+  )
+}
+
+function FamilySearch() {
+  const [q, setQ] = useState("")
+  const [debounced, setDebounced] = useState("")
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(q.trim()), 300)
+    return () => clearTimeout(t)
+  }, [q])
+
+  const { data } = useQuery<{
+    results: Array<{
+      kind: "task" | "goal" | "comment" | "wish"
+      id: number
+      kidId: number
+      kidName: string
+      label: string
+      sub: string
+      at: string | null
+    }>
+  }>({
+    queryKey: ["/api/family/search", debounced],
+    queryFn: async () => {
+      if (!debounced) return { results: [] }
+      const res = await fetch(`/api/family/search?q=${encodeURIComponent(debounced)}`, {
+        credentials: "include",
+      })
+      return res.json()
+    },
+    enabled: debounced.length > 0,
+  })
+
+  const KIND_ICON: Record<string, string> = {
+    task: "📋",
+    goal: "🎯",
+    comment: "💬",
+    wish: "✨",
+  }
+  const KIND_NAME: Record<string, string> = {
+    task: "任務",
+    goal: "目標",
+    comment: "留言",
+    wish: "願望",
+  }
+
+  return (
+    <div className="mb-4 rounded-lg border border-gray-200 bg-white p-3 shadow-sm">
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-lg">🔍</span>
+        <input
+          type="text"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="搜尋任務 / 目標 / 留言 / 願望..."
+          className="flex-1 px-3 py-2 rounded border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+        />
+        {q && (
+          <button
+            type="button"
+            onClick={() => setQ("")}
+            className="px-2 py-1 text-xs text-gray-500 hover:text-gray-700"
+          >
+            清除
+          </button>
+        )}
+      </div>
+      {debounced && data && (
+        <div className="max-h-80 overflow-y-auto space-y-1">
+          {data.results.length === 0 ? (
+            <div className="text-sm text-gray-500 text-center py-3">沒有找到相關項目</div>
+          ) : (
+            data.results.map((r) => (
+              <div
+                key={`${r.kind}-${r.id}`}
+                className="flex items-center gap-2 p-2 rounded hover:bg-gray-50 border border-gray-100"
+              >
+                <span className="text-lg">{KIND_ICON[r.kind]}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium truncate">{r.label}</div>
+                  <div className="text-xs text-gray-500">
+                    {KIND_NAME[r.kind]}・{r.kidName}・{r.sub}
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+    </div>
   )
 }
 
