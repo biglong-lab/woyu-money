@@ -8509,4 +8509,138 @@ router.post(
   })
 )
 
+/**
+ * POST /api/family/tasks/bulk-approve
+ * 家長一鍵批量批准 submitted/pending 任務
+ * body: { ids: number[], parentFeedback?: string }
+ * 簡化版邏輯（跳過驚喜獎勵 + recurring + 徽章、純入帳 + 三罐分配 + 串主系統）
+ * 個別任務失敗不影響其他（部分成功允許）
+ */
+async function bulkApproveOne(
+  taskId: number,
+  parentFeedback: string | null
+): Promise<{
+  taskId: number
+  kidName: string
+  reward: number
+  spendAdd: number
+  saveAdd: number
+  giveAdd: number
+}> {
+  const [task] = await db.select().from(kidsTasks).where(eq(kidsTasks.id, taskId)).limit(1)
+  if (!task) throw new AppError(404, `任務 ${taskId} 不存在`)
+  if (task.status !== "submitted" && task.status !== "pending") {
+    throw new AppError(400, `任務 ${taskId} 狀態無法批准（${task.status}）`)
+  }
+  if (!task.kidId) throw new AppError(400, `任務 ${taskId} 未指定小孩`)
+
+  const [kid] = await db.select().from(kidsAccounts).where(eq(kidsAccounts.id, task.kidId)).limit(1)
+  if (!kid) throw new AppError(404, `小孩 ${task.kidId} 不存在`)
+  await ensureJarsRow(kid.id)
+
+  const reward = parseFloat(task.rewardAmount)
+  const spendAdd = (reward * kid.spendRatio) / 100
+  const saveAdd = (reward * kid.saveRatio) / 100
+  const giveAdd = (reward * kid.giveRatio) / 100
+
+  await db.execute(sql`
+    UPDATE kids_jars SET
+      spend_balance = spend_balance + ${spendAdd.toFixed(2)}::numeric,
+      save_balance  = save_balance  + ${saveAdd.toFixed(2)}::numeric,
+      give_balance  = give_balance  + ${giveAdd.toFixed(2)}::numeric,
+      total_received = total_received + ${reward.toFixed(2)}::numeric,
+      updated_at = NOW()
+    WHERE kid_id = ${kid.id}
+  `)
+
+  let paymentRecordId: number | null = null
+  try {
+    const today = new Date().toISOString().slice(0, 10)
+    const [pi] = await db
+      .insert(paymentItems)
+      .values({
+        itemName: `🎁 ${kid.displayName} 零用金：${task.title}`,
+        totalAmount: reward.toFixed(2),
+        paidAmount: reward.toFixed(2),
+        itemType: "home",
+        paymentType: "single",
+        status: "paid",
+        startDate: today,
+        source: "manual",
+        notes: `家庭記帳「小孩模式」批量批准\n小孩：${kid.displayName}\n任務：${task.title}\n三罐：花$${spendAdd} / 存$${saveAdd} / 捐$${giveAdd}`,
+        tags: "kids,allowance,bulk",
+      })
+      .returning({ id: paymentItems.id })
+
+    const [pr] = await db
+      .insert(paymentRecords)
+      .values({
+        itemId: pi.id,
+        amountPaid: reward.toFixed(2),
+        paymentDate: today,
+        paymentMethod: "現金",
+        notes: `家庭記帳（批量）：${kid.displayName} 完成「${task.title}」`,
+      })
+      .returning({ id: paymentRecords.id })
+    paymentRecordId = pr.id
+  } catch (err) {
+    console.warn("[family-kids bulk-approve] payment 寫入失敗：", err)
+  }
+
+  await db
+    .update(kidsTasks)
+    .set({
+      status: "approved",
+      approvedAt: new Date(),
+      paymentRecordId,
+      updatedAt: new Date(),
+      ...(parentFeedback ? { parentFeedback } : {}),
+    })
+    .where(eq(kidsTasks.id, taskId))
+
+  return { taskId, kidName: kid.displayName, reward, spendAdd, saveAdd, giveAdd }
+}
+
+router.post(
+  "/api/family/tasks/bulk-approve",
+  asyncHandler(async (req, res) => {
+    const rawIds = Array.isArray(req.body?.ids) ? req.body.ids : []
+    const ids = rawIds.filter((x: unknown) => Number.isInteger(x) && (x as number) >= 1) as number[]
+    if (ids.length === 0) throw new AppError(400, "需傳 ids: number[]（至少 1 個）")
+    if (ids.length > 50) throw new AppError(400, "一次最多 50 個")
+    const parentFeedback = req.body?.parentFeedback
+      ? String(req.body.parentFeedback).slice(0, 500)
+      : null
+
+    const successes: Array<{
+      taskId: number
+      kidName: string
+      reward: number
+      spendAdd: number
+      saveAdd: number
+      giveAdd: number
+    }> = []
+    const failures: Array<{ id: number; error: string }> = []
+    for (const id of ids) {
+      try {
+        const r = await bulkApproveOne(id, parentFeedback)
+        successes.push(r)
+      } catch (err) {
+        failures.push({
+          id,
+          error: err instanceof AppError ? err.message : "處理失敗",
+        })
+      }
+    }
+
+    res.json({
+      approved: successes.length,
+      failed: failures.length,
+      totalReward: successes.reduce((s, x) => s + x.reward, 0),
+      successes,
+      failures,
+    })
+  })
+)
+
 export default router

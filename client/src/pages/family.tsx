@@ -246,6 +246,32 @@ export default function FamilyPage() {
     })
   }
 
+  const bulkApproveMutation = useMutation({
+    mutationFn: (vars: { ids: number[]; parentFeedback?: string }) =>
+      apiRequest<{
+        approved: number
+        failed: number
+        totalReward: number
+        failures: Array<{ id: number; error: string }>
+      }>("POST", "/api/family/tasks/bulk-approve", vars),
+    onSuccess: (r) => {
+      if (r.approved > 0) {
+        toast({
+          title: `✅ 批量批准成功：${r.approved} 個任務、總額 ${formatMoney(r.totalReward)}`,
+          description: r.failed > 0 ? `⚠️ ${r.failed} 個失敗` : "已自動入帳 + 三罐分配",
+        })
+        confetti({ particleCount: 150, spread: 100, origin: { y: 0.6 } })
+      } else {
+        toast({
+          title: "❌ 批量批准失敗",
+          description: r.failures[0]?.error ?? "全部失敗",
+          variant: "destructive",
+        })
+      }
+      invalidateAll()
+    },
+  })
+
   const approveTaskMutation = useMutation({
     mutationFn: (vars: { id: number; parentFeedback?: string }) =>
       apiRequest<{
@@ -544,6 +570,25 @@ export default function FamilyPage() {
             <CardDescription>小孩標完成、等家長確認入帳</CardDescription>
           </CardHeader>
           <CardContent className="py-2 px-3 sm:px-4 space-y-2">
+            {pendingTasks.length >= 2 && (
+              <Button
+                size="sm"
+                className="w-full bg-emerald-600 hover:bg-emerald-700 mb-1"
+                disabled={bulkApproveMutation.isPending}
+                onClick={() => {
+                  if (
+                    !window.confirm(
+                      `一鍵批准全部 ${pendingTasks.length} 個任務？（自動入帳 + 三罐分配，不會觸發驚喜獎勵或產生重複任務）`
+                    )
+                  ) {
+                    return
+                  }
+                  bulkApproveMutation.mutate({ ids: pendingTasks.map((t) => t.id) })
+                }}
+              >
+                ✅ 一鍵批准全部 {pendingTasks.length} 個
+              </Button>
+            )}
             {pendingTasks.map((t) => {
               const kid = kids.find((k) => k.id === t.kidId)
               return (

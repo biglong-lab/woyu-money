@@ -4245,6 +4245,62 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.body.weeks).toBe(52)
   })
 
+  it("批量批准：3 個 submitted → 全 approved + totalReward", async () => {
+    const kidObj = (await createKid()) as { id: number }
+    const myKidId = kidObj.id
+    const ids: number[] = []
+    for (let i = 0; i < 3; i++) {
+      const create = await request(app)
+        .post("/api/family/tasks")
+        .send({ kidId: myKidId, title: `任務 ${i}`, rewardAmount: 30 })
+      ids.push(create.body.id)
+      await request(app).post(`/api/family/tasks/${create.body.id}/submit`).send({})
+    }
+    const res = await request(app)
+      .post("/api/family/tasks/bulk-approve")
+      .send({ ids, parentFeedback: "做得好" })
+    expect(res.status).toBe(200)
+    expect(res.body.approved).toBe(3)
+    expect(res.body.failed).toBe(0)
+    expect(res.body.totalReward).toBe(90)
+    expect(res.body.successes).toHaveLength(3)
+    for (const id of ids) {
+      const list = await request(app).get(`/api/family/tasks?kidId=${myKidId}`)
+      const found = list.body.find((t: { id: number }) => t.id === id)
+      expect(found.status).toBe("approved")
+    }
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
+  it("批量批准：空 ids → 400", async () => {
+    const res = await request(app).post("/api/family/tasks/bulk-approve").send({ ids: [] })
+    expect(res.status).toBe(400)
+  })
+
+  it("批量批准：包含不存在 id → 部分成功 + failures 帶錯誤", async () => {
+    const kidObj = (await createKid()) as { id: number }
+    const myKidId = kidObj.id
+    const create = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId: myKidId, title: "OK 任務", rewardAmount: 50 })
+    await request(app).post(`/api/family/tasks/${create.body.id}/submit`).send({})
+    const res = await request(app)
+      .post("/api/family/tasks/bulk-approve")
+      .send({ ids: [create.body.id, 999999] })
+    expect(res.status).toBe(200)
+    expect(res.body.approved).toBe(1)
+    expect(res.body.failed).toBe(1)
+    expect(res.body.failures[0].id).toBe(999999)
+    expect(res.body.failures[0].error).toContain("不存在")
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
+  it("批量批准：超過 50 個 → 400", async () => {
+    const ids = Array.from({ length: 51 }, (_, i) => i + 1)
+    const res = await request(app).post("/api/family/tasks/bulk-approve").send({ ids })
+    expect(res.status).toBe(400)
+  })
+
   it("任務照片上傳：缺檔案 → 400", async () => {
     const res = await request(app).post("/api/family/upload-proof")
     expect(res.status).toBe(400)
