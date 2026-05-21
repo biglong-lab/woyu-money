@@ -8602,6 +8602,79 @@ async function bulkApproveOne(
 }
 
 /**
+ * GET /api/family/today-tasks-list?limit=20
+ * 今日所有 approved task 詳細列表（家長一頁看完）
+ */
+router.get(
+  "/api/family/today-tasks-list",
+  asyncHandler(async (req, res) => {
+    const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 100)
+
+    const rows = await db.execute(sql`
+      SELECT
+        t.id::int AS task_id,
+        t.title,
+        t.emoji,
+        t.reward_amount::numeric AS reward,
+        t.category,
+        t.difficulty,
+        t.completed_at,
+        ka.display_name AS kid_name,
+        ka.avatar
+      FROM kids_tasks t
+      JOIN kids_accounts ka ON ka.id = t.kid_id
+      WHERE t.status = 'approved'
+        AND ka.is_active = true
+        AND DATE(t.completed_at) = CURRENT_DATE
+      ORDER BY t.completed_at DESC
+      LIMIT ${limit}
+    `)
+
+    const tasks = (
+      rows as unknown as {
+        rows: Array<{
+          task_id: number
+          title: string
+          emoji: string
+          reward: string | number
+          category: string
+          difficulty: string
+          completed_at: string
+          kid_name: string
+          avatar: string
+        }>
+      }
+    ).rows.map((r) => ({
+      taskId: r.task_id,
+      title: r.title,
+      emoji: r.emoji,
+      reward: Number(r.reward),
+      category: r.category,
+      difficulty: r.difficulty,
+      completedAt: r.completed_at,
+      kidName: r.kid_name,
+      kidAvatar: r.avatar,
+    }))
+
+    const totalReward = tasks.reduce((s, t) => s + t.reward, 0)
+
+    let message: string
+    if (tasks.length === 0) {
+      message = "今天還沒有任務完成、誰先衝？"
+    } else {
+      message = `🌟 今日全家完成 ${tasks.length} 個任務、累計 $${totalReward}`
+    }
+
+    res.json({
+      tasks,
+      totalCount: tasks.length,
+      totalReward,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/task-repeat-by-kid?days=90
  * 每個 active kid 過去 N 天 task 重複率（1 - unique/total）
  * pattern: routine(>=60% repeat) / mixed / variety(<20% repeat) / no_data

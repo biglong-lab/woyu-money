@@ -4245,6 +4245,33 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.body.weeks).toBe(52)
   })
 
+  it("今日任務列表：基本結構 tasks/totalCount/totalReward", async () => {
+    const res = await request(app).get("/api/family/today-tasks-list")
+    expect(res.status).toBe(200)
+    expect(Array.isArray(res.body.tasks)).toBe(true)
+    expect(res.body).toHaveProperty("totalCount")
+    expect(res.body).toHaveProperty("totalReward")
+    expect(res.body.message).toBeTruthy()
+  })
+
+  it("今日任務列表：approve 任務後 tasks 包含該 task", async () => {
+    const kidObj = (await createKid()) as { id: number }
+    const myKidId = kidObj.id
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId: myKidId, title: "今日列表測試", emoji: "🚀", rewardAmount: 50 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`).send({})
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`).send({})
+    const res = await request(app).get("/api/family/today-tasks-list")
+    expect(res.status).toBe(200)
+    expect(res.body.totalCount).toBeGreaterThanOrEqual(1)
+    const myTask = res.body.tasks.find((x: { title: string }) => x.title === "今日列表測試")
+    expect(myTask).toBeDefined()
+    expect(myTask.reward).toBe(50)
+    expect(myTask.emoji).toBe("🚀")
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
   it("任務重複率：基本結構 kids/patternCounts/message", async () => {
     const res = await request(app).get("/api/family/task-repeat-by-kid")
     expect(res.status).toBe(200)
