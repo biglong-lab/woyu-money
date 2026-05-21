@@ -8602,6 +8602,106 @@ async function bulkApproveOne(
 }
 
 /**
+ * GET /api/family/kid-earnings-trend?months=6
+ * 每個 active kid 過去 N 月每月 task reward sum + topEarner
+ */
+router.get(
+  "/api/family/kid-earnings-trend",
+  asyncHandler(async (req, res) => {
+    const months = Math.min(Math.max(Number(req.query.months) || 6, 2), 24)
+
+    const rows = await db.execute(sql`
+      WITH months AS (
+        SELECT generate_series(
+          DATE_TRUNC('month', CURRENT_DATE) - ((${months}::int - 1) * INTERVAL '1 month'),
+          DATE_TRUNC('month', CURRENT_DATE),
+          INTERVAL '1 month'
+        )::date AS m_start
+      ),
+      kid_months AS (
+        SELECT
+          ka.id AS kid_id,
+          ka.display_name AS kid_name,
+          ka.avatar,
+          TO_CHAR(m.m_start, 'YYYY-MM') AS month,
+          m.m_start
+        FROM kids_accounts ka
+        CROSS JOIN months m
+        WHERE ka.is_active = true
+      )
+      SELECT
+        km.kid_id::int AS kid_id,
+        km.kid_name,
+        km.avatar,
+        km.month,
+        COALESCE((SELECT SUM(reward_amount::numeric)::numeric FROM kids_tasks
+          WHERE kid_id = km.kid_id
+            AND status = 'approved'
+            AND completed_at >= km.m_start
+            AND completed_at < km.m_start + INTERVAL '1 month'
+        ), 0) AS earnings
+      FROM kid_months km
+      ORDER BY km.kid_id ASC, km.m_start ASC
+    `)
+
+    const rowsArr = (
+      rows as unknown as {
+        rows: Array<{
+          kid_id: number
+          kid_name: string
+          avatar: string
+          month: string
+          earnings: string | number
+        }>
+      }
+    ).rows
+
+    const kidMap = new Map<
+      number,
+      {
+        kidId: number
+        kidName: string
+        avatar: string
+        months: Array<{ month: string; earnings: number }>
+        total: number
+      }
+    >()
+    for (const r of rowsArr) {
+      const earnings = Number(r.earnings)
+      let kid = kidMap.get(r.kid_id)
+      if (!kid) {
+        kid = { kidId: r.kid_id, kidName: r.kid_name, avatar: r.avatar, months: [], total: 0 }
+        kidMap.set(r.kid_id, kid)
+      }
+      kid.months.push({ month: r.month, earnings })
+      kid.total += earnings
+    }
+    const kids = Array.from(kidMap.values()).sort((a, b) => b.total - a.total)
+    const topEarner = kids.length > 0 && kids[0].total > 0 ? kids[0] : null
+    const familyTotal = kids.reduce((s, k) => s + k.total, 0)
+
+    let message: string
+    if (kids.length === 0) {
+      message = "還沒有小孩"
+    } else if (!topEarner) {
+      message = `過去 ${months} 月還沒有入帳、開始做任務吧`
+    } else {
+      message = `💰 ${months} 月最賺：${topEarner.avatar} ${topEarner.kidName}（$${topEarner.total}）`
+    }
+
+    res.json({
+      months,
+      kids,
+      topEarner: topEarner
+        ? { kidName: topEarner.kidName, avatar: topEarner.avatar, total: topEarner.total }
+        : null,
+      familyTotal,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/goals-monthly-completion?months=6
  * 過去 N 月 completed goals 數 + 達成總額時序
  */

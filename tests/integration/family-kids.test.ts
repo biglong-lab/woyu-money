@@ -4245,6 +4245,31 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.body.weeks).toBe(52)
   })
 
+  it("兒童入帳趨勢：基本結構 kids/topEarner/familyTotal", async () => {
+    const res = await request(app).get("/api/family/kid-earnings-trend")
+    expect(res.status).toBe(200)
+    expect(Array.isArray(res.body.kids)).toBe(true)
+    expect(res.body).toHaveProperty("familyTotal")
+    expect(res.body.message).toBeTruthy()
+  })
+
+  it("兒童入帳趨勢：approve $200 → kid.total>=200 + topEarner 是該 kid", async () => {
+    const kidObj = (await createKid()) as { id: number }
+    const myKidId = kidObj.id
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId: myKidId, title: "入帳測試", rewardAmount: 200 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`).send({})
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`).send({})
+    const res = await request(app).get("/api/family/kid-earnings-trend?months=3")
+    expect(res.status).toBe(200)
+    const myKid = res.body.kids.find((k: { kidId: number }) => k.kidId === myKidId)
+    expect(myKid).toBeDefined()
+    expect(myKid.total).toBeGreaterThanOrEqual(200)
+    expect(myKid.months).toHaveLength(3)
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
   it("目標月度達成：基本結構 months/grandTotal/message", async () => {
     const res = await request(app).get("/api/family/goals-monthly-completion")
     expect(res.status).toBe(200)

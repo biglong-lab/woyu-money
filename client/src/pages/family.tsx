@@ -589,6 +589,9 @@ export default function FamilyPage() {
       {/* 家庭目標月度達成 */}
       <FamilyGoalsMonthlyCompletionCard />
 
+      {/* 家庭兒童入帳趨勢 */}
+      <FamilyKidEarningsTrendCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3543,6 +3546,68 @@ function ParentTodoList() {
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
       )}
+    </div>
+  )
+}
+
+function FamilyKidEarningsTrendCard() {
+  const { data } = useQuery<{
+    months: number
+    kids: Array<{
+      kidId: number
+      kidName: string
+      avatar: string
+      months: Array<{ month: string; earnings: number }>
+      total: number
+    }>
+    topEarner: { kidName: string; avatar: string; total: number } | null
+    familyTotal: number
+    message: string
+  }>({
+    queryKey: ["/api/family/kid-earnings-trend?months=6"],
+  })
+  if (!data || data.kids.length === 0 || data.familyTotal === 0) return null
+
+  const allMaxEarnings = Math.max(...data.kids.flatMap((k) => k.months.map((m) => m.earnings)), 1)
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-cyan-400 bg-gradient-to-br from-cyan-50 to-blue-50 p-3 shadow">
+      <h3 className="font-bold mb-2 flex items-center gap-2">💰 兒童入帳趨勢（6 月）</h3>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-2 text-xs">
+        {data.message}
+        <div className="text-gray-600 mt-1">全家累計 ${data.familyTotal}</div>
+      </div>
+
+      <div className="space-y-2">
+        {data.kids.map((k) => (
+          <div key={k.kidId} className="bg-white rounded-lg p-2">
+            <div className="flex items-center justify-between mb-1 text-xs">
+              <span>
+                {k.avatar} {k.kidName}
+              </span>
+              <span className="font-bold">${k.total}</span>
+            </div>
+            <div className="flex items-end gap-1 h-10">
+              {k.months.map((m) => {
+                const h = (m.earnings / allMaxEarnings) * 100
+                return (
+                  <div
+                    key={m.month}
+                    className="flex-1 flex flex-col items-center justify-end"
+                    title={`${m.month}: $${m.earnings}`}
+                  >
+                    <div
+                      className="w-full bg-cyan-500 rounded-t"
+                      style={{ height: `${Math.max(h, 2)}%` }}
+                    />
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
