@@ -2875,6 +2875,113 @@ router.get(
 )
 
 /**
+ * GET /api/family/multi-rank?days=30
+ * 家庭多維排行榜：5 維度各別 top 3
+ *   - tasks（任務完成數）
+ *   - earned（總獎勵）
+ *   - saved（save 罐當前餘額）
+ *   - given（總捐贈）
+ *   - checkin（打卡天數）
+ */
+router.get(
+  "/api/family/multi-rank",
+  asyncHandler(async (req, res) => {
+    const days = Math.min(Math.max(Number(req.query.days) || 30, 1), 365)
+
+    const result = await db.execute(sql`
+      SELECT
+        ka.id::int AS kid_id,
+        ka.display_name AS kid_name,
+        ka.avatar,
+        COALESCE((
+          SELECT COUNT(*)::int FROM kids_tasks
+          WHERE kid_id = ka.id AND status = 'approved'
+            AND completed_at >= NOW() - (${days}::int || ' days')::interval
+        ), 0) AS tasks,
+        COALESCE((
+          SELECT SUM(reward_amount::numeric)::numeric FROM kids_tasks
+          WHERE kid_id = ka.id AND status = 'approved'
+            AND completed_at >= NOW() - (${days}::int || ' days')::interval
+        ), 0) AS earned,
+        COALESCE((
+          SELECT save_balance::numeric FROM kids_jars WHERE kid_id = ka.id
+        ), 0) AS saved,
+        COALESCE((
+          SELECT SUM(amount::numeric)::numeric FROM kids_spendings
+          WHERE kid_id = ka.id AND jar = 'give'
+            AND spend_date >= CURRENT_DATE - (${days}::int || ' days')::interval
+        ), 0) AS given,
+        COALESCE((
+          SELECT COUNT(DISTINCT checkin_date)::int FROM kids_checkins
+          WHERE kid_id = ka.id
+            AND checkin_date >= CURRENT_DATE - (${days}::int || ' days')::interval
+        ), 0) AS checkin
+      FROM kids_accounts ka
+      WHERE ka.is_active = true
+    `)
+    const rows = (
+      result as unknown as {
+        rows: {
+          kid_id: number
+          kid_name: string
+          avatar: string
+          tasks: number
+          earned: string | number
+          saved: string | number
+          given: string | number
+          checkin: number
+        }[]
+      }
+    ).rows
+
+    type Kid = {
+      kidId: number
+      kidName: string
+      avatar: string
+      tasks: number
+      earned: number
+      saved: number
+      given: number
+      checkin: number
+    }
+    const kids: Kid[] = rows.map((r) => ({
+      kidId: r.kid_id,
+      kidName: r.kid_name,
+      avatar: r.avatar,
+      tasks: r.tasks ?? 0,
+      earned: Number(r.earned ?? 0),
+      saved: Number(r.saved ?? 0),
+      given: Number(r.given ?? 0),
+      checkin: r.checkin ?? 0,
+    }))
+
+    function makeRank(metric: keyof Omit<Kid, "kidId" | "kidName" | "avatar">) {
+      return [...kids]
+        .sort((a, b) => b[metric] - a[metric])
+        .filter((k) => k[metric] > 0)
+        .slice(0, 3)
+        .map((k) => ({
+          kidId: k.kidId,
+          kidName: k.kidName,
+          avatar: k.avatar,
+          value: k[metric],
+        }))
+    }
+
+    res.json({
+      days,
+      ranks: [
+        { metric: "tasks", name: "任務數", emoji: "📋", top: makeRank("tasks") },
+        { metric: "earned", name: "賺最多", emoji: "💰", top: makeRank("earned") },
+        { metric: "saved", name: "存最多", emoji: "🐷", top: makeRank("saved") },
+        { metric: "given", name: "最大愛心", emoji: "❤️", top: makeRank("given") },
+        { metric: "checkin", name: "最規律", emoji: "📅", top: makeRank("checkin") },
+      ],
+    })
+  })
+)
+
+/**
  * GET /api/family/calendar-month?month=YYYY-MM
  * 家庭日曆熱度（每月每天活動數）
  *

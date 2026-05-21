@@ -4187,6 +4187,40 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(r.status).toBe(400)
   })
 
+  it("多維排行：5 個 ranks + 每維度 top 3", async () => {
+    await createKid()
+
+    // 做 1 個任務 100 元
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId, title: "T", rewardAmount: 100 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`)
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`)
+
+    const res = await request(app).get("/api/family/multi-rank")
+    expect(res.status).toBe(200)
+    expect(res.body.days).toBe(30)
+
+    const ranks = res.body.ranks as Array<{ metric: string; top: Array<{ value: number }> }>
+    expect(ranks.length).toBe(5)
+    expect(ranks.map((r) => r.metric)).toEqual(["tasks", "earned", "saved", "given", "checkin"])
+
+    // tasks rank 應該有 1 個（剛建的）
+    const tasksRank = ranks.find((r) => r.metric === "tasks")!
+    expect(tasksRank.top.length).toBeGreaterThanOrEqual(1)
+    expect(tasksRank.top[0].value).toBeGreaterThanOrEqual(1)
+
+    // earned 也有
+    const earnedRank = ranks.find((r) => r.metric === "earned")!
+    expect(earnedRank.top.length).toBeGreaterThanOrEqual(1)
+  })
+
+  it("多維排行：days clamp 365", async () => {
+    const res = await request(app).get("/api/family/multi-rank?days=1000")
+    expect(res.status).toBe(200)
+    expect(res.body.days).toBe(365)
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)

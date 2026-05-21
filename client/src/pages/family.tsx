@@ -479,6 +479,9 @@ export default function FamilyPage() {
       {/* 家庭日曆熱度 */}
       <FamilyCalendarHeatmap />
 
+      {/* 多維排行榜 */}
+      <FamilyMultiRankCard />
+
       {/* 家庭財富趨勢（6 個月）*/}
       <FamilyWealthTrend />
 
@@ -2675,6 +2678,60 @@ function CompletedGoalsHistory() {
       </div>
       <div className="text-xs text-green-700 mt-2 text-center">
         平均達成時間：{data.avgDaysTaken} 天
+      </div>
+    </div>
+  )
+}
+
+function FamilyMultiRankCard() {
+  const { data } = useQuery<{
+    days: number
+    ranks: Array<{
+      metric: string
+      name: string
+      emoji: string
+      top: Array<{ kidId: number; kidName: string; avatar: string; value: number }>
+    }>
+  }>({
+    queryKey: ["/api/family/multi-rank"],
+    queryFn: async () => {
+      const res = await fetch("/api/family/multi-rank?days=30", { credentials: "include" })
+      return res.json()
+    },
+  })
+  if (!data) return null
+
+  const hasAny = data.ranks.some((r) => r.top.length > 0)
+  if (!hasAny) return null
+
+  const medals = ["🥇", "🥈", "🥉"]
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-amber-400 bg-gradient-to-br from-amber-50 to-orange-50 p-4 shadow">
+      <h3 className="font-bold text-amber-900 mb-3 flex items-center gap-2">
+        🏆 多維排行（近 {data.days} 天）
+      </h3>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        {data.ranks
+          .filter((r) => r.top.length > 0)
+          .map((r) => (
+            <div key={r.metric} className="bg-white rounded-lg p-2">
+              <div className="text-sm font-bold text-amber-800 mb-1.5">
+                {r.emoji} {r.name}
+              </div>
+              <div className="space-y-1">
+                {r.top.map((k, i) => (
+                  <div key={k.kidId} className="flex items-center gap-1.5 text-xs">
+                    <span>{medals[i] || "🏅"}</span>
+                    <span>{k.avatar}</span>
+                    <span className="flex-1 truncate font-medium">{k.kidName}</span>
+                    <span className="font-bold text-amber-700">{k.value}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
       </div>
     </div>
   )
