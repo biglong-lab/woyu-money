@@ -8602,6 +8602,80 @@ async function bulkApproveOne(
 }
 
 /**
+ * GET /api/family/task-mvp?days=30&limit=5
+ * 家庭最大 reward task：過去 N 天 top N 高獎勵 approved task
+ */
+router.get(
+  "/api/family/task-mvp",
+  asyncHandler(async (req, res) => {
+    const days = Math.min(Math.max(Number(req.query.days) || 30, 7), 365)
+    const limit = Math.min(Math.max(Number(req.query.limit) || 5, 1), 20)
+
+    const rows = await db.execute(sql`
+      SELECT
+        t.id::int AS task_id,
+        t.title,
+        t.emoji,
+        t.reward_amount::numeric AS reward,
+        t.difficulty,
+        t.category,
+        t.completed_at,
+        ka.id::int AS kid_id,
+        ka.display_name AS kid_name,
+        ka.avatar
+      FROM kids_tasks t
+      JOIN kids_accounts ka ON ka.id = t.kid_id
+      WHERE t.status = 'approved'
+        AND ka.is_active = true
+        AND t.completed_at >= CURRENT_DATE - (${days}::int * INTERVAL '1 day')
+      ORDER BY t.reward_amount::numeric DESC, t.completed_at DESC
+      LIMIT ${limit}
+    `)
+
+    const tasks = (
+      rows as unknown as {
+        rows: Array<{
+          task_id: number
+          title: string
+          emoji: string
+          reward: string | number
+          difficulty: string
+          category: string
+          completed_at: string
+          kid_id: number
+          kid_name: string
+          avatar: string
+        }>
+      }
+    ).rows.map((r) => ({
+      taskId: r.task_id,
+      title: r.title,
+      emoji: r.emoji,
+      reward: Number(r.reward),
+      difficulty: r.difficulty,
+      category: r.category,
+      completedAt: r.completed_at,
+      kidName: r.kid_name,
+      kidAvatar: r.avatar,
+    }))
+
+    let message: string
+    if (tasks.length === 0) {
+      message = `過去 ${days} 天還沒有 approved task、開始累積 MVP 榜吧！`
+    } else {
+      const mvp = tasks[0]
+      message = `🏆 MVP：${mvp.emoji} ${mvp.title}（${mvp.kidAvatar} ${mvp.kidName} 賺 $${mvp.reward}）`
+    }
+
+    res.json({
+      days,
+      tasks,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/kid-task-completion-rate?days=90
  * 每個 active kid 過去 N 天 approved / (approved + rejected) 批准率
  * 看任務做得好不好（被駁回多 → 比例低）

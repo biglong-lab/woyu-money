@@ -4245,6 +4245,36 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.body.weeks).toBe(52)
   })
 
+  it("Task MVP：基本結構 tasks/message", async () => {
+    const res = await request(app).get("/api/family/task-mvp")
+    expect(res.status).toBe(200)
+    expect(Array.isArray(res.body.tasks)).toBe(true)
+    expect(res.body.message).toBeTruthy()
+  })
+
+  it("Task MVP：approve $500 → mvp 是該 task", async () => {
+    const kidObj = (await createKid()) as { id: number }
+    const myKidId = kidObj.id
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId: myKidId, title: "高獎勵測試", rewardAmount: 500 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`).send({})
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`).send({})
+    const res = await request(app).get("/api/family/task-mvp?days=7&limit=5")
+    expect(res.status).toBe(200)
+    expect(res.body.tasks.length).toBeGreaterThanOrEqual(1)
+    const myTask = res.body.tasks.find((x: { title: string }) => x.title === "高獎勵測試")
+    expect(myTask).toBeDefined()
+    expect(myTask.reward).toBe(500)
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
+  it("Task MVP：limit clamp 1-20", async () => {
+    const r1 = await request(app).get("/api/family/task-mvp?limit=100")
+    expect(r1.status).toBe(200)
+    expect(r1.body.tasks.length).toBeLessThanOrEqual(20)
+  })
+
   it("兒童批准率：基本結構 kids/familyAvg/message", async () => {
     const res = await request(app).get("/api/family/kid-task-completion-rate")
     expect(res.status).toBe(200)

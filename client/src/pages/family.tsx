@@ -571,6 +571,9 @@ export default function FamilyPage() {
       {/* 家庭兒童任務批准率 */}
       <FamilyKidTaskCompletionRateCard />
 
+      {/* 家庭 task MVP */}
+      <FamilyTaskMvpCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3525,6 +3528,55 @@ function ParentTodoList() {
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
       )}
+    </div>
+  )
+}
+
+function FamilyTaskMvpCard() {
+  const { data } = useQuery<{
+    days: number
+    tasks: Array<{
+      taskId: number
+      title: string
+      emoji: string
+      reward: number
+      difficulty: string
+      category: string
+      completedAt: string
+      kidName: string
+      kidAvatar: string
+    }>
+    message: string
+  }>({
+    queryKey: ["/api/family/task-mvp?days=30&limit=5"],
+  })
+  if (!data || data.tasks.length === 0) return null
+
+  const MEDAL = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣"]
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-yellow-500 bg-gradient-to-br from-yellow-50 to-amber-50 p-3 shadow">
+      <h3 className="font-bold mb-2 flex items-center gap-2">🏆 Task MVP（30 天）</h3>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-2 text-xs">{data.message}</div>
+
+      <div className="space-y-1.5">
+        {data.tasks.map((t, i) => (
+          <div key={t.taskId} className="bg-white rounded-lg p-2 flex items-center gap-2">
+            <div className="text-xl">{MEDAL[i]}</div>
+            <div className="text-lg">{t.emoji}</div>
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-medium truncate">{t.title}</div>
+              <div className="text-[10px] text-gray-500">
+                {t.kidAvatar} {t.kidName} · {t.completedAt.slice(0, 10)}
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="text-lg font-bold text-amber-600">${t.reward}</div>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
