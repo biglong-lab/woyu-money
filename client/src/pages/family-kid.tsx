@@ -1003,6 +1003,9 @@ function KidDashboard({
       {/* 最近活動時間軸 */}
       <KidActivityTimeline kidId={kidId} />
 
+      {/* 個人最佳紀錄牆 */}
+      <KidBestsWall kidId={kidId} />
+
       {/* 成就牆（含未解鎖徽章 + 進度條）*/}
       <AchievementWall kidId={kidId} />
 
@@ -1756,6 +1759,104 @@ function WishesSection({
           ))}
         </div>
       )}
+    </div>
+  )
+}
+
+function KidBestsWall({ kidId }: { kidId: number }) {
+  const { data } = useQuery<{
+    lifetime: {
+      totalTasks: number
+      totalSaved: number
+      totalSpent: number
+      totalGiven: number
+      totalCheckinDays: number
+    }
+    bests: {
+      biggestReward: number
+      biggestSpend: number
+      biggestGive: number
+      longestStreak: number
+    }
+    firsts: {
+      firstTaskAt: string | null
+      firstSpendDate: string | null
+      firstWishAt: string | null
+    }
+  }>({
+    queryKey: ["/api/family/kid-bests", kidId],
+    queryFn: async () => {
+      const res = await fetch(`/api/family/kid-bests?kidId=${kidId}`, { credentials: "include" })
+      return res.json()
+    },
+  })
+  if (!data) return null
+
+  const hasAny =
+    data.lifetime.totalTasks > 0 ||
+    data.lifetime.totalSpent > 0 ||
+    data.lifetime.totalGiven > 0 ||
+    data.lifetime.totalCheckinDays > 0
+  if (!hasAny) return null
+
+  function fmtDate(iso: string | null) {
+    if (!iso) return "—"
+    return new Date(iso).toLocaleDateString("zh-TW")
+  }
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-purple-300 bg-gradient-to-br from-purple-50 to-pink-50 p-4 shadow">
+      <h3 className="font-bold text-purple-900 mb-3 flex items-center gap-2">🏅 我的紀錄牆</h3>
+
+      {/* Lifetime 大字 */}
+      <div className="grid grid-cols-3 gap-2 mb-3">
+        <div className="bg-white rounded-lg p-2 text-center shadow-sm">
+          <div className="text-2xl font-bold text-purple-700">{data.lifetime.totalTasks}</div>
+          <div className="text-xs text-gray-500">完成任務</div>
+        </div>
+        <div className="bg-white rounded-lg p-2 text-center shadow-sm">
+          <div className="text-2xl font-bold text-blue-700">${data.lifetime.totalSaved}</div>
+          <div className="text-xs text-gray-500">存款</div>
+        </div>
+        <div className="bg-white rounded-lg p-2 text-center shadow-sm">
+          <div className="text-2xl font-bold text-pink-700">${data.lifetime.totalGiven}</div>
+          <div className="text-xs text-gray-500">捐贈</div>
+        </div>
+      </div>
+
+      {/* Personal Bests */}
+      <div className="space-y-1 text-sm">
+        {data.bests.biggestReward > 0 && (
+          <div className="flex justify-between bg-white/60 rounded px-2 py-1">
+            <span>🏆 最大任務獎勵</span>
+            <span className="font-bold text-amber-700">${data.bests.biggestReward}</span>
+          </div>
+        )}
+        {data.bests.biggestGive > 0 && (
+          <div className="flex justify-between bg-white/60 rounded px-2 py-1">
+            <span>❤️ 最大單筆捐贈</span>
+            <span className="font-bold text-pink-700">${data.bests.biggestGive}</span>
+          </div>
+        )}
+        {data.bests.longestStreak > 0 && (
+          <div className="flex justify-between bg-white/60 rounded px-2 py-1">
+            <span>🔥 連續打卡</span>
+            <span className="font-bold text-orange-700">{data.bests.longestStreak} 天</span>
+          </div>
+        )}
+        {data.lifetime.totalCheckinDays > 0 && (
+          <div className="flex justify-between bg-white/60 rounded px-2 py-1">
+            <span>📅 累積打卡</span>
+            <span className="font-bold text-indigo-700">{data.lifetime.totalCheckinDays} 天</span>
+          </div>
+        )}
+        {data.firsts.firstTaskAt && (
+          <div className="flex justify-between bg-white/60 rounded px-2 py-1">
+            <span>🎬 第一次完成任務</span>
+            <span className="text-gray-600">{fmtDate(data.firsts.firstTaskAt)}</span>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

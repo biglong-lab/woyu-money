@@ -2804,6 +2804,133 @@ router.get(
 )
 
 /**
+ * GET /api/family/kid-bests?kidId=
+ * 小孩終生統計 + 個人最佳紀錄
+ * 培養長期成就感（看見一路走來的軌跡）
+ *
+ * 回傳：
+ *   lifetime: { totalTasks, totalSaved, totalSpent, totalGiven, totalDays }
+ *   bests: { biggestReward, biggestSpend, biggestGive, longestStreak }
+ *   firsts: { firstTaskDate, firstSpendDate, firstWishDate }
+ */
+router.get(
+  "/api/family/kid-bests",
+  asyncHandler(async (req, res) => {
+    const kidIdQ = Number(req.query.kidId)
+    if (!Number.isInteger(kidIdQ) || kidIdQ < 1) throw new AppError(400, "需傳 kidId")
+
+    const lifetime = await db.execute(sql`
+      SELECT
+        (SELECT COUNT(*)::int FROM kids_tasks WHERE kid_id = ${kidIdQ} AND status = 'approved') AS total_tasks,
+        (SELECT COALESCE(SUM(amount::numeric), 0)::numeric FROM kids_spendings WHERE kid_id = ${kidIdQ} AND jar = 'save') AS total_save_spent,
+        (SELECT COALESCE(SUM(amount::numeric), 0)::numeric FROM kids_spendings WHERE kid_id = ${kidIdQ} AND jar = 'spend') AS total_spent,
+        (SELECT COALESCE(SUM(amount::numeric), 0)::numeric FROM kids_spendings WHERE kid_id = ${kidIdQ} AND jar = 'give') AS total_given,
+        (SELECT COUNT(DISTINCT checkin_date)::int FROM kids_checkins WHERE kid_id = ${kidIdQ}) AS total_checkin_days,
+        (SELECT save_balance::numeric FROM kids_jars WHERE kid_id = ${kidIdQ}) AS save_balance
+    `)
+    const lt = (
+      lifetime as unknown as {
+        rows: {
+          total_tasks: number
+          total_save_spent: string | number
+          total_spent: string | number
+          total_given: string | number
+          total_checkin_days: number
+          save_balance: string | number | null
+        }[]
+      }
+    ).rows[0] ?? {
+      total_tasks: 0,
+      total_save_spent: 0,
+      total_spent: 0,
+      total_given: 0,
+      total_checkin_days: 0,
+      save_balance: 0,
+    }
+
+    const bests = await db.execute(sql`
+      SELECT
+        (SELECT COALESCE(MAX(reward_amount::numeric), 0)::numeric FROM kids_tasks WHERE kid_id = ${kidIdQ} AND status = 'approved') AS biggest_reward,
+        (SELECT COALESCE(MAX(amount::numeric), 0)::numeric FROM kids_spendings WHERE kid_id = ${kidIdQ} AND jar = 'spend') AS biggest_spend,
+        (SELECT COALESCE(MAX(amount::numeric), 0)::numeric FROM kids_spendings WHERE kid_id = ${kidIdQ} AND jar = 'give') AS biggest_give
+    `)
+    const bt = (
+      bests as unknown as {
+        rows: {
+          biggest_reward: string | number
+          biggest_spend: string | number
+          biggest_give: string | number
+        }[]
+      }
+    ).rows[0] ?? { biggest_reward: 0, biggest_spend: 0, biggest_give: 0 }
+
+    const firsts = await db.execute(sql`
+      SELECT
+        (SELECT MIN(completed_at) FROM kids_tasks WHERE kid_id = ${kidIdQ} AND status = 'approved') AS first_task_at,
+        (SELECT MIN(spend_date) FROM kids_spendings WHERE kid_id = ${kidIdQ}) AS first_spend_date,
+        (SELECT MIN(created_at) FROM kids_wishes WHERE kid_id = ${kidIdQ}) AS first_wish_at
+    `)
+    const fr = (
+      firsts as unknown as {
+        rows: {
+          first_task_at: Date | null
+          first_spend_date: Date | null
+          first_wish_at: Date | null
+        }[]
+      }
+    ).rows[0] ?? { first_task_at: null, first_spend_date: null, first_wish_at: null }
+
+    // 連續打卡（latest streak、不必歷史最長、用今日往回算）
+    const streakRows = await db.execute(sql`
+      SELECT DISTINCT checkin_date FROM kids_checkins
+      WHERE kid_id = ${kidIdQ}
+      ORDER BY checkin_date DESC
+      LIMIT 365
+    `)
+    const dates = (streakRows as unknown as { rows: { checkin_date: Date }[] }).rows.map((r) =>
+      new Date(r.checkin_date).toISOString().slice(0, 10)
+    )
+    let streak = 0
+    if (dates.length > 0) {
+      const today = new Date().toISOString().slice(0, 10)
+      const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10)
+      if (dates[0] === today || dates[0] === yesterday) {
+        streak = 1
+        for (let i = 1; i < dates.length; i++) {
+          const prev = new Date(dates[i - 1])
+          const cur = new Date(dates[i])
+          const diff = Math.round((prev.getTime() - cur.getTime()) / 86_400_000)
+          if (diff === 1) streak++
+          else break
+        }
+      }
+    }
+
+    res.json({
+      kidId: kidIdQ,
+      lifetime: {
+        totalTasks: lt.total_tasks ?? 0,
+        totalSaved: Number(lt.save_balance ?? 0),
+        totalSpent: Number(lt.total_spent ?? 0),
+        totalGiven: Number(lt.total_given ?? 0),
+        totalCheckinDays: lt.total_checkin_days ?? 0,
+      },
+      bests: {
+        biggestReward: Number(bt.biggest_reward ?? 0),
+        biggestSpend: Number(bt.biggest_spend ?? 0),
+        biggestGive: Number(bt.biggest_give ?? 0),
+        longestStreak: streak,
+      },
+      firsts: {
+        firstTaskAt: fr.first_task_at,
+        firstSpendDate: fr.first_spend_date,
+        firstWishAt: fr.first_wish_at,
+      },
+    })
+  })
+)
+
+/**
  * GET /api/family/kid-activity?kidId=&limit=20
  * 小孩個人活動時間軸：tasks（approved）/ spendings / checkins / wishes
  * 提升黏著度（看自己最近做了什麼）

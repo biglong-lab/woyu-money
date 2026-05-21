@@ -2217,6 +2217,68 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(r.status).toBe(400)
   })
 
+  it("小孩最佳紀錄：lifetime + bests + firsts", async () => {
+    await createKid({ spendRatio: 50, saveRatio: 30, giveRatio: 20 })
+
+    // 完成 3 個任務（不同獎勵額度測 biggest）
+    for (const amt of [50, 200, 100]) {
+      const t = await request(app)
+        .post("/api/family/tasks")
+        .send({ kidId, title: `T${amt}`, rewardAmount: amt })
+      await request(app).post(`/api/family/tasks/${t.body.id}/submit`)
+      await request(app).post(`/api/family/tasks/${t.body.id}/approve`)
+    }
+
+    // 花錢 spend（biggest_spend = 30）
+    await request(app)
+      .post("/api/family/spendings")
+      .send({ kidId, jar: "spend", amount: 30, description: "零食" })
+    // 捐錢 give（biggest_give = 40）
+    await request(app)
+      .post("/api/family/spendings")
+      .send({ kidId, jar: "give", amount: 40, description: "幫流浪貓", recipient: "貓中途" })
+
+    // 打卡 1 天
+    await request(app).post("/api/family/checkins").send({ kidId, mood: "😄 開心" })
+
+    // 願望
+    await request(app).post("/api/family/wishes").send({ kidId, title: "玩具" })
+
+    const res = await request(app).get(`/api/family/kid-bests?kidId=${kidId}`)
+    expect(res.status).toBe(200)
+    expect(res.body.kidId).toBe(kidId)
+
+    expect(res.body.lifetime.totalTasks).toBe(3)
+    expect(res.body.lifetime.totalSpent).toBe(30)
+    expect(res.body.lifetime.totalGiven).toBe(40)
+    expect(res.body.lifetime.totalCheckinDays).toBeGreaterThanOrEqual(1)
+
+    expect(res.body.bests.biggestReward).toBe(200)
+    expect(res.body.bests.biggestSpend).toBe(30)
+    expect(res.body.bests.biggestGive).toBe(40)
+    expect(res.body.bests.longestStreak).toBeGreaterThanOrEqual(1)
+
+    expect(res.body.firsts.firstTaskAt).toBeTruthy()
+    expect(res.body.firsts.firstSpendDate).toBeTruthy()
+    expect(res.body.firsts.firstWishAt).toBeTruthy()
+  })
+
+  it("kid-bests：新小孩 lifetime 全 0、bests 全 0、firsts 全 null", async () => {
+    await createKid()
+    const res = await request(app).get(`/api/family/kid-bests?kidId=${kidId}`)
+    expect(res.status).toBe(200)
+    expect(res.body.lifetime.totalTasks).toBe(0)
+    expect(res.body.lifetime.totalSpent).toBe(0)
+    expect(res.body.bests.biggestReward).toBe(0)
+    expect(res.body.bests.longestStreak).toBe(0)
+    expect(res.body.firsts.firstTaskAt).toBeNull()
+  })
+
+  it("kid-bests 缺 kidId 回 400", async () => {
+    const r = await request(app).get("/api/family/kid-bests")
+    expect(r.status).toBe(400)
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)
