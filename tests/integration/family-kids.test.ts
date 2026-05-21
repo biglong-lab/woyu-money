@@ -3359,6 +3359,54 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(Array.isArray(res.body.highlights)).toBe(true)
   })
 
+  it("週成績單：本週 vs 上週 metrics + 趨勢 + overall", async () => {
+    await createKid()
+
+    // 本週做 2 個任務
+    for (let i = 0; i < 2; i++) {
+      const t = await request(app)
+        .post("/api/family/tasks")
+        .send({ kidId, title: `T${i}`, rewardAmount: 50 })
+      await request(app).post(`/api/family/tasks/${t.body.id}/submit`)
+      await request(app).post(`/api/family/tasks/${t.body.id}/approve`)
+    }
+
+    const res = await request(app).get(`/api/family/kid-weekly-report?kidId=${kidId}`)
+    expect(res.status).toBe(200)
+    expect(res.body.kidId).toBe(kidId)
+    expect(res.body.thisWeek.tasks).toBe(2)
+    expect(res.body.prevWeek.tasks).toBe(0)
+
+    const metrics = res.body.metrics as Array<{
+      key: string
+      this: number
+      prev: number
+      trend: string
+      delta: number
+    }>
+    expect(metrics.length).toBe(4)
+
+    const tasksMetric = metrics.find((m) => m.key === "tasks")!
+    expect(tasksMetric.delta).toBe(2)
+    expect(tasksMetric.trend).toBe("up")
+
+    expect(res.body.overall).toBeTruthy()
+  })
+
+  it("週成績單：完全沒任務 → overall 含「還沒開始」", async () => {
+    await createKid()
+    const res = await request(app).get(`/api/family/kid-weekly-report?kidId=${kidId}`)
+    expect(res.status).toBe(200)
+    expect(res.body.thisWeek.tasks).toBe(0)
+    expect(res.body.prevWeek.tasks).toBe(0)
+    expect(res.body.overall).toContain("還沒開始")
+  })
+
+  it("kid-weekly-report 缺 kidId 回 400", async () => {
+    const r = await request(app).get("/api/family/kid-weekly-report")
+    expect(r.status).toBe(400)
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)

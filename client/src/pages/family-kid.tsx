@@ -1007,6 +1007,9 @@ function KidDashboard({
       {/* 任務 streak（連續做任務）*/}
       <KidTaskStreakCard kidId={kidId} />
 
+      {/* 本週成績單 */}
+      <KidWeeklyReportCard kidId={kidId} />
+
       {/* 活動 heatmap（12 週小方塊）*/}
       <KidActivityHeatmap kidId={kidId} />
 
@@ -1990,6 +1993,84 @@ function KidNextBadgeCard({ kidId }: { kidId: number }) {
       </div>
       <div className="text-center mt-1 text-xs text-gray-600">
         {data.next.current} / {data.next.target}（{data.next.progress}%）
+      </div>
+    </div>
+  )
+}
+
+function KidWeeklyReportCard({ kidId }: { kidId: number }) {
+  const { data } = useQuery<{
+    thisWeek: { tasks: number; earned: number; spent: number; checkins: number }
+    prevWeek: { tasks: number; earned: number; spent: number; checkins: number }
+    metrics: Array<{
+      key: string
+      name: string
+      this: number
+      prev: number
+      trend: "up" | "down" | "flat"
+      trendEmoji: string
+      delta: number
+    }>
+    overall: string
+  }>({
+    queryKey: ["/api/family/kid-weekly-report", kidId],
+    queryFn: async () => {
+      const res = await fetch(`/api/family/kid-weekly-report?kidId=${kidId}`, {
+        credentials: "include",
+      })
+      return res.json()
+    },
+  })
+  if (!data) return null
+
+  // 本週 + 上週都 0 任務不顯示
+  if (data.thisWeek.tasks === 0 && data.prevWeek.tasks === 0) return null
+
+  function deltaTag(d: number, key: string) {
+    if (d === 0) return "持平"
+    const sign = d > 0 ? "+" : ""
+    if (key === "earned" || key === "spent") return `${sign}$${d}`
+    return `${sign}${d}`
+  }
+
+  // spent up 是壞、其他 up 是好
+  function trendColor(key: string, trend: "up" | "down" | "flat") {
+    if (trend === "flat") return "text-gray-500"
+    if (key === "spent") {
+      return trend === "up" ? "text-rose-600" : "text-emerald-600"
+    }
+    return trend === "up" ? "text-emerald-600" : "text-rose-600"
+  }
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-sky-300 bg-gradient-to-br from-sky-50 to-blue-50 p-4 shadow">
+      <h3 className="font-bold text-sky-900 mb-3 flex items-center gap-2">📅 本週成績單</h3>
+
+      {/* overall 大字 */}
+      <div className="bg-white rounded-lg p-3 mb-3 text-center text-sm font-medium text-sky-900">
+        {data.overall}
+      </div>
+
+      {/* 4 metrics */}
+      <div className="grid grid-cols-2 gap-2">
+        {data.metrics.map((m) => (
+          <div key={m.key} className="bg-white rounded-lg p-2">
+            <div className="text-xs text-gray-500 mb-0.5">
+              {m.name} <span>{m.trendEmoji}</span>
+            </div>
+            <div className="flex items-baseline gap-1">
+              <span className="text-xl font-bold text-sky-700">
+                {m.key === "earned" || m.key === "spent" ? `$${m.this}` : m.this}
+              </span>
+              <span className={`text-xs font-bold ${trendColor(m.key, m.trend)}`}>
+                {deltaTag(m.delta, m.key)}
+              </span>
+            </div>
+            <div className="text-[10px] text-gray-400">
+              上週 {m.key === "earned" || m.key === "spent" ? `$${m.prev}` : m.prev}
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   )

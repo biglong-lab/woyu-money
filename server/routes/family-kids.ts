@@ -2875,6 +2875,150 @@ router.get(
 )
 
 /**
+ * GET /api/family/kid-weekly-report?kidId=
+ * 小孩本週成績單：本週 vs 上週、4 維度 + 趨勢
+ */
+router.get(
+  "/api/family/kid-weekly-report",
+  asyncHandler(async (req, res) => {
+    const kidIdQ = Number(req.query.kidId)
+    if (!Number.isInteger(kidIdQ) || kidIdQ < 1) throw new AppError(400, "需傳 kidId")
+
+    const result = await db.execute(sql`
+      SELECT
+        COALESCE((
+          SELECT COUNT(*)::int FROM kids_tasks
+          WHERE kid_id = ${kidIdQ} AND status = 'approved'
+            AND completed_at >= NOW() - INTERVAL '7 days'
+        ), 0) AS this_tasks,
+        COALESCE((
+          SELECT SUM(reward_amount::numeric)::numeric FROM kids_tasks
+          WHERE kid_id = ${kidIdQ} AND status = 'approved'
+            AND completed_at >= NOW() - INTERVAL '7 days'
+        ), 0) AS this_earned,
+        COALESCE((
+          SELECT SUM(amount::numeric)::numeric FROM kids_spendings
+          WHERE kid_id = ${kidIdQ} AND jar = 'spend'
+            AND spend_date >= CURRENT_DATE - INTERVAL '7 days'
+        ), 0) AS this_spent,
+        COALESCE((
+          SELECT COUNT(*)::int FROM kids_checkins
+          WHERE kid_id = ${kidIdQ}
+            AND checkin_date >= CURRENT_DATE - INTERVAL '7 days'
+        ), 0) AS this_checkins,
+        COALESCE((
+          SELECT COUNT(*)::int FROM kids_tasks
+          WHERE kid_id = ${kidIdQ} AND status = 'approved'
+            AND completed_at >= NOW() - INTERVAL '14 days'
+            AND completed_at < NOW() - INTERVAL '7 days'
+        ), 0) AS prev_tasks,
+        COALESCE((
+          SELECT SUM(reward_amount::numeric)::numeric FROM kids_tasks
+          WHERE kid_id = ${kidIdQ} AND status = 'approved'
+            AND completed_at >= NOW() - INTERVAL '14 days'
+            AND completed_at < NOW() - INTERVAL '7 days'
+        ), 0) AS prev_earned,
+        COALESCE((
+          SELECT SUM(amount::numeric)::numeric FROM kids_spendings
+          WHERE kid_id = ${kidIdQ} AND jar = 'spend'
+            AND spend_date >= CURRENT_DATE - INTERVAL '14 days'
+            AND spend_date < CURRENT_DATE - INTERVAL '7 days'
+        ), 0) AS prev_spent,
+        COALESCE((
+          SELECT COUNT(*)::int FROM kids_checkins
+          WHERE kid_id = ${kidIdQ}
+            AND checkin_date >= CURRENT_DATE - INTERVAL '14 days'
+            AND checkin_date < CURRENT_DATE - INTERVAL '7 days'
+        ), 0) AS prev_checkins
+    `)
+    const row = (
+      result as unknown as {
+        rows: {
+          this_tasks: number
+          this_earned: string | number
+          this_spent: string | number
+          this_checkins: number
+          prev_tasks: number
+          prev_earned: string | number
+          prev_spent: string | number
+          prev_checkins: number
+        }[]
+      }
+    ).rows[0]!
+
+    const thisWeek = {
+      tasks: row.this_tasks,
+      earned: Number(row.this_earned ?? 0),
+      spent: Number(row.this_spent ?? 0),
+      checkins: row.this_checkins,
+    }
+    const prevWeek = {
+      tasks: row.prev_tasks,
+      earned: Number(row.prev_earned ?? 0),
+      spent: Number(row.prev_spent ?? 0),
+      checkins: row.prev_checkins,
+    }
+
+    type Metric = {
+      key: string
+      name: string
+      this: number
+      prev: number
+      trend: "up" | "down" | "flat"
+      trendEmoji: string
+      delta: number
+    }
+    function buildMetric(key: string, name: string, thisV: number, prevV: number): Metric {
+      const delta = thisV - prevV
+      let trend: "up" | "down" | "flat" = "flat"
+      let trendEmoji = "➡️"
+      if (delta > 0) {
+        trend = "up"
+        trendEmoji = "📈"
+      } else if (delta < 0) {
+        trend = "down"
+        trendEmoji = "📉"
+      }
+      return { key, name, this: thisV, prev: prevV, trend, trendEmoji, delta }
+    }
+    const metrics = [
+      buildMetric("tasks", "完成任務", thisWeek.tasks, prevWeek.tasks),
+      buildMetric("earned", "賺到的錢", thisWeek.earned, prevWeek.earned),
+      buildMetric("spent", "花掉的錢", thisWeek.spent, prevWeek.spent),
+      buildMetric("checkins", "打卡天數", thisWeek.checkins, prevWeek.checkins),
+    ]
+
+    const positiveCount = [
+      metrics[0].delta > 0,
+      metrics[1].delta > 0,
+      metrics[2].delta < 0, // 花得少是好事
+      metrics[3].delta > 0,
+    ].filter(Boolean).length
+
+    let overall: string
+    if (thisWeek.tasks === 0 && prevWeek.tasks === 0) {
+      overall = "🌱 還沒開始這週的任務、加油！"
+    } else if (positiveCount >= 3) {
+      overall = "🌟 本週超棒！持續進步中"
+    } else if (positiveCount >= 2) {
+      overall = "👍 本週有進步、繼續加油"
+    } else if (thisWeek.tasks > 0) {
+      overall = "💪 本週有完成任務、不錯哦"
+    } else {
+      overall = "🔄 本週稍慢、下週可以做更多"
+    }
+
+    res.json({
+      kidId: kidIdQ,
+      thisWeek,
+      prevWeek,
+      metrics,
+      overall,
+    })
+  })
+)
+
+/**
  * GET /api/family/today-summary
  * 家庭今日重點（家長端、一頁看今日全家動態）
  * 今日全家：完成任務數 / 收入 / 花費 / 待審核 / 打卡數 / 各小孩活動
