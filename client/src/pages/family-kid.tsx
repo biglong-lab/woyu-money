@@ -479,6 +479,46 @@ function KidDashboard({
       {/* 心情簽到（今日心情）*/}
       <CheckinPrompt kidId={kidId} />
 
+      {/* 本月戰績 hero（有資料才顯示）*/}
+      {report && (report.tasks.approvedCount > 0 || report.completedGoals.length > 0) && (
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-3 rounded-xl bg-gradient-to-br from-indigo-400 via-purple-500 to-pink-500 text-white p-3 shadow-lg"
+        >
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-2xl">✨</span>
+            <div className="flex-1">
+              <div className="text-xs opacity-90">{report.month} 我做到了</div>
+              <div className="text-base font-bold">本月戰績</div>
+            </div>
+          </div>
+          <div className="grid grid-cols-4 gap-1.5 text-center">
+            <div className="bg-white/20 rounded p-1.5">
+              <div className="text-[10px] opacity-90">完成任務</div>
+              <div className="font-bold text-base">{report.tasks.approvedCount}</div>
+            </div>
+            <div className="bg-white/20 rounded p-1.5">
+              <div className="text-[10px] opacity-90">賺到</div>
+              <div className="font-bold text-base">{formatMoney(report.tasks.approvedSum)}</div>
+            </div>
+            <div className="bg-white/20 rounded p-1.5">
+              <div className="text-[10px] opacity-90">達標</div>
+              <div className="font-bold text-base">{report.completedGoals.length}</div>
+            </div>
+            <div className="bg-white/20 rounded p-1.5">
+              <div className="text-[10px] opacity-90">徽章</div>
+              <div className="font-bold text-base">{report.badges.length}</div>
+            </div>
+          </div>
+          {report.netGain > 0 && (
+            <div className="mt-2 text-[10px] text-center opacity-90">
+              💰 淨成長 {formatMoney(report.netGain)}（賺 - 花）
+            </div>
+          )}
+        </motion.div>
+      )}
+
       {/* 三罐（最大、最顯眼） */}
       <div className="grid grid-cols-3 gap-2 mb-4">
         <JarCard
