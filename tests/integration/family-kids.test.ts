@@ -4245,6 +4245,34 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.body.weeks).toBe(52)
   })
 
+  it("批准延遲：基本結構 stats/buckets/level", async () => {
+    const res = await request(app).get("/api/family/approve-latency")
+    expect(res.status).toBe(200)
+    expect(res.body.stats).toHaveProperty("total")
+    expect(res.body.stats).toHaveProperty("avgHours")
+    expect(res.body.stats).toHaveProperty("medianHours")
+    expect(res.body.buckets).toHaveLength(5)
+    expect(["instant", "fast", "good", "slow", "sluggish", "no_data"]).toContain(res.body.level)
+    expect(res.body.message).toBeTruthy()
+  })
+
+  it("批准延遲：approve 後 total >=1 + level=instant", async () => {
+    const kidObj = (await createKid()) as { id: number }
+    const myKidId = kidObj.id
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId: myKidId, title: "批准延遲測試", rewardAmount: 30 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`).send({})
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`).send({})
+    const res = await request(app).get("/api/family/approve-latency?days=7")
+    expect(res.status).toBe(200)
+    expect(res.body.stats.total).toBeGreaterThanOrEqual(1)
+    const instant = res.body.buckets.find((b: { range: string }) => b.range === "instant")
+    expect(instant.count).toBeGreaterThanOrEqual(1)
+    expect(res.body.level).toBe("instant")
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
   it("Feedback 比例：基本結構 + parentRate/kidRate/interactionScore", async () => {
     const res = await request(app).get("/api/family/feedback-rate")
     expect(res.status).toBe(200)

@@ -8602,6 +8602,101 @@ async function bulkApproveOne(
 }
 
 /**
+ * GET /api/family/approve-latency?days=60
+ * 家長批准延遲：submitted（completed_at）→ approved 平均小時
+ * 分桶：<1h / 1-6h / 6-24h / 1-3 天 / >3 天
+ */
+router.get(
+  "/api/family/approve-latency",
+  asyncHandler(async (req, res) => {
+    const days = Math.min(Math.max(Number(req.query.days) || 60, 7), 365)
+
+    const rows = await db.execute(sql`
+      WITH a AS (
+        SELECT
+          EXTRACT(EPOCH FROM (approved_at - completed_at)) / 3600.0 AS hours
+        FROM kids_tasks
+        WHERE status = 'approved'
+          AND approved_at IS NOT NULL
+          AND completed_at IS NOT NULL
+          AND approved_at >= CURRENT_DATE - (${days}::int * INTERVAL '1 day')
+      )
+      SELECT
+        COUNT(*)::int AS total,
+        COALESCE(AVG(hours), 0)::numeric AS avg_hours,
+        COALESCE(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY hours), 0)::numeric AS median_hours,
+        COUNT(*) FILTER (WHERE hours < 1)::int AS bucket_under_1h,
+        COUNT(*) FILTER (WHERE hours >= 1 AND hours < 6)::int AS bucket_1_6h,
+        COUNT(*) FILTER (WHERE hours >= 6 AND hours < 24)::int AS bucket_6_24h,
+        COUNT(*) FILTER (WHERE hours >= 24 AND hours < 72)::int AS bucket_1_3d,
+        COUNT(*) FILTER (WHERE hours >= 72)::int AS bucket_over_3d
+      FROM a
+    `)
+
+    const row = (
+      rows as unknown as {
+        rows: Array<{
+          total: number
+          avg_hours: string | number
+          median_hours: string | number
+          bucket_under_1h: number
+          bucket_1_6h: number
+          bucket_6_24h: number
+          bucket_1_3d: number
+          bucket_over_3d: number
+        }>
+      }
+    ).rows[0]
+
+    const total = row?.total ?? 0
+    const avgHours = Number(row?.avg_hours ?? 0)
+    const medianHours = Number(row?.median_hours ?? 0)
+
+    const buckets = [
+      { label: "<1 小時", range: "instant", count: row?.bucket_under_1h ?? 0 },
+      { label: "1-6 小時", range: "fast", count: row?.bucket_1_6h ?? 0 },
+      { label: "6-24 小時", range: "normal", count: row?.bucket_6_24h ?? 0 },
+      { label: "1-3 天", range: "slow", count: row?.bucket_1_3d ?? 0 },
+      { label: ">3 天", range: "delayed", count: row?.bucket_over_3d ?? 0 },
+    ]
+
+    let level: "instant" | "fast" | "good" | "slow" | "sluggish" | "no_data"
+    let message: string
+    if (total === 0) {
+      level = "no_data"
+      message = `過去 ${days} 天沒有批准紀錄、家長要記得及時批准！`
+    } else if (medianHours < 1) {
+      level = "instant"
+      message = `⚡ 家長超快響應（中位 ${medianHours.toFixed(1)} 小時）、小孩成就感滿滿！`
+    } else if (medianHours < 6) {
+      level = "fast"
+      message = `🚀 家長很快（中位 ${medianHours.toFixed(1)} 小時）、不錯`
+    } else if (medianHours < 24) {
+      level = "good"
+      message = `👍 家長半天內批准（中位 ${medianHours.toFixed(1)} 小時）、可接受`
+    } else if (medianHours < 72) {
+      level = "slow"
+      message = `⏰ 批准偏慢（中位 ${(medianHours / 24).toFixed(1)} 天）、小孩等久了會失望`
+    } else {
+      level = "sluggish"
+      message = `🐢 批准太慢（中位 ${(medianHours / 24).toFixed(1)} 天）、影響小孩動力`
+    }
+
+    res.json({
+      days,
+      stats: {
+        total,
+        avgHours: Math.round(avgHours * 10) / 10,
+        medianHours: Math.round(medianHours * 10) / 10,
+      },
+      buckets,
+      level,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/feedback-rate?days=90
  * 家庭親子互動深度：approve 任務中 parentFeedback 帶率 + submissionNote 帶率
  * 鼓勵更多 feedback 與描述
