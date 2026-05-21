@@ -8602,6 +8602,78 @@ async function bulkApproveOne(
 }
 
 /**
+ * GET /api/family/peak-moment?days=30
+ * 過去 N 天 top 3 活動最高的日子（task + checkin + spending count 加總）
+ */
+router.get(
+  "/api/family/peak-moment",
+  asyncHandler(async (req, res) => {
+    const days = Math.min(Math.max(Number(req.query.days) || 30, 7), 90)
+
+    const rows = await db.execute(sql`
+      WITH days_set AS (
+        SELECT generate_series(
+          CURRENT_DATE - (${days - 1}::int * INTERVAL '1 day'),
+          CURRENT_DATE,
+          INTERVAL '1 day'
+        )::date AS d
+      )
+      SELECT
+        TO_CHAR(d.d, 'YYYY-MM-DD') AS date,
+        TO_CHAR(d.d, 'Dy') AS weekday,
+        (SELECT COUNT(*)::int FROM kids_tasks
+          WHERE status = 'approved' AND DATE(completed_at) = d.d) AS tasks,
+        (SELECT COUNT(*)::int FROM kids_checkins WHERE checkin_date = d.d) AS checkins,
+        (SELECT COUNT(*)::int FROM kids_spendings WHERE spend_date = d.d) AS spendings
+      FROM days_set d
+      ORDER BY d.d ASC
+    `)
+
+    const daily = (
+      rows as unknown as {
+        rows: Array<{
+          date: string
+          weekday: string
+          tasks: number
+          checkins: number
+          spendings: number
+        }>
+      }
+    ).rows.map((r) => ({
+      date: r.date,
+      weekday: r.weekday,
+      tasks: r.tasks,
+      checkins: r.checkins,
+      spendings: r.spendings,
+      score: r.tasks + r.checkins + r.spendings,
+    }))
+
+    const sortedByScore = [...daily].sort((a, b) => b.score - a.score)
+    const top3 = sortedByScore.slice(0, 3).filter((d) => d.score > 0)
+    const totalScore = daily.reduce((s, d) => s + d.score, 0)
+    const avgScore = totalScore / days
+
+    let message: string
+    if (totalScore === 0) {
+      message = `過去 ${days} 天家裡都沒活動、開始累積吧 🌱`
+    } else if (top3.length > 0) {
+      const peak = top3[0]
+      message = `🔥 高峰日：${peak.date}（${peak.weekday}）共 ${peak.score} 個活動（${peak.tasks} 任務 + ${peak.checkins} 打卡 + ${peak.spendings} 花用）`
+    } else {
+      message = "過去活動量低、繼續累積！"
+    }
+
+    res.json({
+      days,
+      top3,
+      avgScore: Math.round(avgScore * 10) / 10,
+      totalScore,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/goals-progress-rank?limit=10
  * 家庭 active goals 按 progress% 排名（誰快達標）
  * stage: near_complete(>=80%) / midway(50-80%) / starting(<50%)

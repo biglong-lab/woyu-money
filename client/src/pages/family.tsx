@@ -535,6 +535,9 @@ export default function FamilyPage() {
       {/* 家庭目標進度排名 */}
       <FamilyGoalsProgressRankCard />
 
+      {/* 家庭高峰時刻 */}
+      <FamilyPeakMomentCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3489,6 +3492,57 @@ function ParentTodoList() {
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
       )}
+    </div>
+  )
+}
+
+function FamilyPeakMomentCard() {
+  const { data } = useQuery<{
+    days: number
+    top3: Array<{
+      date: string
+      weekday: string
+      tasks: number
+      checkins: number
+      spendings: number
+      score: number
+    }>
+    avgScore: number
+    totalScore: number
+    message: string
+  }>({
+    queryKey: ["/api/family/peak-moment?days=30"],
+  })
+  if (!data || data.totalScore === 0) return null
+
+  const MEDAL = ["🥇", "🥈", "🥉"]
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-yellow-400 bg-gradient-to-br from-yellow-50 to-amber-50 p-3 shadow">
+      <h3 className="font-bold mb-2 flex items-center gap-2">🏆 家庭高峰時刻（30 天）</h3>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-2 text-xs">{data.message}</div>
+
+      <div className="space-y-1.5">
+        {data.top3.map((d, i) => (
+          <div key={d.date} className="bg-white rounded-lg p-2 flex items-center gap-2">
+            <div className="text-2xl">{MEDAL[i]}</div>
+            <div className="flex-1">
+              <div className="text-sm font-bold">
+                {d.date} ({d.weekday})
+              </div>
+              <div className="text-[10px] text-gray-500">
+                📋 {d.tasks} 任務 · ✅ {d.checkins} 打卡 · 🛒 {d.spendings} 花用
+              </div>
+            </div>
+            <div className="text-2xl font-bold text-amber-600">{d.score}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-2 text-[10px] text-gray-600 text-center">
+        平均每天 {data.avgScore} 個活動
+      </div>
     </div>
   )
 }

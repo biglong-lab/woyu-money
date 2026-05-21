@@ -4245,6 +4245,39 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.body.weeks).toBe(52)
   })
 
+  it("高峰時刻：基本結構 top3/avgScore/totalScore", async () => {
+    const res = await request(app).get("/api/family/peak-moment")
+    expect(res.status).toBe(200)
+    expect(Array.isArray(res.body.top3)).toBe(true)
+    expect(res.body).toHaveProperty("avgScore")
+    expect(res.body).toHaveProperty("totalScore")
+    expect(res.body.message).toBeTruthy()
+  })
+
+  it("高峰時刻：approve task 後 top3 有今日", async () => {
+    const kidObj = (await createKid()) as { id: number }
+    const myKidId = kidObj.id
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId: myKidId, title: "高峰測試", rewardAmount: 30 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`).send({})
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`).send({})
+    const res = await request(app).get("/api/family/peak-moment?days=7")
+    expect(res.status).toBe(200)
+    expect(res.body.totalScore).toBeGreaterThanOrEqual(1)
+    expect(res.body.top3.length).toBeGreaterThanOrEqual(1)
+    expect(res.body.top3[0]).toHaveProperty("date")
+    expect(res.body.top3[0]).toHaveProperty("score")
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
+  it("高峰時刻：days clamp 7-90", async () => {
+    const r1 = await request(app).get("/api/family/peak-moment?days=200")
+    expect(r1.body.days).toBe(90)
+    const r2 = await request(app).get("/api/family/peak-moment?days=3")
+    expect(r2.body.days).toBe(7)
+  })
+
   it("目標排名：基本結構 goals/total/message", async () => {
     const res = await request(app).get("/api/family/goals-progress-rank")
     expect(res.status).toBe(200)
