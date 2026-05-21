@@ -96,9 +96,19 @@ interface Task {
   isOverdue?: boolean
   isDueSoon?: boolean
   overdueDays?: number
+  category?: "housework" | "study" | "self_care" | "kindness" | "other"
 }
 
 const difficultyStars = (d?: string) => (d === "easy" ? "⭐" : d === "hard" ? "⭐⭐⭐" : "⭐⭐")
+
+const CATEGORY_FILTER: Array<{ v: string; label: string }> = [
+  { v: "all", label: "全部" },
+  { v: "housework", label: "🧹 家事" },
+  { v: "study", label: "📚 學習" },
+  { v: "self_care", label: "🪥 照顧" },
+  { v: "kindness", label: "❤️ 善行" },
+  { v: "other", label: "📋 其他" },
+]
 
 interface Goal {
   id: number
@@ -375,6 +385,7 @@ function KidDashboard({
     onError: (e: Error) => toast({ title: "失敗", description: e.message, variant: "destructive" }),
   })
   const [showSpend, setShowSpend] = useState(false)
+  const [categoryFilter, setCategoryFilter] = useState<string>("all")
   const [showPropose, setShowPropose] = useState(false)
   const [showReport, setShowReport] = useState(false)
   const [showTransfer, setShowTransfer] = useState(false)
@@ -457,7 +468,11 @@ function KidDashboard({
   }
 
   const { kid, jar, tasks, goals, badges } = data
-  const pendingTasks = tasks.filter((t) => t.status === "pending")
+  const allPending = tasks.filter((t) => t.status === "pending")
+  const pendingTasks =
+    categoryFilter === "all"
+      ? allPending
+      : allPending.filter((t) => (t.category ?? "other") === categoryFilter)
   const activeGoals = goals.filter((g) => g.status === "active")
   const recentApprovedCount = tasks.filter((t) => t.status === "approved").length
   // 家長有寫回饋的最近 3 筆（approved 或 rejected）
@@ -657,8 +672,34 @@ function KidDashboard({
       <div className="mb-4">
         <h2 className="font-bold mb-2 flex items-center gap-2">
           <Sparkles className="h-4 w-4 text-amber-500" />
-          我的任務（{pendingTasks.length}）
+          我的任務（{pendingTasks.length}
+          {categoryFilter !== "all" && ` / ${allPending.length}`}）
         </h2>
+        {allPending.length >= 3 && (
+          <div className="flex gap-1 mb-2 flex-wrap">
+            {CATEGORY_FILTER.map((c) => {
+              const count =
+                c.v === "all"
+                  ? allPending.length
+                  : allPending.filter((t) => (t.category ?? "other") === c.v).length
+              if (c.v !== "all" && count === 0) return null
+              return (
+                <button
+                  key={c.v}
+                  type="button"
+                  onClick={() => setCategoryFilter(c.v)}
+                  className={`text-[10px] px-2 py-0.5 rounded-full border ${
+                    categoryFilter === c.v
+                      ? "bg-indigo-500 text-white border-indigo-500"
+                      : "bg-white border-gray-300 hover:bg-gray-50"
+                  }`}
+                >
+                  {c.label} {c.v !== "all" && `(${count})`}
+                </button>
+              )
+            })}
+          </div>
+        )}
         {pendingTasks.length === 0 ? (
           <div className="text-center text-sm text-gray-400 py-4 bg-white rounded-lg">
             目前沒有任務、好好放鬆吧 😊
