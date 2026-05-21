@@ -574,6 +574,9 @@ export default function FamilyPage() {
       {/* 家庭 task MVP */}
       <FamilyTaskMvpCard />
 
+      {/* 家庭兒童活躍天數 */}
+      <FamilyKidActiveDaysCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3528,6 +3531,67 @@ function ParentTodoList() {
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
       )}
+    </div>
+  )
+}
+
+function FamilyKidActiveDaysCard() {
+  const { data } = useQuery<{
+    days: number
+    kids: Array<{
+      kidId: number
+      kidName: string
+      avatar: string
+      activeDays: number
+      ratio: number
+    }>
+    topPerformer: { kidName: string; avatar: string; activeDays: number; ratio: number } | null
+    familyAvgRatio: number
+    message: string
+  }>({
+    queryKey: ["/api/family/kid-active-days?days=30"],
+  })
+  if (!data || data.kids.length === 0) return null
+  const hasActivity = data.kids.some((k) => k.activeDays > 0)
+  if (!hasActivity) return null
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-cyan-400 bg-gradient-to-br from-cyan-50 to-teal-50 p-3 shadow">
+      <h3 className="font-bold mb-2 flex items-center gap-2">📅 活躍天數排名（30 天）</h3>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-2 text-xs">
+        {data.message}
+        {data.topPerformer && (
+          <div className="text-gray-600 mt-1">
+            👑 最活躍：{data.topPerformer.avatar} {data.topPerformer.kidName}（
+            {data.topPerformer.activeDays}/{data.days} 天 = {data.topPerformer.ratio}%）
+          </div>
+        )}
+      </div>
+
+      <div className="space-y-1.5">
+        {data.kids.map((k, i) => (
+          <div key={k.kidId} className="bg-white rounded-lg p-2 flex items-center gap-2">
+            <div className="w-4 text-center text-gray-500">{i + 1}</div>
+            <div className="text-lg">{k.avatar}</div>
+            <div className="flex-1">
+              <div className="text-sm font-medium">{k.kidName}</div>
+              <div className="h-1.5 bg-gray-100 rounded overflow-hidden mt-1">
+                <div
+                  className="h-full bg-gradient-to-r from-cyan-400 to-teal-500"
+                  style={{ width: `${k.ratio}%` }}
+                />
+              </div>
+            </div>
+            <div className="text-right whitespace-nowrap">
+              <div className="text-sm font-bold">
+                {k.activeDays}/{data.days}
+              </div>
+              <div className="text-[9px] text-gray-500">{k.ratio}%</div>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

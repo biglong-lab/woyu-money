@@ -4245,6 +4245,31 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.body.weeks).toBe(52)
   })
 
+  it("兒童活躍天數：基本結構 kids/familyAvgRatio/message", async () => {
+    const res = await request(app).get("/api/family/kid-active-days")
+    expect(res.status).toBe(200)
+    expect(Array.isArray(res.body.kids)).toBe(true)
+    expect(res.body).toHaveProperty("familyAvgRatio")
+    expect(res.body.message).toBeTruthy()
+  })
+
+  it("兒童活躍天數：approve 1 task → activeDays>=1", async () => {
+    const kidObj = (await createKid()) as { id: number }
+    const myKidId = kidObj.id
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId: myKidId, title: "活躍測試", rewardAmount: 30 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`).send({})
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`).send({})
+    const res = await request(app).get("/api/family/kid-active-days?days=7")
+    expect(res.status).toBe(200)
+    const myKid = res.body.kids.find((k: { kidId: number }) => k.kidId === myKidId)
+    expect(myKid).toBeDefined()
+    expect(myKid.activeDays).toBeGreaterThanOrEqual(1)
+    expect(res.body.topPerformer).not.toBeNull()
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
   it("Task MVP：基本結構 tasks/message", async () => {
     const res = await request(app).get("/api/family/task-mvp")
     expect(res.status).toBe(200)

@@ -8602,6 +8602,88 @@ async function bulkApproveOne(
 }
 
 /**
+ * GET /api/family/kid-active-days?days=30
+ * 每個 active kid 過去 N 天有活動（task/checkin/spending）的天數比例
+ * 排名 + topPerformer
+ */
+router.get(
+  "/api/family/kid-active-days",
+  asyncHandler(async (req, res) => {
+    const days = Math.min(Math.max(Number(req.query.days) || 30, 7), 90)
+
+    const rows = await db.execute(sql`
+      SELECT
+        ka.id::int AS kid_id,
+        ka.display_name AS kid_name,
+        ka.avatar,
+        (
+          SELECT COUNT(DISTINCT day)::int FROM (
+            SELECT DATE(completed_at) AS day FROM kids_tasks
+              WHERE kid_id = ka.id AND status = 'approved'
+                AND completed_at >= CURRENT_DATE - (${days}::int * INTERVAL '1 day')
+            UNION
+            SELECT checkin_date AS day FROM kids_checkins
+              WHERE kid_id = ka.id
+                AND checkin_date >= CURRENT_DATE - (${days}::int * INTERVAL '1 day')
+            UNION
+            SELECT spend_date AS day FROM kids_spendings
+              WHERE kid_id = ka.id
+                AND spend_date >= CURRENT_DATE - (${days}::int * INTERVAL '1 day')
+          ) all_days
+        ) AS active_days
+      FROM kids_accounts ka
+      WHERE ka.is_active = true
+      ORDER BY ka.id ASC
+    `)
+
+    const kids = (
+      rows as unknown as {
+        rows: Array<{ kid_id: number; kid_name: string; avatar: string; active_days: number }>
+      }
+    ).rows.map((r) => ({
+      kidId: r.kid_id,
+      kidName: r.kid_name,
+      avatar: r.avatar,
+      activeDays: r.active_days,
+      ratio: Math.round((r.active_days / days) * 100),
+    }))
+
+    const sorted = [...kids].sort((a, b) => b.activeDays - a.activeDays)
+    const topPerformer = sorted.length > 0 && sorted[0].activeDays > 0 ? sorted[0] : null
+    const familyAvgRatio =
+      kids.length > 0 ? Math.round(kids.reduce((s, k) => s + k.ratio, 0) / kids.length) : 0
+
+    let message: string
+    if (kids.length === 0) {
+      message = "還沒有小孩"
+    } else if (!topPerformer) {
+      message = `過去 ${days} 天都沒人活動、開始累積活躍天數吧 🌱`
+    } else if (familyAvgRatio >= 70) {
+      message = `🔥 全家平均活躍率 ${familyAvgRatio}%、超棒！`
+    } else if (familyAvgRatio >= 40) {
+      message = `💪 全家平均活躍率 ${familyAvgRatio}%、不錯`
+    } else {
+      message = `🌱 全家平均活躍率 ${familyAvgRatio}%、可以更積極`
+    }
+
+    res.json({
+      days,
+      kids: sorted,
+      topPerformer: topPerformer
+        ? {
+            kidName: topPerformer.kidName,
+            avatar: topPerformer.avatar,
+            activeDays: topPerformer.activeDays,
+            ratio: topPerformer.ratio,
+          }
+        : null,
+      familyAvgRatio,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/task-mvp?days=30&limit=5
  * 家庭最大 reward task：過去 N 天 top N 高獎勵 approved task
  */
