@@ -8602,6 +8602,99 @@ async function bulkApproveOne(
 }
 
 /**
+ * GET /api/family/today-vs-yesterday
+ * 今日 vs 昨日 5 metric 對比：tasks / reward / spent / given / checkins
+ */
+router.get(
+  "/api/family/today-vs-yesterday",
+  asyncHandler(async (_req, res) => {
+    const rows = await db.execute(sql`
+      SELECT
+        (SELECT COUNT(*)::int FROM kids_tasks
+          WHERE status = 'approved' AND DATE(completed_at) = CURRENT_DATE) AS today_tasks,
+        (SELECT COUNT(*)::int FROM kids_tasks
+          WHERE status = 'approved' AND DATE(completed_at) = CURRENT_DATE - INTERVAL '1 day') AS yesterday_tasks,
+        COALESCE((SELECT SUM(reward_amount::numeric)::numeric FROM kids_tasks
+          WHERE status = 'approved' AND DATE(completed_at) = CURRENT_DATE), 0) AS today_reward,
+        COALESCE((SELECT SUM(reward_amount::numeric)::numeric FROM kids_tasks
+          WHERE status = 'approved' AND DATE(completed_at) = CURRENT_DATE - INTERVAL '1 day'), 0) AS yesterday_reward,
+        COALESCE((SELECT SUM(amount::numeric)::numeric FROM kids_spendings
+          WHERE jar = 'spend' AND spend_date = CURRENT_DATE), 0) AS today_spent,
+        COALESCE((SELECT SUM(amount::numeric)::numeric FROM kids_spendings
+          WHERE jar = 'spend' AND spend_date = CURRENT_DATE - INTERVAL '1 day'), 0) AS yesterday_spent,
+        COALESCE((SELECT SUM(amount::numeric)::numeric FROM kids_spendings
+          WHERE jar = 'give' AND spend_date = CURRENT_DATE), 0) AS today_given,
+        COALESCE((SELECT SUM(amount::numeric)::numeric FROM kids_spendings
+          WHERE jar = 'give' AND spend_date = CURRENT_DATE - INTERVAL '1 day'), 0) AS yesterday_given,
+        (SELECT COUNT(*)::int FROM kids_checkins WHERE checkin_date = CURRENT_DATE) AS today_checkins,
+        (SELECT COUNT(*)::int FROM kids_checkins WHERE checkin_date = CURRENT_DATE - INTERVAL '1 day') AS yesterday_checkins
+    `)
+
+    const row = (
+      rows as unknown as {
+        rows: Array<{
+          today_tasks: number
+          yesterday_tasks: number
+          today_reward: string | number
+          yesterday_reward: string | number
+          today_spent: string | number
+          yesterday_spent: string | number
+          today_given: string | number
+          yesterday_given: string | number
+          today_checkins: number
+          yesterday_checkins: number
+        }>
+      }
+    ).rows[0]
+
+    const toNum = (v: string | number): number => Number(v ?? 0)
+    const today = {
+      tasks: row?.today_tasks ?? 0,
+      reward: toNum(row?.today_reward ?? 0),
+      spent: toNum(row?.today_spent ?? 0),
+      given: toNum(row?.today_given ?? 0),
+      checkins: row?.today_checkins ?? 0,
+    }
+    const yesterday = {
+      tasks: row?.yesterday_tasks ?? 0,
+      reward: toNum(row?.yesterday_reward ?? 0),
+      spent: toNum(row?.yesterday_spent ?? 0),
+      given: toNum(row?.yesterday_given ?? 0),
+      checkins: row?.yesterday_checkins ?? 0,
+    }
+
+    const deltas: Record<string, { abs: number; arrow: "↑" | "↓" | "→" }> = {}
+    for (const key of Object.keys(today) as Array<keyof typeof today>) {
+      const t = today[key]
+      const y = yesterday[key]
+      const abs = Math.round((t - y) * 10) / 10
+      deltas[key as string] = {
+        abs,
+        arrow: abs > 0 ? "↑" : abs < 0 ? "↓" : "→",
+      }
+    }
+
+    let message: string
+    if (today.tasks === 0 && yesterday.tasks === 0) {
+      message = "兩天都沒任務、加油吧 🌱"
+    } else if (today.tasks > yesterday.tasks) {
+      message = `🚀 今天比昨天多做 ${today.tasks - yesterday.tasks} 個任務、進步中！`
+    } else if (today.tasks < yesterday.tasks) {
+      message = `📋 今天比昨天少 ${yesterday.tasks - today.tasks} 個任務、加油追上`
+    } else {
+      message = `📊 跟昨天一樣完成 ${today.tasks} 個任務`
+    }
+
+    res.json({
+      today,
+      yesterday,
+      deltas,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/kid-avg-reward?days=90
  * 每個 active kid 過去 N 天 task reward 平均/最低/最高
  */

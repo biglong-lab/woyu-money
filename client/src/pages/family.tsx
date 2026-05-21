@@ -619,6 +619,9 @@ export default function FamilyPage() {
       {/* 家庭兒童獎勵平均 */}
       <FamilyKidAvgRewardCard />
 
+      {/* 家庭今日 vs 昨日 */}
+      <FamilyTodayVsYesterdayCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3573,6 +3576,64 @@ function ParentTodoList() {
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
       )}
+    </div>
+  )
+}
+
+function FamilyTodayVsYesterdayCard() {
+  const { data } = useQuery<{
+    today: { tasks: number; reward: number; spent: number; given: number; checkins: number }
+    yesterday: { tasks: number; reward: number; spent: number; given: number; checkins: number }
+    deltas: Record<string, { abs: number; arrow: "↑" | "↓" | "→" }>
+    message: string
+  }>({
+    queryKey: ["/api/family/today-vs-yesterday"],
+  })
+  if (!data) return null
+  const totalToday = data.today.tasks + data.today.checkins
+  const totalYesterday = data.yesterday.tasks + data.yesterday.checkins
+  if (totalToday === 0 && totalYesterday === 0) return null
+
+  const metrics: Array<{ key: keyof typeof data.today; label: string; emoji: string }> = [
+    { key: "tasks", label: "任務", emoji: "📋" },
+    { key: "reward", label: "入帳", emoji: "💰" },
+    { key: "spent", label: "花用", emoji: "🛒" },
+    { key: "given", label: "捐贈", emoji: "💝" },
+    { key: "checkins", label: "打卡", emoji: "✅" },
+  ]
+
+  const ARROW_COLOR: Record<string, string> = {
+    "↑": "text-emerald-600",
+    "↓": "text-rose-500",
+    "→": "text-gray-400",
+  }
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-pink-300 bg-gradient-to-br from-pink-50 to-rose-50 p-3 shadow">
+      <h3 className="font-bold mb-2 flex items-center gap-2">⏳ 今日 vs 昨日</h3>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-2 text-xs">{data.message}</div>
+
+      <div className="grid grid-cols-5 gap-1.5">
+        {metrics.map((m) => {
+          const t = data.today[m.key]
+          const y = data.yesterday[m.key]
+          const d = data.deltas[m.key]
+          return (
+            <div key={m.key} className="bg-white rounded-lg p-2 text-center">
+              <div className="text-[10px] text-gray-500">
+                {m.emoji} {m.label}
+              </div>
+              <div className="text-base font-bold">{t}</div>
+              <div className={`text-[9px] ${ARROW_COLOR[d?.arrow ?? "→"]}`}>
+                {d?.arrow} {d?.abs > 0 ? "+" : ""}
+                {d?.abs}
+              </div>
+              <div className="text-[9px] text-gray-400">昨 {y}</div>
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }
