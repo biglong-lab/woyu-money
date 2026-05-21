@@ -2740,6 +2740,49 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.body.goals).toEqual([])
   })
 
+  it("活動 heatmap：12 週 = 84 天、含今日 task → activeDays>=1", async () => {
+    await createKid()
+
+    // 今天做一個任務
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId, title: "今日", rewardAmount: 50 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`)
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`)
+
+    const res = await request(app).get(`/api/family/kid-activity-heatmap?kidId=${kidId}`)
+    expect(res.status).toBe(200)
+    expect(res.body.weeks).toBe(12)
+    expect(res.body.days.length).toBe(84) // 12*7
+    expect(res.body.peak).toBeGreaterThanOrEqual(1)
+    expect(res.body.activeDays).toBeGreaterThanOrEqual(1)
+
+    // 最後一天應該是今日
+    const today = new Date().toISOString().slice(0, 10)
+    expect(res.body.days[res.body.days.length - 1].date).toBe(today)
+    expect(res.body.days[res.body.days.length - 1].taskCount).toBeGreaterThanOrEqual(1)
+  })
+
+  it("活動 heatmap weeks=4 → 28 天", async () => {
+    await createKid()
+    const res = await request(app).get(`/api/family/kid-activity-heatmap?kidId=${kidId}&weeks=4`)
+    expect(res.status).toBe(200)
+    expect(res.body.weeks).toBe(4)
+    expect(res.body.days.length).toBe(28)
+  })
+
+  it("活動 heatmap：weeks 超範圍 → 自動 clamp", async () => {
+    await createKid()
+    const res = await request(app).get(`/api/family/kid-activity-heatmap?kidId=${kidId}&weeks=100`)
+    expect(res.status).toBe(200)
+    expect(res.body.weeks).toBe(52) // clamp 上限
+  })
+
+  it("kid-activity-heatmap 缺 kidId 回 400", async () => {
+    const r = await request(app).get("/api/family/kid-activity-heatmap")
+    expect(r.status).toBe(400)
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)

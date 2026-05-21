@@ -1004,6 +1004,9 @@ function KidDashboard({
       {/* 任務 streak（連續做任務）*/}
       <KidTaskStreakCard kidId={kidId} />
 
+      {/* 活動 heatmap（12 週小方塊）*/}
+      <KidActivityHeatmap kidId={kidId} />
+
       {/* 下一個徽章提示 */}
       <KidNextBadgeCard kidId={kidId} />
 
@@ -1772,6 +1775,81 @@ function WishesSection({
           ))}
         </div>
       )}
+    </div>
+  )
+}
+
+function KidActivityHeatmap({ kidId }: { kidId: number }) {
+  const { data } = useQuery<{
+    weeks: number
+    peak: number
+    activeDays: number
+    days: Array<{
+      date: string
+      taskCount: number
+      spendingCount: number
+      total: number
+    }>
+  }>({
+    queryKey: ["/api/family/kid-activity-heatmap", kidId],
+    queryFn: async () => {
+      const res = await fetch(`/api/family/kid-activity-heatmap?kidId=${kidId}&weeks=12`, {
+        credentials: "include",
+      })
+      return res.json()
+    },
+  })
+  if (!data || data.activeDays === 0) return null
+
+  const peak = data.peak
+  const allDays = data.days
+  const activeDays = data.activeDays
+
+  const weeks: Array<Array<(typeof allDays)[0]>> = []
+  for (let i = 0; i < allDays.length; i += 7) {
+    weeks.push(allDays.slice(i, i + 7))
+  }
+
+  function intensity(total: number) {
+    if (total === 0) return "bg-gray-100"
+    if (peak <= 1 || total === 1) return "bg-emerald-200"
+    if (total <= Math.ceil(peak * 0.33)) return "bg-emerald-300"
+    if (total <= Math.ceil(peak * 0.66)) return "bg-emerald-500"
+    return "bg-emerald-700"
+  }
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-emerald-200 bg-white p-4 shadow">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="font-bold text-emerald-800 flex items-center gap-2">🗓️ 12 週活動</h3>
+        <span className="text-xs text-gray-500">
+          {activeDays} 個活躍日・最高 {peak} 件/日
+        </span>
+      </div>
+
+      <div className="flex gap-0.5 overflow-x-auto">
+        {weeks.map((week, wi) => (
+          <div key={wi} className="flex flex-col gap-0.5">
+            {week.map((day) => (
+              <div
+                key={day.date}
+                className={`w-3 h-3 rounded ${intensity(day.total)}`}
+                title={`${day.date}：${day.taskCount} 任務、${day.spendingCount} 支出`}
+              />
+            ))}
+          </div>
+        ))}
+      </div>
+
+      <div className="flex items-center justify-end gap-1 mt-2 text-xs text-gray-500">
+        <span>少</span>
+        <div className="w-3 h-3 rounded bg-gray-100" />
+        <div className="w-3 h-3 rounded bg-emerald-200" />
+        <div className="w-3 h-3 rounded bg-emerald-300" />
+        <div className="w-3 h-3 rounded bg-emerald-500" />
+        <div className="w-3 h-3 rounded bg-emerald-700" />
+        <span>多</span>
+      </div>
     </div>
   )
 }

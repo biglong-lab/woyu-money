@@ -2875,6 +2875,75 @@ router.get(
 )
 
 /**
+ * GET /api/family/kid-activity-heatmap?kidId=&weeks=12
+ * 小孩活動 heatmap（近 N 週每天 task count + spending count）
+ * GitHub 風小方塊視覺化、培養日常感
+ *
+ * 回：
+ *   days: [{ date: 'YYYY-MM-DD', taskCount, spendingCount, total }]
+ *   peak：最大值（給前端計算 intensity 0-4 級）
+ */
+router.get(
+  "/api/family/kid-activity-heatmap",
+  asyncHandler(async (req, res) => {
+    const kidIdQ = Number(req.query.kidId)
+    if (!Number.isInteger(kidIdQ) || kidIdQ < 1) throw new AppError(400, "需傳 kidId")
+    const weeks = Math.min(Math.max(Number(req.query.weeks) || 12, 1), 52)
+    const days = weeks * 7
+
+    const result = await db.execute(sql`
+      WITH RECURSIVE date_series AS (
+        SELECT CURRENT_DATE - (${days - 1}::int) AS d
+        UNION ALL
+        SELECT d + 1 FROM date_series WHERE d < CURRENT_DATE
+      )
+      SELECT
+        ds.d AS date,
+        COALESCE((
+          SELECT COUNT(*)::int FROM kids_tasks
+          WHERE kid_id = ${kidIdQ} AND status = 'approved'
+            AND DATE(completed_at) = ds.d
+        ), 0) AS task_count,
+        COALESCE((
+          SELECT COUNT(*)::int FROM kids_spendings
+          WHERE kid_id = ${kidIdQ} AND spend_date = ds.d
+        ), 0) AS spending_count
+      FROM date_series ds
+      ORDER BY ds.d ASC
+    `)
+    const rows = (
+      result as unknown as {
+        rows: { date: Date | string; task_count: number; spending_count: number }[]
+      }
+    ).rows
+
+    const daysOut = rows.map((r) => {
+      const dateStr =
+        typeof r.date === "string"
+          ? r.date.slice(0, 10)
+          : new Date(r.date).toISOString().slice(0, 10)
+      const total = (r.task_count ?? 0) + (r.spending_count ?? 0)
+      return {
+        date: dateStr,
+        taskCount: r.task_count ?? 0,
+        spendingCount: r.spending_count ?? 0,
+        total,
+      }
+    })
+    const peak = daysOut.reduce((m, d) => Math.max(m, d.total), 0)
+    const activeDays = daysOut.filter((d) => d.total > 0).length
+
+    res.json({
+      kidId: kidIdQ,
+      weeks,
+      peak,
+      activeDays,
+      days: daysOut,
+    })
+  })
+)
+
+/**
  * GET /api/family/all-goals-summary
  * 家長端：所有 active 目標一覽（按進度降序）
  */
