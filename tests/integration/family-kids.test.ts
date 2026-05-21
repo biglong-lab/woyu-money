@@ -2836,6 +2836,51 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(r.status).toBe(400)
   })
 
+  it("熱門任務 TOP：按 title 分組、times DESC 排序", async () => {
+    // 清乾淨避免污染
+    await db.execute(sql`DELETE FROM kids_accounts WHERE pin = ${TEST_PIN}`)
+    await createKid()
+
+    // 3 個「倒垃圾」 + 2 個「掃地」 + 1 個「洗碗」
+    const titles = ["倒垃圾", "倒垃圾", "倒垃圾", "掃地", "掃地", "洗碗"]
+    for (const title of titles) {
+      const t = await request(app)
+        .post("/api/family/tasks")
+        .send({ kidId, title, rewardAmount: 20 })
+      await request(app).post(`/api/family/tasks/${t.body.id}/submit`)
+      await request(app).post(`/api/family/tasks/${t.body.id}/approve`)
+    }
+
+    const res = await request(app).get("/api/family/popular-tasks?limit=5")
+    expect(res.status).toBe(200)
+    expect(res.body.tasks.length).toBeGreaterThanOrEqual(3)
+
+    const tasks = res.body.tasks as Array<{ title: string; times: number; totalReward: number }>
+    // 最熱門應該是「倒垃圾」(3 次)
+    expect(tasks[0].title).toBe("倒垃圾")
+    expect(tasks[0].times).toBe(3)
+    expect(tasks[0].totalReward).toBe(60) // 3 × 20
+
+    // 按 times DESC
+    for (let i = 1; i < tasks.length; i++) {
+      expect(tasks[i - 1].times).toBeGreaterThanOrEqual(tasks[i].times)
+    }
+  })
+
+  it("熱門任務：limit 超範圍 → clamp 上限 20", async () => {
+    const res = await request(app).get("/api/family/popular-tasks?limit=100")
+    expect(res.status).toBe(200)
+    expect(res.body.tasks.length).toBeLessThanOrEqual(20)
+  })
+
+  it("熱門任務：無 approved → 空陣列", async () => {
+    await db.execute(sql`DELETE FROM kids_accounts WHERE pin = ${TEST_PIN}`)
+    const res = await request(app).get("/api/family/popular-tasks")
+    expect(res.status).toBe(200)
+    expect(res.body.total).toBe(0)
+    expect(res.body.tasks).toEqual([])
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)

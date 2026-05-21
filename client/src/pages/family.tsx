@@ -449,6 +449,9 @@ export default function FamilyPage() {
       {/* 家庭目標進度看板 */}
       <FamilyGoalsBoard />
 
+      {/* 熱門任務 TOP 5 */}
+      <PopularTasksCard />
+
       {/* 全家活動 feed */}
       <FamilyActivityFeed />
 
@@ -1876,6 +1879,52 @@ function DifficultyInsights() {
         ))}
       </CardContent>
     </Card>
+  )
+}
+
+function PopularTasksCard() {
+  const { data } = useQuery<{
+    total: number
+    tasks: Array<{
+      title: string
+      emoji: string
+      times: number
+      totalReward: number
+      uniqueKids: number
+      lastAt: string | null
+    }>
+  }>({
+    queryKey: ["/api/family/popular-tasks"],
+    queryFn: async () => {
+      const res = await fetch("/api/family/popular-tasks?limit=5", { credentials: "include" })
+      return res.json()
+    },
+  })
+  if (!data || data.total === 0) return null
+
+  const medals = ["🥇", "🥈", "🥉", "🏅", "🏅"]
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-orange-300 bg-gradient-to-br from-orange-50 to-amber-50 p-4 shadow">
+      <h3 className="font-bold text-orange-900 mb-3 flex items-center gap-2">
+        🏆 全家熱門任務 TOP {data.total}
+      </h3>
+      <div className="space-y-2">
+        {data.tasks.map((t, i) => (
+          <div key={t.title} className="bg-white rounded-lg p-2 flex items-center gap-2 shadow-sm">
+            <span className="text-2xl shrink-0">{medals[i]}</span>
+            <span className="text-xl shrink-0">{t.emoji}</span>
+            <div className="flex-1 min-w-0">
+              <div className="font-medium text-sm truncate">{t.title}</div>
+              <div className="text-xs text-gray-500">
+                做了 <b className="text-orange-700">{t.times}</b> 次・累積 ${t.totalReward}・
+                {t.uniqueKids} 個小孩
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
   )
 }
 

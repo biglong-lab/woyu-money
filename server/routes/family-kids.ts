@@ -2875,6 +2875,57 @@ router.get(
 )
 
 /**
+ * GET /api/family/popular-tasks?limit=5
+ * 家庭最常做的任務 TOP N（按 title 分組統計）
+ * 看哪些任務最熱門、totalReward 多少、最近一次完成日
+ */
+router.get(
+  "/api/family/popular-tasks",
+  asyncHandler(async (req, res) => {
+    const limit = Math.min(Math.max(Number(req.query.limit) || 5, 1), 20)
+
+    const result = await db.execute(sql`
+      SELECT
+        title,
+        MAX(emoji) AS emoji,
+        COUNT(*)::int AS times,
+        SUM(reward_amount::numeric)::numeric AS total_reward,
+        COUNT(DISTINCT kid_id)::int AS unique_kids,
+        MAX(completed_at) AS last_at
+      FROM kids_tasks
+      WHERE status = 'approved' AND completed_at IS NOT NULL
+      GROUP BY title
+      ORDER BY times DESC, total_reward DESC
+      LIMIT ${limit}
+    `)
+    const rows = (
+      result as unknown as {
+        rows: {
+          title: string
+          emoji: string | null
+          times: number
+          total_reward: string | number
+          unique_kids: number
+          last_at: Date | null
+        }[]
+      }
+    ).rows
+
+    res.json({
+      total: rows.length,
+      tasks: rows.map((r) => ({
+        title: r.title,
+        emoji: r.emoji ?? "📋",
+        times: r.times,
+        totalReward: Number(r.total_reward ?? 0),
+        uniqueKids: r.unique_kids,
+        lastAt: r.last_at,
+      })),
+    })
+  })
+)
+
+/**
  * GET /api/family/kid-praises?kidId=&limit=10
  * 小孩端：家長誇獎回顧
  * 從 kids_tasks.parent_feedback 拉非空的、按時間倒序
