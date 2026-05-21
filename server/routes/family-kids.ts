@@ -8602,6 +8602,102 @@ async function bulkApproveOne(
 }
 
 /**
+ * GET /api/family/daily-recap?days=7
+ * 過去 N 天每日活動概覽（任務 / 打卡 / 花用 / 捐贈）
+ * 用 generate_series 確保每天都有資料（即使 0）、從舊到新
+ */
+router.get(
+  "/api/family/daily-recap",
+  asyncHandler(async (req, res) => {
+    const days = Math.min(Math.max(Number(req.query.days) || 7, 1), 60)
+
+    const rows = await db.execute(sql`
+      WITH days AS (
+        SELECT generate_series(
+          CURRENT_DATE - (${days - 1}::int * INTERVAL '1 day'),
+          CURRENT_DATE,
+          INTERVAL '1 day'
+        )::date AS d
+      )
+      SELECT
+        TO_CHAR(d.d, 'YYYY-MM-DD') AS date,
+        TO_CHAR(d.d, 'Dy') AS weekday,
+        (SELECT COUNT(*)::int FROM kids_tasks
+          WHERE status = 'approved' AND DATE(completed_at) = d.d) AS tasks,
+        (SELECT COUNT(DISTINCT kid_id)::int FROM kids_checkins
+          WHERE checkin_date = d.d) AS checkins,
+        (SELECT COALESCE(SUM(amount::numeric), 0)::numeric FROM kids_spendings
+          WHERE jar = 'spend' AND spend_date = d.d) AS spent,
+        (SELECT COALESCE(SUM(amount::numeric), 0)::numeric FROM kids_spendings
+          WHERE jar = 'give' AND spend_date = d.d) AS given,
+        (SELECT COALESCE(SUM(reward_amount::numeric), 0)::numeric FROM kids_tasks
+          WHERE status = 'approved' AND DATE(completed_at) = d.d) AS reward
+      FROM days d
+      ORDER BY d.d ASC
+    `)
+
+    const daysArr = (
+      rows as unknown as {
+        rows: Array<{
+          date: string
+          weekday: string
+          tasks: number
+          checkins: number
+          spent: string | number
+          given: string | number
+          reward: string | number
+        }>
+      }
+    ).rows.map((r) => {
+      const tasks = r.tasks
+      const checkins = r.checkins
+      const spent = Number(r.spent)
+      const given = Number(r.given)
+      const reward = Number(r.reward)
+      const hasActivity = tasks > 0 || checkins > 0 || spent > 0 || given > 0
+      return {
+        date: r.date,
+        weekday: r.weekday,
+        tasks,
+        checkins,
+        spent,
+        given,
+        reward,
+        hasActivity,
+      }
+    })
+
+    const activeDays = daysArr.filter((d) => d.hasActivity).length
+    const totalTasks = daysArr.reduce((s, d) => s + d.tasks, 0)
+    const totalReward = daysArr.reduce((s, d) => s + d.reward, 0)
+
+    const ratio = activeDays / days
+    let message: string
+    if (ratio >= 0.8) {
+      message = `🔥 過去 ${days} 天有 ${activeDays} 天活躍、保持得超好！`
+    } else if (ratio >= 0.5) {
+      message = `💪 過去 ${days} 天 ${activeDays} 天活躍、再加把勁`
+    } else if (ratio > 0) {
+      message = `🌱 過去 ${days} 天 ${activeDays} 天活躍、可以更積極`
+    } else {
+      message = `🛌 過去 ${days} 天完全沒活動、該動起來了！`
+    }
+
+    res.json({
+      days: daysArr,
+      summary: {
+        totalDays: days,
+        activeDays,
+        activeRatio: Math.round(ratio * 100),
+        totalTasks,
+        totalReward,
+      },
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/family-story?month=YYYY-MM
  * 月度家庭故事：敘事化呈現本月家庭數據（多段中文文字、好分享）
  * 自動從 kids_tasks / kids_spendings / kids_checkins / kids_goals 彙整

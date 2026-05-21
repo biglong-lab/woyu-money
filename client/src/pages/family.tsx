@@ -481,6 +481,9 @@ export default function FamilyPage() {
       {/* 家庭月度故事 */}
       <FamilyStoryCard />
 
+      {/* 家庭一週日報 */}
+      <FamilyDailyRecapCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3435,6 +3438,79 @@ function ParentTodoList() {
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
       )}
+    </div>
+  )
+}
+
+function FamilyDailyRecapCard() {
+  const { data } = useQuery<{
+    days: Array<{
+      date: string
+      weekday: string
+      tasks: number
+      checkins: number
+      spent: number
+      given: number
+      reward: number
+      hasActivity: boolean
+    }>
+    summary: {
+      totalDays: number
+      activeDays: number
+      activeRatio: number
+      totalTasks: number
+      totalReward: number
+    }
+    message: string
+  }>({
+    queryKey: ["/api/family/daily-recap?days=7"],
+  })
+  if (!data) return null
+
+  const maxTasks = Math.max(...data.days.map((d) => d.tasks), 1)
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-cyan-300 bg-gradient-to-br from-cyan-50 to-blue-50 p-3 shadow">
+      <h3 className="font-bold mb-2 flex items-center gap-2">📅 一週日報</h3>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-2 text-xs">
+        {data.message} · 活躍 {data.summary.activeDays}/{data.summary.totalDays} 天 · 完成{" "}
+        {data.summary.totalTasks} 個任務（${data.summary.totalReward}）
+      </div>
+
+      <div className="space-y-1">
+        {data.days.map((d) => {
+          const isToday = d.date === new Date().toISOString().slice(0, 10)
+          return (
+            <div
+              key={d.date}
+              className={`flex items-center gap-2 text-xs ${isToday ? "font-bold" : ""}`}
+            >
+              <div className="w-16 text-gray-500">
+                {d.date.slice(5)} ({d.weekday})
+              </div>
+              <div className="flex-1 h-4 bg-white rounded relative overflow-hidden">
+                {d.tasks > 0 && (
+                  <div
+                    className="h-full bg-emerald-400"
+                    style={{ width: `${(d.tasks / maxTasks) * 100}%` }}
+                    title={`${d.tasks} 個任務`}
+                  />
+                )}
+              </div>
+              <div className="w-20 text-right text-gray-600">
+                {d.hasActivity ? (
+                  <span>
+                    {d.tasks > 0 && `📋${d.tasks}`} {d.checkins > 0 && `✅${d.checkins}`}
+                  </span>
+                ) : (
+                  <span className="text-gray-300">無</span>
+                )}
+              </div>
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }

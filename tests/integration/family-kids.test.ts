@@ -4245,6 +4245,41 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.body.weeks).toBe(52)
   })
 
+  it("一週日報：基本結構 days[7] + summary + message", async () => {
+    const res = await request(app).get("/api/family/daily-recap")
+    expect(res.status).toBe(200)
+    expect(res.body.days).toHaveLength(7)
+    expect(res.body.days[0]).toHaveProperty("date")
+    expect(res.body.days[0]).toHaveProperty("tasks")
+    expect(res.body.days[0]).toHaveProperty("hasActivity")
+    expect(res.body.summary).toHaveProperty("totalDays")
+    expect(res.body.summary).toHaveProperty("activeDays")
+    expect(res.body.message).toBeTruthy()
+  })
+
+  it("一週日報：完成任務後最後一天有活動", async () => {
+    const kidObj = (await createKid()) as { id: number }
+    const myKidId = kidObj.id
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId: myKidId, title: "今日任務", rewardAmount: 50 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`).send({})
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`).send({})
+    const res = await request(app).get("/api/family/daily-recap?days=3")
+    expect(res.status).toBe(200)
+    expect(res.body.days).toHaveLength(3)
+    expect(res.body.summary.activeDays).toBeGreaterThanOrEqual(1)
+    expect(res.body.summary.totalTasks).toBeGreaterThanOrEqual(1)
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
+  it("一週日報：days 範圍 clamp 1-60", async () => {
+    const r1 = await request(app).get(`/api/family/daily-recap?days=100`)
+    expect(r1.body.days).toHaveLength(60)
+    const r2 = await request(app).get(`/api/family/daily-recap?days=0`)
+    expect(r2.body.days).toHaveLength(7)
+  })
+
   it("月度故事：基本結構 month/paragraphs/stats/characters", async () => {
     const res = await request(app).get("/api/family/family-story")
     expect(res.status).toBe(200)
