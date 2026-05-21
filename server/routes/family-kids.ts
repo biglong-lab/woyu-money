@@ -8822,6 +8822,85 @@ router.get(
 )
 
 /**
+ * GET /api/family/task-category-breakdown?days=30
+ * 家庭 N 天任務 category 分布（培養哪方面？）
+ */
+router.get(
+  "/api/family/task-category-breakdown",
+  asyncHandler(async (req, res) => {
+    const days = Math.min(Math.max(Number(req.query.days) || 30, 1), 365)
+
+    const rows = await db.execute(sql`
+      SELECT
+        t.category,
+        COUNT(*)::int AS task_count,
+        SUM(t.reward_amount)::numeric AS total_reward,
+        COUNT(DISTINCT t.kid_id)::int AS unique_kids
+      FROM kids_tasks t
+      JOIN kids_accounts ka ON ka.id = t.kid_id
+      WHERE t.status = 'approved'
+        AND t.approved_at >= NOW() - (${days} || ' days')::interval
+        AND ka.is_active = true
+      GROUP BY t.category
+      ORDER BY task_count DESC
+    `)
+
+    const CATEGORY_META: Record<string, { label: string; emoji: string }> = {
+      housework: { label: "家事", emoji: "🧹" },
+      study: { label: "學習", emoji: "📚" },
+      self_care: { label: "自我照顧", emoji: "🪥" },
+      kindness: { label: "善行", emoji: "❤️" },
+      other: { label: "其他", emoji: "✨" },
+    }
+
+    const data = (
+      rows as unknown as {
+        rows: Array<{
+          category: string
+          task_count: number
+          total_reward: string
+          unique_kids: number
+        }>
+      }
+    ).rows
+
+    const totalCount = data.reduce((s, r) => s + r.task_count, 0)
+
+    const categories = data.map((r) => {
+      const meta = CATEGORY_META[r.category] ?? { label: r.category, emoji: "📋" }
+      return {
+        category: r.category,
+        label: meta.label,
+        emoji: meta.emoji,
+        taskCount: r.task_count,
+        totalReward: Number(r.total_reward),
+        uniqueKids: r.unique_kids,
+        percentage: totalCount > 0 ? Math.round((r.task_count / totalCount) * 100) : 0,
+      }
+    })
+
+    const topCategory = categories.length > 0 ? categories[0] : null
+
+    let message: string
+    if (categories.length === 0) {
+      message = `過去 ${days} 天家裡還沒有 approved 任務`
+    } else if (topCategory) {
+      message = `${topCategory.emoji} 家裡 ${days} 天最多「${topCategory.label}」(${topCategory.percentage}%)、共 ${topCategory.taskCount} 個任務`
+    } else {
+      message = `共 ${totalCount} 個任務分佈於 ${categories.length} 類`
+    }
+
+    res.json({
+      days,
+      categories,
+      totalCount,
+      topCategory,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/kindness-milestone
  * 家庭 give jar 累積總額 + 里程碑進度（慶祝感）
  */

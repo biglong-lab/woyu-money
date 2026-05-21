@@ -4315,6 +4315,36 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.status).toBe(404)
   })
 
+  it("任務類別 breakdown：基本結構 categories/totalCount/topCategory/message", async () => {
+    const res = await request(app).get("/api/family/task-category-breakdown")
+    expect(res.status).toBe(200)
+    expect(Array.isArray(res.body.categories)).toBe(true)
+    expect(res.body.days).toBe(30)
+    expect(res.body).toHaveProperty("totalCount")
+    expect(res.body).toHaveProperty("topCategory")
+    expect(res.body.message).toBeTruthy()
+  })
+
+  it("任務類別 breakdown：approve 2 個 study 任務 → topCategory=study", async () => {
+    await db.execute(sql`DELETE FROM kids_accounts`)
+    const kidObj = (await createKid()) as { id: number }
+    const myKidId = kidObj.id
+    for (let i = 0; i < 2; i++) {
+      const t = await request(app)
+        .post("/api/family/tasks")
+        .send({ kidId: myKidId, title: `背英文 ${i}`, rewardAmount: 30, category: "study" })
+      await request(app).post(`/api/family/tasks/${t.body.id}/submit`).send({})
+      await request(app).post(`/api/family/tasks/${t.body.id}/approve`).send({})
+    }
+    const res = await request(app).get("/api/family/task-category-breakdown")
+    expect(res.status).toBe(200)
+    expect(res.body.topCategory).not.toBeNull()
+    expect(res.body.topCategory.category).toBe("study")
+    expect(res.body.topCategory.taskCount).toBeGreaterThanOrEqual(2)
+    expect(res.body.topCategory.percentage).toBeGreaterThan(0)
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
   it("行善里程碑：基本結構 total/currentMilestone/nextMilestone/progressToNext", async () => {
     const res = await request(app).get("/api/family/kindness-milestone")
     expect(res.status).toBe(200)

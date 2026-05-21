@@ -655,6 +655,9 @@ export default function FamilyPage() {
       {/* 行善里程碑 */}
       <FamilyKindnessMilestoneCard />
 
+      {/* 任務類別分佈 */}
+      <FamilyCategoryBreakdownCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3609,6 +3612,67 @@ function ParentTodoList() {
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
       )}
+    </div>
+  )
+}
+
+function FamilyCategoryBreakdownCard() {
+  const { data } = useQuery<{
+    days: number
+    categories: Array<{
+      category: string
+      label: string
+      emoji: string
+      taskCount: number
+      totalReward: number
+      uniqueKids: number
+      percentage: number
+    }>
+    totalCount: number
+    topCategory: { label: string; emoji: string } | null
+    message: string
+  }>({
+    queryKey: ["/api/family/task-category-breakdown?days=30"],
+  })
+  if (!data || data.categories.length === 0) return null
+
+  const COLORS: Record<string, string> = {
+    housework: "bg-emerald-400",
+    study: "bg-blue-400",
+    self_care: "bg-purple-400",
+    kindness: "bg-rose-400",
+    other: "bg-gray-400",
+  }
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-indigo-300 bg-gradient-to-br from-indigo-50 to-blue-50 p-3 shadow">
+      <h3 className="font-bold mb-2 flex items-center gap-2">📊 30 天任務類別分佈</h3>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-2 text-xs">{data.message}</div>
+
+      <div className="space-y-2">
+        {data.categories.map((c) => (
+          <div key={c.category} className="bg-white rounded-lg p-2">
+            <div className="flex items-center justify-between mb-1 text-xs">
+              <span className="font-medium">
+                {c.emoji} {c.label}
+              </span>
+              <span className="text-gray-500">
+                {c.taskCount} 次 · ${Math.round(c.totalReward)}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="flex-1 h-3 bg-gray-100 rounded-full overflow-hidden">
+                <div
+                  className={`${COLORS[c.category] ?? "bg-gray-400"} h-3 transition-all`}
+                  style={{ width: `${c.percentage}%` }}
+                />
+              </div>
+              <span className="text-xs font-bold w-10 text-right">{c.percentage}%</span>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
