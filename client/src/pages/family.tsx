@@ -649,6 +649,9 @@ export default function FamilyPage() {
       {/* 證明照片牆 */}
       <FamilyProofImageWallCard />
 
+      {/* 最常支持對象 ranking */}
+      <FamilyTopRecipientsCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3603,6 +3606,55 @@ function ParentTodoList() {
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
       )}
+    </div>
+  )
+}
+
+function FamilyTopRecipientsCard() {
+  const { data } = useQuery<{
+    days: number
+    recipients: Array<{
+      recipient: string
+      totalAmount: number
+      giveCount: number
+      uniqueKids: number
+      lastGiveDate: string
+    }>
+    grandTotal: number
+    recipientCount: number
+    topPick: { recipient: string; totalAmount: number } | null
+    message: string
+  }>({
+    queryKey: ["/api/family/top-recipients?days=30&limit=5"],
+  })
+  if (!data || data.recipients.length === 0) return null
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-rose-300 bg-gradient-to-br from-rose-50 to-pink-50 p-3 shadow">
+      <h3 className="font-bold mb-2 flex items-center gap-2">❤️ 家裡最支持的對象</h3>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-2 text-xs">{data.message}</div>
+
+      <div className="space-y-1">
+        {data.recipients.map((r, i) => {
+          const medal = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `${i + 1}.`
+          return (
+            <div
+              key={r.recipient}
+              className="bg-white rounded-lg p-2 flex items-center gap-2 text-xs"
+            >
+              <div className="w-6 text-center text-sm">{medal}</div>
+              <div className="flex-1 min-w-0">
+                <div className="font-medium truncate">{r.recipient}</div>
+                <div className="text-[10px] text-gray-500">
+                  {r.giveCount} 次 · {r.uniqueKids} 位小孩 · 最近 {r.lastGiveDate}
+                </div>
+              </div>
+              <div className="text-sm font-bold text-rose-600">${Math.round(r.totalAmount)}</div>
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }

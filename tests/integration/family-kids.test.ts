@@ -4315,6 +4315,73 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.status).toBe(404)
   })
 
+  it("最常支持對象：基本結構 recipients/topPick/grandTotal/message", async () => {
+    const res = await request(app).get("/api/family/top-recipients")
+    expect(res.status).toBe(200)
+    expect(Array.isArray(res.body.recipients)).toBe(true)
+    expect(res.body.days).toBe(30)
+    expect(res.body).toHaveProperty("grandTotal")
+    expect(res.body).toHaveProperty("recipientCount")
+    expect(res.body).toHaveProperty("topPick")
+    expect(res.body.message).toBeTruthy()
+  })
+
+  it("最常支持對象：give jar + recipient 後 topPick 為該對象", async () => {
+    const kidObj = (await createKid({ giveRatio: 100, spendRatio: 0, saveRatio: 0 })) as {
+      id: number
+    }
+    const myKidId = kidObj.id
+    // 賺 200
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId: myKidId, title: "公益儲值", rewardAmount: 200 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`).send({})
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`).send({})
+    // 捐 80 給「測試慈善基金會」
+    await request(app).post("/api/family/spendings").send({
+      kidId: myKidId,
+      jar: "give",
+      amount: 80,
+      description: "公益捐款",
+      recipient: "測試慈善基金會",
+    })
+    const res = await request(app).get("/api/family/top-recipients?days=30")
+    expect(res.status).toBe(200)
+    const mine = res.body.recipients.find(
+      (r: { recipient: string }) => r.recipient === "測試慈善基金會"
+    )
+    expect(mine).toBeDefined()
+    expect(mine.totalAmount).toBeGreaterThanOrEqual(80)
+    expect(mine.giveCount).toBeGreaterThanOrEqual(1)
+    expect(mine.uniqueKids).toBeGreaterThanOrEqual(1)
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
+  it("最常支持對象：spend jar 不出現於 ranking", async () => {
+    const kidObj = (await createKid({ spendRatio: 100, saveRatio: 0, giveRatio: 0 })) as {
+      id: number
+    }
+    const myKidId = kidObj.id
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId: myKidId, title: "賺", rewardAmount: 50 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`).send({})
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`).send({})
+    await request(app).post("/api/family/spendings").send({
+      kidId: myKidId,
+      jar: "spend",
+      amount: 30,
+      description: "買零食",
+      recipient: "不應出現的店家",
+    })
+    const res = await request(app).get("/api/family/top-recipients")
+    const found = res.body.recipients.find(
+      (r: { recipient: string }) => r.recipient === "不應出現的店家"
+    )
+    expect(found).toBeUndefined()
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
   it("證明照片牆：基本結構 photos/photoCount/uniqueKids/message", async () => {
     const res = await request(app).get("/api/family/proof-image-wall")
     expect(res.status).toBe(200)

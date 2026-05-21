@@ -8822,6 +8822,76 @@ router.get(
 )
 
 /**
+ * GET /api/family/top-recipients?days=30&limit=5
+ * 家裡 give jar 最常支持的對象 ranking、培養家庭價值觀
+ */
+router.get(
+  "/api/family/top-recipients",
+  asyncHandler(async (req, res) => {
+    const days = Math.min(Math.max(Number(req.query.days) || 30, 1), 365)
+    const limit = Math.min(Math.max(Number(req.query.limit) || 5, 1), 20)
+
+    const rows = await db.execute(sql`
+      SELECT
+        s.recipient,
+        SUM(s.amount)::numeric AS total_amount,
+        COUNT(*)::int AS give_count,
+        COUNT(DISTINCT s.kid_id)::int AS unique_kids,
+        MAX(s.spend_date) AS last_give_date
+      FROM kids_spendings s
+      JOIN kids_accounts ka ON ka.id = s.kid_id
+      WHERE s.jar = 'give'
+        AND s.recipient IS NOT NULL
+        AND length(trim(s.recipient)) > 0
+        AND s.spend_date >= CURRENT_DATE - (${days} || ' days')::interval
+        AND ka.is_active = true
+      GROUP BY s.recipient
+      ORDER BY total_amount DESC
+      LIMIT ${limit}
+    `)
+
+    const recipients = (
+      rows as unknown as {
+        rows: Array<{
+          recipient: string
+          total_amount: string
+          give_count: number
+          unique_kids: number
+          last_give_date: string
+        }>
+      }
+    ).rows.map((r) => ({
+      recipient: r.recipient,
+      totalAmount: Number(r.total_amount),
+      giveCount: r.give_count,
+      uniqueKids: r.unique_kids,
+      lastGiveDate: r.last_give_date,
+    }))
+
+    const grandTotal = recipients.reduce((s, r) => s + r.totalAmount, 0)
+    const topPick = recipients.length > 0 ? recipients[0] : null
+
+    let message: string
+    if (recipients.length === 0) {
+      message = `過去 ${days} 天家裡還沒有具名捐獻對象`
+    } else if (topPick) {
+      message = `❤️ 家裡 ${days} 天最支持「${topPick.recipient}」、共捐 $${Math.round(topPick.totalAmount)}`
+    } else {
+      message = `共支持 ${recipients.length} 個對象、總計 $${Math.round(grandTotal)}`
+    }
+
+    res.json({
+      days,
+      recipients,
+      grandTotal: Math.round(grandTotal * 100) / 100,
+      recipientCount: recipients.length,
+      topPick,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/proof-image-wall?days=7
  * 過去 N 天 approved + 有 proof_image_url 任務的縮圖牆
  */
