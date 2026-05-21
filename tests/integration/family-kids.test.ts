@@ -1926,6 +1926,25 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(beforeSpend).toBeGreaterThan(0)
   })
 
+  it("無主任務搶任務：kidId=null 可被搶、已認領拒絕", async () => {
+    await createKid()
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId: null, title: "公開任務", rewardAmount: 30 })
+    expect(t.status).toBe(201)
+    expect(t.body.kidId).toBeNull()
+
+    const claim = await request(app).post(`/api/family/tasks/${t.body.id}/claim`).send({ kidId })
+    expect(claim.status).toBe(200)
+    expect(claim.body.task.kidId).toBe(kidId)
+
+    const again = await request(app).post(`/api/family/tasks/${t.body.id}/claim`).send({ kidId })
+    expect(again.status).toBe(400)
+
+    const notFound = await request(app).post(`/api/family/tasks/999999/claim`).send({ kidId })
+    expect(notFound.status).toBe(404)
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)

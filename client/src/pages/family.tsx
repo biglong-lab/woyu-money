@@ -2318,7 +2318,7 @@ function TaskDialog({
         title: title.trim(),
         emoji,
         rewardAmount: parseFloat(rewardAmount),
-        kidId: kidId ? parseInt(kidId) : null,
+        kidId: kidId === "__public__" || !kidId ? null : parseInt(kidId),
         notes: notes.trim() || null,
         dueDate: dueDate || null,
         recurringInterval: recurringInterval === "none" ? null : recurringInterval,
@@ -2332,7 +2332,7 @@ function TaskDialog({
     onError: (e: Error) => toast({ title: "失敗", description: e.message, variant: "destructive" }),
   })
 
-  const canSubmit = title.trim() && parseFloat(rewardAmount) > 0 && kidId
+  const canSubmit = title.trim() && parseFloat(rewardAmount) > 0
 
   return (
     <Dialog open onOpenChange={onClose}>
@@ -2440,12 +2440,13 @@ function TaskDialog({
             </div>
           </div>
           <div>
-            <Label>指派給 *</Label>
+            <Label>指派給</Label>
             <Select value={kidId} onValueChange={setKidId}>
               <SelectTrigger>
                 <SelectValue placeholder="選擇小孩" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="__public__">🙋 公開任務（誰先做誰拿）</SelectItem>
                 {kids.map((k) => (
                   <SelectItem key={k.id} value={k.id.toString()}>
                     {k.avatar} {k.displayName}
@@ -2453,6 +2454,7 @@ function TaskDialog({
                 ))}
               </SelectContent>
             </Select>
+            <div className="text-[10px] text-gray-400 mt-1">選「公開」→ 小孩端可主動搶任務</div>
           </div>
           <div>
             <Label>截止日</Label>

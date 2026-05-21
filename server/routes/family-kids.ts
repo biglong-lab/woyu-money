@@ -646,6 +646,33 @@ router.post(
   })
 )
 
+/**
+ * POST /api/family/tasks/:id/claim
+ * 小孩搶無主任務（kidId IS NULL 且 status='pending'）
+ * 培養主動性：家長派公開任務、誰先做誰拿
+ */
+router.post(
+  "/api/family/tasks/:id/claim",
+  asyncHandler(async (req, res) => {
+    const id = Number(req.params.id)
+    const kidIdN = Number(req.body?.kidId)
+    if (!Number.isInteger(id) || id < 1) throw new AppError(400, "無效的 taskId")
+    if (!kidIdN) throw new AppError(400, "kidId 必填")
+    const [task] = await db.select().from(kidsTasks).where(eq(kidsTasks.id, id)).limit(1)
+    if (!task) throw new AppError(404, "任務不存在")
+    if (task.kidId !== null) throw new AppError(400, "任務已被認領")
+    if (task.status !== "pending") throw new AppError(400, "任務狀態不可認領")
+    const [kid] = await db.select().from(kidsAccounts).where(eq(kidsAccounts.id, kidIdN)).limit(1)
+    if (!kid) throw new AppError(404, "小孩不存在")
+    const [updated] = await db
+      .update(kidsTasks)
+      .set({ kidId: kidIdN, updatedAt: new Date() })
+      .where(eq(kidsTasks.id, id))
+      .returning()
+    res.json({ ok: true, task: updated })
+  })
+)
+
 router.post(
   "/api/family/tasks/:id/submit",
   asyncHandler(async (req, res) => {

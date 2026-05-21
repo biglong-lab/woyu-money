@@ -346,6 +346,34 @@ function KidDashboard({
   }>({
     queryKey: [`/api/family/jars-trend?kidId=${kidId}&days=30`],
   })
+
+  // 無主任務（公開、誰先做誰拿）
+  interface PublicTask {
+    id: number
+    title: string
+    emoji: string | null
+    rewardAmount: string
+    kidId: number | null
+    status: string
+    difficulty?: string
+  }
+  const publicQuery = useQuery<PublicTask[]>({
+    queryKey: ["/api/family/tasks?status=pending"],
+    select: (all: PublicTask[]) => all.filter((t) => t.kidId === null),
+  })
+  const publicTasks = publicQuery.data ?? []
+  const claimMut = useMutation({
+    mutationFn: (taskId: number) =>
+      apiRequest("POST", `/api/family/tasks/${taskId}/claim`, { kidId }),
+    onSuccess: () => {
+      toast({ title: "🙋 任務搶到了！" })
+      confetti({ particleCount: 60, spread: 70, origin: { y: 0.6 } })
+      vibrate([30, 50, 30])
+      invalidate()
+      queryClient.invalidateQueries({ queryKey: ["/api/family/tasks?status=pending"] })
+    },
+    onError: (e: Error) => toast({ title: "失敗", description: e.message, variant: "destructive" }),
+  })
   const [showSpend, setShowSpend] = useState(false)
   const [showPropose, setShowPropose] = useState(false)
   const [showReport, setShowReport] = useState(false)
@@ -589,6 +617,41 @@ function KidDashboard({
           </div>
         </CardContent>
       </Card>
+
+      {/* 無主任務（公開、可搶）*/}
+      {publicTasks.length > 0 && (
+        <div className="mb-4">
+          <h2 className="font-bold mb-2 flex items-center gap-2">
+            <span className="text-amber-500">🙋</span>
+            可搶任務（{publicTasks.length}）
+          </h2>
+          <div className="space-y-2">
+            {publicTasks.map((t) => (
+              <motion.div
+                key={t.id}
+                whileTap={{ scale: 0.98 }}
+                className="bg-gradient-to-r from-yellow-50 to-amber-100 border-2 border-amber-300 rounded-lg p-3 flex items-center gap-3 shadow-sm"
+              >
+                <div className="text-3xl">{t.emoji ?? "📋"}</div>
+                <div className="flex-1">
+                  <div className="font-medium">{t.title}</div>
+                  <div className="text-xs text-gray-600">
+                    搶到可得 {formatMoney(t.rewardAmount)}
+                  </div>
+                </div>
+                <Button
+                  size="sm"
+                  onClick={() => claimMut.mutate(t.id)}
+                  disabled={claimMut.isPending}
+                  className="bg-amber-500 hover:bg-amber-600"
+                >
+                  🙋 我要做
+                </Button>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* 待完成任務 */}
       <div className="mb-4">
