@@ -413,15 +413,18 @@ function KidDashboard({
     onError: (e: Error) => toast({ title: "失敗", description: e.message, variant: "destructive" }),
   })
 
-  // 拍照上傳：用 FormData / 既有 /api/upload/images endpoint
+  // 拍照上傳：用小孩端開放的 /api/family/upload-proof（不需 auth）
   const uploadImage = async (file: File): Promise<string | null> => {
     try {
       const fd = new FormData()
-      fd.append("images", file)
-      const resp = await fetch("/api/upload/images", { method: "POST", body: fd })
-      if (!resp.ok) throw new Error("上傳失敗")
-      const data = (await resp.json()) as { imagePaths: string[] }
-      return data.imagePaths?.[0] ?? null
+      fd.append("image", file)
+      const resp = await fetch("/api/family/upload-proof", { method: "POST", body: fd })
+      if (!resp.ok) {
+        const err = (await resp.json().catch(() => ({}))) as { error?: string }
+        throw new Error(err.error ?? "上傳失敗")
+      }
+      const data = (await resp.json()) as { url: string }
+      return data.url ?? null
     } catch (e: unknown) {
       toast({
         title: "上傳失敗",

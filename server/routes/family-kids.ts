@@ -27,6 +27,9 @@ import { Router } from "express"
 import { asyncHandler, AppError } from "../middleware/error-handler"
 import { db } from "../db"
 import { sql, eq, and, desc } from "drizzle-orm"
+import multer from "multer"
+import path from "path"
+import fs from "fs"
 import {
   kidsAccounts,
   kidsJars,
@@ -51,6 +54,32 @@ import {
 } from "@shared/schema"
 
 const router = Router()
+
+// ============================================================
+// 小孩任務照片上傳 multer 設定（uploads/kids-proofs/）
+// ============================================================
+const proofDir = path.resolve(process.cwd(), "uploads/kids-proofs")
+if (!fs.existsSync(proofDir)) {
+  fs.mkdirSync(proofDir, { recursive: true })
+}
+const proofStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, proofDir),
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase().slice(0, 8) || ".jpg"
+    const ts = Date.now()
+    const rand = Math.random().toString(36).slice(2, 8)
+    cb(null, `proof_${ts}_${rand}${ext}`)
+  },
+})
+const proofUpload = multer({
+  storage: proofStorage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  fileFilter: (_req, file, cb) => {
+    const ok = /^image\/(jpeg|png|gif|webp|heic)$/.test(file.mimetype)
+    if (!ok) return cb(new Error("僅接受圖片（jpeg/png/gif/webp/heic）"))
+    cb(null, true)
+  },
+})
 
 // ============================================================
 // helpers
@@ -8451,6 +8480,32 @@ router.get(
     res.setHeader("Content-Type", "text/calendar; charset=utf-8")
     res.setHeader("Content-Disposition", 'attachment; filename="family-tasks.ics"')
     res.send(body)
+  })
+)
+
+/**
+ * POST /api/family/upload-proof
+ * 小孩任務照片上傳（multipart/form-data, field=image）
+ * 回傳：{ url }（相對路徑、前端用 src 直接渲染）
+ */
+router.post(
+  "/api/family/upload-proof",
+  (req, res, next) => {
+    proofUpload.single("image")(req, res, (err) => {
+      if (err instanceof multer.MulterError) {
+        if (err.code === "LIMIT_FILE_SIZE") {
+          return res.status(400).json({ error: "檔案過大（上限 5MB）" })
+        }
+        return res.status(400).json({ error: err.message || "上傳失敗" })
+      }
+      if (err) return res.status(400).json({ error: err.message || "上傳失敗" })
+      next()
+    })
+  },
+  asyncHandler(async (req, res) => {
+    if (!req.file) throw new AppError(400, "需附帶圖片（field: image）")
+    const url = `/uploads/kids-proofs/${req.file.filename}`
+    res.json({ url, filename: req.file.filename, size: req.file.size })
   })
 )
 

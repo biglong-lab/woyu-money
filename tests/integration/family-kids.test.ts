@@ -4245,6 +4245,34 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.body.weeks).toBe(52)
   })
 
+  it("任務照片上傳：缺檔案 → 400", async () => {
+    const res = await request(app).post("/api/family/upload-proof")
+    expect(res.status).toBe(400)
+  })
+
+  it("任務照片上傳：png buffer → 回 url + filename + size", async () => {
+    const pngBytes = Buffer.from(
+      "89504E470D0A1A0A0000000D49484452000000010000000108060000001F15C4890000000A49444154789C6300010000000500010DBE0E1B0000000049454E44AE426082",
+      "hex"
+    )
+    const res = await request(app)
+      .post("/api/family/upload-proof")
+      .attach("image", pngBytes, { filename: "test.png", contentType: "image/png" })
+    expect(res.status).toBe(200)
+    expect(res.body.url).toMatch(/^\/uploads\/kids-proofs\/proof_\d+_[a-z0-9]+\.png$/)
+    expect(res.body.filename).toMatch(/^proof_\d+_[a-z0-9]+\.png$/)
+    expect(res.body.size).toBe(pngBytes.length)
+  })
+
+  it("任務照片上傳：非圖片 → 400", async () => {
+    const txt = Buffer.from("hello", "utf-8")
+    const res = await request(app)
+      .post("/api/family/upload-proof")
+      .attach("image", txt, { filename: "x.txt", contentType: "text/plain" })
+    expect(res.status).toBe(400)
+    expect(res.body.error).toContain("圖片")
+  })
+
   it("家庭累計總成就：stats + level + message", async () => {
     const res = await request(app).get("/api/family/lifetime-stats")
     expect(res.status).toBe(200)
