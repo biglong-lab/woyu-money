@@ -616,6 +616,9 @@ export default function FamilyPage() {
       {/* 家庭兒童學習曲線 */}
       <FamilyKidLearningCurveCard />
 
+      {/* 家庭兒童獎勵平均 */}
+      <FamilyKidAvgRewardCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3570,6 +3573,56 @@ function ParentTodoList() {
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
       )}
+    </div>
+  )
+}
+
+function FamilyKidAvgRewardCard() {
+  const { data } = useQuery<{
+    days: number
+    kids: Array<{
+      kidId: number
+      kidName: string
+      avatar: string
+      taskCount: number
+      avgReward: number
+      minReward: number
+      maxReward: number
+      totalReward: number
+    }>
+    topByAvg: { kidName: string; avatar: string; avgReward: number } | null
+    message: string
+  }>({
+    queryKey: ["/api/family/kid-avg-reward?days=90"],
+  })
+  if (!data || data.kids.length === 0) return null
+  const withTasks = data.kids.filter((k) => k.taskCount > 0)
+  if (withTasks.length === 0) return null
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-yellow-400 bg-gradient-to-br from-yellow-50 to-amber-50 p-3 shadow">
+      <h3 className="font-bold mb-2 flex items-center gap-2">💎 任務獎勵平均（90 天）</h3>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-2 text-xs">{data.message}</div>
+
+      <div className="space-y-1.5">
+        {withTasks.map((k) => (
+          <div key={k.kidId} className="bg-white rounded-lg p-2">
+            <div className="flex items-center gap-2 mb-1">
+              <div className="text-lg">{k.avatar}</div>
+              <div className="flex-1 text-sm font-medium">{k.kidName}</div>
+              <div className="text-lg font-bold text-amber-600">${k.avgReward}</div>
+              <div className="text-[10px] text-gray-500">平均</div>
+            </div>
+            <div className="flex justify-between text-[10px] text-gray-500">
+              <span>共 {k.taskCount} 個</span>
+              <span>最低 ${k.minReward}</span>
+              <span>最高 ${k.maxReward}</span>
+              <span>累計 ${k.totalReward}</span>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

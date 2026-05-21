@@ -4245,6 +4245,35 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.body.weeks).toBe(52)
   })
 
+  it("兒童獎勵平均：基本結構 kids/topByAvg/message", async () => {
+    const res = await request(app).get("/api/family/kid-avg-reward")
+    expect(res.status).toBe(200)
+    expect(Array.isArray(res.body.kids)).toBe(true)
+    expect(res.body.message).toBeDefined()
+  })
+
+  it("兒童獎勵平均：approve $100 → kid.avgReward>=50", async () => {
+    const kidObj = (await createKid()) as { id: number }
+    const myKidId = kidObj.id
+    for (const amt of [50, 100, 150]) {
+      const t = await request(app)
+        .post("/api/family/tasks")
+        .send({ kidId: myKidId, title: `task ${amt}`, rewardAmount: amt })
+      await request(app).post(`/api/family/tasks/${t.body.id}/submit`).send({})
+      await request(app).post(`/api/family/tasks/${t.body.id}/approve`).send({})
+    }
+    const res = await request(app).get("/api/family/kid-avg-reward?days=7")
+    expect(res.status).toBe(200)
+    const myKid = res.body.kids.find((k: { kidId: number }) => k.kidId === myKidId)
+    expect(myKid).toBeDefined()
+    expect(myKid.taskCount).toBeGreaterThanOrEqual(3)
+    expect(myKid.avgReward).toBeGreaterThanOrEqual(95)
+    expect(myKid.avgReward).toBeLessThanOrEqual(105)
+    expect(myKid.minReward).toBe(50)
+    expect(myKid.maxReward).toBe(150)
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
   it("學習曲線：基本結構 kids/risingCount/message", async () => {
     const res = await request(app).get("/api/family/kid-learning-curve")
     expect(res.status).toBe(200)

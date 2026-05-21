@@ -8602,6 +8602,82 @@ async function bulkApproveOne(
 }
 
 /**
+ * GET /api/family/kid-avg-reward?days=90
+ * 每個 active kid 過去 N 天 task reward 平均/最低/最高
+ */
+router.get(
+  "/api/family/kid-avg-reward",
+  asyncHandler(async (req, res) => {
+    const days = Math.min(Math.max(Number(req.query.days) || 90, 7), 365)
+
+    const rows = await db.execute(sql`
+      SELECT
+        ka.id::int AS kid_id,
+        ka.display_name AS kid_name,
+        ka.avatar,
+        COUNT(t.id)::int AS task_count,
+        COALESCE(AVG(t.reward_amount::numeric), 0)::numeric AS avg_reward,
+        COALESCE(MIN(t.reward_amount::numeric), 0)::numeric AS min_reward,
+        COALESCE(MAX(t.reward_amount::numeric), 0)::numeric AS max_reward,
+        COALESCE(SUM(t.reward_amount::numeric), 0)::numeric AS total_reward
+      FROM kids_accounts ka
+      LEFT JOIN kids_tasks t ON
+        t.kid_id = ka.id
+        AND t.status = 'approved'
+        AND t.completed_at >= CURRENT_DATE - (${days}::int * INTERVAL '1 day')
+      WHERE ka.is_active = true
+      GROUP BY ka.id, ka.display_name, ka.avatar
+      ORDER BY avg_reward DESC
+    `)
+
+    const kids = (
+      rows as unknown as {
+        rows: Array<{
+          kid_id: number
+          kid_name: string
+          avatar: string
+          task_count: number
+          avg_reward: string | number
+          min_reward: string | number
+          max_reward: string | number
+          total_reward: string | number
+        }>
+      }
+    ).rows.map((r) => ({
+      kidId: r.kid_id,
+      kidName: r.kid_name,
+      avatar: r.avatar,
+      taskCount: r.task_count,
+      avgReward: Math.round(Number(r.avg_reward)),
+      minReward: Math.round(Number(r.min_reward)),
+      maxReward: Math.round(Number(r.max_reward)),
+      totalReward: Math.round(Number(r.total_reward)),
+    }))
+
+    const withTasks = kids.filter((k) => k.taskCount > 0)
+    const topByAvg = withTasks[0] ?? null
+
+    let message: string
+    if (withTasks.length === 0) {
+      message = `過去 ${days} 天還沒任務`
+    } else if (topByAvg) {
+      message = `💎 最高平均：${topByAvg.avatar} ${topByAvg.kidName}（平均 $${topByAvg.avgReward}）`
+    } else {
+      message = ""
+    }
+
+    res.json({
+      days,
+      kids,
+      topByAvg: topByAvg
+        ? { kidName: topByAvg.kidName, avatar: topByAvg.avatar, avgReward: topByAvg.avgReward }
+        : null,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/kid-learning-curve
  * 每 active kid 第一個月 vs 最近 30 天 task 對比
  * improvement: rising / steady / declining / new / no_data
