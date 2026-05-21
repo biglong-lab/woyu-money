@@ -4245,6 +4245,34 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.body.weeks).toBe(52)
   })
 
+  it("儲蓄速度排名：基本結構 kids/topSaver/message", async () => {
+    const res = await request(app).get("/api/family/savings-velocity-rank")
+    expect(res.status).toBe(200)
+    expect(Array.isArray(res.body.kids)).toBe(true)
+    expect(res.body.message).toBeTruthy()
+  })
+
+  it("儲蓄速度排名：完成 $300 task save_ratio=50 → monthlyVelocity=50", async () => {
+    const kidObj = (await createKid({
+      spendRatio: 50,
+      saveRatio: 50,
+      giveRatio: 0,
+    })) as { id: number }
+    const myKidId = kidObj.id
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId: myKidId, title: "存錢測試", rewardAmount: 300 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`).send({})
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`).send({})
+    const res = await request(app).get("/api/family/savings-velocity-rank?months=3")
+    expect(res.status).toBe(200)
+    const myKid = res.body.kids.find((k: { kidId: number }) => k.kidId === myKidId)
+    expect(myKid).toBeDefined()
+    expect(myKid.saveEarned).toBeGreaterThanOrEqual(150)
+    expect(myKid.monthlyVelocity).toBeGreaterThanOrEqual(50)
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
   it("月度成長率：基本結構 months/trend/avgGrowth", async () => {
     const res = await request(app).get("/api/family/task-monthly-growth")
     expect(res.status).toBe(200)

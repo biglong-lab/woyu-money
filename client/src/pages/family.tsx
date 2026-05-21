@@ -562,6 +562,9 @@ export default function FamilyPage() {
       {/* 家庭月度任務成長率 */}
       <FamilyTaskMonthlyGrowthCard />
 
+      {/* 家庭儲蓄速度排名 */}
+      <FamilySavingsVelocityRankCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3516,6 +3519,65 @@ function ParentTodoList() {
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
       )}
+    </div>
+  )
+}
+
+function FamilySavingsVelocityRankCard() {
+  const { data } = useQuery<{
+    months: number
+    kids: Array<{
+      kidId: number
+      kidName: string
+      avatar: string
+      saveRatio: number
+      monthlyVelocity: number
+      currentSave: number
+      monthsTo1000: number | null
+    }>
+    topSaver: {
+      kidName: string
+      avatar: string
+      monthlyVelocity: number
+      monthsTo1000: number | null
+    } | null
+    message: string
+  }>({
+    queryKey: ["/api/family/savings-velocity-rank?months=3"],
+  })
+  if (!data || data.kids.length === 0) return null
+  const hasVelocity = data.kids.some((k) => k.monthlyVelocity > 0)
+  if (!hasVelocity) return null
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-emerald-400 bg-gradient-to-br from-emerald-50 to-cyan-50 p-3 shadow">
+      <h3 className="font-bold mb-2 flex items-center gap-2">💎 儲蓄速度排名（3 月）</h3>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-2 text-xs">
+        {data.message}
+        {data.topSaver && data.topSaver.monthsTo1000 !== null && data.topSaver.monthsTo1000 > 0 && (
+          <div className="text-gray-600 mt-1">預估 {data.topSaver.monthsTo1000} 個月可達 $1000</div>
+        )}
+      </div>
+
+      <div className="space-y-1.5">
+        {data.kids.map((k, i) => (
+          <div key={k.kidId} className="bg-white rounded-lg p-2 flex items-center gap-2">
+            <div className="w-4 text-center text-gray-500">{i + 1}</div>
+            <div className="text-lg">{k.avatar}</div>
+            <div className="flex-1">
+              <div className="text-sm font-medium">{k.kidName}</div>
+              <div className="text-[10px] text-gray-500">
+                save {k.saveRatio}% · 目前 ${k.currentSave}
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="text-sm font-bold text-emerald-600">+${k.monthlyVelocity}</div>
+              <div className="text-[9px] text-gray-500">/月</div>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

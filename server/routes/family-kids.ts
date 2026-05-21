@@ -8602,6 +8602,98 @@ async function bulkApproveOne(
 }
 
 /**
+ * GET /api/family/savings-velocity-rank?months=3
+ * 家庭兒童儲蓄速度排名
+ * 速度 = 過去 N 月 task reward * saveRatio / N（月均 save 增量）
+ */
+router.get(
+  "/api/family/savings-velocity-rank",
+  asyncHandler(async (req, res) => {
+    const months = Math.min(Math.max(Number(req.query.months) || 3, 1), 12)
+
+    const rows = await db.execute(sql`
+      SELECT
+        ka.id::int AS kid_id,
+        ka.display_name AS kid_name,
+        ka.avatar,
+        ka.save_ratio::int AS save_ratio,
+        COALESCE((
+          SELECT SUM(reward_amount::numeric)::numeric FROM kids_tasks
+          WHERE kid_id = ka.id
+            AND status = 'approved'
+            AND completed_at >= CURRENT_DATE - (${months}::int * INTERVAL '1 month')
+        ), 0) AS total_reward,
+        COALESCE((SELECT save_balance::numeric FROM kids_jars WHERE kid_id = ka.id), 0) AS current_save
+      FROM kids_accounts ka
+      WHERE ka.is_active = true
+      ORDER BY ka.id ASC
+    `)
+
+    const kids = (
+      rows as unknown as {
+        rows: Array<{
+          kid_id: number
+          kid_name: string
+          avatar: string
+          save_ratio: number
+          total_reward: string | number
+          current_save: string | number
+        }>
+      }
+    ).rows.map((r) => {
+      const totalReward = Number(r.total_reward)
+      const saveEarned = (totalReward * r.save_ratio) / 100
+      const monthlyVelocity = Math.round((saveEarned / months) * 10) / 10
+      const currentSave = Number(r.current_save)
+      // 預估到 $1000 還差幾個月
+      const monthsTo1000 =
+        monthlyVelocity > 0 && currentSave < 1000
+          ? Math.ceil((1000 - currentSave) / monthlyVelocity)
+          : currentSave >= 1000
+            ? 0
+            : null
+      return {
+        kidId: r.kid_id,
+        kidName: r.kid_name,
+        avatar: r.avatar,
+        saveRatio: r.save_ratio,
+        totalReward,
+        saveEarned: Math.round(saveEarned),
+        monthlyVelocity,
+        currentSave: Math.round(currentSave),
+        monthsTo1000,
+      }
+    })
+
+    const sorted = [...kids].sort((a, b) => b.monthlyVelocity - a.monthlyVelocity)
+    const topSaver = sorted.length > 0 && sorted[0].monthlyVelocity > 0 ? sorted[0] : null
+
+    let message: string
+    if (kids.length === 0) {
+      message = "還沒有小孩"
+    } else if (!topSaver) {
+      message = `過去 ${months} 個月還沒人存錢、開始累積吧 🌱`
+    } else {
+      message = `💎 儲蓄王：${topSaver.avatar} ${topSaver.kidName}（每月 +$${topSaver.monthlyVelocity}）`
+    }
+
+    res.json({
+      months,
+      kids: sorted,
+      topSaver: topSaver
+        ? {
+            kidName: topSaver.kidName,
+            avatar: topSaver.avatar,
+            monthlyVelocity: topSaver.monthlyVelocity,
+            monthsTo1000: topSaver.monthsTo1000,
+          }
+        : null,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/task-monthly-growth?months=6
  * 過去 N 個月 task 完成數 + 環比成長率
  */
