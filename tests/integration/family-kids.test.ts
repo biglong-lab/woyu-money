@@ -4245,6 +4245,30 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.body.weeks).toBe(52)
   })
 
+  it("家庭隊長：基本結構 kids/captain/message", async () => {
+    const res = await request(app).get("/api/family/captain")
+    expect(res.status).toBe(200)
+    expect(Array.isArray(res.body.kids)).toBe(true)
+    expect(res.body.message).toBeTruthy()
+  })
+
+  it("家庭隊長：approve 任務後 captain 是該 kid + score>=2", async () => {
+    const kidObj = (await createKid()) as { id: number }
+    const myKidId = kidObj.id
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId: myKidId, title: "隊長測試", rewardAmount: 30 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`).send({})
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`).send({})
+    const res = await request(app).get("/api/family/captain")
+    expect(res.status).toBe(200)
+    expect(res.body.captain).not.toBeNull()
+    const myKid = res.body.kids.find((k: { kidId: number }) => k.kidId === myKidId)
+    expect(myKid).toBeDefined()
+    expect(myKid.score).toBeGreaterThanOrEqual(2)
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
   it("月度進步榜：基本結構 kids/topImprover/message", async () => {
     const res = await request(app).get("/api/family/monthly-improvement-rank")
     expect(res.status).toBe(200)

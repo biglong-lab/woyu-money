@@ -8602,6 +8602,94 @@ async function bulkApproveOne(
 }
 
 /**
+ * GET /api/family/captain?days=30
+ * 家庭隊長：過去 N 天綜合活躍度最高的小孩
+ * score = tasks * 2 + checkins * 1 + goalsCompleted * 5
+ */
+router.get(
+  "/api/family/captain",
+  asyncHandler(async (req, res) => {
+    const days = Math.min(Math.max(Number(req.query.days) || 30, 7), 365)
+
+    const rows = await db.execute(sql`
+      SELECT
+        ka.id::int AS kid_id,
+        ka.display_name AS kid_name,
+        ka.avatar,
+        (SELECT COUNT(*)::int FROM kids_tasks
+          WHERE kid_id = ka.id
+            AND status = 'approved'
+            AND completed_at >= CURRENT_DATE - (${days}::int * INTERVAL '1 day')
+        ) AS tasks,
+        (SELECT COUNT(*)::int FROM kids_checkins
+          WHERE kid_id = ka.id
+            AND checkin_date >= CURRENT_DATE - (${days}::int * INTERVAL '1 day')
+        ) AS checkins,
+        (SELECT COUNT(*)::int FROM kids_goals
+          WHERE kid_id = ka.id
+            AND status = 'completed'
+            AND completed_at >= CURRENT_DATE - (${days}::int * INTERVAL '1 day')
+        ) AS goals_completed
+      FROM kids_accounts ka
+      WHERE ka.is_active = true
+      ORDER BY ka.id ASC
+    `)
+
+    const kids = (
+      rows as unknown as {
+        rows: Array<{
+          kid_id: number
+          kid_name: string
+          avatar: string
+          tasks: number
+          checkins: number
+          goals_completed: number
+        }>
+      }
+    ).rows.map((r) => ({
+      kidId: r.kid_id,
+      kidName: r.kid_name,
+      avatar: r.avatar,
+      tasks: r.tasks,
+      checkins: r.checkins,
+      goalsCompleted: r.goals_completed,
+      score: r.tasks * 2 + r.checkins * 1 + r.goals_completed * 5,
+    }))
+
+    const sorted = [...kids].sort((a, b) => b.score - a.score)
+    const captain = sorted.length > 0 && sorted[0].score > 0 ? sorted[0] : null
+
+    let message: string
+    if (kids.length === 0) {
+      message = "還沒有小孩、加入第一個吧"
+    } else if (!captain) {
+      message = `過去 ${days} 天家裡沒活動、待選出新隊長！`
+    } else {
+      const tied = sorted.filter((k) => k.score === captain.score).length
+      if (tied > 1) {
+        message = `🤝 ${tied} 個小孩並列第一（${captain.score} 分）、家裡氣氛超棒`
+      } else {
+        message = `🎖️ 本月家庭隊長：${captain.avatar} ${captain.kidName}（${captain.score} 分）`
+      }
+    }
+
+    res.json({
+      days,
+      kids: sorted,
+      captain: captain
+        ? {
+            kidId: captain.kidId,
+            kidName: captain.kidName,
+            avatar: captain.avatar,
+            score: captain.score,
+          }
+        : null,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/monthly-improvement-rank
  * 家庭月度進步榜：每個 active kid 本月 vs 上月 task 完成數
  * improvement = (this - last) / max(last, 1) 比例

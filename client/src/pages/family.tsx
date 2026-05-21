@@ -547,6 +547,9 @@ export default function FamilyPage() {
       {/* 家庭月度進步榜 */}
       <FamilyMonthlyImprovementCard />
 
+      {/* 家庭隊長 */}
+      <FamilyCaptainCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3501,6 +3504,54 @@ function ParentTodoList() {
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
       )}
+    </div>
+  )
+}
+
+function FamilyCaptainCard() {
+  const { data } = useQuery<{
+    days: number
+    kids: Array<{
+      kidId: number
+      kidName: string
+      avatar: string
+      tasks: number
+      checkins: number
+      goalsCompleted: number
+      score: number
+    }>
+    captain: { kidName: string; avatar: string; score: number } | null
+    message: string
+  }>({
+    queryKey: ["/api/family/captain?days=30"],
+  })
+  if (!data || data.kids.length === 0) return null
+  if (!data.captain) return null
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-yellow-500 bg-gradient-to-br from-yellow-50 via-amber-50 to-orange-50 p-3 shadow">
+      <h3 className="font-bold mb-2 flex items-center gap-2">🎖️ 家庭隊長（30 天）</h3>
+
+      <div className="bg-white/80 rounded-lg p-3 mb-2 text-center">
+        <div className="text-5xl mb-1">{data.captain.avatar}</div>
+        <div className="text-lg font-bold">{data.captain.kidName}</div>
+        <div className="text-2xl font-bold text-amber-600 mt-1">{data.captain.score} 分</div>
+        <div className="text-[10px] text-gray-500 mt-1">{data.message}</div>
+      </div>
+
+      <div className="space-y-1">
+        {data.kids.map((k, i) => (
+          <div key={k.kidId} className="bg-white rounded p-1.5 flex items-center gap-2 text-xs">
+            <div className="w-4 text-center text-gray-500">{i + 1}</div>
+            <div className="text-lg">{k.avatar}</div>
+            <div className="flex-1 truncate">{k.kidName}</div>
+            <div className="text-[10px] text-gray-500">
+              📋{k.tasks} ✅{k.checkins} 🎯{k.goalsCompleted}
+            </div>
+            <div className="font-bold text-amber-600">{k.score}</div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
