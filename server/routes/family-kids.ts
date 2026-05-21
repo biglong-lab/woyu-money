@@ -2804,6 +2804,77 @@ router.get(
 )
 
 /**
+ * GET /api/family/kid-strengths?kidId=
+ * 小孩能力強項統計（按任務 category 分群）
+ * 視覺化「天賦」：知道自己擅長什麼類別、培養自我認識
+ *
+ * 5 大類別：clean（清潔）/ cook（烹飪）/ study（學習）/ home（家事）/ other（其他）
+ * 每類：count + percentage + level（S 30+ / A 15+ / B 5+ / C 1+ / D 0）
+ * topCategory：count 最多的那類（含 emoji + 文案）
+ */
+router.get(
+  "/api/family/kid-strengths",
+  asyncHandler(async (req, res) => {
+    const kidIdQ = Number(req.query.kidId)
+    if (!Number.isInteger(kidIdQ) || kidIdQ < 1) throw new AppError(400, "需傳 kidId")
+
+    const result = await db.execute(sql`
+      SELECT category, COUNT(*)::int AS n
+      FROM kids_tasks
+      WHERE kid_id = ${kidIdQ} AND status = 'approved'
+      GROUP BY category
+    `)
+    const rows = (result as unknown as { rows: { category: string; n: number }[] }).rows
+
+    const CATEGORY_META: Record<string, { name: string; emoji: string; praise: string }> = {
+      clean: { name: "清潔", emoji: "🧹", praise: "你超會打掃！" },
+      cook: { name: "烹飪", emoji: "🍳", praise: "你是小廚神！" },
+      study: { name: "學習", emoji: "📚", praise: "你愛學習！" },
+      home: { name: "家事", emoji: "🏠", praise: "你超顧家！" },
+      other: { name: "其他", emoji: "✨", praise: "你樣樣通！" },
+    }
+
+    const total = rows.reduce((s, r) => s + r.n, 0)
+    const byCategory = new Map(rows.map((r) => [r.category, r.n]))
+
+    const categories = (["clean", "cook", "study", "home", "other"] as const).map((key) => {
+      const count = byCategory.get(key) ?? 0
+      const percentage = total > 0 ? Math.round((count / total) * 100) : 0
+      const level =
+        count >= 30 ? "S" : count >= 15 ? "A" : count >= 5 ? "B" : count >= 1 ? "C" : "D"
+      return {
+        category: key,
+        name: CATEGORY_META[key].name,
+        emoji: CATEGORY_META[key].emoji,
+        count,
+        percentage,
+        level,
+      }
+    })
+
+    // topCategory（count 最多）
+    let topCategory: (typeof categories)[0] & { praise: string } = {
+      ...categories[0],
+      praise: "",
+    }
+    let topCount = -1
+    for (const c of categories) {
+      if (c.count > topCount) {
+        topCount = c.count
+        topCategory = { ...c, praise: CATEGORY_META[c.category].praise }
+      }
+    }
+
+    res.json({
+      kidId: kidIdQ,
+      totalTasks: total,
+      categories,
+      topCategory: total > 0 ? topCategory : null,
+    })
+  })
+)
+
+/**
  * GET /api/family/activity?limit=30
  * 全家活動 feed（家長端、不指定 kidId）
  * 一次看全家最近動態：task / spending / checkin / wish

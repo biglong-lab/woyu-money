@@ -1006,6 +1006,9 @@ function KidDashboard({
       {/* 個人最佳紀錄牆 */}
       <KidBestsWall kidId={kidId} />
 
+      {/* 能力強項統計 */}
+      <KidStrengthsCard kidId={kidId} />
+
       {/* 成就牆（含未解鎖徽章 + 進度條）*/}
       <AchievementWall kidId={kidId} />
 
@@ -1759,6 +1762,82 @@ function WishesSection({
           ))}
         </div>
       )}
+    </div>
+  )
+}
+
+function KidStrengthsCard({ kidId }: { kidId: number }) {
+  const { data } = useQuery<{
+    totalTasks: number
+    categories: Array<{
+      category: string
+      name: string
+      emoji: string
+      count: number
+      percentage: number
+      level: "S" | "A" | "B" | "C" | "D"
+    }>
+    topCategory: { name: string; emoji: string; praise: string; level: string } | null
+  }>({
+    queryKey: ["/api/family/kid-strengths", kidId],
+    queryFn: async () => {
+      const res = await fetch(`/api/family/kid-strengths?kidId=${kidId}`, {
+        credentials: "include",
+      })
+      return res.json()
+    },
+  })
+  if (!data || data.totalTasks === 0) return null
+
+  const LEVEL_COLOR: Record<string, { bg: string; text: string; ring: string }> = {
+    S: { bg: "bg-rose-100", text: "text-rose-700", ring: "ring-rose-300" },
+    A: { bg: "bg-orange-100", text: "text-orange-700", ring: "ring-orange-300" },
+    B: { bg: "bg-amber-100", text: "text-amber-700", ring: "ring-amber-300" },
+    C: { bg: "bg-blue-100", text: "text-blue-700", ring: "ring-blue-300" },
+    D: { bg: "bg-gray-100", text: "text-gray-500", ring: "ring-gray-300" },
+  }
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-cyan-300 bg-gradient-to-br from-cyan-50 to-blue-50 p-4 shadow">
+      <h3 className="font-bold text-cyan-900 mb-3 flex items-center gap-2">💪 我的天賦</h3>
+
+      {/* topCategory 大字 */}
+      {data.topCategory && (
+        <div className="bg-white rounded-lg p-3 mb-3 text-center shadow-sm">
+          <div className="text-4xl mb-1">{data.topCategory.emoji}</div>
+          <div className="text-sm font-bold text-cyan-900">
+            最強：{data.topCategory.name}（{data.topCategory.level} 級）
+          </div>
+          <div className="text-xs text-gray-600 mt-1">{data.topCategory.praise}</div>
+        </div>
+      )}
+
+      {/* 5 大類條形圖 */}
+      <div className="space-y-2">
+        {data.categories.map((c) => {
+          const color = LEVEL_COLOR[c.level]
+          return (
+            <div key={c.category} className={`rounded-lg p-2 ${color.bg}`}>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-sm font-medium">
+                  {c.emoji} {c.name}
+                </span>
+                <span
+                  className={`text-xs font-bold ${color.text} px-2 py-0.5 rounded ring-1 ${color.ring} bg-white`}
+                >
+                  {c.level} 級・{c.count} 次
+                </span>
+              </div>
+              <div className="h-2 w-full bg-white/60 rounded-full overflow-hidden">
+                <div
+                  className={`h-full ${color.text.replace("text-", "bg-")}`}
+                  style={{ width: `${c.percentage}%` }}
+                />
+              </div>
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }

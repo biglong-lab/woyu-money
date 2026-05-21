@@ -2317,6 +2317,67 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     }
   })
 
+  it("小孩能力強項：5 大類統計 + level + topCategory", async () => {
+    await createKid()
+
+    // 5 個 clean + 2 個 cook + 1 個 study（總 8）
+    const tasks: Array<{ category: string; title: string }> = [
+      ...Array(5)
+        .fill(null)
+        .map((_, i) => ({ category: "clean", title: `掃 ${i}` })),
+      ...Array(2)
+        .fill(null)
+        .map((_, i) => ({ category: "cook", title: `煮 ${i}` })),
+      { category: "study", title: "讀書" },
+    ]
+    for (const tk of tasks) {
+      const t = await request(app)
+        .post("/api/family/tasks")
+        .send({ kidId, title: tk.title, rewardAmount: 10, category: tk.category })
+      await request(app).post(`/api/family/tasks/${t.body.id}/submit`)
+      await request(app).post(`/api/family/tasks/${t.body.id}/approve`)
+    }
+
+    const res = await request(app).get(`/api/family/kid-strengths?kidId=${kidId}`)
+    expect(res.status).toBe(200)
+    expect(res.body.totalTasks).toBe(8)
+
+    const cats = res.body.categories as Array<{
+      category: string
+      count: number
+      percentage: number
+      level: string
+    }>
+    expect(cats.length).toBe(5)
+    const cleanCat = cats.find((c) => c.category === "clean")!
+    expect(cleanCat.count).toBe(5)
+    expect(cleanCat.level).toBe("B")
+    expect(cleanCat.percentage).toBe(63)
+
+    const cookCat = cats.find((c) => c.category === "cook")!
+    expect(cookCat.level).toBe("C")
+
+    const homeCat = cats.find((c) => c.category === "home")!
+    expect(homeCat.count).toBe(0)
+    expect(homeCat.level).toBe("D")
+
+    expect(res.body.topCategory.category).toBe("clean")
+    expect(res.body.topCategory.praise).toBeTruthy()
+  })
+
+  it("kid-strengths：無任務 totalTasks=0、topCategory=null", async () => {
+    await createKid()
+    const res = await request(app).get(`/api/family/kid-strengths?kidId=${kidId}`)
+    expect(res.status).toBe(200)
+    expect(res.body.totalTasks).toBe(0)
+    expect(res.body.topCategory).toBeNull()
+  })
+
+  it("kid-strengths 缺 kidId 回 400", async () => {
+    const r = await request(app).get("/api/family/kid-strengths")
+    expect(r.status).toBe(400)
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)
