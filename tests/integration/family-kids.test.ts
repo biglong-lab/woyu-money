@@ -4245,6 +4245,40 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.body.weeks).toBe(52)
   })
 
+  it("收入花用：基本結構 income/spent/balance/ratio/level", async () => {
+    const res = await request(app).get("/api/family/income-vs-spending")
+    expect(res.status).toBe(200)
+    expect(res.body).toHaveProperty("income")
+    expect(res.body).toHaveProperty("spent")
+    expect(res.body).toHaveProperty("given")
+    expect(res.body).toHaveProperty("balance")
+    expect(res.body).toHaveProperty("ratio")
+    expect(["saver", "balanced", "spender", "overspending", "no_data"]).toContain(res.body.level)
+    expect(res.body.message).toBeTruthy()
+  })
+
+  it("收入花用：approve $100 → income>=100、level=saver", async () => {
+    const kidObj = (await createKid()) as { id: number }
+    const myKidId = kidObj.id
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId: myKidId, title: "收入花用測試", rewardAmount: 100 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`).send({})
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`).send({})
+    const res = await request(app).get("/api/family/income-vs-spending")
+    expect(res.status).toBe(200)
+    expect(res.body.income).toBeGreaterThanOrEqual(100)
+    expect(res.body.balance).toBeGreaterThan(0)
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
+  it("收入花用：days clamp 7-90", async () => {
+    const r1 = await request(app).get("/api/family/income-vs-spending?days=200")
+    expect(r1.body.days).toBe(90)
+    const r2 = await request(app).get("/api/family/income-vs-spending?days=3")
+    expect(r2.body.days).toBe(7)
+  })
+
   it("三罐當前餘額：基本結構 jars + total + health", async () => {
     const res = await request(app).get("/api/family/jars-current-balance")
     expect(res.status).toBe(200)

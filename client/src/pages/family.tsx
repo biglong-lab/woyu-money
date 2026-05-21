@@ -511,6 +511,9 @@ export default function FamilyPage() {
       {/* 家庭三罐當前餘額 */}
       <FamilyJarsCurrentCard />
 
+      {/* 家庭收入 vs 花用對比 */}
+      <FamilyIncomeVsSpendingCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3464,6 +3467,73 @@ function ParentTodoList() {
         >
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
+      )}
+    </div>
+  )
+}
+
+function FamilyIncomeVsSpendingCard() {
+  const { data } = useQuery<{
+    days: number
+    income: number
+    spent: number
+    given: number
+    totalOut: number
+    balance: number
+    ratio: number
+    level: "saver" | "balanced" | "spender" | "overspending" | "no_data"
+    message: string
+  }>({
+    queryKey: ["/api/family/income-vs-spending?days=30"],
+  })
+  if (!data) return null
+  if (data.income === 0 && data.totalOut === 0) return null
+
+  const LEVEL_BG: Record<string, string> = {
+    saver: "from-emerald-50 to-green-50 border-emerald-500",
+    balanced: "from-blue-50 to-sky-50 border-blue-300",
+    spender: "from-amber-50 to-yellow-50 border-amber-400",
+    overspending: "from-rose-50 to-red-50 border-rose-500",
+    no_data: "from-gray-50 to-slate-50 border-gray-300",
+  }
+
+  return (
+    <div
+      className={`mb-4 rounded-2xl border-2 bg-gradient-to-br ${LEVEL_BG[data.level]} p-3 shadow`}
+    >
+      <h3 className="font-bold mb-2 flex items-center gap-2">⚖️ 收入 vs 花用（30 天）</h3>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-2 text-xs">{data.message}</div>
+
+      <div className="grid grid-cols-3 gap-2 mb-2">
+        <div className="bg-white rounded-lg p-2 text-center">
+          <div className="text-xl font-bold text-emerald-600">${data.income}</div>
+          <div className="text-[10px] text-gray-500">收入</div>
+        </div>
+        <div className="bg-white rounded-lg p-2 text-center">
+          <div className="text-xl font-bold text-rose-500">${data.totalOut}</div>
+          <div className="text-[10px] text-gray-500">花用</div>
+        </div>
+        <div className="bg-white rounded-lg p-2 text-center">
+          <div
+            className={`text-xl font-bold ${data.balance >= 0 ? "text-blue-600" : "text-red-600"}`}
+          >
+            {data.balance >= 0 ? "+" : ""}${data.balance}
+          </div>
+          <div className="text-[10px] text-gray-500">結餘</div>
+        </div>
+      </div>
+
+      {data.income > 0 && (
+        <div className="bg-white/40 rounded p-2">
+          <div className="text-[10px] text-gray-600 mb-1">花用占收入比例 {data.ratio}%</div>
+          <div className="h-2 bg-white rounded overflow-hidden">
+            <div
+              className={`h-full ${data.ratio > 100 ? "bg-rose-500" : data.ratio > 60 ? "bg-amber-500" : data.ratio > 30 ? "bg-blue-500" : "bg-emerald-500"}`}
+              style={{ width: `${Math.min(data.ratio, 100)}%` }}
+            />
+          </div>
+        </div>
       )}
     </div>
   )

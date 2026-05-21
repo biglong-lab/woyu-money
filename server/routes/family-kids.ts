@@ -8602,6 +8602,80 @@ async function bulkApproveOne(
 }
 
 /**
+ * GET /api/family/income-vs-spending?days=30
+ * 全家過去 N 天收入（task reward）vs 花用（spend + give）對比
+ * 含 balance / ratio / 評等 / 動態 message
+ */
+router.get(
+  "/api/family/income-vs-spending",
+  asyncHandler(async (req, res) => {
+    const days = Math.min(Math.max(Number(req.query.days) || 30, 7), 90)
+
+    const rows = await db.execute(sql`
+      SELECT
+        COALESCE((SELECT SUM(reward_amount::numeric)::numeric FROM kids_tasks
+          WHERE status = 'approved'
+            AND completed_at >= CURRENT_DATE - (${days}::int * INTERVAL '1 day')
+        ), 0) AS income,
+        COALESCE((SELECT SUM(amount::numeric)::numeric FROM kids_spendings
+          WHERE jar = 'spend'
+            AND spend_date >= CURRENT_DATE - (${days}::int * INTERVAL '1 day')
+        ), 0) AS spent,
+        COALESCE((SELECT SUM(amount::numeric)::numeric FROM kids_spendings
+          WHERE jar = 'give'
+            AND spend_date >= CURRENT_DATE - (${days}::int * INTERVAL '1 day')
+        ), 0) AS given
+    `)
+    const row = (
+      rows as unknown as {
+        rows: Array<{ income: string | number; spent: string | number; given: string | number }>
+      }
+    ).rows[0]
+
+    const income = Number(row?.income ?? 0)
+    const spent = Number(row?.spent ?? 0)
+    const given = Number(row?.given ?? 0)
+    const totalOut = spent + given
+    const balance = income - totalOut
+    const ratio = income > 0 ? Math.round((totalOut / income) * 100) : 0
+
+    let level: "saver" | "balanced" | "spender" | "overspending" | "no_data"
+    let message: string
+    if (income === 0 && totalOut === 0) {
+      level = "no_data"
+      message = `過去 ${days} 天還沒收入或花用、開始活動吧 🌱`
+    } else if (income === 0 && totalOut > 0) {
+      level = "overspending"
+      message = `⚠️ 過去 ${days} 天無收入但花用 $${totalOut}、要先賺再花`
+    } else if (ratio <= 30) {
+      level = "saver"
+      message = `💎 收入 $${income} / 只花 $${totalOut}（${ratio}%）、超會存！`
+    } else if (ratio <= 60) {
+      level = "balanced"
+      message = `💰 收入 $${income} / 花 $${totalOut}（${ratio}%）、平衡良好`
+    } else if (ratio <= 100) {
+      level = "spender"
+      message = `🛒 收入 $${income} / 花 $${totalOut}（${ratio}%）、花用偏高`
+    } else {
+      level = "overspending"
+      message = `🚨 花了 $${totalOut} > 收入 $${income}（${ratio}%）、入不敷出！`
+    }
+
+    res.json({
+      days,
+      income,
+      spent,
+      given,
+      totalOut,
+      balance,
+      ratio,
+      level,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/jars-current-balance
  * 全家三罐當前餘額總和 + 比例 + 每罐 topKid
  * 健康度：save 占比 ≥ 25% = healthy / 15-25% = ok / <15% = unhealthy
