@@ -8602,6 +8602,98 @@ async function bulkApproveOne(
 }
 
 /**
+ * GET /api/family/monthly-improvement-rank
+ * 家庭月度進步榜：每個 active kid 本月 vs 上月 task 完成數
+ * improvement = (this - last) / max(last, 1) 比例
+ */
+router.get(
+  "/api/family/monthly-improvement-rank",
+  asyncHandler(async (_req, res) => {
+    const rows = await db.execute(sql`
+      SELECT
+        ka.id::int AS kid_id,
+        ka.display_name AS kid_name,
+        ka.avatar,
+        (SELECT COUNT(*)::int FROM kids_tasks
+          WHERE kid_id = ka.id
+            AND status = 'approved'
+            AND completed_at >= DATE_TRUNC('month', CURRENT_DATE)
+            AND completed_at < DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month'
+        ) AS this_month,
+        (SELECT COUNT(*)::int FROM kids_tasks
+          WHERE kid_id = ka.id
+            AND status = 'approved'
+            AND completed_at >= DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '1 month'
+            AND completed_at < DATE_TRUNC('month', CURRENT_DATE)
+        ) AS last_month
+      FROM kids_accounts ka
+      WHERE ka.is_active = true
+      ORDER BY ka.id ASC
+    `)
+    const kids = (
+      rows as unknown as {
+        rows: Array<{
+          kid_id: number
+          kid_name: string
+          avatar: string
+          this_month: number
+          last_month: number
+        }>
+      }
+    ).rows.map((r) => {
+      const thisMonth = r.this_month
+      const lastMonth = r.last_month
+      const diff = thisMonth - lastMonth
+      const improvement =
+        lastMonth > 0 ? Math.round((diff / lastMonth) * 100) : thisMonth > 0 ? 100 : 0
+      let status: "improving" | "steady" | "declining" | "stagnated"
+      if (thisMonth === 0 && lastMonth === 0) status = "stagnated"
+      else if (improvement >= 20) status = "improving"
+      else if (improvement <= -20) status = "declining"
+      else status = "steady"
+      return {
+        kidId: r.kid_id,
+        kidName: r.kid_name,
+        avatar: r.avatar,
+        thisMonth,
+        lastMonth,
+        diff,
+        improvement,
+        status,
+      }
+    })
+
+    const sorted = [...kids].sort((a, b) => b.improvement - a.improvement)
+    const topImprover = sorted.length > 0 && sorted[0].improvement > 0 ? sorted[0] : null
+    const stagnatedKids = kids.filter((k) => k.status === "stagnated")
+
+    let message: string
+    if (kids.length === 0) {
+      message = "還沒有小孩、加入第一個吧"
+    } else if (topImprover) {
+      message = `🚀 ${topImprover.avatar} ${topImprover.kidName} 本月進步 ${topImprover.improvement}%（${topImprover.lastMonth} → ${topImprover.thisMonth}）`
+    } else if (stagnatedKids.length === kids.length) {
+      message = "全家本月還沒任務完成、該動起來了！"
+    } else {
+      message = "全家本月進度持平、繼續保持"
+    }
+
+    res.json({
+      kids: sorted,
+      topImprover: topImprover
+        ? {
+            kidName: topImprover.kidName,
+            avatar: topImprover.avatar,
+            improvement: topImprover.improvement,
+          }
+        : null,
+      stagnatedCount: stagnatedKids.length,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/deadline-hit-rate?days=90
  * 任務 deadline 準時達成率：approved_at <= due_date 算準時
  * level: excellent(>=80%) / good(>=60%) / fair(>=30%) / poor / no_data

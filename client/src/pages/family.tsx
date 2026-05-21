@@ -544,6 +544,9 @@ export default function FamilyPage() {
       {/* 家庭 deadline 達標率 */}
       <FamilyDeadlineHitRateCard />
 
+      {/* 家庭月度進步榜 */}
+      <FamilyMonthlyImprovementCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3498,6 +3501,72 @@ function ParentTodoList() {
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
       )}
+    </div>
+  )
+}
+
+function FamilyMonthlyImprovementCard() {
+  const { data } = useQuery<{
+    kids: Array<{
+      kidId: number
+      kidName: string
+      avatar: string
+      thisMonth: number
+      lastMonth: number
+      diff: number
+      improvement: number
+      status: "improving" | "steady" | "declining" | "stagnated"
+    }>
+    topImprover: { kidName: string; avatar: string; improvement: number } | null
+    stagnatedCount: number
+    message: string
+  }>({
+    queryKey: ["/api/family/monthly-improvement-rank"],
+  })
+  if (!data || data.kids.length === 0) return null
+  const hasActivity = data.kids.some((k) => k.thisMonth > 0 || k.lastMonth > 0)
+  if (!hasActivity) return null
+
+  const STATUS_COLOR: Record<string, string> = {
+    improving: "bg-emerald-500 text-white",
+    steady: "bg-blue-400 text-white",
+    declining: "bg-rose-500 text-white",
+    stagnated: "bg-gray-400 text-white",
+  }
+
+  const STATUS_LABEL: Record<string, string> = {
+    improving: "📈 進步",
+    steady: "➖ 持平",
+    declining: "📉 下滑",
+    stagnated: "💤 停滯",
+  }
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-orange-300 bg-gradient-to-br from-orange-50 to-amber-50 p-3 shadow">
+      <h3 className="font-bold mb-2 flex items-center gap-2">🏃 月度進步榜</h3>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-2 text-xs">{data.message}</div>
+
+      <div className="space-y-1.5">
+        {data.kids.map((k) => (
+          <div key={k.kidId} className="bg-white rounded-lg p-2 flex items-center gap-2">
+            <div className="text-lg">{k.avatar}</div>
+            <div className="flex-1">
+              <div className="text-sm font-medium">{k.kidName}</div>
+              <div className="text-[10px] text-gray-500">
+                本月 {k.thisMonth} · 上月 {k.lastMonth} · {k.diff >= 0 ? "+" : ""}
+                {k.diff}
+              </div>
+            </div>
+            <div
+              className={`text-[10px] px-2 py-0.5 rounded ${STATUS_COLOR[k.status]} whitespace-nowrap`}
+            >
+              {STATUS_LABEL[k.status]} {k.improvement >= 0 ? "+" : ""}
+              {k.improvement}%
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
