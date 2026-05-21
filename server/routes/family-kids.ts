@@ -2875,6 +2875,62 @@ router.get(
 )
 
 /**
+ * GET /api/family/kid-donation-recipients?kidId=
+ * 小孩捐贈受贈方統計（看給誰最多、培養同理心）
+ * 從 kids_spendings WHERE jar='give' AND recipient IS NOT NULL GROUP BY
+ */
+router.get(
+  "/api/family/kid-donation-recipients",
+  asyncHandler(async (req, res) => {
+    const kidIdQ = Number(req.query.kidId)
+    if (!Number.isInteger(kidIdQ) || kidIdQ < 1) throw new AppError(400, "需傳 kidId")
+
+    const result = await db.execute(sql`
+      SELECT
+        recipient,
+        COUNT(*)::int AS times,
+        SUM(amount::numeric)::numeric AS total,
+        MAX(spend_date) AS last_at
+      FROM kids_spendings
+      WHERE kid_id = ${kidIdQ}
+        AND jar = 'give'
+        AND recipient IS NOT NULL
+        AND TRIM(recipient) != ''
+      GROUP BY recipient
+      ORDER BY total DESC, times DESC
+    `)
+    const rows = (
+      result as unknown as {
+        rows: {
+          recipient: string
+          times: number
+          total: string | number
+          last_at: Date | null
+        }[]
+      }
+    ).rows
+
+    const recipients = rows.map((r) => ({
+      recipient: r.recipient,
+      times: r.times,
+      total: Number(r.total ?? 0),
+      lastAt: r.last_at,
+    }))
+
+    const totalGiven = recipients.reduce((s, r) => s + r.total, 0)
+    const totalRecipients = recipients.length
+
+    res.json({
+      kidId: kidIdQ,
+      totalGiven,
+      totalRecipients,
+      mostHelped: recipients[0] ?? null,
+      recipients,
+    })
+  })
+)
+
+/**
  * GET /api/family/kid-spending-keywords?kidId=&limit=10
  * 小孩消費分類分析：按 description 分群、看錢花在哪
  *

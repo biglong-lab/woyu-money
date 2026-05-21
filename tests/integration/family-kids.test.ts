@@ -3252,6 +3252,65 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(r.status).toBe(400)
   })
 
+  it("捐贈受贈方：3 筆給「貓中途」+ 1 筆給「兒童基金」、按 total 排序", async () => {
+    await createKid({ spendRatio: 0, saveRatio: 0, giveRatio: 100 })
+
+    // 任務 1000 全到 give 罐
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId, title: "T", rewardAmount: 1000 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`)
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`)
+
+    // 3 筆「貓中途」50 each = 150
+    for (let i = 0; i < 3; i++) {
+      await request(app).post("/api/family/spendings").send({
+        kidId,
+        jar: "give",
+        amount: 50,
+        description: "幫流浪貓",
+        recipient: "貓中途",
+      })
+    }
+    // 1 筆「兒童基金」200
+    await request(app).post("/api/family/spendings").send({
+      kidId,
+      jar: "give",
+      amount: 200,
+      description: "助學",
+      recipient: "兒童基金",
+    })
+
+    const res = await request(app).get(`/api/family/kid-donation-recipients?kidId=${kidId}`)
+    expect(res.status).toBe(200)
+    expect(res.body.totalGiven).toBe(350) // 150 + 200
+    expect(res.body.totalRecipients).toBe(2)
+
+    // 兒童基金 200 > 貓中途 150 → mostHelped = 兒童基金
+    expect(res.body.mostHelped.recipient).toBe("兒童基金")
+    expect(res.body.mostHelped.total).toBe(200)
+    expect(res.body.mostHelped.times).toBe(1)
+
+    const rs = res.body.recipients as Array<{ recipient: string; total: number }>
+    expect(rs[0].recipient).toBe("兒童基金")
+    expect(rs[1].recipient).toBe("貓中途")
+    expect(rs[1].total).toBe(150)
+  })
+
+  it("捐贈受贈方：無 recipient → 空陣列、mostHelped=null", async () => {
+    await createKid()
+    const res = await request(app).get(`/api/family/kid-donation-recipients?kidId=${kidId}`)
+    expect(res.status).toBe(200)
+    expect(res.body.totalGiven).toBe(0)
+    expect(res.body.totalRecipients).toBe(0)
+    expect(res.body.mostHelped).toBeNull()
+  })
+
+  it("kid-donation-recipients 缺 kidId 回 400", async () => {
+    const r = await request(app).get("/api/family/kid-donation-recipients")
+    expect(r.status).toBe(400)
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)

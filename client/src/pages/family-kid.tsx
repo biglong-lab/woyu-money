@@ -1028,6 +1028,9 @@ function KidDashboard({
       {/* 消費分類 */}
       <KidSpendingKeywordsCard kidId={kidId} />
 
+      {/* 捐贈受贈方統計 */}
+      <KidDonationRecipientsCard kidId={kidId} />
+
       {/* 能力強項統計 */}
       <KidStrengthsCard kidId={kidId} />
 
@@ -2285,6 +2288,72 @@ function KidStrengthsCard({ kidId }: { kidId: number }) {
                 <div
                   className={`h-full ${color.text.replace("text-", "bg-")}`}
                   style={{ width: `${c.percentage}%` }}
+                />
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function KidDonationRecipientsCard({ kidId }: { kidId: number }) {
+  const { data } = useQuery<{
+    totalGiven: number
+    totalRecipients: number
+    mostHelped: { recipient: string; total: number; times: number } | null
+    recipients: Array<{
+      recipient: string
+      times: number
+      total: number
+      lastAt: string | null
+    }>
+  }>({
+    queryKey: ["/api/family/kid-donation-recipients", kidId],
+    queryFn: async () => {
+      const res = await fetch(`/api/family/kid-donation-recipients?kidId=${kidId}`, {
+        credentials: "include",
+      })
+      return res.json()
+    },
+  })
+  if (!data || data.totalRecipients === 0) return null
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-pink-300 bg-gradient-to-br from-pink-50 to-rose-50 p-4 shadow">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="font-bold text-pink-900 flex items-center gap-2">❤️ 我幫助過誰</h3>
+        <span className="text-xs text-gray-500">
+          ${data.totalGiven}・{data.totalRecipients} 位
+        </span>
+      </div>
+
+      {data.mostHelped && (
+        <div className="bg-white rounded-lg p-3 mb-3 text-center">
+          <div className="text-xs text-gray-500">最常幫助</div>
+          <div className="text-lg font-bold text-pink-900">{data.mostHelped.recipient}</div>
+          <div className="text-xs text-gray-600">
+            累積捐 ${data.mostHelped.total}（{data.mostHelped.times} 次）
+          </div>
+        </div>
+      )}
+
+      <div className="space-y-1">
+        {data.recipients.map((r) => {
+          const percentage = data.totalGiven > 0 ? Math.round((r.total / data.totalGiven) * 100) : 0
+          return (
+            <div key={r.recipient} className="bg-white rounded-lg p-2">
+              <div className="flex items-center justify-between mb-1 text-sm">
+                <span className="font-medium">🤝 {r.recipient}</span>
+                <span className="text-xs font-bold text-pink-700">
+                  ${r.total}（{r.times} 次）
+                </span>
+              </div>
+              <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-pink-400 to-rose-500"
+                  style={{ width: `${percentage}%` }}
                 />
               </div>
             </div>
