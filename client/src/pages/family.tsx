@@ -458,6 +458,9 @@ export default function FamilyPage() {
       {/* 家庭里程碑紀錄 */}
       <FamilyMilestonesCard />
 
+      {/* 兄弟姊妹比較 */}
+      <SiblingComparisonCard />
+
       {/* 全家活動 feed */}
       <FamilyActivityFeed />
 
@@ -1885,6 +1888,96 @@ function DifficultyInsights() {
         ))}
       </CardContent>
     </Card>
+  )
+}
+
+function SiblingComparisonCard() {
+  const { data } = useQuery<{
+    kidCount: number
+    message?: string
+    familyAvg?: { tasks: number; reward: number; spent: number; given: number }
+    kids: Array<{
+      kidId: number
+      kidName: string
+      avatar: string
+      tasks: number
+      reward: number
+      spent: number
+      given: number
+      ratios: { tasks: number; reward: number; spent: number; given: number }
+      highlights: string[]
+    }>
+  }>({
+    queryKey: ["/api/family/sibling-comparison"],
+    queryFn: async () => {
+      const res = await fetch("/api/family/sibling-comparison", { credentials: "include" })
+      return res.json()
+    },
+  })
+  if (!data || data.kidCount < 2 || data.kids.length === 0) return null
+
+  function ratioColor(r: number) {
+    if (r >= 1.5) return "text-emerald-700 bg-emerald-50"
+    if (r >= 1.0) return "text-blue-700 bg-blue-50"
+    if (r >= 0.5) return "text-amber-700 bg-amber-50"
+    return "text-rose-700 bg-rose-50"
+  }
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-blue-300 bg-gradient-to-br from-blue-50 to-cyan-50 p-4 shadow">
+      <h3 className="font-bold text-blue-900 mb-3 flex items-center gap-2">⚖️ 兄弟姊妹比較</h3>
+
+      {/* 家庭平均 */}
+      {data.familyAvg && (
+        <div className="bg-white rounded-lg p-2 mb-3 text-center text-xs text-gray-600">
+          家庭平均：{data.familyAvg.tasks} 任務・$ {data.familyAvg.reward} 獎勵
+        </div>
+      )}
+
+      {/* 每個小孩 */}
+      <div className="space-y-2">
+        {data.kids.map((k) => (
+          <div key={k.kidId} className="bg-white rounded-lg p-2 shadow-sm">
+            <div className="flex items-center gap-2 mb-1.5">
+              <span className="text-2xl">{k.avatar}</span>
+              <span className="font-bold text-sm flex-1">{k.kidName}</span>
+              <span className="text-xs text-gray-500">
+                {k.tasks} 任務・$ {k.reward}
+              </span>
+            </div>
+
+            {/* 4 個 ratio */}
+            <div className="grid grid-cols-4 gap-1 mb-1">
+              {[
+                { key: "tasks", label: "任務", r: k.ratios.tasks },
+                { key: "reward", label: "獎勵", r: k.ratios.reward },
+                { key: "spent", label: "花用", r: k.ratios.spent },
+                { key: "given", label: "捐贈", r: k.ratios.given },
+              ].map((m) => (
+                <div key={m.key} className={`text-center rounded p-1 text-xs ${ratioColor(m.r)}`}>
+                  <div className="font-bold">{m.r.toFixed(1)}×</div>
+                  <div className="opacity-70">{m.label}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* highlights */}
+            {k.highlights.length > 0 && (
+              <div className="flex flex-wrap gap-1 mt-1">
+                {k.highlights.map((h) => (
+                  <span
+                    key={h}
+                    className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-bold"
+                  >
+                    {h}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
   )
 }
 

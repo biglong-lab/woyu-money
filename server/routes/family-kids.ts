@@ -2875,6 +2875,127 @@ router.get(
 )
 
 /**
+ * GET /api/family/sibling-comparison
+ * 兄弟姊妹比較（家長端、看公平性）
+ * 每個 active kid 相對家庭平均的 ratio（任務數/獎勵/儲蓄/花費/捐贈）
+ *
+ * ratio = kidValue / familyAvg
+ *   1.0 = 跟平均一樣
+ *   > 1 = 比平均多
+ *   < 1 = 比平均少
+ */
+router.get(
+  "/api/family/sibling-comparison",
+  asyncHandler(async (_req, res) => {
+    const result = await db.execute(sql`
+      SELECT
+        ka.id::int AS kid_id,
+        ka.display_name AS kid_name,
+        ka.avatar AS avatar,
+        COALESCE((
+          SELECT COUNT(*)::int FROM kids_tasks
+          WHERE kid_id = ka.id AND status = 'approved'
+            AND completed_at >= NOW() - INTERVAL '30 days'
+        ), 0) AS tasks,
+        COALESCE((
+          SELECT SUM(reward_amount::numeric)::numeric FROM kids_tasks
+          WHERE kid_id = ka.id AND status = 'approved'
+            AND completed_at >= NOW() - INTERVAL '30 days'
+        ), 0) AS reward,
+        COALESCE((
+          SELECT SUM(amount::numeric)::numeric FROM kids_spendings
+          WHERE kid_id = ka.id AND jar = 'spend'
+            AND spend_date >= CURRENT_DATE - INTERVAL '30 days'
+        ), 0) AS spent,
+        COALESCE((
+          SELECT SUM(amount::numeric)::numeric FROM kids_spendings
+          WHERE kid_id = ka.id AND jar = 'give'
+            AND spend_date >= CURRENT_DATE - INTERVAL '30 days'
+        ), 0) AS given
+      FROM kids_accounts ka
+      WHERE ka.is_active = true
+      ORDER BY ka.id ASC
+    `)
+    const rows = (
+      result as unknown as {
+        rows: {
+          kid_id: number
+          kid_name: string
+          avatar: string
+          tasks: number
+          reward: string | number
+          spent: string | number
+          given: string | number
+        }[]
+      }
+    ).rows
+
+    if (rows.length < 2) {
+      return res.json({
+        kidCount: rows.length,
+        message: "需要至少 2 個小孩才能比較",
+        kids: [],
+      })
+    }
+
+    const kidsData = rows.map((r) => ({
+      kidId: r.kid_id,
+      kidName: r.kid_name,
+      avatar: r.avatar,
+      tasks: r.tasks ?? 0,
+      reward: Number(r.reward ?? 0),
+      spent: Number(r.spent ?? 0),
+      given: Number(r.given ?? 0),
+    }))
+
+    const familyAvg = {
+      tasks: kidsData.reduce((s, k) => s + k.tasks, 0) / kidsData.length,
+      reward: kidsData.reduce((s, k) => s + k.reward, 0) / kidsData.length,
+      spent: kidsData.reduce((s, k) => s + k.spent, 0) / kidsData.length,
+      given: kidsData.reduce((s, k) => s + k.given, 0) / kidsData.length,
+    }
+
+    function ratio(v: number, avg: number) {
+      if (avg === 0) return v > 0 ? 2.0 : 1.0
+      return Math.round((v / avg) * 100) / 100
+    }
+
+    // 標記每個 kid 的「特長」 + 「需要注意」
+    const kids = kidsData.map((k) => {
+      const ratios = {
+        tasks: ratio(k.tasks, familyAvg.tasks),
+        reward: ratio(k.reward, familyAvg.reward),
+        spent: ratio(k.spent, familyAvg.spent),
+        given: ratio(k.given, familyAvg.given),
+      }
+      const highlights: string[] = []
+      if (ratios.tasks >= 1.5) highlights.push("🏆 任務超積極")
+      if (ratios.given >= 1.5) highlights.push("❤️ 最有愛心")
+      if (ratios.spent <= 0.5 && k.reward > 0) highlights.push("🐷 最會存錢")
+      if (ratios.spent >= 2.0) highlights.push("💸 花最多")
+
+      return {
+        ...k,
+        ratios,
+        highlights,
+      }
+    })
+
+    res.json({
+      period: "近 30 天",
+      kidCount: kids.length,
+      familyAvg: {
+        tasks: Math.round(familyAvg.tasks * 10) / 10,
+        reward: Math.round(familyAvg.reward),
+        spent: Math.round(familyAvg.spent),
+        given: Math.round(familyAvg.given),
+      },
+      kids,
+    })
+  })
+)
+
+/**
  * GET /api/family/kid-suggestions?kidId=&limit=5
  * 推薦小孩可挑戰的任務（別的小孩做過、這個小孩沒做過的）
  */

@@ -3140,6 +3140,59 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(r.status).toBe(400)
   })
 
+  it("兄弟姊妹比較：2 小孩 + 不同 task count → ratios + highlights", async () => {
+    // 清乾淨
+    await db.execute(sql`DELETE FROM kids_accounts WHERE pin = ${TEST_PIN}`)
+
+    // 小華做 3 個任務（積極）
+    await createKid({ displayName: "小華" })
+    const huaId = kidId
+    for (let i = 0; i < 3; i++) {
+      const t = await request(app)
+        .post("/api/family/tasks")
+        .send({ kidId: huaId, title: `H${i}`, rewardAmount: 50 })
+      await request(app).post(`/api/family/tasks/${t.body.id}/submit`)
+      await request(app).post(`/api/family/tasks/${t.body.id}/approve`)
+    }
+
+    // 小明做 1 個任務
+    await createKid({ displayName: "小明" })
+    const mingId = kidId
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId: mingId, title: "M1", rewardAmount: 50 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`)
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`)
+
+    const res = await request(app).get("/api/family/sibling-comparison")
+    expect(res.status).toBe(200)
+    expect(res.body.kidCount).toBe(2)
+    expect(res.body.kids.length).toBe(2)
+
+    const hua = res.body.kids.find((k: { kidName: string }) => k.kidName === "小華")
+    const ming = res.body.kids.find((k: { kidName: string }) => k.kidName === "小明")
+    expect(hua.tasks).toBe(3)
+    expect(ming.tasks).toBe(1)
+    // familyAvg.tasks = 2 → hua=1.5, ming=0.5
+    expect(hua.ratios.tasks).toBe(1.5)
+    expect(ming.ratios.tasks).toBe(0.5)
+    // hua >= 1.5 應該有「🏆 任務超積極」
+    expect(hua.highlights).toContain("🏆 任務超積極")
+
+    // 清姐姐
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${huaId}`)
+  })
+
+  it("兄弟姊妹比較：只有 1 個小孩 → 不夠比較", async () => {
+    await db.execute(sql`DELETE FROM kids_accounts WHERE pin = ${TEST_PIN}`)
+    await createKid()
+    const res = await request(app).get("/api/family/sibling-comparison")
+    expect(res.status).toBe(200)
+    expect(res.body.kidCount).toBe(1)
+    expect(res.body.kids).toEqual([])
+    expect(res.body.message).toContain("至少 2")
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)
