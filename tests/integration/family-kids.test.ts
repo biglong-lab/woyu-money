@@ -2378,6 +2378,74 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(r.status).toBe(400)
   })
 
+  it("目標 ETA：有存款 → predictable + etaDays/etaDate/suggestion", async () => {
+    await createKid({ spendRatio: 40, saveRatio: 50, giveRatio: 10 })
+
+    for (let i = 0; i < 3; i++) {
+      const t = await request(app)
+        .post("/api/family/tasks")
+        .send({ kidId, title: `T${i}`, rewardAmount: 200 })
+      await request(app).post(`/api/family/tasks/${t.body.id}/submit`)
+      await request(app).post(`/api/family/tasks/${t.body.id}/approve`)
+    }
+
+    const goalRes = await request(app)
+      .post("/api/family/goals")
+      .send({ kidId, name: "新樂高", targetAmount: 1000 })
+    expect(goalRes.status).toBe(201)
+    const goalId = goalRes.body.id
+
+    const eta = await request(app).get(`/api/family/goals/${goalId}/eta`)
+    expect(eta.status).toBe(200)
+    expect(eta.body.status).toBe("predictable")
+    expect(eta.body.dailyNetSave).toBeGreaterThan(0)
+    expect(eta.body.etaDays).toBeGreaterThan(0)
+    expect(eta.body.etaDate).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+    expect(eta.body.suggestion).toBeTruthy()
+  })
+
+  it("目標 ETA：無任務 → no_savings", async () => {
+    await createKid()
+    const goalRes = await request(app)
+      .post("/api/family/goals")
+      .send({ kidId, name: "玩偶", targetAmount: 500 })
+    const goalId = goalRes.body.id
+
+    const eta = await request(app).get(`/api/family/goals/${goalId}/eta`)
+    expect(eta.status).toBe(200)
+    expect(eta.body.status).toBe("no_savings")
+    expect(eta.body.etaDays).toBeNull()
+    expect(eta.body.suggestion).toContain("存錢")
+  })
+
+  it("目標 ETA：已達成 → reached", async () => {
+    await createKid({ spendRatio: 0, saveRatio: 100, giveRatio: 0 })
+
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId, title: "大任務", rewardAmount: 600 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`)
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`)
+
+    const goalRes = await request(app)
+      .post("/api/family/goals")
+      .send({ kidId, name: "小目標", targetAmount: 100 })
+    const goalId = goalRes.body.id
+
+    // 把 200 元從 save 罐撥到目標（撥滿目標）
+    await request(app).post(`/api/family/goals/${goalId}/save`).send({ amount: 200 })
+
+    const eta = await request(app).get(`/api/family/goals/${goalId}/eta`)
+    expect(eta.status).toBe(200)
+    expect(eta.body.status).toBe("reached")
+    expect(eta.body.etaDays).toBe(0)
+  })
+
+  it("目標 ETA：不存在 → 404", async () => {
+    const r = await request(app).get("/api/family/goals/999999/eta")
+    expect(r.status).toBe(404)
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)

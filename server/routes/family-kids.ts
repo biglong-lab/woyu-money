@@ -2875,6 +2875,111 @@ router.get(
 )
 
 /**
+ * GET /api/family/goals/:id/eta
+ * 目標達成 ETA 預測（按近 30 天 save 罐淨流入推估）
+ *
+ * 收入 = 近 30 天 task reward × saveRatio
+ * 支出 = 近 30 天 save 罐 spending
+ * dailyNetSave = (收入 - 支出) / 30
+ * etaDays = ceil(remaining / dailyNetSave)
+ */
+router.get(
+  "/api/family/goals/:id/eta",
+  asyncHandler(async (req, res) => {
+    const goalId = Number(req.params.id)
+    if (!Number.isInteger(goalId) || goalId < 1) throw new AppError(400, "ID 無效")
+
+    const [goal] = await db.select().from(kidsGoals).where(eq(kidsGoals.id, goalId)).limit(1)
+    if (!goal) throw new AppError(404, "目標不存在")
+
+    const target = parseFloat(goal.targetAmount)
+    const current = parseFloat(goal.currentAmount)
+    const remaining = target - current
+
+    if (remaining <= 0) {
+      return res.json({
+        goalId,
+        status: "reached",
+        dailyNetSave: 0,
+        etaDays: 0,
+        etaDate: null,
+        remaining: 0,
+        suggestion: "🎉 已達成！可以買了！",
+      })
+    }
+
+    const [kid] = await db
+      .select()
+      .from(kidsAccounts)
+      .where(eq(kidsAccounts.id, goal.kidId))
+      .limit(1)
+    if (!kid) throw new AppError(404, "小孩不存在")
+    const saveRatio = kid.saveRatio / 100
+
+    const earnedRows = await db.execute(sql`
+      SELECT COALESCE(SUM(reward_amount::numeric), 0)::numeric AS total
+      FROM kids_tasks
+      WHERE kid_id = ${goal.kidId}
+        AND status = 'approved'
+        AND completed_at >= NOW() - INTERVAL '30 days'
+    `)
+    const totalEarned = Number(
+      (earnedRows as unknown as { rows: { total: string | number }[] }).rows[0]?.total ?? 0
+    )
+    const saveEarned = totalEarned * saveRatio
+
+    const spentRows = await db.execute(sql`
+      SELECT COALESCE(SUM(amount::numeric), 0)::numeric AS total
+      FROM kids_spendings
+      WHERE kid_id = ${goal.kidId}
+        AND jar = 'save'
+        AND spend_date >= CURRENT_DATE - INTERVAL '30 days'
+    `)
+    const saveSpent = Number(
+      (spentRows as unknown as { rows: { total: string | number }[] }).rows[0]?.total ?? 0
+    )
+
+    const netSave30 = saveEarned - saveSpent
+    const dailyNetSave = netSave30 / 30
+
+    if (dailyNetSave <= 0) {
+      return res.json({
+        goalId,
+        status: "no_savings",
+        dailyNetSave: 0,
+        etaDays: null,
+        etaDate: null,
+        remaining,
+        suggestion: "近期沒在存錢，多做任務或調整 save 比例試試",
+      })
+    }
+
+    const etaDays = Math.ceil(remaining / dailyNetSave)
+    const etaDate = new Date()
+    etaDate.setDate(etaDate.getDate() + etaDays)
+
+    const suggestion =
+      etaDays <= 7
+        ? `🔥 再 ${etaDays} 天就能買！繼續加油！`
+        : etaDays <= 30
+          ? `💪 大約 ${etaDays} 天達成、每天存 ${Math.round(dailyNetSave)} 元`
+          : etaDays <= 90
+            ? `🌱 還要 ${etaDays} 天、試試提高 save 比例會更快`
+            : `🎯 ${etaDays} 天有點久、考慮分階段或調整目標`
+
+    res.json({
+      goalId,
+      status: "predictable",
+      dailyNetSave: Math.round(dailyNetSave * 100) / 100,
+      etaDays,
+      etaDate: etaDate.toISOString().slice(0, 10),
+      remaining,
+      suggestion,
+    })
+  })
+)
+
+/**
  * GET /api/family/activity?limit=30
  * 全家活動 feed（家長端、不指定 kidId）
  * 一次看全家最近動態：task / spending / checkin / wish

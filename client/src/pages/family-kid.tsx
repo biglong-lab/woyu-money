@@ -890,6 +890,7 @@ function KidDashboard({
                       💭 「{g.reflection}」
                     </div>
                   )}
+                  <GoalEtaBadge goalId={g.id} />
                   <div className="h-3 rounded-full bg-gray-100 overflow-hidden mb-2">
                     <motion.div
                       initial={{ width: 0 }}
@@ -1762,6 +1763,36 @@ function WishesSection({
           ))}
         </div>
       )}
+    </div>
+  )
+}
+
+function GoalEtaBadge({ goalId }: { goalId: number }) {
+  const { data } = useQuery<{
+    status: "reached" | "predictable" | "no_savings"
+    etaDays: number | null
+    etaDate: string | null
+    suggestion: string
+  }>({
+    queryKey: ["/api/family/goals", goalId, "eta"],
+    queryFn: async () => {
+      const res = await fetch(`/api/family/goals/${goalId}/eta`, { credentials: "include" })
+      return res.json()
+    },
+  })
+  if (!data) return null
+
+  const colorByStatus = {
+    reached: "bg-green-50 text-green-700 border-green-200",
+    predictable: "bg-blue-50 text-blue-700 border-blue-200",
+    no_savings: "bg-amber-50 text-amber-700 border-amber-200",
+  }
+  return (
+    <div
+      className={`text-xs rounded px-2 py-1.5 mb-1.5 border ${colorByStatus[data.status]} flex items-center gap-1`}
+    >
+      <span className="shrink-0">⏱️</span>
+      <span className="flex-1">{data.suggestion}</span>
     </div>
   )
 }
