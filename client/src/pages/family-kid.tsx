@@ -1004,6 +1004,9 @@ function KidDashboard({
       {/* 任務挑戰推薦（明天試試這些）*/}
       <KidSuggestionsCard kidId={kidId} />
 
+      {/* 目標倒數 */}
+      <KidGoalDeadlinesCard kidId={kidId} />
+
       {/* 任務 streak（連續做任務）*/}
       <KidTaskStreakCard kidId={kidId} />
 
@@ -2773,6 +2776,95 @@ function KidActivityTimeline({ kidId }: { kidId: number }) {
             </div>
           )
         })}
+      </div>
+    </div>
+  )
+}
+
+function KidGoalDeadlinesCard({ kidId }: { kidId: number }) {
+  const { data } = useQuery<{
+    total: number
+    passedCount: number
+    urgentCount: number
+    goals: Array<{
+      id: number
+      name: string
+      emoji: string
+      current: number
+      target: number
+      remaining: number
+      progress: number
+      daysLeft: number
+      urgency: "passed" | "urgent" | "soon" | "ok"
+      message: string
+    }>
+  }>({
+    queryKey: ["/api/family/kid-goals-deadlines", kidId],
+    queryFn: async () => {
+      const res = await fetch(`/api/family/kid-goals-deadlines?kidId=${kidId}`, {
+        credentials: "include",
+      })
+      return res.json()
+    },
+  })
+  if (!data || data.total === 0) return null
+
+  const URGENCY_COLOR: Record<string, string> = {
+    passed: "bg-gray-100 border-gray-300 text-gray-700",
+    urgent: "bg-rose-100 border-rose-400 text-rose-900",
+    soon: "bg-amber-100 border-amber-400 text-amber-900",
+    ok: "bg-emerald-50 border-emerald-300 text-emerald-900",
+  }
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-rose-300 bg-gradient-to-br from-rose-50 to-pink-50 p-4 shadow">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="font-bold text-rose-900 flex items-center gap-2">⏳ 目標倒數</h3>
+        {(data.urgentCount > 0 || data.passedCount > 0) && (
+          <div className="flex gap-1 text-xs">
+            {data.urgentCount > 0 && (
+              <span className="bg-rose-500 text-white px-2 py-0.5 rounded-full font-bold">
+                🔥 {data.urgentCount}
+              </span>
+            )}
+            {data.passedCount > 0 && (
+              <span className="bg-gray-500 text-white px-2 py-0.5 rounded-full font-bold">
+                ⏰ {data.passedCount}
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div className="space-y-2">
+        {data.goals.map((g) => (
+          <div key={g.id} className={`rounded-lg p-2 border-2 ${URGENCY_COLOR[g.urgency]}`}>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-2xl">{g.emoji}</span>
+              <div className="flex-1 min-w-0">
+                <div className="font-bold text-sm truncate">{g.name}</div>
+                <div className="text-xs opacity-75">
+                  ${g.current} / ${g.target}（{g.progress}%）
+                </div>
+              </div>
+            </div>
+            <div className="h-1.5 w-full bg-white/70 rounded-full overflow-hidden mb-1">
+              <div
+                className={
+                  g.urgency === "urgent"
+                    ? "h-full bg-rose-500"
+                    : g.urgency === "soon"
+                      ? "h-full bg-amber-500"
+                      : g.urgency === "passed"
+                        ? "h-full bg-gray-400"
+                        : "h-full bg-emerald-500"
+                }
+                style={{ width: `${g.progress}%` }}
+              />
+            </div>
+            <div className="text-xs font-medium">{g.message}</div>
+          </div>
+        ))}
       </div>
     </div>
   )

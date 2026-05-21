@@ -2875,6 +2875,97 @@ router.get(
 )
 
 /**
+ * GET /api/family/kid-goals-deadlines?kidId=
+ * 小孩端：有 deadline 的 active goals 倒數 + 緊迫度
+ */
+router.get(
+  "/api/family/kid-goals-deadlines",
+  asyncHandler(async (req, res) => {
+    const kidIdQ = Number(req.query.kidId)
+    if (!Number.isInteger(kidIdQ) || kidIdQ < 1) throw new AppError(400, "需傳 kidId")
+
+    const result = await db.execute(sql`
+      SELECT
+        id::int AS id,
+        name,
+        emoji,
+        current_amount::numeric AS current,
+        target_amount::numeric AS target,
+        deadline,
+        (deadline - CURRENT_DATE)::int AS days_left
+      FROM kids_goals
+      WHERE kid_id = ${kidIdQ}
+        AND status = 'active'
+        AND deadline IS NOT NULL
+      ORDER BY deadline ASC
+    `)
+    const rows = (
+      result as unknown as {
+        rows: {
+          id: number
+          name: string
+          emoji: string | null
+          current: string | number
+          target: string | number
+          deadline: Date
+          days_left: number
+        }[]
+      }
+    ).rows
+
+    const goals = rows.map((r) => {
+      const current = Number(r.current ?? 0)
+      const target = Number(r.target ?? 0)
+      const remaining = Math.max(0, target - current)
+      const progress = target > 0 ? Math.min(100, Math.round((current / target) * 100)) : 0
+      const days = r.days_left
+
+      let urgency: "passed" | "urgent" | "soon" | "ok"
+      let message: string
+      if (days < 0) {
+        urgency = "passed"
+        message = `⏰ 已過期 ${Math.abs(days)} 天、調整目標或日期`
+      } else if (days <= 7) {
+        urgency = "urgent"
+        if (remaining === 0) message = `🎉 達標！可以買了！還 ${days} 天到期`
+        else message = `🔥 還剩 ${days} 天、需要再存 $${remaining}`
+      } else if (days <= 30) {
+        urgency = "soon"
+        message = `💪 ${days} 天到期、平均每天存 $${Math.ceil(remaining / days)}`
+      } else {
+        urgency = "ok"
+        message = `🌱 ${days} 天到期、放心慢慢存`
+      }
+
+      return {
+        id: r.id,
+        name: r.name,
+        emoji: r.emoji ?? "🎯",
+        current,
+        target,
+        remaining,
+        progress,
+        deadline: r.deadline,
+        daysLeft: days,
+        urgency,
+        message,
+      }
+    })
+
+    const passedCount = goals.filter((g) => g.urgency === "passed").length
+    const urgentCount = goals.filter((g) => g.urgency === "urgent").length
+
+    res.json({
+      kidId: kidIdQ,
+      total: goals.length,
+      passedCount,
+      urgentCount,
+      goals,
+    })
+  })
+)
+
+/**
  * GET /api/family/parent-todo
  * 家長端待辦清單：今日該做什麼 actionable items
  *

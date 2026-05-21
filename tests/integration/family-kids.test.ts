@@ -3447,6 +3447,67 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.body.urgentCount).toBe(0)
   })
 
+  it("目標倒數：5 天後到期 → urgency=urgent + message 含「還剩」", async () => {
+    await createKid({ spendRatio: 0, saveRatio: 100, giveRatio: 0 })
+
+    // 任務 1000、存 200 到目標 500（達 40%）
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId, title: "T", rewardAmount: 1000 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`)
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`)
+
+    // 設定 deadline 5 天後
+    const deadline = new Date(Date.now() + 5 * 86_400_000).toISOString().slice(0, 10)
+    const goalRes = await request(app)
+      .post("/api/family/goals")
+      .send({ kidId, name: "新樂高", targetAmount: 500, deadline })
+    expect(goalRes.status).toBe(201)
+    const goalId = goalRes.body.id
+    await request(app).post(`/api/family/goals/${goalId}/save`).send({ amount: 200 })
+
+    const res = await request(app).get(`/api/family/kid-goals-deadlines?kidId=${kidId}`)
+    expect(res.status).toBe(200)
+    expect(res.body.total).toBe(1)
+    expect(res.body.urgentCount).toBe(1)
+
+    const g = res.body.goals[0]
+    expect(g.urgency).toBe("urgent")
+    expect(g.daysLeft).toBe(5)
+    expect(g.remaining).toBe(300) // 500 - 200
+    expect(g.progress).toBe(40)
+    expect(g.message).toContain("還剩")
+  })
+
+  it("目標倒數：deadline 過期 → urgency=passed", async () => {
+    await createKid()
+    const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10)
+    const goalRes = await request(app)
+      .post("/api/family/goals")
+      .send({ kidId, name: "過期目標", targetAmount: 500, deadline: yesterday })
+    expect(goalRes.status).toBe(201)
+
+    const res = await request(app).get(`/api/family/kid-goals-deadlines?kidId=${kidId}`)
+    expect(res.status).toBe(200)
+    expect(res.body.passedCount).toBe(1)
+    expect(res.body.goals[0].urgency).toBe("passed")
+    expect(res.body.goals[0].message).toContain("已過期")
+  })
+
+  it("目標倒數：無 deadline goal → total=0", async () => {
+    await createKid()
+    await request(app).post("/api/family/goals").send({ kidId, name: "無期限", targetAmount: 100 })
+
+    const res = await request(app).get(`/api/family/kid-goals-deadlines?kidId=${kidId}`)
+    expect(res.status).toBe(200)
+    expect(res.body.total).toBe(0)
+  })
+
+  it("kid-goals-deadlines 缺 kidId 回 400", async () => {
+    const r = await request(app).get("/api/family/kid-goals-deadlines")
+    expect(r.status).toBe(400)
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)
