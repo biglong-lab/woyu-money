@@ -8602,6 +8602,104 @@ async function bulkApproveOne(
 }
 
 /**
+ * GET /api/family/difficulty-evolution?kidId=&months=6
+ * 個別小孩過去 N 個月每月 easy / medium / hard 完成數變化趨勢
+ * 用 generate_series 確保每月都有資料（即使 0）、從舊到新排序
+ * trend：rising_challenge / easing / steady / no_data
+ */
+router.get(
+  "/api/family/difficulty-evolution",
+  asyncHandler(async (req, res) => {
+    const kidId = Number(req.query.kidId)
+    if (!Number.isInteger(kidId) || kidId < 1) throw new AppError(400, "需傳 kidId")
+    const months = Math.min(Math.max(Number(req.query.months) || 6, 1), 24)
+
+    const rows = await db.execute(sql`
+      WITH months AS (
+        SELECT generate_series(
+          DATE_TRUNC('month', CURRENT_DATE) - ((${months}::int - 1) * INTERVAL '1 month'),
+          DATE_TRUNC('month', CURRENT_DATE),
+          INTERVAL '1 month'
+        )::date AS month_start
+      )
+      SELECT
+        TO_CHAR(m.month_start, 'YYYY-MM') AS month,
+        COALESCE(SUM(CASE WHEN t.difficulty = 'easy' THEN 1 ELSE 0 END), 0)::int AS easy,
+        COALESCE(SUM(CASE WHEN t.difficulty = 'medium' THEN 1 ELSE 0 END), 0)::int AS medium,
+        COALESCE(SUM(CASE WHEN t.difficulty = 'hard' THEN 1 ELSE 0 END), 0)::int AS hard
+      FROM months m
+      LEFT JOIN kids_tasks t ON
+        t.kid_id = ${kidId}
+        AND t.status = 'approved'
+        AND t.completed_at >= m.month_start
+        AND t.completed_at < m.month_start + INTERVAL '1 month'
+      GROUP BY m.month_start
+      ORDER BY m.month_start ASC
+    `)
+
+    const monthsArr = (
+      rows as unknown as {
+        rows: Array<{ month: string; easy: number; medium: number; hard: number }>
+      }
+    ).rows
+
+    let trend: "rising_challenge" | "easing" | "steady" | "no_data"
+    let message: string
+
+    const totalsAll = monthsArr.reduce(
+      (acc, m) => {
+        acc.easy += m.easy
+        acc.medium += m.medium
+        acc.hard += m.hard
+        return acc
+      },
+      { easy: 0, medium: 0, hard: 0 }
+    )
+    const totalCount = totalsAll.easy + totalsAll.medium + totalsAll.hard
+    if (totalCount === 0) {
+      trend = "no_data"
+      message = "還沒有完成的任務、開始第一個吧！"
+    } else {
+      const half = Math.floor(monthsArr.length / 2)
+      const firstHalf = monthsArr.slice(0, half)
+      const secondHalf = monthsArr.slice(half)
+      const ratio = (arr: typeof monthsArr) => {
+        const s = arr.reduce(
+          (acc, m) => {
+            acc.hard += m.hard
+            acc.total += m.easy + m.medium + m.hard
+            return acc
+          },
+          { hard: 0, total: 0 }
+        )
+        return s.total > 0 ? s.hard / s.total : 0
+      }
+      const r1 = ratio(firstHalf)
+      const r2 = ratio(secondHalf)
+      const diff = r2 - r1
+      if (diff > 0.1) {
+        trend = "rising_challenge"
+        message = `🚀 越來越勇敢挑戰困難任務（hard 比例 +${Math.round(diff * 100)}%）`
+      } else if (diff < -0.1) {
+        trend = "easing"
+        message = `🌱 困難任務變少了、可以再挑戰看看（hard 比例 ${Math.round(diff * 100)}%）`
+      } else {
+        trend = "steady"
+        message = "穩定發揮、繼續保持節奏 👍"
+      }
+    }
+
+    res.json({
+      kidId,
+      months: monthsArr,
+      totals: totalsAll,
+      trend,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/weekly-summary
  * 全家本週 vs 上週 metrics 對比 + highlights
  * 起：本週一 00:00（PostgreSQL DATE_TRUNC('week', ...) 對應 ISO 週、週一為起）

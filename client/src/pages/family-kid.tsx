@@ -1207,6 +1207,9 @@ function KidDashboard({
         </div>
       )}
 
+      {/* 難度演進（過去 6 個月）*/}
+      <KidDifficultyEvolutionCard kidId={kidId} />
+
       {/* 三罐趨勢圖（過去 30 天）*/}
       {trend && trend.trend.length > 0 && (
         <div className="mb-4">
@@ -1836,6 +1839,91 @@ function WishesSection({
           ))}
         </div>
       )}
+    </div>
+  )
+}
+
+function KidDifficultyEvolutionCard({ kidId }: { kidId: number }) {
+  const { data } = useQuery<{
+    months: Array<{ month: string; easy: number; medium: number; hard: number }>
+    totals: { easy: number; medium: number; hard: number }
+    trend: "rising_challenge" | "easing" | "steady" | "no_data"
+    message: string
+  }>({
+    queryKey: [`/api/family/difficulty-evolution?kidId=${kidId}&months=6`],
+  })
+  if (!data) return null
+  if (data.totals.easy + data.totals.medium + data.totals.hard === 0) return null
+
+  const max = Math.max(...data.months.map((m) => m.easy + m.medium + m.hard), 1)
+
+  const TREND_BG: Record<string, string> = {
+    rising_challenge: "from-orange-50 to-red-50 border-orange-300",
+    easing: "from-sky-50 to-blue-50 border-sky-300",
+    steady: "from-emerald-50 to-green-50 border-emerald-300",
+    no_data: "from-gray-50 to-slate-50 border-gray-300",
+  }
+
+  return (
+    <div
+      className={`mb-4 rounded-2xl border-2 bg-gradient-to-br ${TREND_BG[data.trend]} p-3 shadow`}
+    >
+      <h2 className="font-bold mb-2 flex items-center gap-2">⚡ 我的難度演進（6 個月）</h2>
+
+      <div className="bg-white/80 rounded-lg p-2 mb-2 text-sm">{data.message}</div>
+
+      <div className="flex items-end gap-1.5 h-28 mb-2">
+        {data.months.map((m) => {
+          const total = m.easy + m.medium + m.hard
+          const h = (total / max) * 100
+          return (
+            <div key={m.month} className="flex-1 flex flex-col items-center justify-end">
+              <div
+                className="w-full flex flex-col-reverse rounded overflow-hidden bg-white/50"
+                style={{ height: `${Math.max(h, 4)}%` }}
+              >
+                {m.easy > 0 && (
+                  <div
+                    className="bg-green-400 w-full"
+                    style={{ height: `${(m.easy / Math.max(total, 1)) * 100}%` }}
+                    title={`easy: ${m.easy}`}
+                  />
+                )}
+                {m.medium > 0 && (
+                  <div
+                    className="bg-amber-400 w-full"
+                    style={{ height: `${(m.medium / Math.max(total, 1)) * 100}%` }}
+                    title={`medium: ${m.medium}`}
+                  />
+                )}
+                {m.hard > 0 && (
+                  <div
+                    className="bg-red-500 w-full"
+                    style={{ height: `${(m.hard / Math.max(total, 1)) * 100}%` }}
+                    title={`hard: ${m.hard}`}
+                  />
+                )}
+              </div>
+              <div className="text-[9px] text-gray-500 mt-1">{m.month.slice(5)}</div>
+            </div>
+          )
+        })}
+      </div>
+
+      <div className="flex justify-center gap-3 text-xs text-gray-600">
+        <span>
+          <span className="inline-block w-2.5 h-2.5 bg-green-400 rounded-sm mr-1" />⭐ easy{" "}
+          {data.totals.easy}
+        </span>
+        <span>
+          <span className="inline-block w-2.5 h-2.5 bg-amber-400 rounded-sm mr-1" />
+          ⭐⭐ medium {data.totals.medium}
+        </span>
+        <span>
+          <span className="inline-block w-2.5 h-2.5 bg-red-500 rounded-sm mr-1" />
+          ⭐⭐⭐ hard {data.totals.hard}
+        </span>
+      </div>
     </div>
   )
 }

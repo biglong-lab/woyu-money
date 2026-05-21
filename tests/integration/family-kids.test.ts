@@ -4245,6 +4245,49 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.body.weeks).toBe(52)
   })
 
+  it("難度演進：months=6 → 6 個月資料 + trend", async () => {
+    const kidObj = (await createKid()) as { id: number }
+    const myKidId = kidObj.id
+    const res = await request(app).get(`/api/family/difficulty-evolution?kidId=${myKidId}&months=6`)
+    expect(res.status).toBe(200)
+    expect(res.body.kidId).toBe(myKidId)
+    expect(res.body.months).toHaveLength(6)
+    expect(res.body.months[0]).toHaveProperty("easy")
+    expect(res.body.months[0]).toHaveProperty("medium")
+    expect(res.body.months[0]).toHaveProperty("hard")
+    expect(res.body.totals).toHaveProperty("easy")
+    expect(["rising_challenge", "easing", "steady", "no_data"]).toContain(res.body.trend)
+    expect(res.body.message).toBeTruthy()
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
+  it("難度演進：無任務 → no_data", async () => {
+    const kidObj = (await createKid()) as { id: number }
+    const myKidId = kidObj.id
+    const res = await request(app).get(`/api/family/difficulty-evolution?kidId=${myKidId}`)
+    expect(res.status).toBe(200)
+    expect(res.body.trend).toBe("no_data")
+    expect(res.body.totals.easy + res.body.totals.medium + res.body.totals.hard).toBe(0)
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
+  it("難度演進：months 範圍 clamp 1-24", async () => {
+    const kidObj = (await createKid()) as { id: number }
+    const myKidId = kidObj.id
+    const r1 = await request(app).get(
+      `/api/family/difficulty-evolution?kidId=${myKidId}&months=100`
+    )
+    expect(r1.body.months).toHaveLength(24)
+    const r2 = await request(app).get(`/api/family/difficulty-evolution?kidId=${myKidId}&months=0`)
+    expect(r2.body.months).toHaveLength(6)
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
+  it("難度演進：缺 kidId → 400", async () => {
+    const res = await request(app).get(`/api/family/difficulty-evolution`)
+    expect(res.status).toBe(400)
+  })
+
   it("本週摘要：基本結構 thisWeek/lastWeek/deltas/highlights", async () => {
     const res = await request(app).get("/api/family/weekly-summary")
     expect(res.status).toBe(200)
