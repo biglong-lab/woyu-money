@@ -8602,6 +8602,72 @@ async function bulkApproveOne(
 }
 
 /**
+ * GET /api/family/spending-top-items?days=90&limit=10
+ * 家庭花用 top N description（spend 罐）
+ */
+router.get(
+  "/api/family/spending-top-items",
+  asyncHandler(async (req, res) => {
+    const days = Math.min(Math.max(Number(req.query.days) || 90, 7), 365)
+    const limit = Math.min(Math.max(Number(req.query.limit) || 10, 1), 30)
+
+    const rows = await db.execute(sql`
+      SELECT
+        COALESCE(NULLIF(TRIM(description), ''), '(無描述)') AS description,
+        COUNT(*)::int AS count,
+        SUM(amount::numeric)::numeric AS total
+      FROM kids_spendings
+      WHERE jar = 'spend'
+        AND spend_date >= CURRENT_DATE - (${days}::int * INTERVAL '1 day')
+      GROUP BY COALESCE(NULLIF(TRIM(description), ''), '(無描述)')
+      ORDER BY total DESC, count DESC
+      LIMIT ${limit}
+    `)
+
+    const items = (
+      rows as unknown as {
+        rows: Array<{ description: string; count: number; total: string | number }>
+      }
+    ).rows.map((r) => ({
+      description: r.description,
+      count: r.count,
+      total: Number(r.total),
+    }))
+
+    const totalRow = await db.execute(sql`
+      SELECT COALESCE(SUM(amount::numeric)::numeric, 0) AS grand_total
+      FROM kids_spendings
+      WHERE jar = 'spend'
+        AND spend_date >= CURRENT_DATE - (${days}::int * INTERVAL '1 day')
+    `)
+    const grandTotal = Number(
+      (totalRow as unknown as { rows: Array<{ grand_total: string | number }> }).rows[0]
+        ?.grand_total ?? 0
+    )
+
+    const withPercentage = items.map((it) => ({
+      ...it,
+      percentage: grandTotal > 0 ? Math.round((it.total / grandTotal) * 100) : 0,
+    }))
+
+    let message: string
+    if (items.length === 0) {
+      message = `過去 ${days} 天家裡沒花用紀錄、超節省 🌱`
+    } else {
+      const top = withPercentage[0]
+      message = `🛒 過去 ${days} 天最常花在「${top.description}」（$${top.total}、占 ${top.percentage}%）`
+    }
+
+    res.json({
+      days,
+      items: withPercentage,
+      grandTotal,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/captain?days=30
  * 家庭隊長：過去 N 天綜合活躍度最高的小孩
  * score = tasks * 2 + checkins * 1 + goalsCompleted * 5

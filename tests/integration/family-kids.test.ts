@@ -4245,6 +4245,43 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.body.weeks).toBe(52)
   })
 
+  it("花用 top 細項：基本結構 items/grandTotal/message", async () => {
+    const res = await request(app).get("/api/family/spending-top-items")
+    expect(res.status).toBe(200)
+    expect(Array.isArray(res.body.items)).toBe(true)
+    expect(res.body).toHaveProperty("grandTotal")
+    expect(res.body.message).toBeTruthy()
+  })
+
+  it("花用 top 細項：建 spending 後 items 含 description", async () => {
+    const kidObj = (await createKid()) as { id: number }
+    const myKidId = kidObj.id
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId: myKidId, title: "獲得錢", rewardAmount: 500 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`).send({})
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`).send({})
+    await request(app).post("/api/family/spendings").send({
+      kidId: myKidId,
+      jar: "spend",
+      amount: 50,
+      description: "玩具車",
+    })
+    const res = await request(app).get("/api/family/spending-top-items?days=7")
+    expect(res.status).toBe(200)
+    expect(res.body.items.length).toBeGreaterThanOrEqual(1)
+    const myItem = res.body.items.find((i: { description: string }) => i.description === "玩具車")
+    expect(myItem).toBeDefined()
+    expect(myItem.total).toBe(50)
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
+  it("花用 top 細項：limit clamp 1-30", async () => {
+    const r1 = await request(app).get("/api/family/spending-top-items?limit=100")
+    expect(r1.status).toBe(200)
+    expect(r1.body.items.length).toBeLessThanOrEqual(30)
+  })
+
   it("家庭隊長：基本結構 kids/captain/message", async () => {
     const res = await request(app).get("/api/family/captain")
     expect(res.status).toBe(200)

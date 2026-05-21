@@ -550,6 +550,9 @@ export default function FamilyPage() {
       {/* 家庭隊長 */}
       <FamilyCaptainCard />
 
+      {/* 家庭花用 top 細項 */}
+      <FamilySpendingTopItemsCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3504,6 +3507,48 @@ function ParentTodoList() {
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
       )}
+    </div>
+  )
+}
+
+function FamilySpendingTopItemsCard() {
+  const { data } = useQuery<{
+    days: number
+    items: Array<{ description: string; count: number; total: number; percentage: number }>
+    grandTotal: number
+    message: string
+  }>({
+    queryKey: ["/api/family/spending-top-items?days=90&limit=10"],
+  })
+  if (!data || data.items.length === 0) return null
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-pink-300 bg-gradient-to-br from-pink-50 to-rose-50 p-3 shadow">
+      <h3 className="font-bold mb-2 flex items-center gap-2">🛒 花用 top 細項（90 天）</h3>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-2 text-xs">{data.message}</div>
+
+      <div className="space-y-1">
+        {data.items.map((it, i) => (
+          <div key={i} className="bg-white rounded p-2">
+            <div className="flex items-center justify-between mb-0.5 text-xs">
+              <div className="flex-1 truncate">
+                <span className="text-gray-400">#{i + 1}</span> {it.description}
+              </div>
+              <div className="font-bold">${it.total}</div>
+            </div>
+            <div className="h-1.5 bg-gray-100 rounded overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-pink-400 to-rose-500"
+                style={{ width: `${it.percentage}%` }}
+              />
+            </div>
+            <div className="text-[10px] text-gray-500 mt-0.5">
+              {it.count} 筆 · 占 {it.percentage}%
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
