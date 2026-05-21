@@ -897,6 +897,10 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(ics).toContain("⭐⭐⭐")
     // 已 approved 不該出現
     expect(ics).not.toContain(`family-task-${done.body.id}@homi.cc`)
+    // VALARM 提醒（截止前 15 小時 = 前一天 09:00）
+    expect(ics).toContain("BEGIN:VALARM")
+    expect(ics).toContain("TRIGGER:-PT15H")
+    expect(ics).toContain("END:VALARM")
   })
 
   it("活動 Timeline：past N 天 task/spending/goal/badge 全部匯總按時序", async () => {

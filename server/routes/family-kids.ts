@@ -3861,6 +3861,12 @@ router.get(
         "CATEGORIES:家庭任務",
         "STATUS:CONFIRMED",
         "TRANSP:TRANSPARENT",
+        // VALARM：事件前 15 小時提醒（整天事件 DTSTART 是 00:00、-PT15H = 前一天 09:00）
+        "BEGIN:VALARM",
+        "ACTION:DISPLAY",
+        `DESCRIPTION:${escapeIcs(`明天截止：${row.title}（獎勵 $${row.reward_amount}）`)}`,
+        "TRIGGER:-PT15H",
+        "END:VALARM",
         "END:VEVENT"
       )
     }
