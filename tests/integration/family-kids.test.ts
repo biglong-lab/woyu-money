@@ -2590,6 +2590,60 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.body.month).toMatch(/^\d{4}-\d{2}$/)
   })
 
+  it("任務 streak：今天做 1 個 → currentStreak=1、有 message", async () => {
+    await createKid()
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId, title: "今日任務", rewardAmount: 30 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`)
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`)
+
+    const res = await request(app).get(`/api/family/kid-task-streak?kidId=${kidId}`)
+    expect(res.status).toBe(200)
+    expect(res.body.kidId).toBe(kidId)
+    expect(res.body.currentStreak).toBe(1)
+    expect(res.body.longestStreak).toBeGreaterThanOrEqual(1)
+    expect(res.body.lastTaskDate).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+    expect(res.body.message).toBeTruthy()
+  })
+
+  it("任務 streak：歷史 3 天連續但中斷 → longestStreak=3、currentStreak=0", async () => {
+    await createKid()
+
+    // 建任務直接設 completed_at 為 60/59/58 天前（3 天連續）
+    for (const daysAgo of [60, 59, 58]) {
+      const t = await request(app)
+        .post("/api/family/tasks")
+        .send({ kidId, title: `T${daysAgo}`, rewardAmount: 10 })
+      await request(app).post(`/api/family/tasks/${t.body.id}/submit`)
+      await request(app).post(`/api/family/tasks/${t.body.id}/approve`)
+      // 手動改 completed_at（測試 only）
+      await db.execute(
+        sql`UPDATE kids_tasks SET completed_at = NOW() - INTERVAL '${sql.raw(String(daysAgo))} days' WHERE id = ${t.body.id}`
+      )
+    }
+
+    const res = await request(app).get(`/api/family/kid-task-streak?kidId=${kidId}`)
+    expect(res.status).toBe(200)
+    expect(res.body.currentStreak).toBe(0) // 60 天前太久、不算 current
+    expect(res.body.longestStreak).toBe(3)
+  })
+
+  it("任務 streak：無任務 → currentStreak=0 + 鼓勵 message", async () => {
+    await createKid()
+    const res = await request(app).get(`/api/family/kid-task-streak?kidId=${kidId}`)
+    expect(res.status).toBe(200)
+    expect(res.body.currentStreak).toBe(0)
+    expect(res.body.longestStreak).toBe(0)
+    expect(res.body.lastTaskDate).toBeNull()
+    expect(res.body.message).toContain("任務")
+  })
+
+  it("kid-task-streak 缺 kidId 回 400", async () => {
+    const r = await request(app).get("/api/family/kid-task-streak")
+    expect(r.status).toBe(400)
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)

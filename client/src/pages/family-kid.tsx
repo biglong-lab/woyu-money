@@ -1001,6 +1001,9 @@ function KidDashboard({
       {/* 等級徽章（累積分數升 level）*/}
       <KidLevelBadge kidId={kidId} />
 
+      {/* 任務 streak（連續做任務）*/}
+      <KidTaskStreakCard kidId={kidId} />
+
       {/* 最近活動時間軸 */}
       <KidActivityTimeline kidId={kidId} />
 
@@ -1766,6 +1769,59 @@ function WishesSection({
           ))}
         </div>
       )}
+    </div>
+  )
+}
+
+function KidTaskStreakCard({ kidId }: { kidId: number }) {
+  const { data } = useQuery<{
+    currentStreak: number
+    longestStreak: number
+    lastTaskDate: string | null
+    message: string
+  }>({
+    queryKey: ["/api/family/kid-task-streak", kidId],
+    queryFn: async () => {
+      const res = await fetch(`/api/family/kid-task-streak?kidId=${kidId}`, {
+        credentials: "include",
+      })
+      return res.json()
+    },
+  })
+  if (!data) return null
+
+  // 無任何任務則不顯示
+  if (data.longestStreak === 0) return null
+
+  const intensity =
+    data.currentStreak === 0
+      ? "from-gray-100 to-gray-50 border-gray-300"
+      : data.currentStreak < 3
+        ? "from-orange-100 to-amber-50 border-orange-300"
+        : data.currentStreak < 7
+          ? "from-amber-100 to-yellow-50 border-amber-400"
+          : data.currentStreak < 30
+            ? "from-rose-100 to-orange-50 border-rose-400"
+            : "from-purple-100 to-pink-50 border-purple-500"
+
+  return (
+    <div className={`mb-4 rounded-2xl border-2 ${intensity} bg-gradient-to-r p-3 shadow`}>
+      <div className="flex items-center gap-3">
+        <div className="text-4xl">🔥</div>
+        <div className="flex-1">
+          <div className="text-xs text-gray-600">連續做任務</div>
+          <div className="text-3xl font-bold text-orange-700">
+            {data.currentStreak} <span className="text-base font-normal text-gray-500">天</span>
+          </div>
+          <div className="text-xs text-gray-600 mt-0.5">{data.message}</div>
+        </div>
+        {data.longestStreak > data.currentStreak && (
+          <div className="text-right shrink-0">
+            <div className="text-xs text-gray-500">最高紀錄</div>
+            <div className="text-xl font-bold text-amber-700">{data.longestStreak}</div>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

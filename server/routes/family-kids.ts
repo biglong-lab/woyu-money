@@ -2875,6 +2875,93 @@ router.get(
 )
 
 /**
+ * GET /api/family/kid-task-streak?kidId=
+ * 任務 streak：連續做任務的天數（培養日常習慣）
+ *
+ * currentStreak：今天/昨天起連續、用 completed_at 的不同日期算
+ * longestStreak：歷史最長連續天數
+ * lastTaskDate：最近一次 approved 任務的日期
+ */
+router.get(
+  "/api/family/kid-task-streak",
+  asyncHandler(async (req, res) => {
+    const kidIdQ = Number(req.query.kidId)
+    if (!Number.isInteger(kidIdQ) || kidIdQ < 1) throw new AppError(400, "需傳 kidId")
+
+    const result = await db.execute(sql`
+      SELECT DISTINCT DATE(completed_at) AS d
+      FROM kids_tasks
+      WHERE kid_id = ${kidIdQ} AND status = 'approved' AND completed_at IS NOT NULL
+      ORDER BY d DESC
+      LIMIT 365
+    `)
+    const dates = (result as unknown as { rows: { d: Date | string }[] }).rows.map((r) =>
+      typeof r.d === "string" ? r.d.slice(0, 10) : new Date(r.d).toISOString().slice(0, 10)
+    )
+
+    if (dates.length === 0) {
+      return res.json({
+        kidId: kidIdQ,
+        currentStreak: 0,
+        longestStreak: 0,
+        lastTaskDate: null,
+        message: "還沒做任務、開始第一個！",
+      })
+    }
+
+    const today = new Date().toISOString().slice(0, 10)
+    const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10)
+
+    // currentStreak：從今天/昨天起連續
+    let currentStreak = 0
+    if (dates[0] === today || dates[0] === yesterday) {
+      currentStreak = 1
+      for (let i = 1; i < dates.length; i++) {
+        const prev = new Date(dates[i - 1])
+        const cur = new Date(dates[i])
+        const diff = Math.round((prev.getTime() - cur.getTime()) / 86_400_000)
+        if (diff === 1) currentStreak++
+        else break
+      }
+    }
+
+    // longestStreak：掃描全 365 天找最長連續
+    let longestStreak = 1
+    let tempStreak = 1
+    for (let i = 1; i < dates.length; i++) {
+      const prev = new Date(dates[i - 1])
+      const cur = new Date(dates[i])
+      const diff = Math.round((prev.getTime() - cur.getTime()) / 86_400_000)
+      if (diff === 1) {
+        tempStreak++
+        if (tempStreak > longestStreak) longestStreak = tempStreak
+      } else {
+        tempStreak = 1
+      }
+    }
+
+    const message =
+      currentStreak === 0
+        ? "🌱 來做任務、開啟新 streak！"
+        : currentStreak < 3
+          ? `🔥 連續 ${currentStreak} 天、繼續加油！`
+          : currentStreak < 7
+            ? `🌟 已經 ${currentStreak} 天了！別斷了！`
+            : currentStreak < 30
+              ? `🏆 ${currentStreak} 天連續、超強！`
+              : `🐉 ${currentStreak} 天連續、傳奇等級！`
+
+    res.json({
+      kidId: kidIdQ,
+      currentStreak,
+      longestStreak,
+      lastTaskDate: dates[0],
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/monthly-stats?month=YYYY-MM
  * 全家月度統計（家長端、不指定 kidId）
  * 一頁看全家本月表現、含每個小孩的細項
