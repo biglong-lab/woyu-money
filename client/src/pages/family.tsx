@@ -553,6 +553,9 @@ export default function FamilyPage() {
       {/* 家庭花用 top 細項 */}
       <FamilySpendingTopItemsCard />
 
+      {/* 家庭 task 處理時長 */}
+      <FamilyTaskDurationCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3507,6 +3510,62 @@ function ParentTodoList() {
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
       )}
+    </div>
+  )
+}
+
+function FamilyTaskDurationCard() {
+  const { data } = useQuery<{
+    days: number
+    kids: Array<{
+      kidId: number
+      kidName: string
+      avatar: string
+      taskCount: number
+      avgDays: number
+    }>
+    fastest: { kidName: string; avgDays: number } | null
+    slowest: { kidName: string; avgDays: number } | null
+    familyAvg: number
+    message: string
+  }>({
+    queryKey: ["/api/family/task-duration?days=60"],
+  })
+  if (!data || data.kids.length === 0) return null
+  const hasTask = data.kids.some((k) => k.taskCount > 0)
+  if (!hasTask) return null
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-teal-300 bg-gradient-to-br from-teal-50 to-cyan-50 p-3 shadow">
+      <h3 className="font-bold mb-2 flex items-center gap-2">⏱️ Task 處理速度（60 天）</h3>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-2 text-xs">
+        {data.message}
+        {data.fastest && (
+          <div className="text-gray-600 mt-1">
+            ⚡ 最快：{data.fastest.kidName}（{data.fastest.avgDays} 天）
+            {data.slowest && ` · 最慢：${data.slowest.kidName}（${data.slowest.avgDays} 天）`}
+          </div>
+        )}
+      </div>
+
+      <div className="space-y-1.5">
+        {data.kids
+          .filter((k) => k.taskCount > 0)
+          .map((k) => (
+            <div key={k.kidId} className="bg-white rounded-lg p-2 flex items-center gap-2">
+              <div className="text-lg">{k.avatar}</div>
+              <div className="flex-1">
+                <div className="text-sm font-medium">{k.kidName}</div>
+                <div className="text-[10px] text-gray-500">{k.taskCount} 個任務</div>
+              </div>
+              <div className="text-right">
+                <div className="text-lg font-bold text-teal-600">{k.avgDays}</div>
+                <div className="text-[9px] text-gray-500">平均天</div>
+              </div>
+            </div>
+          ))}
+      </div>
     </div>
   )
 }

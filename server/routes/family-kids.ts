@@ -8602,6 +8602,91 @@ async function bulkApproveOne(
 }
 
 /**
+ * GET /api/family/task-duration?days=60
+ * 每個 active kid 過去 N 天 approved task 從 created_at 到 approved_at 平均天數
+ * 看處理速度：fastest vs slowest
+ */
+router.get(
+  "/api/family/task-duration",
+  asyncHandler(async (req, res) => {
+    const days = Math.min(Math.max(Number(req.query.days) || 60, 7), 365)
+
+    const rows = await db.execute(sql`
+      SELECT
+        ka.id::int AS kid_id,
+        ka.display_name AS kid_name,
+        ka.avatar,
+        COUNT(t.id)::int AS task_count,
+        COALESCE(AVG(EXTRACT(DAY FROM (t.approved_at - t.created_at))), 0)::numeric AS avg_days
+      FROM kids_accounts ka
+      LEFT JOIN kids_tasks t ON
+        t.kid_id = ka.id
+        AND t.status = 'approved'
+        AND t.approved_at IS NOT NULL
+        AND t.created_at IS NOT NULL
+        AND t.approved_at >= CURRENT_DATE - (${days}::int * INTERVAL '1 day')
+      WHERE ka.is_active = true
+      GROUP BY ka.id, ka.display_name, ka.avatar
+      ORDER BY ka.id ASC
+    `)
+
+    const kids = (
+      rows as unknown as {
+        rows: Array<{
+          kid_id: number
+          kid_name: string
+          avatar: string
+          task_count: number
+          avg_days: string | number
+        }>
+      }
+    ).rows.map((r) => ({
+      kidId: r.kid_id,
+      kidName: r.kid_name,
+      avatar: r.avatar,
+      taskCount: r.task_count,
+      avgDays: Math.round(Number(r.avg_days) * 10) / 10,
+    }))
+
+    const withTasks = kids.filter((k) => k.taskCount > 0)
+    const sorted = [...withTasks].sort((a, b) => a.avgDays - b.avgDays)
+    const fastest = sorted[0] ?? null
+    const slowest = sorted[sorted.length - 1] ?? null
+    const familyAvg =
+      withTasks.length > 0
+        ? Math.round((withTasks.reduce((s, k) => s + k.avgDays, 0) / withTasks.length) * 10) / 10
+        : 0
+
+    let message: string
+    if (kids.length === 0) {
+      message = "還沒小孩、加入第一個"
+    } else if (withTasks.length === 0) {
+      message = `過去 ${days} 天沒任務通過、無法計算處理速度`
+    } else if (familyAvg < 1) {
+      message = `⚡ 全家平均 ${familyAvg} 天搞定、超快！`
+    } else if (familyAvg < 3) {
+      message = `🚀 全家平均 ${familyAvg} 天處理一個任務、節奏不錯`
+    } else if (familyAvg < 7) {
+      message = `👍 全家平均 ${familyAvg} 天、可接受範圍`
+    } else {
+      message = `⏰ 全家平均 ${familyAvg} 天、任務拖得久、可以鼓勵更快動手`
+    }
+
+    res.json({
+      days,
+      kids,
+      fastest: fastest ? { kidName: fastest.kidName, avgDays: fastest.avgDays } : null,
+      slowest:
+        slowest && slowest !== fastest
+          ? { kidName: slowest.kidName, avgDays: slowest.avgDays }
+          : null,
+      familyAvg,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/spending-top-items?days=90&limit=10
  * 家庭花用 top N description（spend 罐）
  */
