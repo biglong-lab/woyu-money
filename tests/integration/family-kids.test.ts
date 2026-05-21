@@ -4245,6 +4245,33 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.body.weeks).toBe(52)
   })
 
+  it("分類偏好：基本結構 kids/message", async () => {
+    const res = await request(app).get("/api/family/task-category-by-kid")
+    expect(res.status).toBe(200)
+    expect(Array.isArray(res.body.kids)).toBe(true)
+    expect(res.body.message).toBeTruthy()
+  })
+
+  it("分類偏好：approve study 任務 → topCategory=study", async () => {
+    const kidObj = (await createKid()) as { id: number }
+    const myKidId = kidObj.id
+    const t = await request(app).post("/api/family/tasks").send({
+      kidId: myKidId,
+      title: "讀書",
+      rewardAmount: 30,
+      category: "study",
+    })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`).send({})
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`).send({})
+    const res = await request(app).get("/api/family/task-category-by-kid?days=7")
+    expect(res.status).toBe(200)
+    const myKid = res.body.kids.find((k: { kidId: number }) => k.kidId === myKidId)
+    expect(myKid).toBeDefined()
+    expect(myKid.categories.study).toBeGreaterThanOrEqual(1)
+    expect(myKid.topCategory).toBe("study")
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
   it("目標緊急度：基本結構 goals/overdueCount/message", async () => {
     const res = await request(app).get("/api/family/goal-urgency-rank")
     expect(res.status).toBe(200)

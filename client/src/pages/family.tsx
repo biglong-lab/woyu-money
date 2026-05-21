@@ -595,6 +595,9 @@ export default function FamilyPage() {
       {/* 家庭目標緊急度排名 */}
       <FamilyGoalUrgencyRankCard />
 
+      {/* 家庭兒童分類偏好 */}
+      <FamilyTaskCategoryByKidCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3549,6 +3552,79 @@ function ParentTodoList() {
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
       )}
+    </div>
+  )
+}
+
+function FamilyTaskCategoryByKidCard() {
+  const { data } = useQuery<{
+    days: number
+    kids: Array<{
+      kidId: number
+      kidName: string
+      avatar: string
+      categories: {
+        housework: number
+        study: number
+        self_care: number
+        kindness: number
+        other: number
+      }
+      topCategory: string | null
+      topCategoryLabel: string | null
+      total: number
+    }>
+    message: string
+  }>({
+    queryKey: ["/api/family/task-category-by-kid?days=90"],
+  })
+  if (!data || data.kids.length === 0) return null
+  const withTasks = data.kids.filter((k) => k.total > 0)
+  if (withTasks.length === 0) return null
+
+  const CAT_INFO = [
+    { key: "housework", label: "🧹 家事", color: "bg-blue-400" },
+    { key: "study", label: "📚 學習", color: "bg-purple-400" },
+    { key: "self_care", label: "🧴 自理", color: "bg-pink-400" },
+    { key: "kindness", label: "💝 善行", color: "bg-rose-400" },
+    { key: "other", label: "📋 其他", color: "bg-gray-400" },
+  ] as const
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-fuchsia-300 bg-gradient-to-br from-fuchsia-50 to-purple-50 p-3 shadow">
+      <h3 className="font-bold mb-2 flex items-center gap-2">🎨 兒童分類偏好（90 天）</h3>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-2 text-xs">{data.message}</div>
+
+      <div className="space-y-2">
+        {withTasks.map((k) => (
+          <div key={k.kidId} className="bg-white rounded-lg p-2">
+            <div className="flex items-center justify-between mb-1 text-xs">
+              <span>
+                {k.avatar} {k.kidName}
+              </span>
+              <span className="text-[10px] text-gray-500">
+                共 {k.total} 個 · 最愛 {k.topCategoryLabel}
+              </span>
+            </div>
+            <div className="flex h-2 rounded-full overflow-hidden bg-gray-100">
+              {CAT_INFO.map((c) => {
+                const count = k.categories[c.key as keyof typeof k.categories]
+                const pct = k.total > 0 ? (count / k.total) * 100 : 0
+                if (pct === 0) return null
+                return (
+                  <div
+                    key={c.key}
+                    className={c.color}
+                    style={{ width: `${pct}%` }}
+                    title={`${c.label}: ${count}`}
+                  />
+                )
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

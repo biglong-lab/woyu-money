@@ -8602,6 +8602,99 @@ async function bulkApproveOne(
 }
 
 /**
+ * GET /api/family/task-category-by-kid?days=90
+ * 每個 active kid 過去 N 天 5 category 任務數 + topCategory
+ */
+router.get(
+  "/api/family/task-category-by-kid",
+  asyncHandler(async (req, res) => {
+    const days = Math.min(Math.max(Number(req.query.days) || 90, 7), 365)
+
+    const rows = await db.execute(sql`
+      SELECT
+        ka.id::int AS kid_id,
+        ka.display_name AS kid_name,
+        ka.avatar,
+        COUNT(*) FILTER (WHERE t.category = 'housework')::int AS housework,
+        COUNT(*) FILTER (WHERE t.category = 'study')::int AS study,
+        COUNT(*) FILTER (WHERE t.category = 'self_care')::int AS self_care,
+        COUNT(*) FILTER (WHERE t.category = 'kindness')::int AS kindness,
+        COUNT(*) FILTER (WHERE t.category = 'other')::int AS other,
+        COUNT(t.id)::int AS total
+      FROM kids_accounts ka
+      LEFT JOIN kids_tasks t ON
+        t.kid_id = ka.id
+        AND t.status = 'approved'
+        AND t.completed_at >= CURRENT_DATE - (${days}::int * INTERVAL '1 day')
+      WHERE ka.is_active = true
+      GROUP BY ka.id, ka.display_name, ka.avatar
+      ORDER BY ka.id ASC
+    `)
+
+    const CAT_LABEL: Record<string, string> = {
+      housework: "🧹 家事",
+      study: "📚 學習",
+      self_care: "🧴 自理",
+      kindness: "💝 善行",
+      other: "📋 其他",
+    }
+
+    const kids = (
+      rows as unknown as {
+        rows: Array<{
+          kid_id: number
+          kid_name: string
+          avatar: string
+          housework: number
+          study: number
+          self_care: number
+          kindness: number
+          other: number
+          total: number
+        }>
+      }
+    ).rows.map((r) => {
+      const categories = {
+        housework: r.housework,
+        study: r.study,
+        self_care: r.self_care,
+        kindness: r.kindness,
+        other: r.other,
+      }
+      const sorted = Object.entries(categories).sort((a, b) => b[1] - a[1])
+      const topCategory = sorted[0][1] > 0 ? sorted[0][0] : null
+      return {
+        kidId: r.kid_id,
+        kidName: r.kid_name,
+        avatar: r.avatar,
+        categories,
+        topCategory,
+        topCategoryLabel: topCategory ? CAT_LABEL[topCategory] : null,
+        total: r.total,
+      }
+    })
+
+    let message: string
+    const withTasks = kids.filter((k) => k.total > 0)
+    if (withTasks.length === 0) {
+      message = `過去 ${days} 天還沒任務、無偏好可分析`
+    } else {
+      const personalities = withTasks
+        .filter((k) => k.topCategory)
+        .map((k) => `${k.kidName}愛${k.topCategoryLabel?.slice(0, 4)}`)
+        .join("、")
+      message = `🎨 個性分析：${personalities}`
+    }
+
+    res.json({
+      days,
+      kids,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/goal-urgency-rank?limit=10
  * 有 deadline 的 active goals 按距離截止日 ASC 排序
  * urgency: overdue / critical(<7d) / warning(<30d) / safe
