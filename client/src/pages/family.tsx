@@ -440,6 +440,9 @@ export default function FamilyPage() {
       {/* 任務月曆視圖 */}
       <TaskCalendar tasks={allTasks} kids={kids} />
 
+      {/* 家庭共同存錢罐 */}
+      <FamilyPotsManager />
+
       {/* 捐贈對象目錄 */}
       <RecipientsManager />
 
@@ -1519,6 +1522,149 @@ function MoodTrends() {
             )
           })}
       </CardContent>
+    </Card>
+  )
+}
+
+function FamilyPotsManager() {
+  const { toast } = useToast()
+  const [open, setOpen] = useState(false)
+  interface PotContribution {
+    id: number
+    kidId: number
+    amount: string
+    createdAt: string
+  }
+  interface FamilyPot {
+    id: number
+    name: string
+    emoji: string | null
+    targetAmount: string
+    currentAmount: string
+    status: "active" | "completed" | "abandoned"
+    description: string | null
+    completedAt: string | null
+    contributions: PotContribution[]
+  }
+  const { data: pots = [] } = useQuery<FamilyPot[]>({
+    queryKey: ["/api/family/pots"],
+    enabled: open,
+  })
+  const activePots = pots.filter((p) => p.status === "active")
+  const completedPots = pots.filter((p) => p.status === "completed").slice(0, 5)
+
+  const addMut = useMutation({
+    mutationFn: (vars: { name: string; emoji: string; targetAmount: number }) =>
+      apiRequest("POST", "/api/family/pots", vars),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/family/pots"] })
+      toast({ title: "🏆 新罐建立成功" })
+    },
+    onError: (e: Error) => toast({ title: "失敗", description: e.message, variant: "destructive" }),
+  })
+  const delMut = useMutation({
+    mutationFn: (id: number) => apiRequest("DELETE", `/api/family/pots/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/family/pots"] })
+    },
+  })
+
+  return (
+    <Card className="border-amber-300 bg-gradient-to-br from-yellow-50 to-amber-50">
+      <CardHeader className="py-3 px-3 sm:px-4 cursor-pointer" onClick={() => setOpen((s) => !s)}>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base flex items-center gap-2">
+            <span className="text-xl">🏆</span>
+            家庭共同存錢罐
+          </CardTitle>
+          <span className="text-xs text-amber-700">{open ? "▲" : "▼"}</span>
+        </div>
+        <CardDescription>全家為共同目標一起存（如：旅行、家庭遊戲機）</CardDescription>
+      </CardHeader>
+      {open && (
+        <CardContent className="py-2 px-3 sm:px-4 space-y-2">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="w-full h-8 text-xs"
+            onClick={() => {
+              const name = window.prompt("罐名稱（如「家庭旅行」）：", "")
+              if (!name?.trim()) return
+              const emoji = window.prompt("emoji（如 ✈️）：", "🏆") || "🏆"
+              const t = window.prompt("目標金額：", "")
+              const target = parseFloat(t ?? "0")
+              if (!(target > 0)) {
+                toast({ title: "請輸入有效金額", variant: "destructive" })
+                return
+              }
+              addMut.mutate({ name: name.trim(), emoji, targetAmount: target })
+            }}
+          >
+            ➕ 新增共同罐
+          </Button>
+          {activePots.length === 0 && completedPots.length === 0 && (
+            <div className="text-center text-xs text-gray-400 py-2">還沒有共同罐、點上方新增</div>
+          )}
+          {activePots.map((p) => {
+            const cur = parseFloat(p.currentAmount)
+            const target = parseFloat(p.targetAmount)
+            const pct = target > 0 ? Math.min(100, Math.round((cur / target) * 100)) : 0
+            return (
+              <div key={p.id} className="bg-white border border-amber-200 rounded p-2.5">
+                <div className="flex items-center gap-2 mb-1.5">
+                  <span className="text-xl">{p.emoji ?? "🏆"}</span>
+                  <div className="flex-1">
+                    <div className="text-sm font-medium">{p.name}</div>
+                    <div className="text-xs text-gray-500">
+                      {formatMoney(cur)} / {formatMoney(target)}（{pct}%）
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (confirm(`刪除「${p.name}」？貢獻不會退還`)) delMut.mutate(p.id)
+                    }}
+                    className="text-red-400 hover:text-red-600 p-1"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </button>
+                </div>
+                <div className="h-2 bg-gray-100 rounded overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-amber-400 to-yellow-500"
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+                {p.contributions.length > 0 && (
+                  <div className="text-[10px] text-gray-500 mt-1">
+                    {p.contributions.length} 筆貢獻
+                  </div>
+                )}
+              </div>
+            )
+          })}
+          {completedPots.length > 0 && (
+            <div className="pt-2 border-t border-amber-200">
+              <div className="text-xs text-gray-600 mb-1">🎉 已達成</div>
+              <div className="space-y-1">
+                {completedPots.map((p) => (
+                  <div
+                    key={p.id}
+                    className="text-xs bg-emerald-50 border border-emerald-200 rounded p-1.5 flex items-center gap-1.5"
+                  >
+                    <span>{p.emoji ?? "🏆"}</span>
+                    <span className="flex-1">{p.name}</span>
+                    <span className="font-mono text-emerald-700">
+                      {formatMoney(p.targetAmount)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      )}
     </Card>
   )
 }

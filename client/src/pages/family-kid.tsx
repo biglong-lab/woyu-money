@@ -845,6 +845,9 @@ function KidDashboard({
         </div>
       )}
 
+      {/* 家庭共同罐 - 小孩可貢獻 */}
+      <FamilyPotsContribute kidId={kidId} jar={jar} toast={toast} onAfterContribute={invalidate} />
+
       {/* 願望清單（想要、未必有錢、培養理財決策力）*/}
       <WishesSection kidId={kidId} toast={toast} onAfterPromote={invalidate} />
 
@@ -2139,6 +2142,111 @@ function DonationsSection({ kidId }: { kidId: number }) {
           )}
         </div>
       )}
+    </div>
+  )
+}
+
+function FamilyPotsContribute({
+  kidId,
+  jar,
+  toast,
+  onAfterContribute,
+}: {
+  kidId: number
+  jar: Jar
+  toast: (opts: {
+    title: string
+    description?: string
+    variant?: "default" | "destructive"
+  }) => void
+  onAfterContribute: () => void
+}) {
+  interface FamilyPot {
+    id: number
+    name: string
+    emoji: string | null
+    targetAmount: string
+    currentAmount: string
+    status: "active" | "completed" | "abandoned"
+  }
+  const { data: pots = [] } = useQuery<FamilyPot[]>({
+    queryKey: ["/api/family/pots"],
+  })
+  const activePots = pots.filter((p) => p.status === "active")
+  const contributeMut = useMutation({
+    mutationFn: (vars: { potId: number; amount: number }) =>
+      apiRequest<{ reached: boolean }>("POST", `/api/family/pots/${vars.potId}/contribute`, {
+        kidId,
+        amount: vars.amount,
+      }),
+    onSuccess: (r) => {
+      toast({
+        title: r.reached ? "🎉 家庭目標達成！" : "✅ 已貢獻到家庭罐",
+      })
+      if (r.reached) {
+        confetti({ particleCount: 200, spread: 120, origin: { y: 0.5 } })
+      } else {
+        confetti({ particleCount: 50, spread: 60, origin: { y: 0.6 } })
+      }
+      vibrate(40)
+      onAfterContribute()
+    },
+    onError: (e: Error) => toast({ title: "失敗", description: e.message, variant: "destructive" }),
+  })
+
+  if (activePots.length === 0) return null
+  const saveBal = parseFloat(jar.saveBalance)
+
+  return (
+    <div className="mb-4">
+      <h2 className="font-bold mb-2 flex items-center gap-2">
+        <span className="text-amber-500">🏆</span>
+        家庭共同罐（{activePots.length}）
+      </h2>
+      <div className="space-y-2">
+        {activePots.map((p) => {
+          const cur = parseFloat(p.currentAmount)
+          const target = parseFloat(p.targetAmount)
+          const pct = target > 0 ? Math.min(100, Math.round((cur / target) * 100)) : 0
+          return (
+            <div
+              key={p.id}
+              className="bg-gradient-to-br from-yellow-50 to-amber-100 border border-amber-300 rounded-lg p-2.5"
+            >
+              <div className="flex items-center gap-2 mb-1.5">
+                <span className="text-2xl">{p.emoji ?? "🏆"}</span>
+                <div className="flex-1">
+                  <div className="font-medium text-sm">{p.name}</div>
+                  <div className="text-xs text-gray-600">
+                    {formatMoney(cur)} / {formatMoney(target)}（{pct}%）
+                  </div>
+                </div>
+              </div>
+              <div className="h-2 bg-white rounded overflow-hidden mb-1.5">
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: `${pct}%` }}
+                  className="h-full bg-gradient-to-r from-amber-400 to-yellow-500"
+                />
+              </div>
+              <div className="flex gap-1">
+                {[5, 10, 50].map((amt) => (
+                  <Button
+                    key={amt}
+                    size="sm"
+                    variant="outline"
+                    disabled={saveBal < amt || contributeMut.isPending}
+                    onClick={() => contributeMut.mutate({ potId: p.id, amount: amt })}
+                    className="flex-1 text-[11px] h-7"
+                  >
+                    貢獻 ${amt}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }
