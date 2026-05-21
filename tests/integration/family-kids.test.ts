@@ -4245,6 +4245,26 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.body.weeks).toBe(52)
   })
 
+  it("學習曲線：基本結構 kids/risingCount/message", async () => {
+    const res = await request(app).get("/api/family/kid-learning-curve")
+    expect(res.status).toBe(200)
+    expect(Array.isArray(res.body.kids)).toBe(true)
+    expect(res.body).toHaveProperty("risingCount")
+    expect(res.body.message).toBeTruthy()
+  })
+
+  it("學習曲線：新建小孩 → improvement=new", async () => {
+    const kidObj = (await createKid()) as { id: number }
+    const myKidId = kidObj.id
+    const res = await request(app).get("/api/family/kid-learning-curve")
+    expect(res.status).toBe(200)
+    const myKid = res.body.kids.find((k: { kidId: number }) => k.kidId === myKidId)
+    expect(myKid).toBeDefined()
+    expect(myKid.improvement).toBe("new")
+    expect(myKid.accountAgeDays).toBeLessThan(60)
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
   it("最愛 emoji：基本結構 kids/message", async () => {
     const res = await request(app).get("/api/family/kid-favorite-emoji")
     expect(res.status).toBe(200)

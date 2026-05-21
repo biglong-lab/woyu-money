@@ -8602,6 +8602,100 @@ async function bulkApproveOne(
 }
 
 /**
+ * GET /api/family/kid-learning-curve
+ * 每 active kid 第一個月 vs 最近 30 天 task 對比
+ * improvement: rising / steady / declining / new / no_data
+ */
+router.get(
+  "/api/family/kid-learning-curve",
+  asyncHandler(async (_req, res) => {
+    const rows = await db.execute(sql`
+      SELECT
+        ka.id::int AS kid_id,
+        ka.display_name AS kid_name,
+        ka.avatar,
+        ka.created_at,
+        EXTRACT(DAY FROM (NOW() - ka.created_at))::int AS account_age_days,
+        (SELECT COUNT(*)::int FROM kids_tasks
+          WHERE kid_id = ka.id AND status = 'approved'
+            AND completed_at >= ka.created_at
+            AND completed_at < ka.created_at + INTERVAL '30 days'
+        ) AS first_month,
+        (SELECT COUNT(*)::int FROM kids_tasks
+          WHERE kid_id = ka.id AND status = 'approved'
+            AND completed_at >= CURRENT_DATE - INTERVAL '30 days'
+        ) AS recent_month
+      FROM kids_accounts ka
+      WHERE ka.is_active = true
+      ORDER BY ka.id ASC
+    `)
+
+    const kids = (
+      rows as unknown as {
+        rows: Array<{
+          kid_id: number
+          kid_name: string
+          avatar: string
+          created_at: string
+          account_age_days: number
+          first_month: number
+          recent_month: number
+        }>
+      }
+    ).rows.map((r) => {
+      const age = r.account_age_days
+      const first = r.first_month
+      const recent = r.recent_month
+      let improvement: "rising" | "steady" | "declining" | "new" | "no_data"
+      let diff = recent - first
+      if (age < 60) {
+        improvement = "new"
+        diff = 0
+      } else if (first === 0 && recent === 0) {
+        improvement = "no_data"
+      } else if (recent > first * 1.3) {
+        improvement = "rising"
+      } else if (recent < first * 0.7) {
+        improvement = "declining"
+      } else {
+        improvement = "steady"
+      }
+      return {
+        kidId: r.kid_id,
+        kidName: r.kid_name,
+        avatar: r.avatar,
+        accountAgeDays: age,
+        firstMonthTasks: first,
+        recentMonthTasks: recent,
+        diff,
+        improvement,
+      }
+    })
+
+    const risingKids = kids.filter((k) => k.improvement === "rising").length
+    const newKids = kids.filter((k) => k.improvement === "new").length
+
+    let message: string
+    if (kids.length === 0) {
+      message = "還沒有小孩"
+    } else if (newKids === kids.length) {
+      message = `🌱 全家還在 60 天內、學習曲線尚未成形`
+    } else if (risingKids > 0) {
+      message = `📈 ${risingKids} 個小孩越做越多、學習曲線上升`
+    } else {
+      message = "穩定發揮中"
+    }
+
+    res.json({
+      kids,
+      risingCount: risingKids,
+      newCount: newKids,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/kid-favorite-emoji?days=90
  * 每個 active kid 過去 N 天 task emoji 使用最多者
  */

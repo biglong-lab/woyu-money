@@ -613,6 +613,9 @@ export default function FamilyPage() {
       {/* 家庭兒童最愛 emoji */}
       <FamilyKidFavoriteEmojiCard />
 
+      {/* 家庭兒童學習曲線 */}
+      <FamilyKidLearningCurveCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3567,6 +3570,73 @@ function ParentTodoList() {
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
       )}
+    </div>
+  )
+}
+
+function FamilyKidLearningCurveCard() {
+  const { data } = useQuery<{
+    kids: Array<{
+      kidId: number
+      kidName: string
+      avatar: string
+      accountAgeDays: number
+      firstMonthTasks: number
+      recentMonthTasks: number
+      diff: number
+      improvement: "rising" | "steady" | "declining" | "new" | "no_data"
+    }>
+    risingCount: number
+    newCount: number
+    message: string
+  }>({
+    queryKey: ["/api/family/kid-learning-curve"],
+  })
+  if (!data || data.kids.length === 0) return null
+
+  const established = data.kids.filter(
+    (k) => k.improvement !== "new" && k.improvement !== "no_data"
+  )
+  if (established.length === 0) return null
+
+  const IMP_LABEL: Record<string, string> = {
+    rising: "📈 進步",
+    steady: "➖ 持平",
+    declining: "📉 下滑",
+    new: "🌱 新手",
+    no_data: "—",
+  }
+  const IMP_COLOR: Record<string, string> = {
+    rising: "bg-emerald-500 text-white",
+    steady: "bg-blue-400 text-white",
+    declining: "bg-rose-500 text-white",
+    new: "bg-amber-300 text-amber-900",
+    no_data: "bg-gray-300 text-gray-700",
+  }
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-cyan-300 bg-gradient-to-br from-cyan-50 to-blue-50 p-3 shadow">
+      <h3 className="font-bold mb-2 flex items-center gap-2">📈 學習曲線</h3>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-2 text-xs">{data.message}</div>
+
+      <div className="space-y-1.5">
+        {established.map((k) => (
+          <div key={k.kidId} className="bg-white rounded-lg p-2 flex items-center gap-2">
+            <div className="text-lg">{k.avatar}</div>
+            <div className="flex-1">
+              <div className="text-sm font-medium">{k.kidName}</div>
+              <div className="text-[10px] text-gray-500">
+                首月 {k.firstMonthTasks} → 最近 {k.recentMonthTasks}（{k.diff >= 0 ? "+" : ""}
+                {k.diff}）
+              </div>
+            </div>
+            <div className={`text-[10px] px-1.5 py-0.5 rounded ${IMP_COLOR[k.improvement]}`}>
+              {IMP_LABEL[k.improvement]}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
