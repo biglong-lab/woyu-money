@@ -4245,6 +4245,29 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.body.weeks).toBe(52)
   })
 
+  it("速度榮譽榜：基本結構 tasks/message", async () => {
+    const res = await request(app).get("/api/family/task-speed-mvp")
+    expect(res.status).toBe(200)
+    expect(Array.isArray(res.body.tasks)).toBe(true)
+    expect(res.body.message).toBeTruthy()
+  })
+
+  it("速度榮譽榜：immediate submit→approve → task 含 durationDisplay", async () => {
+    const kidObj = (await createKid()) as { id: number }
+    const myKidId = kidObj.id
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId: myKidId, title: "速度測試", rewardAmount: 30 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`).send({})
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`).send({})
+    const res = await request(app).get("/api/family/task-speed-mvp?days=7")
+    expect(res.status).toBe(200)
+    expect(res.body.tasks.length).toBeGreaterThanOrEqual(1)
+    expect(res.body.tasks[0]).toHaveProperty("durationDisplay")
+    expect(res.body.tasks[0].seconds).toBeGreaterThanOrEqual(0)
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
   it("每日平均：基本結構 kids/familyAvgPerDay/message", async () => {
     const res = await request(app).get("/api/family/kid-daily-avg-tasks")
     expect(res.status).toBe(200)

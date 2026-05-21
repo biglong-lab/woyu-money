@@ -601,6 +601,9 @@ export default function FamilyPage() {
       {/* 家庭兒童每日平均任務 */}
       <FamilyKidDailyAvgTasksCard />
 
+      {/* 家庭任務速度榮譽榜 */}
+      <FamilyTaskSpeedMvpCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3555,6 +3558,55 @@ function ParentTodoList() {
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
       )}
+    </div>
+  )
+}
+
+function FamilyTaskSpeedMvpCard() {
+  const { data } = useQuery<{
+    days: number
+    tasks: Array<{
+      taskId: number
+      title: string
+      emoji: string
+      reward: number
+      seconds: number
+      durationDisplay: string
+      kidName: string
+      kidAvatar: string
+    }>
+    message: string
+  }>({
+    queryKey: ["/api/family/task-speed-mvp?days=30&limit=5"],
+  })
+  if (!data || data.tasks.length === 0) return null
+
+  const MEDAL = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣"]
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-green-400 bg-gradient-to-br from-green-50 to-emerald-50 p-3 shadow">
+      <h3 className="font-bold mb-2 flex items-center gap-2">⚡ 速度榮譽榜（30 天）</h3>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-2 text-xs">{data.message}</div>
+
+      <div className="space-y-1.5">
+        {data.tasks.map((t, i) => (
+          <div key={t.taskId} className="bg-white rounded-lg p-2 flex items-center gap-2">
+            <div className="text-xl">{MEDAL[i]}</div>
+            <div className="text-lg">{t.emoji}</div>
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-medium truncate">{t.title}</div>
+              <div className="text-[10px] text-gray-500">
+                {t.kidAvatar} {t.kidName} · ${t.reward}
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="text-sm font-bold text-green-600">{t.durationDisplay}</div>
+              <div className="text-[9px] text-gray-500">處理</div>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

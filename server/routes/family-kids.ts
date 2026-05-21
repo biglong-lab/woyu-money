@@ -8602,6 +8602,87 @@ async function bulkApproveOne(
 }
 
 /**
+ * GET /api/family/task-speed-mvp?days=30&limit=5
+ * 過去 N 天 submitted→approved 最快的 top N 任務
+ */
+router.get(
+  "/api/family/task-speed-mvp",
+  asyncHandler(async (req, res) => {
+    const days = Math.min(Math.max(Number(req.query.days) || 30, 7), 365)
+    const limit = Math.min(Math.max(Number(req.query.limit) || 5, 1), 20)
+
+    const rows = await db.execute(sql`
+      SELECT
+        t.id::int AS task_id,
+        t.title,
+        t.emoji,
+        t.reward_amount::numeric AS reward,
+        EXTRACT(EPOCH FROM (t.approved_at - t.completed_at))::numeric AS seconds,
+        t.completed_at,
+        ka.display_name AS kid_name,
+        ka.avatar
+      FROM kids_tasks t
+      JOIN kids_accounts ka ON ka.id = t.kid_id
+      WHERE t.status = 'approved'
+        AND t.approved_at IS NOT NULL
+        AND t.completed_at IS NOT NULL
+        AND ka.is_active = true
+        AND t.approved_at >= CURRENT_DATE - (${days}::int * INTERVAL '1 day')
+        AND EXTRACT(EPOCH FROM (t.approved_at - t.completed_at)) >= 0
+      ORDER BY (t.approved_at - t.completed_at) ASC
+      LIMIT ${limit}
+    `)
+
+    const tasks = (
+      rows as unknown as {
+        rows: Array<{
+          task_id: number
+          title: string
+          emoji: string
+          reward: string | number
+          seconds: string | number
+          completed_at: string
+          kid_name: string
+          avatar: string
+        }>
+      }
+    ).rows.map((r) => {
+      const secs = Number(r.seconds)
+      let display: string
+      if (secs < 60) display = `${Math.round(secs)} 秒`
+      else if (secs < 3600) display = `${Math.round(secs / 60)} 分鐘`
+      else if (secs < 86400) display = `${(secs / 3600).toFixed(1)} 小時`
+      else display = `${(secs / 86400).toFixed(1)} 天`
+      return {
+        taskId: r.task_id,
+        title: r.title,
+        emoji: r.emoji,
+        reward: Number(r.reward),
+        seconds: secs,
+        durationDisplay: display,
+        completedAt: r.completed_at,
+        kidName: r.kid_name,
+        kidAvatar: r.avatar,
+      }
+    })
+
+    let message: string
+    if (tasks.length === 0) {
+      message = `過去 ${days} 天還沒任務批准、速度榜空了`
+    } else {
+      const fastest = tasks[0]
+      message = `⚡ 最快：${fastest.emoji} ${fastest.title}（${fastest.kidName} ${fastest.durationDisplay}）`
+    }
+
+    res.json({
+      days,
+      tasks,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/kid-daily-avg-tasks?days=30
  * 每個 active kid 過去 N 天平均每天完成 task 數
  * pace: power(>=2/day) / steady(>=0.5) / occasional(>=0.1) / idle
