@@ -2875,6 +2875,208 @@ router.get(
 )
 
 /**
+ * GET /api/family/kid-next-badge?kidId=
+ * 找小孩最接近解鎖的徽章（unlocked=false 且 remaining 最小）
+ * 激勵感極強：大字顯示「再 N 個任務就解鎖 XXX 徽章！」
+ */
+router.get(
+  "/api/family/kid-next-badge",
+  asyncHandler(async (req, res) => {
+    const kidIdQ = Number(req.query.kidId)
+    if (!Number.isInteger(kidIdQ) || kidIdQ < 1) throw new AppError(400, "需傳 kidId")
+
+    // 統計 + 已解鎖徽章（與 badges-catalog 同邏輯）
+    const [tStats, gStats, gvStats, savStats, earned, streak] = await Promise.all([
+      db.execute(sql`SELECT COUNT(*)::int AS n FROM kids_tasks
+        WHERE kid_id = ${kidIdQ} AND status = 'approved'`),
+      db.execute(sql`SELECT COUNT(*)::int AS n FROM kids_goals
+        WHERE kid_id = ${kidIdQ} AND status = 'completed'`),
+      db.execute(sql`SELECT COALESCE(SUM(amount::numeric), 0)::numeric AS s FROM kids_spendings
+        WHERE kid_id = ${kidIdQ} AND jar = 'give'`),
+      db.execute(sql`SELECT COALESCE(SUM(current_amount::numeric), 0)::numeric AS s
+        FROM kids_goals WHERE kid_id = ${kidIdQ}`),
+      db
+        .select({ badgeType: kidsBadges.badgeType })
+        .from(kidsBadges)
+        .where(eq(kidsBadges.kidId, kidIdQ)),
+      calcStreak(kidIdQ),
+    ])
+
+    const totalApproved = (tStats as unknown as { rows: { n: number }[] }).rows[0]?.n ?? 0
+    const totalGoals = (gStats as unknown as { rows: { n: number }[] }).rows[0]?.n ?? 0
+    const totalGiven = parseFloat(
+      String((gvStats as unknown as { rows: { s: string | number }[] }).rows[0]?.s ?? "0")
+    )
+    const totalSaved = parseFloat(
+      String((savStats as unknown as { rows: { s: string | number }[] }).rows[0]?.s ?? "0")
+    )
+    const earnedSet = new Set(earned.map((b) => b.badgeType))
+
+    type BadgeDef = {
+      type: string
+      title: string
+      emoji: string
+      target: number
+      current: number
+      unit: string
+    }
+    const candidates: BadgeDef[] = [
+      {
+        type: "first_task",
+        title: "完成第一個任務",
+        emoji: "🌟",
+        target: 1,
+        current: totalApproved,
+        unit: "個任務",
+      },
+      {
+        type: "tasks_10",
+        title: "完成 10 個任務",
+        emoji: "💪",
+        target: 10,
+        current: totalApproved,
+        unit: "個任務",
+      },
+      {
+        type: "tasks_50",
+        title: "完成 50 個任務",
+        emoji: "🏆",
+        target: 50,
+        current: totalApproved,
+        unit: "個任務",
+      },
+      {
+        type: "tasks_100",
+        title: "完成 100 個任務",
+        emoji: "🚀",
+        target: 100,
+        current: totalApproved,
+        unit: "個任務",
+      },
+      {
+        type: "first_goal",
+        title: "完成第一個存錢目標",
+        emoji: "🎯",
+        target: 1,
+        current: totalGoals,
+        unit: "個目標",
+      },
+      {
+        type: "goals_5",
+        title: "完成 5 個目標",
+        emoji: "🎖️",
+        target: 5,
+        current: totalGoals,
+        unit: "個目標",
+      },
+      {
+        type: "goals_10",
+        title: "完成 10 個目標",
+        emoji: "🏅",
+        target: 10,
+        current: totalGoals,
+        unit: "個目標",
+      },
+      {
+        type: "first_give",
+        title: "第一次捐贈",
+        emoji: "❤️",
+        target: 1,
+        current: totalGiven > 0 ? 1 : 0,
+        unit: "次捐贈",
+      },
+      {
+        type: "give_100",
+        title: "累積捐贈 100 元",
+        emoji: "🤝",
+        target: 100,
+        current: totalGiven,
+        unit: "元",
+      },
+      {
+        type: "give_500",
+        title: "累積捐贈 500 元",
+        emoji: "💝",
+        target: 500,
+        current: totalGiven,
+        unit: "元",
+      },
+      {
+        type: "give_1000",
+        title: "累積捐贈 1000 元",
+        emoji: "🌈",
+        target: 1000,
+        current: totalGiven,
+        unit: "元",
+      },
+      {
+        type: "save_100",
+        title: "存款達 100 元",
+        emoji: "🐷",
+        target: 100,
+        current: totalSaved,
+        unit: "元",
+      },
+      {
+        type: "save_500",
+        title: "存款達 500 元",
+        emoji: "💰",
+        target: 500,
+        current: totalSaved,
+        unit: "元",
+      },
+      {
+        type: "streak_7",
+        title: "連續 7 天打卡",
+        emoji: "🔥",
+        target: 7,
+        current: streak,
+        unit: "天連續",
+      },
+      {
+        type: "streak_30",
+        title: "連續 30 天打卡",
+        emoji: "⚡",
+        target: 30,
+        current: streak,
+        unit: "天連續",
+      },
+    ]
+
+    const locked = candidates
+      .filter((b) => !earnedSet.has(b.type) && b.current < b.target && b.current >= 0)
+      .map((b) => ({ ...b, remaining: b.target - b.current }))
+      .sort((a, b) => a.remaining - b.remaining)
+
+    if (locked.length === 0) {
+      return res.json({
+        kidId: kidIdQ,
+        next: null,
+        message: "🎊 已解鎖目錄內所有徽章、傳奇等級！",
+      })
+    }
+
+    const next = locked[0]
+    const progress = next.target > 0 ? Math.round((next.current / next.target) * 100) : 0
+
+    res.json({
+      kidId: kidIdQ,
+      next: {
+        type: next.type,
+        title: next.title,
+        emoji: next.emoji,
+        target: next.target,
+        current: next.current,
+        remaining: next.remaining,
+        unit: next.unit,
+        progress,
+      },
+      message: `再 ${next.remaining} ${next.unit}就解鎖「${next.title}」！`,
+    })
+  })
+)
+
+/**
  * GET /api/family/kid-task-streak?kidId=
  * 任務 streak：連續做任務的天數（培養日常習慣）
  *

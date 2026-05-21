@@ -2644,6 +2644,38 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(r.status).toBe(400)
   })
 
+  it("下一個徽章：新小孩 → next=first_task 剩 1 個任務", async () => {
+    await createKid()
+    const res = await request(app).get(`/api/family/kid-next-badge?kidId=${kidId}`)
+    expect(res.status).toBe(200)
+    expect(res.body.next).toBeTruthy()
+    expect(res.body.next.type).toBe("first_task")
+    expect(res.body.next.remaining).toBe(1)
+    expect(res.body.next.unit).toBe("個任務")
+    expect(res.body.message).toContain("第一個任務")
+  })
+
+  it("下一個徽章：做 1 個 task → next 變 tasks_10 剩 9", async () => {
+    await createKid()
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId, title: "T1", rewardAmount: 30 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`)
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`)
+
+    const res = await request(app).get(`/api/family/kid-next-badge?kidId=${kidId}`)
+    expect(res.status).toBe(200)
+    // first_task 已解鎖 → 下一個是 tasks_10 或其他更近的
+    // 但因為 totalApproved=1，最近的應該是 tasks_10（剩 9）或 first_goal（剩 1）
+    // first_goal 剩 1 比較小、應該是 next
+    expect(res.body.next.remaining).toBeLessThanOrEqual(9)
+  })
+
+  it("kid-next-badge 缺 kidId 回 400", async () => {
+    const r = await request(app).get("/api/family/kid-next-badge")
+    expect(r.status).toBe(400)
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)

@@ -1004,6 +1004,9 @@ function KidDashboard({
       {/* 任務 streak（連續做任務）*/}
       <KidTaskStreakCard kidId={kidId} />
 
+      {/* 下一個徽章提示 */}
+      <KidNextBadgeCard kidId={kidId} />
+
       {/* 最近活動時間軸 */}
       <KidActivityTimeline kidId={kidId} />
 
@@ -1769,6 +1772,65 @@ function WishesSection({
           ))}
         </div>
       )}
+    </div>
+  )
+}
+
+function KidNextBadgeCard({ kidId }: { kidId: number }) {
+  const { data } = useQuery<{
+    next: {
+      type: string
+      title: string
+      emoji: string
+      target: number
+      current: number
+      remaining: number
+      unit: string
+      progress: number
+    } | null
+    message: string
+  }>({
+    queryKey: ["/api/family/kid-next-badge", kidId],
+    queryFn: async () => {
+      const res = await fetch(`/api/family/kid-next-badge?kidId=${kidId}`, {
+        credentials: "include",
+      })
+      return res.json()
+    },
+  })
+  if (!data) return null
+
+  // 全解鎖
+  if (!data.next) {
+    return (
+      <div className="mb-4 rounded-2xl border-2 border-purple-400 bg-gradient-to-r from-purple-100 to-pink-100 p-4 shadow text-center">
+        <div className="text-3xl mb-1">🎊</div>
+        <div className="font-bold text-purple-900">{data.message}</div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-yellow-400 bg-gradient-to-r from-yellow-50 to-amber-50 p-4 shadow">
+      <div className="flex items-center gap-3 mb-2">
+        <div className="text-5xl">{data.next.emoji}</div>
+        <div className="flex-1">
+          <div className="text-xs text-amber-700">下一個徽章</div>
+          <div className="font-bold text-amber-900">{data.next.title}</div>
+          <div className="text-xs text-gray-600 mt-0.5">
+            還差 <b className="text-amber-700">{data.next.remaining}</b> {data.next.unit}
+          </div>
+        </div>
+      </div>
+      <div className="h-3 bg-amber-100 rounded-full overflow-hidden">
+        <div
+          className="h-full bg-gradient-to-r from-yellow-400 to-amber-500 transition-all"
+          style={{ width: `${data.next.progress}%` }}
+        />
+      </div>
+      <div className="text-center mt-1 text-xs text-gray-600">
+        {data.next.current} / {data.next.target}（{data.next.progress}%）
+      </div>
     </div>
   )
 }
