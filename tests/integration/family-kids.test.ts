@@ -4245,6 +4245,39 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.body.weeks).toBe(52)
   })
 
+  it("派發頻率：基本結構 daily/byWeekday/summary/cadenceLevel", async () => {
+    const res = await request(app).get("/api/family/task-creation-cadence")
+    expect(res.status).toBe(200)
+    expect(res.body.daily).toHaveLength(30)
+    expect(res.body.byWeekday).toHaveProperty("Mon")
+    expect(res.body.byWeekday).toHaveProperty("Sun")
+    expect(res.body.summary).toHaveProperty("totalCreated")
+    expect(res.body.summary).toHaveProperty("avgPerDay")
+    expect(["very_active", "active", "occasional", "rare", "none"]).toContain(res.body.cadenceLevel)
+    expect(res.body.message).toBeTruthy()
+  })
+
+  it("派發頻率：派 1 個任務後 totalCreated >= 1", async () => {
+    const kidObj = (await createKid()) as { id: number }
+    const myKidId = kidObj.id
+    await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId: myKidId, title: "派任務測試", rewardAmount: 30 })
+    const res = await request(app).get("/api/family/task-creation-cadence?days=7")
+    expect(res.status).toBe(200)
+    expect(res.body.daily).toHaveLength(7)
+    expect(res.body.summary.totalCreated).toBeGreaterThanOrEqual(1)
+    expect(res.body.summary.busiestDate).toBeTruthy()
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
+  it("派發頻率：days clamp 1-90", async () => {
+    const r1 = await request(app).get("/api/family/task-creation-cadence?days=200")
+    expect(r1.body.daily).toHaveLength(90)
+    const r2 = await request(app).get("/api/family/task-creation-cadence?days=0")
+    expect(r2.body.daily).toHaveLength(30)
+  })
+
   it("最後活動：基本結構 kids + summary + message", async () => {
     const res = await request(app).get("/api/family/kids-last-activity")
     expect(res.status).toBe(200)

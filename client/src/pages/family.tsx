@@ -493,6 +493,9 @@ export default function FamilyPage() {
       {/* 家庭最後活動追蹤 */}
       <FamilyKidsLastActivityCard />
 
+      {/* 任務派發頻率 */}
+      <FamilyTaskCadenceCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3447,6 +3450,79 @@ function ParentTodoList() {
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
       )}
+    </div>
+  )
+}
+
+function FamilyTaskCadenceCard() {
+  const { data } = useQuery<{
+    byWeekday: Record<string, number>
+    summary: {
+      totalCreated: number
+      avgPerDay: number
+      busiestDate: string | null
+      busiestCount: number
+      consecutiveDryDays: number
+      favWeekday: string | null
+    }
+    cadenceLevel: "very_active" | "active" | "occasional" | "rare" | "none"
+    message: string
+  }>({
+    queryKey: ["/api/family/task-creation-cadence?days=30"],
+  })
+  if (!data) return null
+  if (data.summary.totalCreated === 0) return null
+
+  const LEVEL_BG: Record<string, string> = {
+    very_active: "from-emerald-50 to-green-50 border-emerald-400",
+    active: "from-blue-50 to-sky-50 border-blue-300",
+    occasional: "from-amber-50 to-yellow-50 border-amber-300",
+    rare: "from-rose-50 to-red-50 border-rose-300",
+    none: "from-gray-50 to-slate-50 border-gray-300",
+  }
+
+  const WEEKDAY_LABELS: Record<string, string> = {
+    Mon: "週一",
+    Tue: "週二",
+    Wed: "週三",
+    Thu: "週四",
+    Fri: "週五",
+    Sat: "週六",
+    Sun: "週日",
+  }
+  const maxWd = Math.max(...Object.values(data.byWeekday), 1)
+
+  return (
+    <div
+      className={`mb-4 rounded-2xl border-2 bg-gradient-to-br ${LEVEL_BG[data.cadenceLevel]} p-3 shadow`}
+    >
+      <h3 className="font-bold mb-2 flex items-center gap-2">📅 派任務節奏（30 天）</h3>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-2 text-xs">
+        {data.message}
+        <div className="text-gray-600 mt-1">
+          總計派 {data.summary.totalCreated} 個 · 平均 {data.summary.avgPerDay}/天
+          {data.summary.favWeekday && ` · 最常派：${WEEKDAY_LABELS[data.summary.favWeekday]}`}
+        </div>
+      </div>
+
+      <div className="bg-white/40 rounded-lg p-2">
+        <div className="text-[10px] text-gray-500 mb-1">星期分佈</div>
+        <div className="flex items-end gap-1.5 h-16">
+          {Object.entries(data.byWeekday).map(([wd, count]) => (
+            <div key={wd} className="flex-1 flex flex-col items-center justify-end">
+              <div className="text-[9px] text-gray-600">{count}</div>
+              <div
+                className="w-full bg-purple-500 rounded-t"
+                style={{ height: `${Math.max((count / maxWd) * 100, 4)}%` }}
+              />
+              <div className="text-[9px] text-gray-500 mt-1">
+                {WEEKDAY_LABELS[wd]?.slice(1) ?? wd}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   )
 }

@@ -8602,6 +8602,110 @@ async function bulkApproveOne(
 }
 
 /**
+ * GET /api/family/task-creation-cadence?days=30
+ * 家長派任務 cadence 分析：每天派幾個 + 星期分佈 + 連續沒派警告
+ * 含所有 status 的 task（按 created_at）
+ */
+router.get(
+  "/api/family/task-creation-cadence",
+  asyncHandler(async (req, res) => {
+    const days = Math.min(Math.max(Number(req.query.days) || 30, 1), 90)
+
+    // 每天派任務數
+    const daily = await db.execute(sql`
+      WITH days AS (
+        SELECT generate_series(
+          CURRENT_DATE - (${days - 1}::int * INTERVAL '1 day'),
+          CURRENT_DATE,
+          INTERVAL '1 day'
+        )::date AS d
+      )
+      SELECT
+        TO_CHAR(d.d, 'YYYY-MM-DD') AS date,
+        TO_CHAR(d.d, 'Dy') AS weekday,
+        (SELECT COUNT(*)::int FROM kids_tasks WHERE DATE(created_at) = d.d) AS created
+      FROM days d
+      ORDER BY d.d ASC
+    `)
+
+    const dailyArr = (
+      daily as unknown as { rows: Array<{ date: string; weekday: string; created: number }> }
+    ).rows
+
+    // 星期幾分佈（0=Sun ... 6=Sat → 用 ISO Mon-Sun）
+    const byWeekday: Record<string, number> = {
+      Mon: 0,
+      Tue: 0,
+      Wed: 0,
+      Thu: 0,
+      Fri: 0,
+      Sat: 0,
+      Sun: 0,
+    }
+    for (const d of dailyArr) {
+      const wd = d.weekday.slice(0, 3)
+      if (wd in byWeekday) byWeekday[wd] += d.created
+    }
+
+    const totalCreated = dailyArr.reduce((s, d) => s + d.created, 0)
+    const avgPerDay = totalCreated / days
+    const busiest = dailyArr.reduce((best, d) => (d.created > best.created ? d : best), dailyArr[0])
+
+    // 連續沒派天數（從今天往回算）
+    let consecutiveDryDays = 0
+    for (let i = dailyArr.length - 1; i >= 0; i--) {
+      if (dailyArr[i].created === 0) {
+        consecutiveDryDays++
+      } else {
+        break
+      }
+    }
+
+    // 找最愛派的星期
+    const sortedWeekdays = Object.entries(byWeekday).sort((a, b) => b[1] - a[1])
+    const favWeekday = sortedWeekdays[0][1] > 0 ? sortedWeekdays[0][0] : null
+
+    let cadenceLevel: "very_active" | "active" | "occasional" | "rare" | "none"
+    let message: string
+    if (totalCreated === 0) {
+      cadenceLevel = "none"
+      message = `過去 ${days} 天都沒派任務、開始第一個吧！`
+    } else if (avgPerDay >= 2) {
+      cadenceLevel = "very_active"
+      message = `🚀 平均每天派 ${avgPerDay.toFixed(1)} 個、超積極家長！`
+    } else if (avgPerDay >= 1) {
+      cadenceLevel = "active"
+      message = `💪 平均每天派 ${avgPerDay.toFixed(1)} 個、節奏穩定`
+    } else if (avgPerDay >= 0.3) {
+      cadenceLevel = "occasional"
+      message = `📋 平均每 ${Math.round(1 / avgPerDay)} 天派 1 個、可以更密集一點`
+    } else {
+      cadenceLevel = "rare"
+      message = `⏰ 派任務頻率較低（總共 ${totalCreated} 個）、試試多派一些任務`
+    }
+
+    if (consecutiveDryDays >= 7) {
+      message += ` ⚠️ 已 ${consecutiveDryDays} 天沒派任務、該動起來了`
+    }
+
+    res.json({
+      daily: dailyArr,
+      byWeekday,
+      summary: {
+        totalCreated,
+        avgPerDay: Math.round(avgPerDay * 10) / 10,
+        busiestDate: busiest?.created > 0 ? busiest.date : null,
+        busiestCount: busiest?.created ?? 0,
+        consecutiveDryDays,
+        favWeekday,
+      },
+      cadenceLevel,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/kids-last-activity
  * 每個 active 小孩最後一次活動（task / checkin / spending）+ 距今天數
  * attentionLevel: ok(<=2 天) / watch(3-6 天) / alert(>=7 天) / never
