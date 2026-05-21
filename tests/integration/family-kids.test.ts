@@ -4245,6 +4245,46 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.body.weeks).toBe(52)
   })
 
+  it("最後活動：基本結構 kids + summary + message", async () => {
+    const res = await request(app).get("/api/family/kids-last-activity")
+    expect(res.status).toBe(200)
+    expect(Array.isArray(res.body.kids)).toBe(true)
+    expect(res.body.summary).toHaveProperty("totalKids")
+    expect(res.body.summary).toHaveProperty("alertCount")
+    expect(res.body.message).toBeTruthy()
+  })
+
+  it("最後活動：完成任務後 daysSince=0、attentionLevel=ok", async () => {
+    const kidObj = (await createKid()) as { id: number }
+    const myKidId = kidObj.id
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId: myKidId, title: "今日活動", rewardAmount: 50 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`).send({})
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`).send({})
+    const res = await request(app).get("/api/family/kids-last-activity")
+    expect(res.status).toBe(200)
+    const myKid = res.body.kids.find((k: { kidId: number }) => k.kidId === myKidId)
+    expect(myKid).toBeDefined()
+    expect(myKid.daysSince).toBeLessThanOrEqual(1)
+    expect(myKid.attentionLevel).toBe("ok")
+    expect(myKid.latestType).toBe("task")
+    expect(myKid.lastTaskTitle).toBe("今日活動")
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
+  it("最後活動：新建小孩無活動 → attentionLevel=never", async () => {
+    const kidObj = (await createKid()) as { id: number }
+    const myKidId = kidObj.id
+    const res = await request(app).get("/api/family/kids-last-activity")
+    expect(res.status).toBe(200)
+    const myKid = res.body.kids.find((k: { kidId: number }) => k.kidId === myKidId)
+    expect(myKid).toBeDefined()
+    expect(myKid.attentionLevel).toBe("never")
+    expect(myKid.latestAt).toBeNull()
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
   it("儲蓄留存：基本結構 kids + summary + familyLevel", async () => {
     const res = await request(app).get("/api/family/savings-retention")
     expect(res.status).toBe(200)

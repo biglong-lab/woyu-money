@@ -8602,6 +8602,127 @@ async function bulkApproveOne(
 }
 
 /**
+ * GET /api/family/kids-last-activity
+ * 每個 active 小孩最後一次活動（task / checkin / spending）+ 距今天數
+ * attentionLevel: ok(<=2 天) / watch(3-6 天) / alert(>=7 天) / never
+ */
+router.get(
+  "/api/family/kids-last-activity",
+  asyncHandler(async (_req, res) => {
+    const rows = await db.execute(sql`
+      SELECT
+        ka.id::int AS kid_id,
+        ka.display_name AS kid_name,
+        ka.avatar,
+        (SELECT MAX(completed_at) FROM kids_tasks
+          WHERE kid_id = ka.id AND status = 'approved') AS last_task_at,
+        (SELECT title FROM kids_tasks
+          WHERE kid_id = ka.id AND status = 'approved'
+          ORDER BY completed_at DESC NULLS LAST LIMIT 1) AS last_task_title,
+        (SELECT MAX(checkin_date) FROM kids_checkins WHERE kid_id = ka.id) AS last_checkin_date,
+        (SELECT MAX(spend_date) FROM kids_spendings WHERE kid_id = ka.id) AS last_spending_date
+      FROM kids_accounts ka
+      WHERE ka.is_active = true
+      ORDER BY ka.id ASC
+    `)
+
+    const now = new Date()
+    const todayStr = now.toISOString().slice(0, 10)
+
+    const kids = (
+      rows as unknown as {
+        rows: Array<{
+          kid_id: number
+          kid_name: string
+          avatar: string
+          last_task_at: string | null
+          last_task_title: string | null
+          last_checkin_date: string | null
+          last_spending_date: string | null
+        }>
+      }
+    ).rows.map((r) => {
+      const dates: Array<{ type: string; at: string | null }> = [
+        { type: "task", at: r.last_task_at },
+        { type: "checkin", at: r.last_checkin_date },
+        { type: "spending", at: r.last_spending_date },
+      ]
+      let latestType: "task" | "checkin" | "spending" | null = null
+      let latestAt: string | null = null
+      let latestMs = -1
+      for (const d of dates) {
+        if (!d.at) continue
+        const ms = new Date(d.at).getTime()
+        if (ms > latestMs) {
+          latestMs = ms
+          latestAt = d.at
+          latestType = d.type as "task" | "checkin" | "spending"
+        }
+      }
+
+      let daysSince: number | null = null
+      let attentionLevel: "ok" | "watch" | "alert" | "never"
+      let summary: string
+
+      if (latestAt) {
+        daysSince = Math.floor((Date.parse(todayStr) - new Date(latestAt).getTime()) / 86400000)
+        if (daysSince < 0) daysSince = 0
+        if (daysSince <= 2) {
+          attentionLevel = "ok"
+          summary = `最近 ${daysSince === 0 ? "今天" : `${daysSince} 天前`}活動過 ✅`
+        } else if (daysSince <= 6) {
+          attentionLevel = "watch"
+          summary = `${daysSince} 天沒新活動、注意一下 ⚠️`
+        } else {
+          attentionLevel = "alert"
+          summary = `${daysSince} 天沒任何活動、該關心一下 🚨`
+        }
+      } else {
+        attentionLevel = "never"
+        summary = "從沒活動紀錄、新加入的小孩？"
+      }
+
+      return {
+        kidId: r.kid_id,
+        kidName: r.kid_name,
+        avatar: r.avatar,
+        lastTaskAt: r.last_task_at,
+        lastTaskTitle: r.last_task_title,
+        lastCheckinDate: r.last_checkin_date,
+        lastSpendingDate: r.last_spending_date,
+        latestType,
+        latestAt,
+        daysSince,
+        attentionLevel,
+        summary,
+      }
+    })
+
+    const alertCount = kids.filter((k) => k.attentionLevel === "alert").length
+    const watchCount = kids.filter((k) => k.attentionLevel === "watch").length
+    const message =
+      alertCount > 0
+        ? `⚠️ ${alertCount} 個小孩超過 7 天沒活動、請主動關心`
+        : watchCount > 0
+          ? `${watchCount} 個小孩 3-6 天沒新活動`
+          : kids.length > 0
+            ? "全家近期都有活動 👍"
+            : "尚未加入小孩"
+
+    res.json({
+      kids,
+      summary: {
+        totalKids: kids.length,
+        alertCount,
+        watchCount,
+        okCount: kids.filter((k) => k.attentionLevel === "ok").length,
+      },
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/savings-retention
  * 每個 active 小孩存款留存率分析
  * 留存率 = (save_balance + give_balance) / total_received（spend 罐已花用）

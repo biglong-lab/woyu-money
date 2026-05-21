@@ -490,6 +490,9 @@ export default function FamilyPage() {
       {/* 家庭儲蓄留存率 */}
       <FamilySavingsRetentionCard />
 
+      {/* 家庭最後活動追蹤 */}
+      <FamilyKidsLastActivityCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3444,6 +3447,79 @@ function ParentTodoList() {
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
       )}
+    </div>
+  )
+}
+
+function FamilyKidsLastActivityCard() {
+  const { data } = useQuery<{
+    kids: Array<{
+      kidId: number
+      kidName: string
+      avatar: string
+      lastTaskTitle: string | null
+      latestType: "task" | "checkin" | "spending" | null
+      latestAt: string | null
+      daysSince: number | null
+      attentionLevel: "ok" | "watch" | "alert" | "never"
+      summary: string
+    }>
+    summary: { totalKids: number; alertCount: number; watchCount: number; okCount: number }
+    message: string
+  }>({
+    queryKey: ["/api/family/kids-last-activity"],
+  })
+  if (!data || data.summary.totalKids === 0) return null
+
+  const ROW_BG: Record<string, string> = {
+    ok: "bg-emerald-50 border-emerald-200",
+    watch: "bg-amber-50 border-amber-300",
+    alert: "bg-rose-50 border-rose-400",
+    never: "bg-gray-50 border-gray-300",
+  }
+
+  const TYPE_EMOJI: Record<string, string> = {
+    task: "📋",
+    checkin: "✅",
+    spending: "🛒",
+  }
+
+  // 顯示策略：alert/watch 排前 + ok 排後（家長最先看到需要關注的）
+  const sorted = [...data.kids].sort((a, b) => {
+    const order = { alert: 0, watch: 1, never: 2, ok: 3 }
+    return order[a.attentionLevel] - order[b.attentionLevel]
+  })
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-purple-300 bg-gradient-to-br from-purple-50 to-pink-50 p-3 shadow">
+      <h3 className="font-bold mb-2 flex items-center gap-2">⏰ 最後活動追蹤</h3>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-2 text-xs">{data.message}</div>
+
+      <div className="space-y-1.5">
+        {sorted.map((k) => (
+          <div
+            key={k.kidId}
+            className={`flex items-center gap-2 rounded-lg p-2 border ${ROW_BG[k.attentionLevel]}`}
+          >
+            <div className="text-lg">{k.avatar}</div>
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-medium">{k.kidName}</div>
+              <div className="text-[11px] text-gray-600 truncate">
+                {k.latestType && TYPE_EMOJI[k.latestType]} {k.summary}
+                {k.lastTaskTitle && k.latestType === "task" && (
+                  <span className="text-gray-500"> · 最後任務：{k.lastTaskTitle}</span>
+                )}
+              </div>
+            </div>
+            {k.daysSince !== null && (
+              <div className="text-xs font-bold text-gray-700 whitespace-nowrap">
+                {k.daysSince === 0 ? "今天" : `${k.daysSince}d`}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
