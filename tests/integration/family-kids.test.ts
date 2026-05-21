@@ -3551,6 +3551,66 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(r.status).toBe(400)
   })
 
+  it("教育成果：4 維度評分 + overallScore + comment", async () => {
+    await createKid({ spendRatio: 0, saveRatio: 50, giveRatio: 50 })
+
+    // 完成任務 + 捐贈 + 打卡（培養同理心 + 規律性）
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId, title: "T", rewardAmount: 200 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`)
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`)
+
+    // 捐贈 50（give 罐 100）
+    await request(app)
+      .post("/api/family/spendings")
+      .send({ kidId, jar: "give", amount: 50, description: "幫助", recipient: "貓中途" })
+
+    // 打卡
+    await request(app).post("/api/family/checkins").send({ kidId, mood: "😄 開心" })
+
+    const res = await request(app).get(`/api/family/kid-education-report?kidId=${kidId}`)
+    expect(res.status).toBe(200)
+    expect(res.body.kidId).toBe(kidId)
+
+    const dims = res.body.dimensions as Array<{ key: string; score: number; detail: string }>
+    expect(dims.length).toBe(4)
+    expect(dims.map((d) => d.key)).toEqual(["initiative", "savings", "empathy", "consistency"])
+
+    // 同理心: give_count=1×5 + unique=1×10 = 15
+    const empathy = dims.find((d) => d.key === "empathy")!
+    expect(empathy.score).toBe(15)
+    expect(empathy.detail).toContain("1 次捐贈")
+
+    // 規律性 score > 0（今天打卡了）
+    const consistency = dims.find((d) => d.key === "consistency")!
+    expect(consistency.score).toBeGreaterThan(0)
+
+    expect(res.body.overallScore).toBeGreaterThanOrEqual(0)
+    expect(res.body.overallScore).toBeLessThanOrEqual(100)
+    expect(res.body.overallComment).toBeTruthy()
+  })
+
+  it("教育成果：新小孩無活動 → score 全 0、comment 含「還未」", async () => {
+    await createKid()
+    const res = await request(app).get(`/api/family/kid-education-report?kidId=${kidId}`)
+    expect(res.status).toBe(200)
+    const dims = res.body.dimensions as Array<{ key: string; score: number }>
+    expect(dims.find((d) => d.key === "initiative")!.score).toBe(0)
+    expect(dims.find((d) => d.key === "savings")!.score).toBe(0)
+    expect(dims.find((d) => d.key === "empathy")!.score).toBe(0)
+  })
+
+  it("kid-education-report 不存在 → 404", async () => {
+    const r = await request(app).get("/api/family/kid-education-report?kidId=999999")
+    expect(r.status).toBe(404)
+  })
+
+  it("kid-education-report 缺 kidId 回 400", async () => {
+    const r = await request(app).get("/api/family/kid-education-report")
+    expect(r.status).toBe(400)
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)

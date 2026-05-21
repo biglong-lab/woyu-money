@@ -998,6 +998,9 @@ function KidDashboard({
         </div>
       )}
 
+      {/* 每日金錢小語 */}
+      <DailyMoneyQuote />
+
       {/* 等級徽章（累積分數升 level）*/}
       <KidLevelBadge kidId={kidId} />
 
@@ -2947,6 +2950,60 @@ function KidGoalDeadlinesCard({ kidId }: { kidId: number }) {
             <div className="text-xs font-medium">{g.message}</div>
           </div>
         ))}
+      </div>
+    </div>
+  )
+}
+
+const MONEY_QUOTES: Array<{ text: string; emoji: string }> = [
+  { text: "存錢就是把今天的選擇、留給明天的自己。", emoji: "🐷" },
+  { text: "錢不是萬能、但有錢能讓夢想變真實。", emoji: "💫" },
+  { text: "賺錢有兩種：用時間換、和用智慧換。", emoji: "🧠" },
+  { text: "想買東西前先問：我真的需要嗎？", emoji: "🤔" },
+  { text: "捐贈一塊錢、就是分享一份善意。", emoji: "❤️" },
+  { text: "小錢累積、就是大事業的起點。", emoji: "🌱" },
+  { text: "比賺錢更重要的、是學會管錢。", emoji: "📚" },
+  { text: "不要看別人有什麼、看自己想成為什麼。", emoji: "⭐" },
+  { text: "存錢的習慣、比賺多少更重要。", emoji: "✨" },
+  { text: "每一次儲蓄、都是對未來的投資。", emoji: "🌳" },
+  { text: "聰明的人讓錢工作、傻的人為錢工作。", emoji: "🎯" },
+  { text: "預算不是限制、是給自由的計畫。", emoji: "🗺️" },
+  { text: "想要 vs 需要：兩個字差很多。", emoji: "💡" },
+  { text: "金錢是工具、不是目標。", emoji: "🔧" },
+  { text: "幫助別人、也是讓自己變得富足。", emoji: "🤝" },
+  { text: "今天少花一杯飲料、明天多一個選擇。", emoji: "🥤" },
+  { text: "存錢就像種樹、要有耐心等開花。", emoji: "🌸" },
+  { text: "誠實的勞動最有價值。", emoji: "💪" },
+  { text: "理財是一輩子的功課、慢慢學。", emoji: "🎓" },
+  { text: "存夠了再買、不要先借再還。", emoji: "🐢" },
+  { text: "感恩你擁有的、就會發現自己很富有。", emoji: "🙏" },
+  { text: "金錢能買東西、買不到時間。", emoji: "⏰" },
+  { text: "比別人少花、不是吝嗇、是聰明。", emoji: "🦊" },
+  { text: "成功的人不是賺得多、是花得對。", emoji: "🎖️" },
+  { text: "把錢分成三份：花、存、給予。", emoji: "🌈" },
+  { text: "投資自己永遠是最棒的投資。", emoji: "🚀" },
+  { text: "存錢罐沉沉的、心情會很滿足。", emoji: "🥰" },
+  { text: "做家事不是為了錢、是為了愛家人。", emoji: "🏠" },
+  { text: "學會等待、就學會了存錢。", emoji: "🕰️" },
+  { text: "節儉是美德、不是吝嗇。", emoji: "🌟" },
+]
+
+function DailyMoneyQuote() {
+  // 用 day-of-year 選每天不同金句
+  const now = new Date()
+  const start = new Date(now.getFullYear(), 0, 0)
+  const diff = now.getTime() - start.getTime()
+  const dayOfYear = Math.floor(diff / 86_400_000)
+  const quote = MONEY_QUOTES[dayOfYear % MONEY_QUOTES.length]
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-yellow-300 bg-gradient-to-br from-yellow-50 to-amber-50 p-4 shadow">
+      <div className="flex items-start gap-3">
+        <div className="text-4xl shrink-0">{quote.emoji}</div>
+        <div className="flex-1">
+          <div className="text-xs text-amber-700 mb-1">💬 今日金錢小語</div>
+          <div className="text-sm font-medium text-amber-900 leading-relaxed">「{quote.text}」</div>
+        </div>
       </div>
     </div>
   )

@@ -467,6 +467,9 @@ export default function FamilyPage() {
       {/* 兄弟姊妹比較 */}
       <SiblingComparisonCard />
 
+      {/* 教育成果報告（每個 kid 一份）*/}
+      <FamilyEducationReports />
+
       {/* 全家活動 feed */}
       <FamilyActivityFeed />
 
@@ -1894,6 +1897,108 @@ function DifficultyInsights() {
         ))}
       </CardContent>
     </Card>
+  )
+}
+
+function KidEducationCard({
+  kidId,
+  kidName,
+  avatar,
+}: {
+  kidId: number
+  kidName: string
+  avatar: string
+}) {
+  const { data } = useQuery<{
+    overallScore: number
+    overallComment: string
+    dimensions: Array<{
+      key: string
+      name: string
+      emoji: string
+      score: number
+      comment: string
+      detail: string
+    }>
+  }>({
+    queryKey: ["/api/family/kid-education-report", kidId],
+    queryFn: async () => {
+      const res = await fetch(`/api/family/kid-education-report?kidId=${kidId}`, {
+        credentials: "include",
+      })
+      return res.json()
+    },
+  })
+  if (!data) return null
+
+  function scoreColor(s: number) {
+    if (s >= 80) return "bg-emerald-500"
+    if (s >= 60) return "bg-blue-500"
+    if (s >= 40) return "bg-amber-500"
+    if (s >= 20) return "bg-orange-400"
+    return "bg-gray-300"
+  }
+
+  return (
+    <div className="bg-white rounded-lg p-3 shadow-sm">
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-2xl">{avatar}</span>
+        <div className="flex-1">
+          <div className="font-bold text-sm">{kidName}</div>
+          <div className="text-xs text-gray-500">{data.overallComment}</div>
+        </div>
+        <div className="text-right">
+          <div className="text-2xl font-bold text-violet-700">{data.overallScore}</div>
+          <div className="text-[10px] text-gray-500">總分</div>
+        </div>
+      </div>
+
+      <div className="space-y-1">
+        {data.dimensions.map((d) => (
+          <div key={d.key}>
+            <div className="flex items-center justify-between mb-0.5 text-xs">
+              <span>
+                {d.emoji} {d.name}
+              </span>
+              <span className="font-bold text-gray-700">{d.score}</span>
+            </div>
+            <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
+              <div className={`h-full ${scoreColor(d.score)}`} style={{ width: `${d.score}%` }} />
+            </div>
+            <div className="text-[10px] text-gray-400 mt-0.5">{d.detail}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function FamilyEducationReports() {
+  const { data: kids } = useQuery<
+    Array<{ id: number; displayName: string; avatar: string; isActive: boolean }>
+  >({
+    queryKey: ["/api/family/kids"],
+    queryFn: async () => {
+      const res = await fetch("/api/family/kids", { credentials: "include" })
+      return res.json()
+    },
+  })
+  if (!kids || kids.length === 0) return null
+  const activeKids = kids.filter((k) => k.isActive !== false)
+  if (activeKids.length === 0) return null
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-violet-300 bg-gradient-to-br from-violet-50 to-purple-50 p-4 shadow">
+      <h3 className="font-bold text-violet-900 mb-3 flex items-center gap-2">🎓 教育成果報告</h3>
+      <div className="space-y-2">
+        {activeKids.map((k) => (
+          <KidEducationCard key={k.id} kidId={k.id} kidName={k.displayName} avatar={k.avatar} />
+        ))}
+      </div>
+      <div className="text-[11px] text-violet-600 mt-2 text-center">
+        4 維度：主動性 / 儲蓄能力 / 同理心 / 規律性
+      </div>
+    </div>
   )
 }
 

@@ -2875,6 +2875,159 @@ router.get(
 )
 
 /**
+ * GET /api/family/kid-education-report?kidId=
+ * 小孩教育成果報告（家長端、評估 4 大金融素養面向）
+ *
+ * 4 維度（each 0-100 分）：
+ *   - initiative（主動性）：自己提任務佔總任務的比例
+ *   - savings（儲蓄能力）：完成 goal 數 + 存款累積
+ *   - empathy（同理心）：捐贈次數 + 不同 recipient 數
+ *   - consistency（規律性）：打卡天數 / 註冊以來天數
+ *
+ * overallScore = 4 個平均
+ * 給每個面向評語
+ */
+router.get(
+  "/api/family/kid-education-report",
+  asyncHandler(async (req, res) => {
+    const kidIdQ = Number(req.query.kidId)
+    if (!Number.isInteger(kidIdQ) || kidIdQ < 1) throw new AppError(400, "需傳 kidId")
+
+    const [kid] = await db.select().from(kidsAccounts).where(eq(kidsAccounts.id, kidIdQ)).limit(1)
+    if (!kid) throw new AppError(404, "小孩不存在")
+
+    const result = await db.execute(sql`
+      SELECT
+        -- 主動性：notes 含 '小孩提議' 或 created_by_kid 的任務佔比
+        COALESCE((
+          SELECT COUNT(*)::int FROM kids_tasks
+          WHERE kid_id = ${kidIdQ} AND status = 'approved'
+        ), 0) AS total_approved,
+        COALESCE((
+          SELECT COUNT(*)::int FROM kids_tasks
+          WHERE kid_id = ${kidIdQ} AND status = 'approved'
+            AND (notes LIKE '%小孩%' OR notes LIKE '%我要%' OR notes LIKE '%主動%')
+        ), 0) AS self_proposed,
+        -- 儲蓄能力
+        COALESCE((
+          SELECT COUNT(*)::int FROM kids_goals
+          WHERE kid_id = ${kidIdQ} AND status = 'completed'
+        ), 0) AS goals_completed,
+        COALESCE((
+          SELECT save_balance::numeric FROM kids_jars WHERE kid_id = ${kidIdQ}
+        ), 0) AS save_balance,
+        -- 同理心
+        COALESCE((
+          SELECT COUNT(*)::int FROM kids_spendings
+          WHERE kid_id = ${kidIdQ} AND jar = 'give'
+        ), 0) AS give_count,
+        COALESCE((
+          SELECT COUNT(DISTINCT recipient)::int FROM kids_spendings
+          WHERE kid_id = ${kidIdQ} AND jar = 'give'
+            AND recipient IS NOT NULL AND TRIM(recipient) != ''
+        ), 0) AS unique_recipients,
+        -- 規律性
+        COALESCE((
+          SELECT COUNT(DISTINCT checkin_date)::int FROM kids_checkins
+          WHERE kid_id = ${kidIdQ}
+        ), 0) AS total_checkin_days,
+        GREATEST((CURRENT_DATE - DATE(${kid.createdAt}))::int, 1) AS account_age_days
+    `)
+    const row = (
+      result as unknown as {
+        rows: {
+          total_approved: number
+          self_proposed: number
+          goals_completed: number
+          save_balance: string | number
+          give_count: number
+          unique_recipients: number
+          total_checkin_days: number
+          account_age_days: number
+        }[]
+      }
+    ).rows[0]!
+
+    // 4 分數計算（各 0-100）
+    // 主動性：self_proposed / total（上限 50%、× 200）；無任務則 0
+    const initiativeScore =
+      row.total_approved > 0
+        ? Math.min(100, Math.round((row.self_proposed / row.total_approved) * 200))
+        : 0
+
+    // 儲蓄：goals_completed × 20（上限 60）+ save_balance / 50（上限 40）
+    const savingsBase = Math.min(60, row.goals_completed * 20)
+    const savingsBonus = Math.min(40, Math.round(Number(row.save_balance) / 50))
+    const savingsScore = savingsBase + savingsBonus
+
+    // 同理心：give_count × 5（上限 60）+ unique_recipients × 10（上限 40）
+    const empathyBase = Math.min(60, row.give_count * 5)
+    const empathyBonus = Math.min(40, row.unique_recipients * 10)
+    const empathyScore = empathyBase + empathyBonus
+
+    // 規律性：checkin_days / account_age_days × 100
+    const consistencyScore = Math.min(
+      100,
+      Math.round((row.total_checkin_days / row.account_age_days) * 100)
+    )
+
+    const overallScore = Math.round(
+      (initiativeScore + savingsScore + empathyScore + consistencyScore) / 4
+    )
+
+    function comment(score: number): string {
+      if (score >= 80) return "🌟 表現傑出！"
+      if (score >= 60) return "👍 表現良好"
+      if (score >= 40) return "💪 進步中、繼續加油"
+      if (score >= 20) return "🌱 剛起步、可培養更多"
+      return "🆕 還未開始發展這項"
+    }
+
+    const dimensions = [
+      {
+        key: "initiative",
+        name: "主動性",
+        emoji: "🚀",
+        score: initiativeScore,
+        comment: comment(initiativeScore),
+        detail: `${row.self_proposed} / ${row.total_approved} 任務自己提議`,
+      },
+      {
+        key: "savings",
+        name: "儲蓄能力",
+        emoji: "🐷",
+        score: savingsScore,
+        comment: comment(savingsScore),
+        detail: `${row.goals_completed} 個目標達成、存款 $${row.save_balance}`,
+      },
+      {
+        key: "empathy",
+        name: "同理心",
+        emoji: "❤️",
+        score: empathyScore,
+        comment: comment(empathyScore),
+        detail: `${row.give_count} 次捐贈、幫助 ${row.unique_recipients} 位`,
+      },
+      {
+        key: "consistency",
+        name: "規律性",
+        emoji: "📅",
+        score: consistencyScore,
+        comment: comment(consistencyScore),
+        detail: `${row.total_checkin_days} 天打卡 / ${row.account_age_days} 天帳號`,
+      },
+    ]
+
+    res.json({
+      kidId: kidIdQ,
+      overallScore,
+      overallComment: comment(overallScore),
+      dimensions,
+    })
+  })
+)
+
+/**
  * GET /api/family/kid-timecapsule?kidId=
  * 小孩時光膠囊：1 年 / 半年 / 1 個月前的同一天紀錄
  *
