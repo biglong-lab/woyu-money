@@ -443,6 +443,9 @@ export default function FamilyPage() {
       {/* 家庭今日重點（最頂部）*/}
       <FamilyTodaySummary />
 
+      {/* 家庭健康儀表板 */}
+      <FamilyHealthDashboard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3105,6 +3108,69 @@ function ParentTodoList() {
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
       )}
+    </div>
+  )
+}
+
+function FamilyHealthDashboard() {
+  const { data } = useQuery<{
+    overallScore: number
+    healthLevel: "excellent" | "good" | "moderate" | "needs_attention"
+    message: string
+    dimensions: Array<{ key: string; name: string; score: number; detail: string }>
+  }>({
+    queryKey: ["/api/family/health-dashboard"],
+    queryFn: async () => {
+      const res = await fetch("/api/family/health-dashboard", { credentials: "include" })
+      return res.json()
+    },
+  })
+  if (!data) return null
+
+  const LEVEL_COLOR: Record<string, string> = {
+    excellent: "from-emerald-50 to-green-50 border-emerald-400",
+    good: "from-blue-50 to-sky-50 border-blue-300",
+    moderate: "from-amber-50 to-yellow-50 border-amber-300",
+    needs_attention: "from-rose-50 to-red-50 border-rose-400",
+  }
+
+  function scoreColor(s: number) {
+    if (s >= 80) return "bg-emerald-500"
+    if (s >= 60) return "bg-blue-500"
+    if (s >= 40) return "bg-amber-500"
+    return "bg-rose-500"
+  }
+
+  return (
+    <div
+      className={`mb-4 rounded-2xl border-2 bg-gradient-to-br ${LEVEL_COLOR[data.healthLevel]} p-4 shadow`}
+    >
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="font-bold flex items-center gap-2">💖 家庭健康指數</h3>
+        <div className="text-right">
+          <div className="text-3xl font-bold">{data.overallScore}</div>
+          <div className="text-xs opacity-70">/ 100</div>
+        </div>
+      </div>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-3 text-sm font-medium text-center">
+        {data.message}
+      </div>
+
+      <div className="space-y-2">
+        {data.dimensions.map((d) => (
+          <div key={d.key} className="bg-white/70 rounded p-2">
+            <div className="flex items-center justify-between mb-1 text-sm">
+              <span className="font-medium">{d.name}</span>
+              <span className="font-bold">{d.score} / 100</span>
+            </div>
+            <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden mb-1">
+              <div className={`h-full ${scoreColor(d.score)}`} style={{ width: `${d.score}%` }} />
+            </div>
+            <div className="text-xs text-gray-600">{d.detail}</div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

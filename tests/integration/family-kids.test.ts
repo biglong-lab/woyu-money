@@ -3990,6 +3990,129 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(k.message).toBeNull()
   })
 
+  it("願望清單：建 2 願望（價格 50/500）+ 任務 1000 → 50 affordable / 500 saving", async () => {
+    await createKid({ spendRatio: 60, saveRatio: 40, giveRatio: 0 })
+
+    // 任務 1000 → spend 600 + save 400 = 1000 available
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId, title: "T", rewardAmount: 1000 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`)
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`)
+
+    // 願望 50 元（買得起）
+    await request(app)
+      .post("/api/family/wishes")
+      .send({ kidId, title: "便宜玩具", estimatedPrice: 50 })
+    // 願望 500 元（買得起、available=1000、剛好夠）
+    await request(app)
+      .post("/api/family/wishes")
+      .send({ kidId, title: "便宜書", estimatedPrice: 500 })
+    // 願望 2000 元（買不起）
+    await request(app)
+      .post("/api/family/wishes")
+      .send({ kidId, title: "貴玩具", estimatedPrice: 2000 })
+
+    const res = await request(app).get(`/api/family/kid-wishlist-summary?kidId=${kidId}`)
+    expect(res.status).toBe(200)
+    expect(res.body.totalWishes).toBe(3)
+    expect(res.body.totalEstimated).toBe(2550)
+    expect(res.body.available).toBe(1000)
+    expect(res.body.affordableCount).toBe(2) // 50 + 500 都 <= 1000
+
+    const wishes = res.body.wishes as Array<{ status: string; etaDays: number | null }>
+    const expensive = wishes.find((w) => w.etaDays !== null && w.etaDays > 0)
+    expect(expensive).toBeTruthy()
+  })
+
+  it("kid-wishlist-summary 缺 kidId 回 400", async () => {
+    const r = await request(app).get("/api/family/kid-wishlist-summary")
+    expect(r.status).toBe(400)
+  })
+
+  it("心情走勢：打卡 → totalDays + avgScore + trend", async () => {
+    await createKid()
+
+    // 今日打卡開心
+    await request(app).post("/api/family/checkins").send({ kidId, mood: "😄 開心" })
+
+    const res = await request(app).get(`/api/family/kid-mood-trend?kidId=${kidId}`)
+    expect(res.status).toBe(200)
+    expect(res.body.totalDays).toBe(1)
+    expect(res.body.avgScore).toBe(5)
+    expect(res.body.happyDays).toBe(1)
+    expect(res.body.sadDays).toBe(0)
+    expect(res.body.bestDay).toBeTruthy()
+    expect(res.body.bestDay.mood).toBe("😄 開心")
+    expect(res.body.trend).toContain("超開心")
+  })
+
+  it("心情走勢：無打卡 → totalDays=0、trend 含「還沒」", async () => {
+    await createKid()
+    const res = await request(app).get(`/api/family/kid-mood-trend?kidId=${kidId}`)
+    expect(res.status).toBe(200)
+    expect(res.body.totalDays).toBe(0)
+    expect(res.body.trend).toContain("還沒")
+  })
+
+  it("kid-mood-trend 缺 kidId 回 400", async () => {
+    const r = await request(app).get("/api/family/kid-mood-trend")
+    expect(r.status).toBe(400)
+  })
+
+  it("家庭健康儀表板：3 dimensions + overall + level", async () => {
+    const res = await request(app).get("/api/family/health-dashboard")
+    expect(res.status).toBe(200)
+    expect(res.body.overallScore).toBeGreaterThanOrEqual(0)
+    expect(res.body.overallScore).toBeLessThanOrEqual(100)
+    expect(["excellent", "good", "moderate", "needs_attention"]).toContain(res.body.healthLevel)
+
+    const dims = res.body.dimensions as Array<{ key: string; score: number; detail: string }>
+    expect(dims.length).toBe(3)
+    expect(dims.map((d) => d.key)).toEqual(["mood", "activity", "fairness"])
+    for (const d of dims) {
+      expect(d.score).toBeGreaterThanOrEqual(0)
+      expect(d.score).toBeLessThanOrEqual(100)
+      expect(d.detail).toBeTruthy()
+    }
+    expect(res.body.message).toBeTruthy()
+  })
+
+  it("優點清單：新小孩 → strengths 含 newcomer", async () => {
+    await createKid()
+    const res = await request(app).get(`/api/family/kid-strengths-list?kidId=${kidId}`)
+    expect(res.status).toBe(200)
+    expect(res.body.strengths.length).toBeGreaterThanOrEqual(1)
+
+    const newcomer = res.body.strengths.find((s: { key: string }) => s.key === "newcomer")
+    expect(newcomer).toBeTruthy()
+  })
+
+  it("優點清單：完成 20 個任務 → 含 active 優點", async () => {
+    await createKid()
+
+    for (let i = 0; i < 20; i++) {
+      const t = await request(app)
+        .post("/api/family/tasks")
+        .send({ kidId, title: `T${i}`, rewardAmount: 5 })
+      await request(app).post(`/api/family/tasks/${t.body.id}/submit`)
+      await request(app).post(`/api/family/tasks/${t.body.id}/approve`)
+    }
+
+    const res = await request(app).get(`/api/family/kid-strengths-list?kidId=${kidId}`)
+    expect(res.status).toBe(200)
+    expect(res.body.stats.totalTasks).toBe(20)
+
+    const active = res.body.strengths.find((s: { key: string }) => s.key === "active")
+    expect(active).toBeTruthy()
+    expect(active.detail).toContain("20")
+  })
+
+  it("kid-strengths-list 缺 kidId 回 400", async () => {
+    const r = await request(app).get("/api/family/kid-strengths-list")
+    expect(r.status).toBe(400)
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)

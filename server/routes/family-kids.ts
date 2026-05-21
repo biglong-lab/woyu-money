@@ -2875,6 +2875,484 @@ router.get(
 )
 
 /**
+ * GET /api/family/kid-strengths-list?kidId=
+ * 小孩優點清單：從數據偵測個人化優點
+ */
+router.get(
+  "/api/family/kid-strengths-list",
+  asyncHandler(async (req, res) => {
+    const kidIdQ = Number(req.query.kidId)
+    if (!Number.isInteger(kidIdQ) || kidIdQ < 1) throw new AppError(400, "需傳 kidId")
+
+    const result = await db.execute(sql`
+      SELECT
+        COALESCE((SELECT COUNT(*)::int FROM kids_tasks
+          WHERE kid_id = ${kidIdQ} AND status = 'approved'), 0) AS total_tasks,
+        COALESCE((SELECT COUNT(*)::int FROM kids_tasks
+          WHERE kid_id = ${kidIdQ} AND status = 'approved' AND difficulty = 'hard'), 0) AS hard_tasks,
+        COALESCE((SELECT SUM(amount::numeric)::numeric FROM kids_spendings
+          WHERE kid_id = ${kidIdQ} AND jar = 'give'), 0) AS total_given,
+        COALESCE((SELECT COUNT(*)::int FROM kids_goals
+          WHERE kid_id = ${kidIdQ} AND status = 'completed'), 0) AS goals_completed,
+        COALESCE((SELECT COUNT(DISTINCT checkin_date)::int FROM kids_checkins
+          WHERE kid_id = ${kidIdQ}), 0) AS checkin_days,
+        COALESCE((SELECT save_balance::numeric FROM kids_jars WHERE kid_id = ${kidIdQ}), 0) AS save_balance,
+        COALESCE((SELECT COUNT(DISTINCT category)::int FROM kids_tasks
+          WHERE kid_id = ${kidIdQ} AND status = 'approved'), 0) AS unique_categories,
+        COALESCE((SELECT COUNT(*)::int FROM kids_wishes
+          WHERE kid_id = ${kidIdQ} AND status = 'promoted'), 0) AS promoted_wishes
+    `)
+    const row = (
+      result as unknown as {
+        rows: {
+          total_tasks: number
+          hard_tasks: number
+          total_given: string | number
+          goals_completed: number
+          checkin_days: number
+          save_balance: string | number
+          unique_categories: number
+          promoted_wishes: number
+        }[]
+      }
+    ).rows[0]!
+
+    const stats = {
+      totalTasks: row.total_tasks,
+      hardTasks: row.hard_tasks,
+      totalGiven: Number(row.total_given ?? 0),
+      goalsCompleted: row.goals_completed,
+      checkinDays: row.checkin_days,
+      saveBalance: Number(row.save_balance ?? 0),
+      uniqueCategories: row.unique_categories,
+      promotedWishes: row.promoted_wishes,
+    }
+
+    const strengths: Array<{ key: string; emoji: string; title: string; detail: string }> = []
+
+    if (stats.totalTasks >= 50)
+      strengths.push({
+        key: "diligent",
+        emoji: "💪",
+        title: "勤勞之星",
+        detail: `已完成 ${stats.totalTasks} 個任務、超有耐心`,
+      })
+    else if (stats.totalTasks >= 20)
+      strengths.push({
+        key: "active",
+        emoji: "🌟",
+        title: "積極小幫手",
+        detail: `已完成 ${stats.totalTasks} 個任務`,
+      })
+
+    if (stats.hardTasks >= 10)
+      strengths.push({
+        key: "brave",
+        emoji: "🦁",
+        title: "勇於挑戰",
+        detail: `完成 ${stats.hardTasks} 個困難任務`,
+      })
+    else if (stats.hardTasks >= 3)
+      strengths.push({
+        key: "growing",
+        emoji: "🌱",
+        title: "願意嘗試",
+        detail: `做過 ${stats.hardTasks} 個困難任務`,
+      })
+
+    if (stats.totalGiven >= 500)
+      strengths.push({
+        key: "generous",
+        emoji: "❤️",
+        title: "充滿愛心",
+        detail: `累積捐贈 $${stats.totalGiven}`,
+      })
+    else if (stats.totalGiven >= 100)
+      strengths.push({
+        key: "kind",
+        emoji: "🤗",
+        title: "懂得分享",
+        detail: `已捐贈 $${stats.totalGiven}`,
+      })
+
+    if (stats.goalsCompleted >= 5)
+      strengths.push({
+        key: "achiever",
+        emoji: "🏆",
+        title: "達成目標王",
+        detail: `已達成 ${stats.goalsCompleted} 個目標`,
+      })
+    else if (stats.goalsCompleted >= 1)
+      strengths.push({
+        key: "saver",
+        emoji: "🐷",
+        title: "存錢有方",
+        detail: `達成 ${stats.goalsCompleted} 個目標`,
+      })
+
+    if (stats.checkinDays >= 30)
+      strengths.push({
+        key: "consistent",
+        emoji: "📅",
+        title: "規律小達人",
+        detail: `打卡 ${stats.checkinDays} 天`,
+      })
+    else if (stats.checkinDays >= 7)
+      strengths.push({
+        key: "routine",
+        emoji: "✨",
+        title: "養成習慣",
+        detail: `打卡 ${stats.checkinDays} 天`,
+      })
+
+    if (stats.saveBalance >= 1000)
+      strengths.push({
+        key: "wealthy",
+        emoji: "💎",
+        title: "小富翁",
+        detail: `存款 $${stats.saveBalance}`,
+      })
+
+    if (stats.uniqueCategories >= 4)
+      strengths.push({
+        key: "versatile",
+        emoji: "🎨",
+        title: "多才多藝",
+        detail: `做過 ${stats.uniqueCategories} 種類別`,
+      })
+
+    if (stats.promotedWishes >= 1)
+      strengths.push({
+        key: "decisive",
+        emoji: "🎯",
+        title: "懂得決策",
+        detail: `${stats.promotedWishes} 個願望升級成目標`,
+      })
+
+    if (strengths.length === 0) {
+      strengths.push({
+        key: "newcomer",
+        emoji: "🥚",
+        title: "剛起步",
+        detail: "完成第一個任務、就會解鎖優點！",
+      })
+    }
+
+    res.json({
+      kidId: kidIdQ,
+      stats,
+      strengthCount: strengths.length,
+      strengths,
+    })
+  })
+)
+
+/**
+ * GET /api/family/health-dashboard
+ * 家庭整體健康儀表板（3 維度合成總分）
+ *
+ * 3 維度（each 0-100）：
+ *   - mood: 近 7 天平均 mood score × 20（5×20=100）
+ *   - activity: 近 7 天 approved tasks 數 / (kids × 7 × 0.5) × 100（每 kid 平均一週 3.5 個 = 100）
+ *   - fairness: 100 - (max - min taskPercentage)（越接近平均越高）
+ *
+ * 總分 = 三項平均
+ */
+router.get(
+  "/api/family/health-dashboard",
+  asyncHandler(async (_req, res) => {
+    const [moodRows, taskRows, kidsCount] = await Promise.all([
+      db.execute(sql`
+        SELECT AVG(
+          CASE mood
+            WHEN '😄 開心' THEN 5
+            WHEN '🙂 還好' THEN 4
+            WHEN '😐 普通' THEN 3
+            WHEN '😢 難過' THEN 2
+            WHEN '😡 生氣' THEN 1
+            ELSE 3
+          END
+        )::numeric AS avg_score
+        FROM kids_checkins
+        WHERE checkin_date >= CURRENT_DATE - INTERVAL '7 days'
+      `),
+      db.execute(sql`
+        SELECT
+          kid_id::int,
+          COUNT(*)::int AS tasks
+        FROM kids_tasks
+        WHERE status = 'approved'
+          AND completed_at >= NOW() - INTERVAL '7 days'
+        GROUP BY kid_id
+      `),
+      db.execute(sql`SELECT COUNT(*)::int AS n FROM kids_accounts WHERE is_active = true`),
+    ])
+
+    const avgMoodScore = Number(
+      (moodRows as unknown as { rows: { avg_score: string | number | null }[] }).rows[0]
+        ?.avg_score ?? 0
+    )
+    const taskByKid = (taskRows as unknown as { rows: { kid_id: number; tasks: number }[] }).rows
+    const totalKids = (kidsCount as unknown as { rows: { n: number }[] }).rows[0]?.n ?? 0
+
+    const totalTasks = taskByKid.reduce((s, r) => s + r.tasks, 0)
+
+    // mood score 0-100
+    const moodScore = avgMoodScore > 0 ? Math.min(100, Math.round(avgMoodScore * 20)) : 0
+
+    // activity score：每 kid 平均一週 3.5 個 task = 滿分
+    const expectedWeeklyTasks = totalKids * 3.5
+    const activityScore =
+      expectedWeeklyTasks > 0
+        ? Math.min(100, Math.round((totalTasks / expectedWeeklyTasks) * 100))
+        : 0
+
+    // fairness：max - min percentage（差異越小越公平）
+    let fairnessScore = 100
+    if (totalKids >= 2 && totalTasks > 0) {
+      const percentages = taskByKid.map((r) => (r.tasks / totalTasks) * 100)
+      const padded = [...percentages]
+      // 補上 0 task 的 kid
+      while (padded.length < totalKids) padded.push(0)
+      const maxP = Math.max(...padded)
+      const minP = Math.min(...padded)
+      fairnessScore = Math.max(0, Math.round(100 - (maxP - minP)))
+    } else if (totalKids < 2) {
+      fairnessScore = 100 // 一個小孩、不能評估
+    }
+
+    const overallScore = Math.round((moodScore + activityScore + fairnessScore) / 3)
+
+    let healthLevel: "excellent" | "good" | "moderate" | "needs_attention"
+    let message: string
+    if (overallScore >= 80) {
+      healthLevel = "excellent"
+      message = "🌟 全家狀況非常好！"
+    } else if (overallScore >= 60) {
+      healthLevel = "good"
+      message = "👍 家庭狀況不錯、有些可以加強"
+    } else if (overallScore >= 40) {
+      healthLevel = "moderate"
+      message = "💪 一般水準、考慮多互動"
+    } else {
+      healthLevel = "needs_attention"
+      message = "⚠️ 需要多關心、看看哪裡可改善"
+    }
+
+    res.json({
+      overallScore,
+      healthLevel,
+      message,
+      dimensions: [
+        {
+          key: "mood",
+          name: "心情",
+          score: moodScore,
+          detail: `平均 ${avgMoodScore.toFixed(1)}/5`,
+        },
+        {
+          key: "activity",
+          name: "活躍度",
+          score: activityScore,
+          detail: `近 7 天 ${totalTasks} 個任務`,
+        },
+        {
+          key: "fairness",
+          name: "公平度",
+          score: fairnessScore,
+          detail: totalKids < 2 ? "至少需要 2 個小孩" : "任務分配差異",
+        },
+      ],
+    })
+  })
+)
+
+/**
+ * GET /api/family/kid-mood-trend?kidId=&days=30
+ * 小孩心情走勢：近 N 天 mood 分析
+ */
+router.get(
+  "/api/family/kid-mood-trend",
+  asyncHandler(async (req, res) => {
+    const kidIdQ = Number(req.query.kidId)
+    if (!Number.isInteger(kidIdQ) || kidIdQ < 1) throw new AppError(400, "需傳 kidId")
+    const days = Math.min(Math.max(Number(req.query.days) || 30, 1), 90)
+
+    const result = await db.execute(sql`
+      SELECT checkin_date, mood, note
+      FROM kids_checkins
+      WHERE kid_id = ${kidIdQ}
+        AND checkin_date >= CURRENT_DATE - (${days}::int || ' days')::interval
+      ORDER BY checkin_date DESC
+    `)
+    const rows = (
+      result as unknown as {
+        rows: { checkin_date: Date | string; mood: string; note: string | null }[]
+      }
+    ).rows
+
+    const MOOD_SCORE: Record<string, number> = {
+      "😄 開心": 5,
+      "🙂 還好": 4,
+      "😐 普通": 3,
+      "😢 難過": 2,
+      "😡 生氣": 1,
+    }
+
+    const checkins = rows.map((r) => ({
+      date:
+        typeof r.checkin_date === "string"
+          ? r.checkin_date.slice(0, 10)
+          : new Date(r.checkin_date).toISOString().slice(0, 10),
+      mood: r.mood,
+      note: r.note,
+      score: MOOD_SCORE[r.mood] ?? 3,
+    }))
+
+    const totalDays = checkins.length
+    const avgScore =
+      totalDays > 0
+        ? Math.round((checkins.reduce((s, c) => s + c.score, 0) / totalDays) * 100) / 100
+        : 0
+
+    const happyDays = checkins.filter((c) => c.score >= 4).length
+    const sadDays = checkins.filter((c) => c.score <= 2).length
+
+    let bestDay: (typeof checkins)[0] | null = null
+    let worstDay: (typeof checkins)[0] | null = null
+    for (const c of checkins) {
+      if (!bestDay || c.score > bestDay.score) bestDay = c
+      if (!worstDay || c.score < worstDay.score) worstDay = c
+    }
+    if (bestDay && worstDay && bestDay === worstDay && totalDays === 1) worstDay = null
+
+    let trend: string
+    if (totalDays === 0) trend = "🌫️ 還沒打卡過"
+    else if (avgScore >= 4.5) trend = "🌞 整體超開心"
+    else if (avgScore >= 3.5) trend = "😊 大部分時間不錯"
+    else if (avgScore >= 2.5) trend = "🌤️ 起伏正常"
+    else trend = "🌧️ 心情比較低、需要關心"
+
+    res.json({
+      kidId: kidIdQ,
+      days,
+      totalDays,
+      avgScore,
+      happyDays,
+      sadDays,
+      bestDay,
+      worstDay,
+      trend,
+      checkins,
+    })
+  })
+)
+
+/**
+ * GET /api/family/kid-wishlist-summary?kidId=
+ * 小孩願望清單分析（多久能買 / 可買幾個）
+ */
+router.get(
+  "/api/family/kid-wishlist-summary",
+  asyncHandler(async (req, res) => {
+    const kidIdQ = Number(req.query.kidId)
+    if (!Number.isInteger(kidIdQ) || kidIdQ < 1) throw new AppError(400, "需傳 kidId")
+
+    const [wishes, jars, recentReward] = await Promise.all([
+      db.execute(sql`
+        SELECT
+          id::int AS id,
+          title,
+          emoji,
+          estimated_price::numeric AS price,
+          priority,
+          status,
+          created_at
+        FROM kids_wishes
+        WHERE kid_id = ${kidIdQ}
+          AND status = 'wished'
+          AND estimated_price IS NOT NULL
+        ORDER BY priority DESC, estimated_price ASC
+      `),
+      db.execute(sql`
+        SELECT
+          COALESCE(spend_balance::numeric, 0) + COALESCE(save_balance::numeric, 0) AS available
+        FROM kids_jars WHERE kid_id = ${kidIdQ}
+      `),
+      db.execute(sql`
+        SELECT COALESCE(SUM(reward_amount::numeric), 0)::numeric AS s
+        FROM kids_tasks
+        WHERE kid_id = ${kidIdQ} AND status = 'approved'
+          AND completed_at >= NOW() - INTERVAL '30 days'
+      `),
+    ])
+
+    const wishList = (
+      wishes as unknown as {
+        rows: {
+          id: number
+          title: string
+          emoji: string | null
+          price: string | number
+          priority: number
+          status: string
+          created_at: Date
+        }[]
+      }
+    ).rows.map((r) => ({
+      id: r.id,
+      title: r.title,
+      emoji: r.emoji ?? "✨",
+      price: Number(r.price ?? 0),
+      priority: r.priority,
+    }))
+
+    const available = Number(
+      String(
+        (jars as unknown as { rows: { available: string | number }[] }).rows[0]?.available ?? 0
+      )
+    )
+    const monthlyReward = Number(
+      String((recentReward as unknown as { rows: { s: string | number }[] }).rows[0]?.s ?? 0)
+    )
+    const dailyEarning = monthlyReward / 30
+
+    const totalEstimated = wishList.reduce((s, w) => s + w.price, 0)
+
+    const enriched = wishList.map((w) => {
+      let status: "affordable" | "soon" | "saving"
+      let etaDays: number | null
+      if (w.price <= available) {
+        status = "affordable"
+        etaDays = 0
+      } else {
+        const remaining = w.price - available
+        if (dailyEarning <= 0) {
+          status = "saving"
+          etaDays = null
+        } else {
+          etaDays = Math.ceil(remaining / dailyEarning)
+          status = etaDays <= 30 ? "soon" : "saving"
+        }
+      }
+      return { ...w, status, etaDays }
+    })
+
+    const affordableCount = enriched.filter((w) => w.status === "affordable").length
+
+    res.json({
+      kidId: kidIdQ,
+      totalWishes: wishList.length,
+      totalEstimated,
+      available,
+      dailyEarning: Math.round(dailyEarning * 100) / 100,
+      affordableCount,
+      wishes: enriched,
+    })
+  })
+)
+
+/**
  * GET /api/family/kids-attention
  * 家長關心雷達：找出最近無 task / 無 checkin 的 kid
  */

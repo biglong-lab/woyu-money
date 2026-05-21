@@ -858,6 +858,9 @@ function KidDashboard({
       {/* 家庭共同罐 - 小孩可貢獻 */}
       <FamilyPotsContribute kidId={kidId} jar={jar} toast={toast} onAfterContribute={invalidate} />
 
+      {/* 願望清單分析（買得起多少 / 還要多久）*/}
+      <KidWishlistSummaryCard kidId={kidId} />
+
       {/* 願望清單（想要、未必有錢、培養理財決策力）*/}
       <WishesSection kidId={kidId} toast={toast} onAfterPromote={invalidate} />
 
@@ -1011,11 +1014,17 @@ function KidDashboard({
       {/* 每日金錢小語 */}
       <DailyMoneyQuote />
 
+      {/* 今日小目標（每天 3 個 nudge）*/}
+      <DailyMiniGoals kidId={kidId} />
+
       {/* 總財產 */}
       <KidNetWorthCard kidId={kidId} />
 
       {/* 等級徽章（累積分數升 level）*/}
       <KidLevelBadge kidId={kidId} />
+
+      {/* 我的優點清單 */}
+      <KidStrengthsListCard kidId={kidId} />
 
       {/* 任務挑戰推薦（明天試試這些）*/}
       <KidSuggestionsCard kidId={kidId} />
@@ -1025,6 +1034,9 @@ function KidDashboard({
 
       {/* 任務 streak（連續做任務）*/}
       <KidTaskStreakCard kidId={kidId} />
+
+      {/* 心情走勢（近 30 天）*/}
+      <KidMoodTrendCard kidId={kidId} />
 
       {/* 本週成績單 */}
       <KidWeeklyReportCard kidId={kidId} />
@@ -2180,6 +2192,73 @@ function KidWeeklyReportCard({ kidId }: { kidId: number }) {
   )
 }
 
+function KidMoodTrendCard({ kidId }: { kidId: number }) {
+  const { data } = useQuery<{
+    totalDays: number
+    avgScore: number
+    happyDays: number
+    sadDays: number
+    bestDay: { date: string; mood: string } | null
+    worstDay: { date: string; mood: string } | null
+    trend: string
+    checkins: Array<{ date: string; mood: string; score: number; note: string | null }>
+  }>({
+    queryKey: ["/api/family/kid-mood-trend", kidId],
+    queryFn: async () => {
+      const res = await fetch(`/api/family/kid-mood-trend?kidId=${kidId}&days=30`, {
+        credentials: "include",
+      })
+      return res.json()
+    },
+  })
+  if (!data || data.totalDays === 0) return null
+
+  function scoreColor(score: number) {
+    if (score >= 5) return "bg-yellow-400"
+    if (score >= 4) return "bg-emerald-400"
+    if (score >= 3) return "bg-blue-400"
+    if (score >= 2) return "bg-indigo-400"
+    return "bg-rose-400"
+  }
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-pink-300 bg-gradient-to-br from-pink-50 to-rose-50 p-4 shadow">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="font-bold text-pink-900 flex items-center gap-2">🎭 心情走勢</h3>
+        <span className="text-xs text-gray-500">
+          {data.totalDays} 天・平均 {data.avgScore}/5
+        </span>
+      </div>
+
+      <div className="bg-white rounded-lg p-3 mb-3 text-center">
+        <div className="text-base font-bold text-pink-900">{data.trend}</div>
+        <div className="text-xs text-gray-600 mt-1">
+          😊 開心 {data.happyDays} 天・😢 難過 {data.sadDays} 天
+        </div>
+      </div>
+
+      {/* 心情條（每天 1 個小方格、最近 30 天）*/}
+      <div className="flex gap-0.5 mb-2">
+        {data.checkins.slice(0, 30).map((c) => (
+          <div
+            key={c.date}
+            className={`w-2.5 h-6 rounded ${scoreColor(c.score)}`}
+            title={`${c.date}：${c.mood}`}
+          />
+        ))}
+      </div>
+
+      <div className="flex justify-between text-xs text-gray-500">
+        {data.bestDay && (
+          <span>
+            最開心：{data.bestDay.mood}（{new Date(data.bestDay.date).toLocaleDateString("zh-TW")}）
+          </span>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function KidTaskStreakCard({ kidId }: { kidId: number }) {
   const { data } = useQuery<{
     currentStreak: number
@@ -3060,6 +3139,79 @@ const MONEY_QUOTES: Array<{ text: string; emoji: string }> = [
   { text: "節儉是美德、不是吝嗇。", emoji: "🌟" },
 ]
 
+function KidWishlistSummaryCard({ kidId }: { kidId: number }) {
+  const { data } = useQuery<{
+    totalWishes: number
+    totalEstimated: number
+    available: number
+    dailyEarning: number
+    affordableCount: number
+    wishes: Array<{
+      id: number
+      title: string
+      emoji: string
+      price: number
+      status: "affordable" | "soon" | "saving"
+      etaDays: number | null
+    }>
+  }>({
+    queryKey: ["/api/family/kid-wishlist-summary", kidId],
+    queryFn: async () => {
+      const res = await fetch(`/api/family/kid-wishlist-summary?kidId=${kidId}`, {
+        credentials: "include",
+      })
+      return res.json()
+    },
+  })
+  if (!data || data.totalWishes === 0) return null
+
+  const STATUS_COLOR: Record<string, string> = {
+    affordable: "bg-emerald-100 text-emerald-800 border-emerald-300",
+    soon: "bg-amber-100 text-amber-800 border-amber-300",
+    saving: "bg-gray-100 text-gray-700 border-gray-300",
+  }
+  const STATUS_LABEL: Record<string, string> = {
+    affordable: "🎉 可以買！",
+    soon: "💪 快了！",
+    saving: "🌱 還要存",
+  }
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-violet-300 bg-gradient-to-br from-violet-50 to-fuchsia-50 p-4 shadow">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="font-bold text-violet-900 flex items-center gap-2">🎁 我的願望</h3>
+        <span className="text-xs text-gray-500">
+          {data.affordableCount} 可買・全部 ${data.totalEstimated}
+        </span>
+      </div>
+
+      <div className="bg-white rounded-lg p-2 mb-3 text-center text-xs text-gray-600">
+        現在可用 <b className="text-violet-700">${data.available}</b>・每天賺{" "}
+        <b className="text-violet-700">${data.dailyEarning.toFixed(0)}</b>
+      </div>
+
+      <div className="space-y-1.5">
+        {data.wishes.slice(0, 8).map((w) => (
+          <div key={w.id} className={`rounded-lg p-2 border ${STATUS_COLOR[w.status]}`}>
+            <div className="flex items-center gap-2">
+              <span className="text-xl">{w.emoji}</span>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium truncate">{w.title}</div>
+                <div className="text-xs opacity-75">
+                  ${w.price}
+                  {w.etaDays !== null && w.etaDays > 0 && `・${w.etaDays} 天後可買`}
+                  {w.etaDays === null && "・先做任務才能買"}
+                </div>
+              </div>
+              <span className="text-xs font-bold shrink-0">{STATUS_LABEL[w.status]}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function KidNetWorthCard({ kidId }: { kidId: number }) {
   const { data } = useQuery<{
     jars: { spend: number; save: number; give: number }
@@ -3106,6 +3258,69 @@ function KidNetWorthCard({ kidId }: { kidId: number }) {
   )
 }
 
+function DailyMiniGoals({ kidId }: { kidId: number }) {
+  // 用既有的 today-summary 看小孩今日是否完成 3 件事
+  const { data: today } = useQuery<{
+    stats: { approvedToday: number; checkinsToday: number }
+    kids: Array<{ kidId: number; checkedIn: boolean; tasks: number }>
+  }>({
+    queryKey: ["/api/family/today-summary"],
+    queryFn: async () => {
+      const res = await fetch("/api/family/today-summary", { credentials: "include" })
+      return res.json()
+    },
+  })
+
+  const myToday = today?.kids?.find((k) => k.kidId === kidId)
+  const doneTask = !!myToday && myToday.tasks > 0
+  const doneCheckin = !!myToday && myToday.checkedIn
+
+  const goals = [
+    {
+      key: "task",
+      emoji: "✅",
+      label: "完成 1 個任務",
+      done: doneTask,
+    },
+    {
+      key: "checkin",
+      emoji: "📅",
+      label: "今日打卡",
+      done: doneCheckin,
+    },
+    {
+      key: "wish",
+      emoji: "✨",
+      label: "看看我的願望",
+      done: false, // 預設未完成、純提示
+    },
+  ]
+
+  const doneCount = goals.filter((g) => g.done).length
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-cyan-300 bg-gradient-to-br from-cyan-50 to-sky-50 p-3 shadow">
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="font-bold text-cyan-900 text-sm">🎯 今日小目標</h3>
+        <span className="text-xs text-cyan-700 font-bold">{doneCount} / 3</span>
+      </div>
+      <div className="flex gap-2">
+        {goals.map((g) => (
+          <div
+            key={g.key}
+            className={`flex-1 rounded-lg p-2 text-center text-xs ${
+              g.done ? "bg-emerald-100 text-emerald-800" : "bg-white text-gray-600"
+            }`}
+          >
+            <div className="text-lg mb-0.5">{g.done ? "✓" : g.emoji}</div>
+            <div>{g.label}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function DailyMoneyQuote() {
   // 用 day-of-year 選每天不同金句
   const now = new Date()
@@ -3122,6 +3337,41 @@ function DailyMoneyQuote() {
           <div className="text-xs text-amber-700 mb-1">💬 今日金錢小語</div>
           <div className="text-sm font-medium text-amber-900 leading-relaxed">「{quote.text}」</div>
         </div>
+      </div>
+    </div>
+  )
+}
+
+function KidStrengthsListCard({ kidId }: { kidId: number }) {
+  const { data } = useQuery<{
+    strengthCount: number
+    strengths: Array<{ key: string; emoji: string; title: string; detail: string }>
+  }>({
+    queryKey: ["/api/family/kid-strengths-list", kidId],
+    queryFn: async () => {
+      const res = await fetch(`/api/family/kid-strengths-list?kidId=${kidId}`, {
+        credentials: "include",
+      })
+      return res.json()
+    },
+  })
+  if (!data) return null
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-rose-300 bg-gradient-to-br from-rose-50 to-pink-50 p-4 shadow">
+      <h3 className="font-bold text-rose-900 mb-3 flex items-center gap-2">
+        ✨ 我的優點（{data.strengthCount}）
+      </h3>
+      <div className="space-y-2">
+        {data.strengths.map((s) => (
+          <div key={s.key} className="bg-white rounded-lg p-2 flex items-center gap-2">
+            <span className="text-2xl">{s.emoji}</span>
+            <div className="flex-1">
+              <div className="text-sm font-bold text-rose-900">{s.title}</div>
+              <div className="text-xs text-gray-600">{s.detail}</div>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   )
