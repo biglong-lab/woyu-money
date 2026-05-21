@@ -3080,6 +3080,66 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(r.status).toBe(400)
   })
 
+  it("任務推薦：別人做過但這個小孩沒做、回 suggestions", async () => {
+    // 先建妹妹小華做幾個任務、再建小明（沒做）→ 推薦小華做過的給小明
+    await db.execute(sql`DELETE FROM kids_accounts WHERE pin = ${TEST_PIN}`)
+
+    await createKid({ displayName: "小華" })
+    const huaId = kidId
+
+    for (const title of ["倒垃圾", "掃地"]) {
+      const t = await request(app)
+        .post("/api/family/tasks")
+        .send({ kidId: huaId, title, rewardAmount: 30 })
+      await request(app).post(`/api/family/tasks/${t.body.id}/submit`)
+      await request(app).post(`/api/family/tasks/${t.body.id}/approve`)
+    }
+
+    // 建小明（沒做任何任務）
+    await createKid({ displayName: "小明" })
+    const mingId = kidId
+
+    const res = await request(app).get(`/api/family/kid-suggestions?kidId=${mingId}`)
+    expect(res.status).toBe(200)
+    expect(res.body.total).toBeGreaterThanOrEqual(2)
+
+    const titles = res.body.suggestions.map((s: { title: string }) => s.title)
+    expect(titles).toContain("倒垃圾")
+    expect(titles).toContain("掃地")
+
+    // 每筆有 familyTimes 跟 suggestedReward
+    for (const s of res.body.suggestions as Array<{
+      familyTimes: number
+      suggestedReward: number
+    }>) {
+      expect(s.familyTimes).toBeGreaterThan(0)
+      expect(s.suggestedReward).toBeGreaterThan(0)
+    }
+
+    // 清姐姐
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${huaId}`)
+  })
+
+  it("任務推薦：自己做過的不再推薦", async () => {
+    await createKid()
+    // 做一個「澆花」
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId, title: "澆花", rewardAmount: 20 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`)
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`)
+
+    const res = await request(app).get(`/api/family/kid-suggestions?kidId=${kidId}`)
+    expect(res.status).toBe(200)
+    const titles = res.body.suggestions.map((s: { title: string }) => s.title)
+    expect(titles).not.toContain("澆花") // 自己做過、不推薦
+  })
+
+  it("kid-suggestions 缺 kidId 回 400", async () => {
+    const r = await request(app).get("/api/family/kid-suggestions")
+    expect(r.status).toBe(400)
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)

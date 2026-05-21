@@ -1001,6 +1001,9 @@ function KidDashboard({
       {/* 等級徽章（累積分數升 level）*/}
       <KidLevelBadge kidId={kidId} />
 
+      {/* 任務挑戰推薦（明天試試這些）*/}
+      <KidSuggestionsCard kidId={kidId} />
+
       {/* 任務 streak（連續做任務）*/}
       <KidTaskStreakCard kidId={kidId} />
 
@@ -2538,6 +2541,51 @@ function KidActivityTimeline({ kidId }: { kidId: number }) {
             </div>
           )
         })}
+      </div>
+    </div>
+  )
+}
+
+function KidSuggestionsCard({ kidId }: { kidId: number }) {
+  const { data } = useQuery<{
+    total: number
+    suggestions: Array<{
+      title: string
+      emoji: string
+      familyTimes: number
+      suggestedReward: number
+      category: string
+    }>
+  }>({
+    queryKey: ["/api/family/kid-suggestions", kidId],
+    queryFn: async () => {
+      const res = await fetch(`/api/family/kid-suggestions?kidId=${kidId}&limit=5`, {
+        credentials: "include",
+      })
+      return res.json()
+    },
+  })
+  if (!data || data.total === 0) return null
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-emerald-300 bg-gradient-to-br from-emerald-50 to-green-50 p-4 shadow">
+      <h3 className="font-bold text-emerald-900 mb-3 flex items-center gap-2">💡 你可以挑戰這些</h3>
+      <div className="space-y-2">
+        {data.suggestions.map((s) => (
+          <div key={s.title} className="bg-white rounded-lg p-2 flex items-center gap-2 shadow-sm">
+            <span className="text-2xl shrink-0">{s.emoji}</span>
+            <div className="flex-1 min-w-0">
+              <div className="font-medium text-sm truncate">{s.title}</div>
+              <div className="text-xs text-gray-500">
+                家人做過 <b className="text-emerald-700">{s.familyTimes}</b> 次・建議 $
+                {s.suggestedReward}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="text-xs text-emerald-700 mt-2 text-center">
+        💡 跟家人說一聲、就可以開始做了！
       </div>
     </div>
   )

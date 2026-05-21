@@ -2875,6 +2875,68 @@ router.get(
 )
 
 /**
+ * GET /api/family/kid-suggestions?kidId=&limit=5
+ * 推薦小孩可挑戰的任務（別的小孩做過、這個小孩沒做過的）
+ */
+router.get(
+  "/api/family/kid-suggestions",
+  asyncHandler(async (req, res) => {
+    const kidIdQ = Number(req.query.kidId)
+    if (!Number.isInteger(kidIdQ) || kidIdQ < 1) throw new AppError(400, "需傳 kidId")
+    const limit = Math.min(Math.max(Number(req.query.limit) || 5, 1), 10)
+
+    const result = await db.execute(sql`
+      WITH family_recent AS (
+        SELECT
+          title,
+          MAX(emoji) AS emoji,
+          COUNT(*)::int AS times,
+          ROUND(AVG(reward_amount::numeric))::int AS avg_reward,
+          MAX(category) AS category
+        FROM kids_tasks
+        WHERE status = 'approved'
+          AND completed_at >= NOW() - INTERVAL '60 days'
+        GROUP BY title
+      ),
+      kid_recent AS (
+        SELECT DISTINCT title FROM kids_tasks
+        WHERE kid_id = ${kidIdQ}
+          AND completed_at >= NOW() - INTERVAL '30 days'
+      )
+      SELECT fr.title, fr.emoji, fr.times, fr.avg_reward, fr.category
+      FROM family_recent fr
+      LEFT JOIN kid_recent kr ON kr.title = fr.title
+      WHERE kr.title IS NULL
+      ORDER BY fr.times DESC, fr.avg_reward DESC
+      LIMIT ${limit}
+    `)
+    const rows = (
+      result as unknown as {
+        rows: {
+          title: string
+          emoji: string | null
+          times: number
+          avg_reward: number
+          category: string
+        }[]
+      }
+    ).rows
+
+    res.json({
+      kidId: kidIdQ,
+      total: rows.length,
+      suggestions: rows.map((r) => ({
+        title: r.title,
+        emoji: r.emoji ?? "📋",
+        familyTimes: r.times,
+        suggestedReward: r.avg_reward,
+        category: r.category ?? "other",
+      })),
+    })
+  })
+)
+
+/**
  * GET /api/family/kid-wallet-health?kidId=
  * 小孩錢包健康分析：實際支出 vs preset 比較
  *
