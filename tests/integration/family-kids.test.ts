@@ -4315,6 +4315,78 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.status).toBe(404)
   })
 
+  it("善心故事：基本結構 stories/totalKindness/uniqueKids/message", async () => {
+    const res = await request(app).get("/api/family/weekly-kindness-story")
+    expect(res.status).toBe(200)
+    expect(Array.isArray(res.body.stories)).toBe(true)
+    expect(res.body).toHaveProperty("totalKindness")
+    expect(res.body).toHaveProperty("uniqueKids")
+    expect(res.body).toHaveProperty("storyCount")
+    expect(res.body.days).toBe(7)
+    expect(res.body.message).toBeTruthy()
+  })
+
+  it("善心故事：give jar + reflection 後出現於故事列表", async () => {
+    const kidObj = (await createKid({
+      displayName: "小愛",
+      giveRatio: 100,
+      spendRatio: 0,
+      saveRatio: 0,
+    })) as { id: number }
+    const myKidId = kidObj.id
+    // 先賺 100 入 give jar
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId: myKidId, title: "善心儲值", rewardAmount: 100 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`).send({})
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`).send({})
+    // 捐 50 + reflection
+    const sres = await request(app).post("/api/family/spendings").send({
+      kidId: myKidId,
+      jar: "give",
+      amount: 50,
+      description: "捐流浪動物",
+      emoji: "🐾",
+      recipient: "流浪動物協會",
+      reflection: "牠們也是生命、值得溫暖",
+    })
+    expect(sres.status).toBe(201)
+    const res = await request(app).get("/api/family/weekly-kindness-story")
+    expect(res.status).toBe(200)
+    const mine = res.body.stories.find((s: { spendingId: number }) => s.spendingId === sres.body.id)
+    expect(mine).toBeDefined()
+    expect(mine.amount).toBe(50)
+    expect(mine.reflection).toBe("牠們也是生命、值得溫暖")
+    expect(mine.recipient).toBe("流浪動物協會")
+    expect(mine.kidName).toBe("小愛")
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
+  it("善心故事：spend jar 不會出現於故事", async () => {
+    const kidObj = (await createKid({ spendRatio: 100, saveRatio: 0, giveRatio: 0 })) as {
+      id: number
+    }
+    const myKidId = kidObj.id
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId: myKidId, title: "賺一下", rewardAmount: 80 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`).send({})
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`).send({})
+    const sres = await request(app).post("/api/family/spendings").send({
+      kidId: myKidId,
+      jar: "spend",
+      amount: 30,
+      description: "買貼紙",
+      reflection: "我喜歡這個",
+    })
+    const res = await request(app).get("/api/family/weekly-kindness-story")
+    const found = res.body.stories.find(
+      (s: { spendingId: number }) => s.spendingId === sres.body.id
+    )
+    expect(found).toBeUndefined()
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
   it("任務重複率：基本結構 kids/patternCounts/message", async () => {
     const res = await request(app).get("/api/family/task-repeat-by-kid")
     expect(res.status).toBe(200)

@@ -640,6 +640,9 @@ export default function FamilyPage() {
       {/* 家庭今日任務列表 */}
       <FamilyTodayTasksListCard />
 
+      {/* 本週家庭善心故事 */}
+      <FamilyKindnessStoryCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3594,6 +3597,61 @@ function ParentTodoList() {
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
       )}
+    </div>
+  )
+}
+
+function FamilyKindnessStoryCard() {
+  const { data } = useQuery<{
+    days: number
+    stories: Array<{
+      spendingId: number
+      amount: number
+      description: string
+      emoji: string
+      recipient: string | null
+      reflection: string
+      spendDate: string
+      kidName: string
+      kidAvatar: string
+    }>
+    totalKindness: number
+    uniqueKids: number
+    storyCount: number
+    message: string
+  }>({
+    queryKey: ["/api/family/weekly-kindness-story"],
+  })
+  if (!data || data.stories.length === 0) return null
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-pink-300 bg-gradient-to-br from-pink-50 to-rose-50 p-3 shadow">
+      <h3 className="font-bold mb-2 flex items-center gap-2">❤️ 本週善心故事</h3>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-2 text-xs">{data.message}</div>
+
+      <div className="space-y-2 max-h-72 overflow-y-auto">
+        {data.stories.map((s) => (
+          <div key={s.spendingId} className="bg-white rounded-lg p-2 border-l-4 border-pink-400">
+            <div className="flex items-center justify-between mb-1 text-xs">
+              <div className="flex items-center gap-1">
+                <span>{s.kidAvatar}</span>
+                <span className="font-medium">{s.kidName}</span>
+                <span className="text-gray-400">·</span>
+                <span className="text-gray-500">{s.spendDate}</span>
+              </div>
+              <div className="font-bold text-rose-600">${s.amount}</div>
+            </div>
+            <div className="text-xs text-gray-700 mb-1">
+              {s.emoji} {s.description}
+              {s.recipient && <span className="text-gray-500"> → {s.recipient}</span>}
+            </div>
+            <div className="text-xs italic text-pink-700 bg-pink-50 rounded p-1">
+              「{s.reflection}」
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

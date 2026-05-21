@@ -8822,6 +8822,87 @@ router.get(
 )
 
 /**
+ * GET /api/family/weekly-kindness-story?days=7
+ * 過去 N 天 give jar 有 reflection 的捐獻故事彙整
+ */
+router.get(
+  "/api/family/weekly-kindness-story",
+  asyncHandler(async (req, res) => {
+    const days = Math.min(Math.max(Number(req.query.days) || 7, 1), 30)
+
+    const rows = await db.execute(sql`
+      SELECT
+        s.id::int AS spending_id,
+        s.amount::numeric AS amount,
+        s.description,
+        s.emoji,
+        s.recipient,
+        s.reflection,
+        s.spend_date,
+        ka.id::int AS kid_id,
+        ka.display_name AS kid_name,
+        ka.avatar
+      FROM kids_spendings s
+      JOIN kids_accounts ka ON ka.id = s.kid_id
+      WHERE s.jar = 'give'
+        AND s.reflection IS NOT NULL
+        AND length(trim(s.reflection)) > 0
+        AND s.spend_date >= CURRENT_DATE - (${days - 1} || ' days')::interval
+        AND ka.is_active = true
+      ORDER BY s.spend_date DESC, s.created_at DESC
+      LIMIT 20
+    `)
+
+    const stories = (
+      rows as unknown as {
+        rows: Array<{
+          spending_id: number
+          amount: string
+          description: string
+          emoji: string
+          recipient: string | null
+          reflection: string
+          spend_date: string
+          kid_id: number
+          kid_name: string
+          avatar: string
+        }>
+      }
+    ).rows.map((r) => ({
+      spendingId: r.spending_id,
+      amount: Number(r.amount),
+      description: r.description,
+      emoji: r.emoji,
+      recipient: r.recipient,
+      reflection: r.reflection,
+      spendDate: r.spend_date,
+      kidId: r.kid_id,
+      kidName: r.kid_name,
+      kidAvatar: r.avatar,
+    }))
+
+    const totalKindness = stories.reduce((s, x) => s + x.amount, 0)
+    const uniqueKids = new Set(stories.map((s) => s.kidId)).size
+
+    let message: string
+    if (stories.length === 0) {
+      message = `過去 ${days} 天還沒有寫下捐獻反思的故事`
+    } else {
+      message = `❤️ 過去 ${days} 天家裡有 ${uniqueKids} 位小孩寫下 ${stories.length} 則善心故事、共捐 $${Math.round(totalKindness)}`
+    }
+
+    res.json({
+      days,
+      stories,
+      totalKindness: Math.round(totalKindness * 100) / 100,
+      uniqueKids,
+      storyCount: stories.length,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/task-repeat-by-kid?days=90
  * 每個 active kid 過去 N 天 task 重複率（1 - unique/total）
  * pattern: routine(>=60% repeat) / mixed / variety(<20% repeat) / no_data
