@@ -4245,6 +4245,27 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.body.weeks).toBe(52)
   })
 
+  it("家庭花用線：基本結構 daily[30] + summary + trend", async () => {
+    const res = await request(app).get("/api/family/spending-daily")
+    expect(res.status).toBe(200)
+    expect(res.body.daily).toHaveLength(30)
+    expect(res.body.daily[0]).toHaveProperty("date")
+    expect(res.body.daily[0]).toHaveProperty("spent")
+    expect(res.body.daily[0]).toHaveProperty("total")
+    expect(res.body.summary).toHaveProperty("totalAll")
+    expect(res.body.summary).toHaveProperty("avgPerDay")
+    expect(["spiking", "rising", "stable", "declining", "no_data"]).toContain(res.body.trend)
+    expect(typeof res.body.alert).toBe("boolean")
+    expect(res.body.message).toBeTruthy()
+  })
+
+  it("家庭花用線：days clamp 7-90", async () => {
+    const r1 = await request(app).get("/api/family/spending-daily?days=200")
+    expect(r1.body.daily).toHaveLength(90)
+    const r2 = await request(app).get("/api/family/spending-daily?days=3")
+    expect(r2.body.daily).toHaveLength(7)
+  })
+
   it("家庭時段：基本結構 slots/total/dominantSlot/message", async () => {
     const res = await request(app).get("/api/family/time-of-day")
     expect(res.status).toBe(200)

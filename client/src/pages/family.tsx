@@ -502,6 +502,9 @@ export default function FamilyPage() {
       {/* 家庭時段熱圖 */}
       <FamilyTimeOfDayCard />
 
+      {/* 家庭花用每日線 */}
+      <FamilySpendingDailyCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3456,6 +3459,73 @@ function ParentTodoList() {
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
       )}
+    </div>
+  )
+}
+
+function FamilySpendingDailyCard() {
+  const { data } = useQuery<{
+    daily: Array<{ date: string; weekday: string; spent: number; given: number; total: number }>
+    summary: {
+      days: number
+      totalSpent: number
+      totalGiven: number
+      totalAll: number
+      avgPerDay: number
+      recent7Avg: number
+    }
+    trend: "spiking" | "rising" | "stable" | "declining" | "no_data"
+    alert: boolean
+    message: string
+  }>({
+    queryKey: ["/api/family/spending-daily?days=30"],
+  })
+  if (!data || data.summary.totalAll === 0) return null
+
+  const max = Math.max(...data.daily.map((d) => d.total), 1)
+
+  const TREND_BG: Record<string, string> = {
+    spiking: "from-rose-50 to-red-50 border-rose-500",
+    rising: "from-amber-50 to-orange-50 border-amber-300",
+    stable: "from-blue-50 to-sky-50 border-blue-300",
+    declining: "from-emerald-50 to-green-50 border-emerald-300",
+    no_data: "from-gray-50 to-slate-50 border-gray-300",
+  }
+
+  return (
+    <div
+      className={`mb-4 rounded-2xl border-2 bg-gradient-to-br ${TREND_BG[data.trend]} p-3 shadow`}
+    >
+      <h3 className="font-bold mb-2 flex items-center gap-2">
+        💸 家庭花用線（30 天）
+        {data.alert && <span className="text-rose-600 text-sm">🚨 警示</span>}
+      </h3>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-2 text-xs">
+        {data.message}
+        <div className="text-gray-600 mt-1">
+          總花 ${data.summary.totalSpent} + 總捐 ${data.summary.totalGiven} = $
+          {data.summary.totalAll} · 最近 7 天平均 ${data.summary.recent7Avg}/天
+        </div>
+      </div>
+
+      <div className="flex items-end gap-0.5 h-20 bg-white/40 rounded p-2">
+        {data.daily.map((d) => {
+          const h = (d.total / max) * 100
+          return (
+            <div
+              key={d.date}
+              className="flex-1 flex flex-col items-end"
+              title={`${d.date}: $${d.total}`}
+            >
+              <div
+                className="w-full bg-gradient-to-t from-rose-400 to-pink-500 rounded-t"
+                style={{ height: `${Math.max(h, 2)}%` }}
+              />
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }

@@ -8602,6 +8602,100 @@ async function bulkApproveOne(
 }
 
 /**
+ * GET /api/family/spending-daily?days=30
+ * 全家過去 N 天每日花用線（spend + give 罐）+ 趨勢分析
+ * alert: 最近 7 天平均 > 過去 N 天平均 1.5 倍
+ */
+router.get(
+  "/api/family/spending-daily",
+  asyncHandler(async (req, res) => {
+    const days = Math.min(Math.max(Number(req.query.days) || 30, 7), 90)
+
+    const rows = await db.execute(sql`
+      WITH days AS (
+        SELECT generate_series(
+          CURRENT_DATE - (${days - 1}::int * INTERVAL '1 day'),
+          CURRENT_DATE,
+          INTERVAL '1 day'
+        )::date AS d
+      )
+      SELECT
+        TO_CHAR(d.d, 'YYYY-MM-DD') AS date,
+        TO_CHAR(d.d, 'Dy') AS weekday,
+        COALESCE((SELECT SUM(amount::numeric)::numeric FROM kids_spendings
+          WHERE jar = 'spend' AND spend_date = d.d), 0) AS spent,
+        COALESCE((SELECT SUM(amount::numeric)::numeric FROM kids_spendings
+          WHERE jar = 'give' AND spend_date = d.d), 0) AS given
+      FROM days d
+      ORDER BY d.d ASC
+    `)
+
+    const daily = (
+      rows as unknown as {
+        rows: Array<{
+          date: string
+          weekday: string
+          spent: string | number
+          given: string | number
+        }>
+      }
+    ).rows.map((r) => ({
+      date: r.date,
+      weekday: r.weekday,
+      spent: Number(r.spent),
+      given: Number(r.given),
+      total: Number(r.spent) + Number(r.given),
+    }))
+
+    const totalSpent = daily.reduce((s, d) => s + d.spent, 0)
+    const totalGiven = daily.reduce((s, d) => s + d.given, 0)
+    const totalAll = totalSpent + totalGiven
+    const avgPerDay = totalAll / days
+
+    // 最近 7 天 vs 整體平均
+    const recent7 = daily.slice(-7)
+    const recent7Avg = recent7.reduce((s, d) => s + d.total, 0) / 7
+
+    let trend: "spiking" | "rising" | "stable" | "declining" | "no_data"
+    let message: string
+    let alert = false
+
+    if (totalAll === 0) {
+      trend = "no_data"
+      message = `過去 ${days} 天家裡沒花用紀錄、很節省！`
+    } else if (avgPerDay > 0 && recent7Avg >= avgPerDay * 1.5) {
+      trend = "spiking"
+      alert = true
+      message = `🚨 最近 7 天平均 $${recent7Avg.toFixed(0)}/天、超過整體平均 1.5 倍以上`
+    } else if (avgPerDay > 0 && recent7Avg >= avgPerDay * 1.1) {
+      trend = "rising"
+      message = `📈 最近 7 天花用上升中（$${recent7Avg.toFixed(0)}/天 vs 平均 $${avgPerDay.toFixed(0)}）`
+    } else if (avgPerDay > 0 && recent7Avg <= avgPerDay * 0.7) {
+      trend = "declining"
+      message = `📉 最近花用減少（$${recent7Avg.toFixed(0)}/天 vs 平均 $${avgPerDay.toFixed(0)}）省了！`
+    } else {
+      trend = "stable"
+      message = `💰 平均每天 $${avgPerDay.toFixed(0)}、花用穩定`
+    }
+
+    res.json({
+      daily,
+      summary: {
+        days,
+        totalSpent,
+        totalGiven,
+        totalAll,
+        avgPerDay: Math.round(avgPerDay * 10) / 10,
+        recent7Avg: Math.round(recent7Avg * 10) / 10,
+      },
+      trend,
+      alert,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/time-of-day?days=30
  * 全家任務過去 N 天的 4 時段分佈（morning/afternoon/evening/late）
  */
