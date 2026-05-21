@@ -2875,6 +2875,112 @@ router.get(
 )
 
 /**
+ * GET /api/family/peak-week?weeks=12
+ * 家庭高潮週：找近 N 週活動最多那週 + 明細
+ *
+ * 對每週統計：tasks + spendings + checkins
+ * 回 weeks[] + bestWeek（最高 total）+ bestWeekKids（該週各 kid 數據）
+ */
+router.get(
+  "/api/family/peak-week",
+  asyncHandler(async (req, res) => {
+    const weeks = Math.min(Math.max(Number(req.query.weeks) || 12, 1), 52)
+
+    const result = await db.execute(sql`
+      WITH week_series AS (
+        SELECT generate_series(
+          DATE_TRUNC('week', CURRENT_DATE - (${weeks - 1}::int || ' weeks')::interval),
+          DATE_TRUNC('week', CURRENT_DATE),
+          INTERVAL '1 week'
+        )::date AS w
+      )
+      SELECT
+        ws.w AS week_start,
+        COALESCE((
+          SELECT COUNT(*)::int FROM kids_tasks
+          WHERE status = 'approved'
+            AND DATE_TRUNC('week', completed_at)::date = ws.w
+        ), 0) AS tasks,
+        COALESCE((
+          SELECT COUNT(*)::int FROM kids_spendings
+          WHERE DATE_TRUNC('week', spend_date)::date = ws.w
+        ), 0) AS spendings,
+        COALESCE((
+          SELECT COUNT(*)::int FROM kids_checkins
+          WHERE DATE_TRUNC('week', checkin_date)::date = ws.w
+        ), 0) AS checkins
+      FROM week_series ws
+      ORDER BY ws.w ASC
+    `)
+    const rows = (
+      result as unknown as {
+        rows: { week_start: Date | string; tasks: number; spendings: number; checkins: number }[]
+      }
+    ).rows
+
+    const weekList = rows.map((r) => {
+      const dateStr =
+        typeof r.week_start === "string"
+          ? r.week_start.slice(0, 10)
+          : new Date(r.week_start).toISOString().slice(0, 10)
+      return {
+        weekStart: dateStr,
+        tasks: r.tasks,
+        spendings: r.spendings,
+        checkins: r.checkins,
+        total: r.tasks + r.spendings + r.checkins,
+      }
+    })
+
+    let bestWeek: (typeof weekList)[0] | null = null
+    for (const w of weekList) {
+      if (!bestWeek || w.total > bestWeek.total) bestWeek = w
+    }
+    if (bestWeek && bestWeek.total === 0) bestWeek = null
+
+    // bestWeekKids：該週各 kid 的 task count
+    let bestWeekKids: Array<{ kidId: number; kidName: string; avatar: string; tasks: number }> = []
+    if (bestWeek) {
+      const kidResult = await db.execute(sql`
+        SELECT
+          ka.id::int AS kid_id,
+          ka.display_name AS kid_name,
+          ka.avatar,
+          COUNT(*)::int AS tasks
+        FROM kids_tasks kt
+        JOIN kids_accounts ka ON ka.id = kt.kid_id
+        WHERE kt.status = 'approved'
+          AND DATE_TRUNC('week', kt.completed_at)::date = ${bestWeek.weekStart}::date
+        GROUP BY ka.id, ka.display_name, ka.avatar
+        ORDER BY tasks DESC
+      `)
+      bestWeekKids = (
+        kidResult as unknown as {
+          rows: { kid_id: number; kid_name: string; avatar: string; tasks: number }[]
+        }
+      ).rows.map((r) => ({
+        kidId: r.kid_id,
+        kidName: r.kid_name,
+        avatar: r.avatar,
+        tasks: r.tasks,
+      }))
+    }
+
+    const totalActivity = weekList.reduce((s, w) => s + w.total, 0)
+    const avgPerWeek = weekList.length > 0 ? Math.round(totalActivity / weekList.length) : 0
+
+    res.json({
+      weeks,
+      totalActivity,
+      avgPerWeek,
+      bestWeek,
+      bestWeekKids,
+      weekList,
+    })
+  })
+)
+
+/**
  * GET /api/family/multi-rank?days=30
  * 家庭多維排行榜：5 維度各別 top 3
  *   - tasks（任務完成數）

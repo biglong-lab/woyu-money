@@ -4221,6 +4221,30 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.body.days).toBe(365)
   })
 
+  it("家庭高潮週：weeks=12、做任務後 bestWeek 含 tasks", async () => {
+    await createKid()
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId, title: "T", rewardAmount: 20 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`)
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`)
+
+    const res = await request(app).get("/api/family/peak-week")
+    expect(res.status).toBe(200)
+    expect(res.body.weeks).toBe(12)
+    expect(res.body.weekList.length).toBe(12)
+    expect(res.body.totalActivity).toBeGreaterThanOrEqual(1)
+    expect(res.body.bestWeek).toBeTruthy()
+    expect(res.body.bestWeek.tasks).toBeGreaterThanOrEqual(1)
+    expect(Array.isArray(res.body.bestWeekKids)).toBe(true)
+  })
+
+  it("家庭高潮週：weeks clamp 52", async () => {
+    const res = await request(app).get("/api/family/peak-week?weeks=100")
+    expect(res.status).toBe(200)
+    expect(res.body.weeks).toBe(52)
+  })
+
   it("軟刪除小孩（isActive=false）", async () => {
     await createKid()
     const res = await request(app).delete(`/api/family/kids/${kidId}`)

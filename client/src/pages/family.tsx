@@ -482,6 +482,9 @@ export default function FamilyPage() {
       {/* 多維排行榜 */}
       <FamilyMultiRankCard />
 
+      {/* 家庭高潮週回顧 */}
+      <FamilyPeakWeekCard />
+
       {/* 家庭財富趨勢（6 個月）*/}
       <FamilyWealthTrend />
 
@@ -2678,6 +2681,69 @@ function CompletedGoalsHistory() {
       </div>
       <div className="text-xs text-green-700 mt-2 text-center">
         平均達成時間：{data.avgDaysTaken} 天
+      </div>
+    </div>
+  )
+}
+
+function FamilyPeakWeekCard() {
+  const { data } = useQuery<{
+    weeks: number
+    totalActivity: number
+    avgPerWeek: number
+    bestWeek: {
+      weekStart: string
+      tasks: number
+      spendings: number
+      checkins: number
+      total: number
+    } | null
+    bestWeekKids: Array<{ kidId: number; kidName: string; avatar: string; tasks: number }>
+  }>({
+    queryKey: ["/api/family/peak-week"],
+    queryFn: async () => {
+      const res = await fetch("/api/family/peak-week?weeks=12", { credentials: "include" })
+      return res.json()
+    },
+  })
+  if (!data || !data.bestWeek) return null
+
+  const weekStart = new Date(data.bestWeek.weekStart)
+  const weekEnd = new Date(weekStart.getTime() + 6 * 86_400_000)
+  const fmt = (d: Date) => `${d.getMonth() + 1}/${d.getDate()}`
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-rose-300 bg-gradient-to-br from-rose-50 to-orange-50 p-4 shadow">
+      <h3 className="font-bold text-rose-900 mb-3 flex items-center gap-2">🔥 家庭最忙週回顧</h3>
+
+      <div className="bg-white rounded-lg p-3 mb-3 text-center">
+        <div className="text-sm text-gray-500 mb-1">
+          {fmt(weekStart)} ~ {fmt(weekEnd)}
+        </div>
+        <div className="text-3xl font-bold text-rose-700">{data.bestWeek.total}</div>
+        <div className="text-xs text-gray-600 mt-1">
+          {data.bestWeek.tasks} 任務・{data.bestWeek.spendings} 花費・{data.bestWeek.checkins} 打卡
+        </div>
+      </div>
+
+      {data.bestWeekKids.length > 0 && (
+        <div>
+          <div className="text-xs text-gray-500 mb-1">那週各 kid 任務數：</div>
+          <div className="flex gap-1 flex-wrap">
+            {data.bestWeekKids.map((k) => (
+              <span
+                key={k.kidId}
+                className="text-xs bg-rose-100 text-rose-800 px-2 py-1 rounded-full"
+              >
+                {k.avatar} {k.kidName} ×{k.tasks}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="text-xs text-gray-500 mt-2 text-center">
+        近 {data.weeks} 週、平均每週 {data.avgPerWeek} 活動
       </div>
     </div>
   )
