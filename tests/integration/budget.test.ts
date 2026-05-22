@@ -72,9 +72,7 @@ describe.skipIf(skipIfNoDb)("Budget API", () => {
     })
 
     it("應支援 includeItems 參數", async () => {
-      const res = await request(app)
-        .get("/api/budget/plans?includeItems=true")
-        .expect(200)
+      const res = await request(app).get("/api/budget/plans?includeItems=true").expect(200)
 
       expect(Array.isArray(res.body)).toBe(true)
       if (res.body.length > 0) {
@@ -98,19 +96,14 @@ describe.skipIf(skipIfNoDb)("Budget API", () => {
         endDate: "2026-12-31",
       }
 
-      const res = await request(app)
-        .post("/api/budget/plans")
-        .send(plan)
-        .expect(201)
+      const res = await request(app).post("/api/budget/plans").send(plan).expect(201)
 
       expect(res.body).toHaveProperty("id")
       createdPlanIds.push(res.body.id)
     })
 
     it("無效資料應回傳 400", async () => {
-      const res = await request(app)
-        .post("/api/budget/plans")
-        .send({ invalidField: true })
+      const res = await request(app).post("/api/budget/plans").send({ invalidField: true })
 
       expect(res.status).toBe(400)
     })
@@ -123,9 +116,7 @@ describe.skipIf(skipIfNoDb)("Budget API", () => {
       const planId = createdPlanIds[0]
       if (!planId) return
 
-      const res = await request(app)
-        .get(`/api/budget/plans/${planId}`)
-        .expect(200)
+      const res = await request(app).get(`/api/budget/plans/${planId}`).expect(200)
 
       expect(res.body).toHaveProperty("id", planId)
       expect(res.body).toHaveProperty("items")
@@ -172,10 +163,7 @@ describe.skipIf(skipIfNoDb)("Budget API", () => {
         paymentType: "single",
       }
 
-      const res = await request(app)
-        .post("/api/budget/items")
-        .send(item)
-        .expect(201)
+      const res = await request(app).post("/api/budget/items").send(item).expect(201)
 
       expect(res.body).toHaveProperty("id")
       createdItemIds.push(res.body.id)
@@ -186,9 +174,7 @@ describe.skipIf(skipIfNoDb)("Budget API", () => {
 
   describe("GET /api/budget/items - 預算項目列表", () => {
     it("應回傳預算項目陣列", async () => {
-      const res = await request(app)
-        .get("/api/budget/items")
-        .expect(200)
+      const res = await request(app).get("/api/budget/items").expect(200)
 
       expect(Array.isArray(res.body)).toBe(true)
     })
@@ -197,9 +183,7 @@ describe.skipIf(skipIfNoDb)("Budget API", () => {
       const planId = createdPlanIds[0]
       if (!planId) return
 
-      const res = await request(app)
-        .get(`/api/budget/items?budgetPlanId=${planId}`)
-        .expect(200)
+      const res = await request(app).get(`/api/budget/items?budgetPlanId=${planId}`).expect(200)
 
       expect(Array.isArray(res.body)).toBe(true)
       expect(res.body.length).toBeGreaterThanOrEqual(1)
@@ -213,9 +197,7 @@ describe.skipIf(skipIfNoDb)("Budget API", () => {
       const itemId = createdItemIds[0]
       if (!itemId) return
 
-      const res = await request(app)
-        .get(`/api/budget/items/${itemId}`)
-        .expect(200)
+      const res = await request(app).get(`/api/budget/items/${itemId}`).expect(200)
 
       expect(res.body).toHaveProperty("id", itemId)
     })
@@ -251,9 +233,7 @@ describe.skipIf(skipIfNoDb)("Budget API", () => {
       const planId = createdPlanIds[0]
       if (!planId) return
 
-      const res = await request(app)
-        .get(`/api/budget/plans/${planId}/summary`)
-        .expect(200)
+      const res = await request(app).get(`/api/budget/plans/${planId}/summary`).expect(200)
 
       expect(res.body).toHaveProperty("plan")
       expect(res.body).toHaveProperty("summary")
@@ -261,6 +241,36 @@ describe.skipIf(skipIfNoDb)("Budget API", () => {
       expect(res.body.summary).toHaveProperty("calculatedTotal")
       expect(res.body.summary).toHaveProperty("itemCount")
       expect(res.body.summary).toHaveProperty("byPaymentType")
+    })
+  })
+
+  // ── GET /api/budget/overrun-alerts ─────────────────────────────
+
+  describe("GET /api/budget/overrun-alerts - 預算超支警示", () => {
+    it("應回傳超支警示結構（items + totalCount + severity 分級 + message）", async () => {
+      const res = await request(app).get("/api/budget/overrun-alerts").expect(200)
+      expect(Array.isArray(res.body.items)).toBe(true)
+      expect(res.body).toHaveProperty("totalCount")
+      expect(res.body).toHaveProperty("dangerCount")
+      expect(res.body).toHaveProperty("overCount")
+      expect(res.body).toHaveProperty("warnCount")
+      expect(res.body.message).toBeTruthy()
+    })
+
+    it("應依 severity 分級項目（warn 80~100% / over ≥100% / danger ≥120%）", async () => {
+      const res = await request(app).get("/api/budget/overrun-alerts").expect(200)
+      for (const item of res.body.items) {
+        expect(["warn", "over", "danger"]).toContain(item.severity)
+        expect(item).toHaveProperty("usagePct")
+        expect(item).toHaveProperty("planned")
+        expect(item).toHaveProperty("actual")
+        if (item.severity === "danger") expect(item.usagePct).toBeGreaterThanOrEqual(120)
+        if (item.severity === "over") expect(item.usagePct).toBeGreaterThanOrEqual(100)
+        if (item.severity === "warn") {
+          expect(item.usagePct).toBeGreaterThanOrEqual(80)
+          expect(item.usagePct).toBeLessThan(100)
+        }
+      }
     })
   })
 
@@ -281,9 +291,7 @@ describe.skipIf(skipIfNoDb)("Budget API", () => {
         })
         .expect(201)
 
-      await request(app)
-        .delete(`/api/budget/items/${createRes.body.id}`)
-        .expect(204)
+      await request(app).delete(`/api/budget/items/${createRes.body.id}`).expect(204)
     })
   })
 
@@ -304,9 +312,7 @@ describe.skipIf(skipIfNoDb)("Budget API", () => {
         })
         .expect(201)
 
-      await request(app)
-        .delete(`/api/budget/plans/${createRes.body.id}`)
-        .expect(204)
+      await request(app).delete(`/api/budget/plans/${createRes.body.id}`).expect(204)
     })
   })
 })

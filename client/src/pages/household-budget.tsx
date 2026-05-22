@@ -431,6 +431,9 @@ export default function HouseholdBudget() {
         </div>
       </div>
 
+      {/* 預算超支即時警示 */}
+      <BudgetOverrunAlertsCard />
+
       {/* 本月預算概況 */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
@@ -644,5 +647,103 @@ export default function HouseholdBudget() {
       </Card>
       <BackToTop />
     </div>
+  )
+}
+
+function BudgetOverrunAlertsCard() {
+  const { data } = useQuery<{
+    items: Array<{
+      itemId: number
+      planName: string
+      itemName: string
+      planned: number
+      actual: number
+      usagePct: number
+      overAmount: number
+      severity: "warn" | "over" | "danger"
+    }>
+    totalCount: number
+    dangerCount: number
+    overCount: number
+    warnCount: number
+    message: string
+  }>({
+    queryKey: ["/api/budget/overrun-alerts"],
+  })
+  if (!data || data.totalCount === 0) return null
+
+  const SEVERITY_STYLE: Record<string, { border: string; bg: string; bar: string; text: string }> =
+    {
+      danger: {
+        border: "border-red-500",
+        bg: "from-red-50 to-rose-50",
+        bar: "bg-red-500",
+        text: "text-red-700",
+      },
+      over: {
+        border: "border-orange-400",
+        bg: "from-orange-50 to-amber-50",
+        bar: "bg-orange-500",
+        text: "text-orange-700",
+      },
+      warn: {
+        border: "border-yellow-400",
+        bg: "from-yellow-50 to-amber-50",
+        bar: "bg-yellow-500",
+        text: "text-yellow-700",
+      },
+    }
+  const headerStyle =
+    data.dangerCount > 0
+      ? SEVERITY_STYLE.danger
+      : data.overCount > 0
+        ? SEVERITY_STYLE.over
+        : SEVERITY_STYLE.warn
+
+  return (
+    <Card className={`border-2 ${headerStyle.border} bg-gradient-to-br ${headerStyle.bg}`}>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          {data.dangerCount > 0 ? "🚨" : data.overCount > 0 ? "⚠️" : "⏳"} 預算即時警示
+        </CardTitle>
+        <CardDescription>{data.message}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-2">
+          {data.items.slice(0, 10).map((item) => {
+            const sty = SEVERITY_STYLE[item.severity] ?? SEVERITY_STYLE.warn
+            const widthPct = Math.min(150, item.usagePct)
+            return (
+              <div key={item.itemId} className="bg-white rounded-lg p-2">
+                <div className="flex justify-between items-baseline mb-1 text-sm">
+                  <div className="font-medium truncate">
+                    <span className="text-xs text-muted-foreground mr-1">[{item.planName}]</span>
+                    {item.itemName}
+                  </div>
+                  <div className={`font-bold ${sty.text}`}>{item.usagePct}%</div>
+                </div>
+                <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+                  <div
+                    className={`${sty.bar} h-2 transition-all`}
+                    style={{ width: `${(widthPct / 150) * 100}%` }}
+                  />
+                </div>
+                <div className="text-[11px] text-muted-foreground mt-1 flex justify-between">
+                  <span>
+                    實付 NT$ {Math.round(item.actual).toLocaleString()} / 預算 NT${" "}
+                    {Math.round(item.planned).toLocaleString()}
+                  </span>
+                  {item.overAmount > 0 && (
+                    <span className={`font-medium ${sty.text}`}>
+                      超 NT$ {Math.round(item.overAmount).toLocaleString()}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </CardContent>
+    </Card>
   )
 }

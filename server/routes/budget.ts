@@ -3,6 +3,8 @@
  * 包含預算計劃 CRUD、預算項目管理、轉換為付款項目
  */
 import { Router } from "express"
+import { sql } from "drizzle-orm"
+import { db } from "../db"
 import { insertBudgetPlanSchema, insertBudgetItemSchema } from "@shared/schema"
 import { asyncHandler, AppError } from "../middleware/error-handler"
 import * as budgetStorage from "../storage/budget"
@@ -329,6 +331,100 @@ router.get(
           },
         },
       },
+    })
+  })
+)
+
+/**
+ * GET /api/budget/overrun-alerts
+ * 即時超支警示：所有 active 預算計劃中、actual > planned 或接近 (>= 80%) 的項目
+ */
+router.get(
+  "/api/budget/overrun-alerts",
+  asyncHandler(async (_req, res) => {
+    const rows = await db.execute(sql`
+      SELECT
+        i.id::int AS item_id,
+        i.budget_plan_id::int AS plan_id,
+        p.plan_name,
+        i.item_name,
+        i.planned_amount::numeric AS planned,
+        COALESCE(i.actual_amount, 0)::numeric AS actual,
+        i.payment_type,
+        p.start_date,
+        p.end_date
+      FROM budget_items i
+      JOIN budget_plans p ON p.id = i.budget_plan_id
+      WHERE COALESCE(i.is_deleted, false) = false
+        AND p.status = 'active'
+        AND CURRENT_DATE BETWEEN p.start_date AND p.end_date
+        AND i.planned_amount > 0
+        AND COALESCE(i.actual_amount, 0) >= i.planned_amount * 0.8
+      ORDER BY (COALESCE(i.actual_amount, 0) / i.planned_amount) DESC
+      LIMIT 50
+    `)
+
+    const items = (
+      rows as unknown as {
+        rows: Array<{
+          item_id: number
+          plan_id: number
+          plan_name: string
+          item_name: string
+          planned: string
+          actual: string
+          payment_type: string
+          start_date: string
+          end_date: string
+        }>
+      }
+    ).rows.map((r) => {
+      const planned = Number(r.planned)
+      const actual = Number(r.actual)
+      const usagePct = planned > 0 ? Math.round((actual / planned) * 100) : 0
+      const overAmount = actual - planned
+      let severity: "warn" | "over" | "danger"
+      if (usagePct >= 120) severity = "danger"
+      else if (usagePct >= 100) severity = "over"
+      else severity = "warn"
+      return {
+        itemId: r.item_id,
+        planId: r.plan_id,
+        planName: r.plan_name,
+        itemName: r.item_name,
+        planned,
+        actual,
+        usagePct,
+        overAmount: Math.round(overAmount * 100) / 100,
+        severity,
+        paymentType: r.payment_type,
+        startDate: r.start_date,
+        endDate: r.end_date,
+      }
+    })
+
+    const dangerCount = items.filter((i) => i.severity === "danger").length
+    const overCount = items.filter((i) => i.severity === "over").length
+    const warnCount = items.filter((i) => i.severity === "warn").length
+
+    let message: string
+    if (items.length === 0) {
+      message = "✅ 所有 active 預算項目都在 80% 以下、控管良好"
+    } else if (dangerCount > 0) {
+      message = `🚨 有 ${dangerCount} 個項目超支超過 20%、立即檢視`
+    } else if (overCount > 0) {
+      message = `⚠️ 有 ${overCount} 個項目已超支、共 ${items.length} 個需注意`
+    } else {
+      message = `⏳ 有 ${warnCount} 個項目接近超支（≥80%）、提早留意`
+    }
+
+    res.json({
+      items,
+      totalCount: items.length,
+      dangerCount,
+      overCount,
+      warnCount,
+      message,
     })
   })
 )
