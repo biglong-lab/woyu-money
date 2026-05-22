@@ -667,6 +667,9 @@ export default function FamilyPage() {
       {/* 任務時段熱力圖 */}
       <FamilyTaskHourDistributionCard />
 
+      {/* 徽章時間軸 */}
+      <FamilyRecentBadgesCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3621,6 +3624,53 @@ function ParentTodoList() {
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
       )}
+    </div>
+  )
+}
+
+function FamilyRecentBadgesCard() {
+  const { data } = useQuery<{
+    days: number
+    badges: Array<{
+      badgeId: number
+      badgeType: string
+      title: string
+      emoji: string
+      earnedAt: string
+      kidName: string
+      kidAvatar: string
+    }>
+    badgeCount: number
+    uniqueKids: number
+    uniqueTypes: number
+    message: string
+  }>({
+    queryKey: ["/api/family/recent-badges?days=30&limit=20"],
+  })
+  if (!data || data.badgeCount === 0) return null
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-fuchsia-300 bg-gradient-to-br from-fuchsia-50 to-pink-50 p-3 shadow">
+      <h3 className="font-bold mb-2 flex items-center gap-2">🏅 30 天徽章時間軸</h3>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-2 text-xs">{data.message}</div>
+
+      <div className="space-y-1 max-h-72 overflow-y-auto">
+        {data.badges.map((b) => (
+          <div
+            key={b.badgeId}
+            className="bg-white rounded-lg p-2 flex items-center gap-2 text-xs border-l-4 border-fuchsia-400"
+          >
+            <div className="text-xl">{b.emoji}</div>
+            <div className="flex-1 min-w-0">
+              <div className="font-medium truncate">{b.title}</div>
+              <div className="text-[10px] text-gray-500">
+                {b.kidAvatar} {b.kidName} · {b.earnedAt?.slice(0, 10)}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

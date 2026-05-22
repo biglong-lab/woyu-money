@@ -4315,6 +4315,38 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.status).toBe(404)
   })
 
+  it("徽章時間軸：基本結構 badges/badgeCount/uniqueKids/uniqueTypes", async () => {
+    const res = await request(app).get("/api/family/recent-badges")
+    expect(res.status).toBe(200)
+    expect(Array.isArray(res.body.badges)).toBe(true)
+    expect(res.body.days).toBe(30)
+    expect(res.body).toHaveProperty("badgeCount")
+    expect(res.body).toHaveProperty("uniqueKids")
+    expect(res.body).toHaveProperty("uniqueTypes")
+    expect(res.body.message).toBeTruthy()
+  })
+
+  it("徽章時間軸：直接 insert badge 後出現於 list + 含 kid 資訊", async () => {
+    await db.execute(sql`DELETE FROM kids_accounts`)
+    const kidObj = (await createKid({ displayName: "徽章王" })) as { id: number }
+    const myKidId = kidObj.id
+    await db.execute(sql`
+      INSERT INTO kids_badges (kid_id, badge_type, title, emoji)
+      VALUES (${myKidId}, 'test_badge', '測試徽章', '🌟')
+    `)
+    const res = await request(app).get("/api/family/recent-badges?days=30")
+    expect(res.body.badgeCount).toBeGreaterThanOrEqual(1)
+    const mine = res.body.badges.find(
+      (b: { badgeType: string; kidId: number }) =>
+        b.badgeType === "test_badge" && b.kidId === myKidId
+    )
+    expect(mine).toBeDefined()
+    expect(mine.title).toBe("測試徽章")
+    expect(mine.emoji).toBe("🌟")
+    expect(mine.kidName).toBe("徽章王")
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
   it("任務時段熱力圖：基本結構 hours/segments/peakSegment/message", async () => {
     const res = await request(app).get("/api/family/task-hour-distribution")
     expect(res.status).toBe(200)

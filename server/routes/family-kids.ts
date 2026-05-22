@@ -8822,6 +8822,79 @@ router.get(
 )
 
 /**
+ * GET /api/family/recent-badges?days=30&limit=20
+ * 過去 N 天家庭徽章獲得 timeline
+ */
+router.get(
+  "/api/family/recent-badges",
+  asyncHandler(async (req, res) => {
+    const days = Math.min(Math.max(Number(req.query.days) || 30, 1), 365)
+    const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 100)
+
+    const rows = await db.execute(sql`
+      SELECT
+        b.id::int AS badge_id,
+        b.badge_type,
+        b.title,
+        b.emoji,
+        b.earned_at,
+        ka.id::int AS kid_id,
+        ka.display_name AS kid_name,
+        ka.avatar
+      FROM kids_badges b
+      JOIN kids_accounts ka ON ka.id = b.kid_id
+      WHERE b.earned_at >= NOW() - (${days} || ' days')::interval
+        AND ka.is_active = true
+      ORDER BY b.earned_at DESC
+      LIMIT ${limit}
+    `)
+
+    const badges = (
+      rows as unknown as {
+        rows: Array<{
+          badge_id: number
+          badge_type: string
+          title: string
+          emoji: string
+          earned_at: string
+          kid_id: number
+          kid_name: string
+          avatar: string
+        }>
+      }
+    ).rows.map((r) => ({
+      badgeId: r.badge_id,
+      badgeType: r.badge_type,
+      title: r.title,
+      emoji: r.emoji,
+      earnedAt: r.earned_at,
+      kidId: r.kid_id,
+      kidName: r.kid_name,
+      kidAvatar: r.avatar,
+    }))
+
+    const uniqueKids = new Set(badges.map((b) => b.kidId)).size
+    const uniqueTypes = new Set(badges.map((b) => b.badgeType)).size
+
+    let message: string
+    if (badges.length === 0) {
+      message = `過去 ${days} 天家裡還沒有人獲得新徽章`
+    } else {
+      message = `🏅 過去 ${days} 天家裡 ${uniqueKids} 位小孩拿到 ${badges.length} 個徽章 (${uniqueTypes} 種類型)`
+    }
+
+    res.json({
+      days,
+      badges,
+      badgeCount: badges.length,
+      uniqueKids,
+      uniqueTypes,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/task-hour-distribution?days=30
  * approve task 的時段分布（24 hour + 4 segment）
  */
