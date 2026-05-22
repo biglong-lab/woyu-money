@@ -4315,6 +4315,44 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.status).toBe(404)
   })
 
+  it("最大花費 list：基本結構 spendings/topSpending/grandTotal/message", async () => {
+    const res = await request(app).get("/api/family/biggest-spendings")
+    expect(res.status).toBe(200)
+    expect(Array.isArray(res.body.spendings)).toBe(true)
+    expect(res.body.days).toBe(30)
+    expect(res.body).toHaveProperty("spendingCount")
+    expect(res.body).toHaveProperty("topSpending")
+    expect(res.body).toHaveProperty("grandTotal")
+    expect(res.body.message).toBeTruthy()
+  })
+
+  it("最大花費 list：建 3 個 spending → topSpending=最大 + 排序 DESC", async () => {
+    await db.execute(sql`DELETE FROM kids_spendings; DELETE FROM kids_accounts;`)
+    const kidObj = (await createKid({ spendRatio: 100, saveRatio: 0, giveRatio: 0 })) as {
+      id: number
+    }
+    const myKidId = kidObj.id
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId: myKidId, title: "賺", rewardAmount: 500 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`).send({})
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`).send({})
+    for (const amt of [30, 150, 80]) {
+      await request(app)
+        .post("/api/family/spendings")
+        .send({ kidId: myKidId, jar: "spend", amount: amt, description: `花 $${amt}` })
+    }
+    const res = await request(app).get("/api/family/biggest-spendings?days=30&limit=5")
+    expect(res.body.spendingCount).toBeGreaterThanOrEqual(3)
+    expect(res.body.topSpending).not.toBeNull()
+    expect(res.body.topSpending.amount).toBe(150)
+    expect(res.body.topSpending.kidName).toBeTruthy()
+    const amounts = res.body.spendings.slice(0, 3).map((s: { amount: number }) => s.amount)
+    expect(amounts[0]).toBeGreaterThanOrEqual(amounts[1])
+    expect(amounts[1]).toBeGreaterThanOrEqual(amounts[2])
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
   it("月度花費 trend：基本結構 data/totalSpent/trend/message", async () => {
     const res = await request(app).get("/api/family/monthly-spending-trend")
     expect(res.status).toBe(200)

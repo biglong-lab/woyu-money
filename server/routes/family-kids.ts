@@ -8822,6 +8822,87 @@ router.get(
 )
 
 /**
+ * GET /api/family/biggest-spendings?days=30&limit=10
+ * 家庭 N 天最大單筆花費 ranking
+ */
+router.get(
+  "/api/family/biggest-spendings",
+  asyncHandler(async (req, res) => {
+    const days = Math.min(Math.max(Number(req.query.days) || 30, 1), 365)
+    const limit = Math.min(Math.max(Number(req.query.limit) || 10, 1), 50)
+
+    const rows = await db.execute(sql`
+      SELECT
+        s.id::int AS spending_id,
+        s.amount::numeric AS amount,
+        s.description,
+        s.emoji,
+        s.jar,
+        s.recipient,
+        s.spend_date,
+        ka.id::int AS kid_id,
+        ka.display_name AS kid_name,
+        ka.avatar
+      FROM kids_spendings s
+      JOIN kids_accounts ka ON ka.id = s.kid_id
+      WHERE s.spend_date >= CURRENT_DATE - (${days} || ' days')::interval
+        AND ka.is_active = true
+      ORDER BY s.amount DESC, s.spend_date DESC
+      LIMIT ${limit}
+    `)
+
+    const spendings = (
+      rows as unknown as {
+        rows: Array<{
+          spending_id: number
+          amount: string
+          description: string
+          emoji: string
+          jar: string
+          recipient: string | null
+          spend_date: string
+          kid_id: number
+          kid_name: string
+          avatar: string
+        }>
+      }
+    ).rows.map((r) => ({
+      spendingId: r.spending_id,
+      amount: Number(r.amount),
+      description: r.description,
+      emoji: r.emoji,
+      jar: r.jar,
+      recipient: r.recipient,
+      spendDate: r.spend_date,
+      kidId: r.kid_id,
+      kidName: r.kid_name,
+      kidAvatar: r.avatar,
+    }))
+
+    const topSpending = spendings.length > 0 ? spendings[0] : null
+    const grandTotal = spendings.reduce((s, x) => s + x.amount, 0)
+
+    let message: string
+    if (spendings.length === 0) {
+      message = `過去 ${days} 天家裡還沒有花費紀錄`
+    } else if (topSpending) {
+      message = `💸 過去 ${days} 天最大單筆是 ${topSpending.kidAvatar} ${topSpending.kidName} 的「${topSpending.description}」($${topSpending.amount})`
+    } else {
+      message = `共 ${spendings.length} 筆、累計 $${Math.round(grandTotal)}`
+    }
+
+    res.json({
+      days,
+      spendings,
+      spendingCount: spendings.length,
+      topSpending,
+      grandTotal: Math.round(grandTotal * 100) / 100,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/monthly-spending-trend?months=6
  * 過去 N 個月家庭 spending 走勢（花費習慣）
  */

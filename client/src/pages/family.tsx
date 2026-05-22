@@ -709,6 +709,9 @@ export default function FamilyPage() {
       {/* 月度花費走勢 */}
       <FamilyMonthlySpendingTrendCard />
 
+      {/* 最大花費 list */}
+      <FamilyBiggestSpendingsCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3663,6 +3666,67 @@ function ParentTodoList() {
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
       )}
+    </div>
+  )
+}
+
+function FamilyBiggestSpendingsCard() {
+  const { data } = useQuery<{
+    days: number
+    spendings: Array<{
+      spendingId: number
+      amount: number
+      description: string
+      emoji: string
+      jar: string
+      recipient: string | null
+      spendDate: string
+      kidName: string
+      kidAvatar: string
+    }>
+    spendingCount: number
+    topSpending: { amount: number; description: string; kidName: string } | null
+    grandTotal: number
+    message: string
+  }>({
+    queryKey: ["/api/family/biggest-spendings?days=30&limit=10"],
+  })
+  if (!data || data.spendingCount === 0) return null
+
+  const JAR_EMOJI: Record<string, string> = {
+    spend: "💸",
+    save: "🐷",
+    give: "❤️",
+  }
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-rose-300 bg-gradient-to-br from-rose-50 to-pink-50 p-3 shadow">
+      <h3 className="font-bold mb-2 flex items-center gap-2">💸 30 天最大花費排行</h3>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-2 text-xs">{data.message}</div>
+
+      <div className="space-y-1 max-h-72 overflow-y-auto">
+        {data.spendings.map((s, i) => {
+          const medal = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `${i + 1}.`
+          return (
+            <div
+              key={s.spendingId}
+              className="bg-white rounded-lg p-2 flex items-center gap-2 text-xs"
+            >
+              <div className="w-6 text-center text-sm">{medal}</div>
+              <div className="text-lg">{s.emoji}</div>
+              <div className="flex-1 min-w-0">
+                <div className="font-medium truncate">{s.description}</div>
+                <div className="text-[10px] text-gray-500">
+                  {s.kidAvatar} {s.kidName} · {JAR_EMOJI[s.jar] ?? "•"} {s.spendDate}
+                  {s.recipient && ` · → ${s.recipient}`}
+                </div>
+              </div>
+              <div className="text-base font-bold text-rose-700">${s.amount}</div>
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }
