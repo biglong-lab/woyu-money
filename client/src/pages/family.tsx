@@ -688,6 +688,9 @@ export default function FamilyPage() {
       {/* 家庭打卡連續天數 */}
       <FamilyCheckinStreakCard />
 
+      {/* 花費三罐分布 */}
+      <FamilySpendingSummaryCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3642,6 +3645,75 @@ function ParentTodoList() {
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
       )}
+    </div>
+  )
+}
+
+function FamilySpendingSummaryCard() {
+  const { data } = useQuery<{
+    days: number
+    jars: Array<{
+      jar: string
+      label: string
+      emoji: string
+      color: string
+      spendCount: number
+      totalAmount: number
+      uniqueKids: number
+      percentage: number
+    }>
+    totalAmount: number
+    totalCount: number
+    topJar: { jar: string; label: string; emoji: string; totalAmount: number } | null
+    message: string
+  }>({
+    queryKey: ["/api/family/spending-summary?days=30"],
+  })
+  if (!data || data.totalCount === 0) return null
+
+  const COLOR_BAR: Record<string, string> = {
+    rose: "bg-rose-400",
+    emerald: "bg-emerald-400",
+    pink: "bg-pink-400",
+  }
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-cyan-300 bg-gradient-to-br from-cyan-50 to-blue-50 p-3 shadow">
+      <h3 className="font-bold mb-2 flex items-center gap-2">💰 30 天花費分布</h3>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-2 text-xs">{data.message}</div>
+
+      <div className="bg-white rounded-lg p-3 mb-2 text-center">
+        <div className="text-2xl font-bold text-cyan-700">
+          ${Math.round(data.totalAmount).toLocaleString()}
+        </div>
+        <div className="text-[10px] text-gray-500">總花費（{data.totalCount} 筆）</div>
+      </div>
+
+      <div className="space-y-2">
+        {data.jars
+          .filter((j) => j.spendCount > 0)
+          .sort((a, b) => b.totalAmount - a.totalAmount)
+          .map((j) => (
+            <div key={j.jar} className="bg-white rounded-lg p-2">
+              <div className="flex justify-between text-xs mb-1">
+                <span className="font-medium">
+                  {j.emoji} {j.label}
+                </span>
+                <span className="text-gray-500">
+                  ${Math.round(j.totalAmount)} · {j.spendCount} 筆
+                </span>
+              </div>
+              <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+                <div
+                  className={`${COLOR_BAR[j.color] ?? "bg-gray-400"} h-2 transition-all`}
+                  style={{ width: `${j.percentage}%` }}
+                />
+              </div>
+              <div className="text-[10px] text-gray-400 text-right mt-1">{j.percentage}%</div>
+            </div>
+          ))}
+      </div>
     </div>
   )
 }

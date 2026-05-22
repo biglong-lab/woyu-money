@@ -8822,6 +8822,89 @@ router.get(
 )
 
 /**
+ * GET /api/family/spending-summary?days=30
+ * 家庭 N 天三罐花費分布（spend/save/give outflow）
+ */
+router.get(
+  "/api/family/spending-summary",
+  asyncHandler(async (req, res) => {
+    const days = Math.min(Math.max(Number(req.query.days) || 30, 1), 365)
+
+    const rows = await db.execute(sql`
+      SELECT
+        s.jar,
+        COUNT(*)::int AS spend_count,
+        COALESCE(SUM(s.amount), 0)::numeric AS total_amount,
+        COUNT(DISTINCT s.kid_id)::int AS unique_kids
+      FROM kids_spendings s
+      JOIN kids_accounts ka ON ka.id = s.kid_id
+      WHERE s.spend_date >= CURRENT_DATE - (${days} || ' days')::interval
+        AND ka.is_active = true
+      GROUP BY s.jar
+    `)
+
+    const data = (
+      rows as unknown as {
+        rows: Array<{
+          jar: string
+          spend_count: number
+          total_amount: string
+          unique_kids: number
+        }>
+      }
+    ).rows
+
+    const JAR_META: Record<string, { label: string; emoji: string; color: string }> = {
+      spend: { label: "花用", emoji: "💸", color: "rose" },
+      save: { label: "存錢", emoji: "🐷", color: "emerald" },
+      give: { label: "給予", emoji: "❤️", color: "pink" },
+    }
+
+    const jars = ["spend", "save", "give"].map((j) => {
+      const r = data.find((d) => d.jar === j)
+      const meta = JAR_META[j]
+      return {
+        jar: j,
+        label: meta.label,
+        emoji: meta.emoji,
+        color: meta.color,
+        spendCount: r?.spend_count ?? 0,
+        totalAmount: Number(r?.total_amount ?? 0),
+        uniqueKids: r?.unique_kids ?? 0,
+      }
+    })
+
+    const totalAmount = jars.reduce((s, j) => s + j.totalAmount, 0)
+    const totalCount = jars.reduce((s, j) => s + j.spendCount, 0)
+    const jarsWithPct = jars.map((j) => ({
+      ...j,
+      percentage: totalAmount > 0 ? Math.round((j.totalAmount / totalAmount) * 100) : 0,
+    }))
+
+    const topJar =
+      totalAmount > 0 ? jarsWithPct.reduce((a, b) => (a.totalAmount > b.totalAmount ? a : b)) : null
+
+    let message: string
+    if (totalCount === 0) {
+      message = `過去 ${days} 天家裡還沒有花費紀錄`
+    } else if (topJar) {
+      message = `${topJar.emoji} 過去 ${days} 天主要花在「${topJar.label}」($${Math.round(topJar.totalAmount)}、${topJar.percentage}%)`
+    } else {
+      message = `共 ${totalCount} 筆花費、總計 $${Math.round(totalAmount)}`
+    }
+
+    res.json({
+      days,
+      jars: jarsWithPct,
+      totalAmount: Math.round(totalAmount * 100) / 100,
+      totalCount,
+      topJar,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/family-checkin-streak
  * 家庭整體打卡連續天數（至少一位小孩當日有 checkin 才算連續）
  */

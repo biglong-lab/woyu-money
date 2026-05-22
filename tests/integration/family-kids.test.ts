@@ -4315,6 +4315,48 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.status).toBe(404)
   })
 
+  it("花費三罐分布：基本結構 jars/totalAmount/topJar/message", async () => {
+    const res = await request(app).get("/api/family/spending-summary")
+    expect(res.status).toBe(200)
+    expect(Array.isArray(res.body.jars)).toBe(true)
+    expect(res.body.jars).toHaveLength(3)
+    expect(res.body.jars.map((j: { jar: string }) => j.jar).sort()).toEqual([
+      "give",
+      "save",
+      "spend",
+    ])
+    expect(res.body).toHaveProperty("totalAmount")
+    expect(res.body).toHaveProperty("topJar")
+    expect(res.body.message).toBeTruthy()
+  })
+
+  it("花費三罐分布：建 give 100 + spend 50 → topJar='give' 比例 67%", async () => {
+    await db.execute(sql`DELETE FROM kids_accounts`)
+    const kidObj = (await createKid({ spendRatio: 50, saveRatio: 0, giveRatio: 50 })) as {
+      id: number
+    }
+    const myKidId = kidObj.id
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId: myKidId, title: "賺一下", rewardAmount: 300 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`).send({})
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`).send({})
+    await request(app)
+      .post("/api/family/spendings")
+      .send({ kidId: myKidId, jar: "give", amount: 100, description: "捐款" })
+    await request(app)
+      .post("/api/family/spendings")
+      .send({ kidId: myKidId, jar: "spend", amount: 50, description: "買貼紙" })
+    const res = await request(app).get("/api/family/spending-summary?days=30")
+    expect(res.body.totalCount).toBeGreaterThanOrEqual(2)
+    expect(res.body.totalAmount).toBeGreaterThanOrEqual(150)
+    expect(res.body.topJar.jar).toBe("give")
+    const giveJar = res.body.jars.find((j: { jar: string }) => j.jar === "give")
+    expect(giveJar.totalAmount).toBeGreaterThanOrEqual(100)
+    expect(giveJar.percentage).toBeGreaterThanOrEqual(60)
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
   it("家庭打卡 streak：基本結構 streak/lastCheckinDate/level/message", async () => {
     const res = await request(app).get("/api/family/family-checkin-streak")
     expect(res.status).toBe(200)
