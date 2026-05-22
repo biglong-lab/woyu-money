@@ -391,6 +391,9 @@ export default function FinancialDashboardPage() {
         </p>
       </div>
 
+      {/* PM 待確認金額警示（解釋 dashboard ytd vs revenue-forecast 累積差距） */}
+      <PmPendingAlertCard />
+
       {/* 單館切換器（限 forecast 區塊、YTD 維持合計）*/}
       {companies.length > 0 && (
         <Card>
@@ -1197,5 +1200,49 @@ export default function FinancialDashboardPage() {
 
       <BackToTop />
     </div>
+  )
+}
+
+function PmPendingAlertCard() {
+  const { data } = useQuery<{
+    pendingCount: number
+    pendingAmount: number
+    oldestPendingDate: string | null
+    latestPendingDate: string | null
+    severity: "ok" | "warn" | "alert"
+    message: string
+  }>({
+    queryKey: ["/api/dashboard/pm-pending-summary"],
+    refetchInterval: 5 * 60 * 1000,
+  })
+  if (!data || data.pendingCount === 0) return null
+
+  const isAlert = data.severity === "alert"
+  return (
+    <Card
+      className={`border-2 ${isAlert ? "border-red-400 bg-red-50" : "border-orange-300 bg-orange-50"}`}
+    >
+      <CardContent className="py-3 px-4">
+        <div className="flex items-start gap-3 flex-wrap">
+          <div className="text-2xl shrink-0">{isAlert ? "🚨" : "⏳"}</div>
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-semibold">{data.message}</div>
+            <div className="text-xs text-muted-foreground mt-1">
+              這些是 PM 系統已收的款項、但 Money 端尚未人工確認。 「收入合計」只算已確認部分、差距 =
+              待確認金額。
+              {data.oldestPendingDate && (
+                <span className="ml-1">最早待確認：{data.oldestPendingDate.slice(0, 10)}</span>
+              )}
+            </div>
+          </div>
+          <a
+            href="/income-webhooks"
+            className="shrink-0 px-3 py-1.5 bg-white border border-current rounded text-xs font-medium hover:bg-gray-50"
+          >
+            去確認 →
+          </a>
+        </div>
+      </CardContent>
+    </Card>
   )
 }

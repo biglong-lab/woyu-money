@@ -364,16 +364,38 @@ export default function RevenueForecastPage() {
                 string | null
               >((max, s) => (max === null || s.snapshotDate > max ? s.snapshotDate : max), null)
             if (!latestPm && !latestPms) return null
+            // 標示資料新鮮度（PMS 是使用者不定期填、可能延遲）
+            const todayStr = new Date().toISOString().slice(0, 10)
+            const pmDate = latestPm?.slice(0, 10)
+            const pmsDate = latestPms?.slice(0, 10)
+            const pmsBehindDays = pmsDate
+              ? Math.round((new Date(todayStr).getTime() - new Date(pmsDate).getTime()) / 86400000)
+              : 0
             return (
-              <div className="text-xs text-gray-400 mt-1 flex gap-3 flex-wrap">
+              <div className="text-xs text-gray-400 mt-1 flex gap-3 flex-wrap items-center">
                 {latestPm && (
                   <span>
-                    📊 PM 累積：<span className="font-mono">{latestPm.slice(0, 10)}</span>
+                    📊 PM 累積：
+                    <span
+                      className={`font-mono ${pmDate === todayStr ? "text-emerald-600" : "text-orange-600"}`}
+                    >
+                      {pmDate}
+                    </span>
                   </span>
                 )}
                 {latestPms && (
-                  <span>
-                    🎯 PMS 累積：<span className="font-mono">{latestPms.slice(0, 10)}</span>
+                  <span title="PMS 累積是使用者在 PMS 系統不定期手動填入、Money 每天 cron 同步、可能比 PM 晚 1-N 天">
+                    🎯 PMS 累積：
+                    <span
+                      className={`font-mono ${pmsBehindDays === 0 ? "text-emerald-600" : pmsBehindDays >= 3 ? "text-red-600" : "text-orange-600"}`}
+                    >
+                      {pmsDate}
+                    </span>
+                    {pmsBehindDays >= 1 && (
+                      <span className="ml-1 text-gray-500">
+                        （PMS 還沒填到今天、落後 {pmsBehindDays} 天）
+                      </span>
+                    )}
                   </span>
                 )}
               </div>

@@ -545,4 +545,63 @@ router.get(
   })
 )
 
+/**
+ * GET /api/dashboard/pm-pending-summary
+ * PM-bridge 待確認 webhook 統計（解釋 dashboard ytd vs PM 累積差距）
+ *
+ * 場景：使用者看到「綜合儀表板 收入合計 $A」vs「revenue-forecast 走勢圖 PM 累積 $B」
+ * 差距 = 待人工確認的 income_webhooks。提示使用者去 /income-webhooks 確認。
+ */
+router.get(
+  "/api/dashboard/pm-pending-summary",
+  asyncHandler(async (_req, res) => {
+    const rows = await db.execute(sql`
+      SELECT
+        COUNT(*)::int AS pending_count,
+        COALESCE(SUM(w.parsed_amount_twd::numeric), 0)::numeric AS pending_amount,
+        MIN(w.parsed_paid_at) AS oldest_pending_date,
+        MAX(w.parsed_paid_at) AS latest_pending_date
+      FROM income_webhooks w
+      JOIN income_sources s ON s.id = w.source_id
+      WHERE s.source_key = 'pm-bridge'
+        AND w.status = 'pending'
+    `)
+    const r = (
+      rows as unknown as {
+        rows: Array<{
+          pending_count: number
+          pending_amount: string
+          oldest_pending_date: string | null
+          latest_pending_date: string | null
+        }>
+      }
+    ).rows[0]
+
+    const pendingCount = r?.pending_count ?? 0
+    const pendingAmount = Number(r?.pending_amount ?? 0)
+
+    let severity: "ok" | "warn" | "alert"
+    let message: string
+    if (pendingCount === 0) {
+      severity = "ok"
+      message = "✅ PM 收入全數已確認、payment_items 與 PM 累積一致"
+    } else if (pendingCount >= 20 || pendingAmount >= 100000) {
+      severity = "alert"
+      message = `🚨 PM 有 ${pendingCount} 筆共 $${Math.round(pendingAmount).toLocaleString()} 待確認、儀表板數字可能低估`
+    } else {
+      severity = "warn"
+      message = `⏳ PM 有 ${pendingCount} 筆共 $${Math.round(pendingAmount).toLocaleString()} 待確認`
+    }
+
+    res.json({
+      pendingCount,
+      pendingAmount: Math.round(pendingAmount * 100) / 100,
+      oldestPendingDate: r?.oldest_pending_date ?? null,
+      latestPendingDate: r?.latest_pending_date ?? null,
+      severity,
+      message,
+    })
+  })
+)
+
 export default router
