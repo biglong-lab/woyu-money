@@ -4315,6 +4315,48 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.status).toBe(404)
   })
 
+  it("今日簽到名冊：基本結構 kids/checkedInCount/uncheckedKids/rate/message", async () => {
+    const res = await request(app).get("/api/family/today-checkin-roster")
+    expect(res.status).toBe(200)
+    expect(Array.isArray(res.body.kids)).toBe(true)
+    expect(Array.isArray(res.body.uncheckedKids)).toBe(true)
+    expect(res.body).toHaveProperty("checkedInCount")
+    expect(res.body).toHaveProperty("totalKids")
+    expect(res.body).toHaveProperty("rate")
+    expect(res.body.message).toBeTruthy()
+  })
+
+  it("今日簽到名冊：簽到後 checkedIn=true + mood 回傳", async () => {
+    await db.execute(sql`DELETE FROM kids_accounts`)
+    const kidObj = (await createKid({ displayName: "心情寶寶" })) as { id: number }
+    const myKidId = kidObj.id
+    // 簽到
+    const post = await request(app)
+      .post("/api/family/checkins")
+      .send({ kidId: myKidId, mood: "😄 開心", note: "今天天氣好" })
+    expect([200, 201]).toContain(post.status)
+    const res = await request(app).get("/api/family/today-checkin-roster")
+    const mine = res.body.kids.find((k: { kidId: number }) => k.kidId === myKidId)
+    expect(mine).toBeDefined()
+    expect(mine.checkedIn).toBe(true)
+    expect(mine.mood).toBe("😄 開心")
+    expect(mine.note).toBe("今天天氣好")
+    expect(res.body.checkedInCount).toBeGreaterThanOrEqual(1)
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
+  it("今日簽到名冊：未簽到的 kid 進入 uncheckedKids", async () => {
+    await db.execute(sql`DELETE FROM kids_accounts`)
+    const kidObj = (await createKid({ displayName: "還沒簽" })) as { id: number }
+    const myKidId = kidObj.id
+    const res = await request(app).get("/api/family/today-checkin-roster")
+    const mine = res.body.uncheckedKids.find((k: { kidId: number }) => k.kidId === myKidId)
+    expect(mine).toBeDefined()
+    expect(mine.checkedIn).toBe(false)
+    expect(mine.mood).toBeNull()
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
   it("任務類別 breakdown：基本結構 categories/totalCount/topCategory/message", async () => {
     const res = await request(app).get("/api/family/task-category-breakdown")
     expect(res.status).toBe(200)

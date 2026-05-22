@@ -8822,6 +8822,80 @@ router.get(
 )
 
 /**
+ * GET /api/family/today-checkin-roster
+ * 今日每位 active kid 簽到狀態（簽了沒？心情如何？）
+ */
+router.get(
+  "/api/family/today-checkin-roster",
+  asyncHandler(async (_req, res) => {
+    const rows = await db.execute(sql`
+      SELECT
+        ka.id::int AS kid_id,
+        ka.display_name AS kid_name,
+        ka.avatar,
+        ka.color,
+        c.mood,
+        c.note,
+        c.created_at AS checkin_time
+      FROM kids_accounts ka
+      LEFT JOIN kids_checkins c
+        ON c.kid_id = ka.id AND c.checkin_date = CURRENT_DATE
+      WHERE ka.is_active = true
+      ORDER BY ka.id ASC
+    `)
+
+    const kids = (
+      rows as unknown as {
+        rows: Array<{
+          kid_id: number
+          kid_name: string
+          avatar: string
+          color: string
+          mood: string | null
+          note: string | null
+          checkin_time: string | null
+        }>
+      }
+    ).rows.map((r) => ({
+      kidId: r.kid_id,
+      kidName: r.kid_name,
+      avatar: r.avatar,
+      color: r.color,
+      checkedIn: r.mood !== null,
+      mood: r.mood,
+      note: r.note,
+      checkinTime: r.checkin_time,
+    }))
+
+    const totalKids = kids.length
+    const checkedInCount = kids.filter((k) => k.checkedIn).length
+    const uncheckedKids = kids.filter((k) => !k.checkedIn)
+    const rate = totalKids > 0 ? Math.round((checkedInCount / totalKids) * 100) : 0
+
+    let message: string
+    if (totalKids === 0) {
+      message = "還沒有 active 小孩、新增第一個吧"
+    } else if (checkedInCount === totalKids) {
+      message = `🎉 全家 ${totalKids} 位小孩今天都簽到了！`
+    } else if (checkedInCount === 0) {
+      message = `⏰ 今天還沒有人簽到、提醒小孩來打卡吧`
+    } else {
+      message = `✅ ${checkedInCount}/${totalKids} 位小孩已簽到、還剩 ${uncheckedKids.length} 位`
+    }
+
+    res.json({
+      totalKids,
+      checkedInCount,
+      uncheckedCount: uncheckedKids.length,
+      rate,
+      kids,
+      uncheckedKids,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/task-category-breakdown?days=30
  * 家庭 N 天任務 category 分布（培養哪方面？）
  */

@@ -658,6 +658,9 @@ export default function FamilyPage() {
       {/* 任務類別分佈 */}
       <FamilyCategoryBreakdownCard />
 
+      {/* 今日簽到名冊 */}
+      <FamilyTodayCheckinRosterCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3612,6 +3615,66 @@ function ParentTodoList() {
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
       )}
+    </div>
+  )
+}
+
+function FamilyTodayCheckinRosterCard() {
+  const { data } = useQuery<{
+    totalKids: number
+    checkedInCount: number
+    uncheckedCount: number
+    rate: number
+    kids: Array<{
+      kidId: number
+      kidName: string
+      avatar: string
+      checkedIn: boolean
+      mood: string | null
+      note: string | null
+    }>
+    uncheckedKids: Array<{ kidId: number; kidName: string; avatar: string }>
+    message: string
+  }>({
+    queryKey: ["/api/family/today-checkin-roster"],
+  })
+  if (!data || data.totalKids === 0) return null
+
+  const allDone = data.checkedInCount === data.totalKids
+  const borderColor = allDone ? "border-emerald-300" : "border-yellow-300"
+  const bgGradient = allDone ? "from-emerald-50 to-green-50" : "from-yellow-50 to-amber-50"
+
+  return (
+    <div
+      className={`mb-4 rounded-2xl border-2 ${borderColor} bg-gradient-to-br ${bgGradient} p-3 shadow`}
+    >
+      <h3 className="font-bold mb-2 flex items-center gap-2">
+        {allDone ? "🎉" : "📋"} 今日簽到名冊 ({data.checkedInCount}/{data.totalKids})
+      </h3>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-2 text-xs">{data.message}</div>
+
+      <div className="space-y-1">
+        {data.kids.map((k) => (
+          <div
+            key={k.kidId}
+            className={`rounded-lg p-2 flex items-center gap-2 text-xs ${k.checkedIn ? "bg-white" : "bg-yellow-50 border border-yellow-200"}`}
+          >
+            <div className="text-lg">{k.avatar}</div>
+            <div className="flex-1 min-w-0">
+              <div className="font-medium">{k.kidName}</div>
+              {k.checkedIn ? (
+                <div className="text-[10px] text-gray-600 truncate">
+                  {k.mood} {k.note && `· ${k.note}`}
+                </div>
+              ) : (
+                <div className="text-[10px] text-yellow-700">尚未簽到</div>
+              )}
+            </div>
+            <div className="text-base">{k.checkedIn ? "✅" : "⏰"}</div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
