@@ -664,6 +664,9 @@ export default function FamilyPage() {
       {/* 最大獎勵 wins */}
       <FamilyBiggestWinsCard />
 
+      {/* 任務時段熱力圖 */}
+      <FamilyTaskHourDistributionCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3618,6 +3621,73 @@ function ParentTodoList() {
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
       )}
+    </div>
+  )
+}
+
+function FamilyTaskHourDistributionCard() {
+  const { data } = useQuery<{
+    days: number
+    hours: Array<{ hour: number; taskCount: number }>
+    segments: Array<{
+      key: string
+      label: string
+      emoji: string
+      taskCount: number
+      percentage: number
+    }>
+    totalCount: number
+    peakSegment: { label: string; emoji: string; percentage: number } | null
+    message: string
+  }>({
+    queryKey: ["/api/family/task-hour-distribution?days=30"],
+  })
+  if (!data || data.totalCount === 0) return null
+
+  const maxHourCount = Math.max(...data.hours.map((h) => h.taskCount), 1)
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-teal-300 bg-gradient-to-br from-teal-50 to-cyan-50 p-3 shadow">
+      <h3 className="font-bold mb-2 flex items-center gap-2">⏰ 30 天完成時段熱力圖</h3>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-2 text-xs">{data.message}</div>
+
+      {/* 4 段大區塊 */}
+      <div className="grid grid-cols-4 gap-1 mb-3">
+        {data.segments.map((s) => (
+          <div key={s.key} className="bg-white rounded-lg p-2 text-center">
+            <div className="text-lg">{s.emoji}</div>
+            <div className="text-[9px] text-gray-500 truncate">{s.label.split(" ")[0]}</div>
+            <div className="text-xs font-bold text-teal-700">{s.percentage}%</div>
+            <div className="text-[9px] text-gray-400">{s.taskCount} 次</div>
+          </div>
+        ))}
+      </div>
+
+      {/* 24 小時 mini bar */}
+      <div className="bg-white rounded-lg p-2">
+        <div className="text-[10px] text-gray-500 mb-1">每小時完成數</div>
+        <div className="flex items-end gap-[1px] h-12">
+          {data.hours.map((h) => {
+            const height = (h.taskCount / maxHourCount) * 100
+            return (
+              <div
+                key={h.hour}
+                className="flex-1 bg-teal-400 rounded-t hover:bg-teal-600 transition-colors"
+                style={{ height: `${Math.max(2, height)}%` }}
+                title={`${h.hour}:00 — ${h.taskCount} 次`}
+              />
+            )
+          })}
+        </div>
+        <div className="flex justify-between text-[8px] text-gray-400 mt-1">
+          <span>0</span>
+          <span>6</span>
+          <span>12</span>
+          <span>18</span>
+          <span>24</span>
+        </div>
+      </div>
     </div>
   )
 }

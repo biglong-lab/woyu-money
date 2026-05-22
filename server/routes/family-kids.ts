@@ -8822,6 +8822,87 @@ router.get(
 )
 
 /**
+ * GET /api/family/task-hour-distribution?days=30
+ * approve task 的時段分布（24 hour + 4 segment）
+ */
+router.get(
+  "/api/family/task-hour-distribution",
+  asyncHandler(async (req, res) => {
+    const days = Math.min(Math.max(Number(req.query.days) || 30, 1), 365)
+
+    const rows = await db.execute(sql`
+      SELECT
+        EXTRACT(HOUR FROM t.approved_at)::int AS hour,
+        COUNT(*)::int AS task_count
+      FROM kids_tasks t
+      JOIN kids_accounts ka ON ka.id = t.kid_id
+      WHERE t.status = 'approved'
+        AND t.approved_at IS NOT NULL
+        AND t.approved_at >= NOW() - (${days} || ' days')::interval
+        AND ka.is_active = true
+      GROUP BY hour
+      ORDER BY hour
+    `)
+
+    const flow = (rows as unknown as { rows: Array<{ hour: number; task_count: number }> }).rows
+
+    const hourMap = new Map<number, number>()
+    for (const r of flow) hourMap.set(r.hour, r.task_count)
+
+    const hours = Array.from({ length: 24 }, (_, h) => ({
+      hour: h,
+      taskCount: hourMap.get(h) ?? 0,
+    }))
+
+    const SEGMENTS = [
+      { key: "dawn", label: "清晨 0-6", emoji: "🌙", range: [0, 6] },
+      { key: "morning", label: "上午 6-12", emoji: "☀️", range: [6, 12] },
+      { key: "afternoon", label: "下午 12-18", emoji: "🌤️", range: [12, 18] },
+      { key: "evening", label: "晚上 18-24", emoji: "🌆", range: [18, 24] },
+    ] as const
+
+    const segments = SEGMENTS.map((s) => ({
+      key: s.key,
+      label: s.label,
+      emoji: s.emoji,
+      taskCount: hours
+        .filter((h) => h.hour >= s.range[0] && h.hour < s.range[1])
+        .reduce((sum, h) => sum + h.taskCount, 0),
+    }))
+
+    const totalCount = hours.reduce((s, h) => s + h.taskCount, 0)
+    const segmentsWithPct = segments.map((s) => ({
+      ...s,
+      percentage: totalCount > 0 ? Math.round((s.taskCount / totalCount) * 100) : 0,
+    }))
+
+    const peakHour =
+      totalCount > 0 ? hours.reduce((a, b) => (a.taskCount > b.taskCount ? a : b)) : null
+    const peakSegment =
+      totalCount > 0 ? segmentsWithPct.reduce((a, b) => (a.taskCount > b.taskCount ? a : b)) : null
+
+    let message: string
+    if (totalCount === 0) {
+      message = `過去 ${days} 天家裡還沒有 approved 任務`
+    } else if (peakSegment) {
+      message = `${peakSegment.emoji} 家裡 ${days} 天最常在「${peakSegment.label}」完成任務 (${peakSegment.percentage}%)`
+    } else {
+      message = `共 ${totalCount} 個任務分佈`
+    }
+
+    res.json({
+      days,
+      hours,
+      segments: segmentsWithPct,
+      totalCount,
+      peakHour,
+      peakSegment,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/biggest-wins?days=30&limit=10
  * 過去 N 天最大筆獎勵任務 ranking（慶祝大勝利）
  */

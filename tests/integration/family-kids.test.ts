@@ -4315,6 +4315,41 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.status).toBe(404)
   })
 
+  it("任務時段熱力圖：基本結構 hours/segments/peakSegment/message", async () => {
+    const res = await request(app).get("/api/family/task-hour-distribution")
+    expect(res.status).toBe(200)
+    expect(Array.isArray(res.body.hours)).toBe(true)
+    expect(res.body.hours).toHaveLength(24)
+    expect(Array.isArray(res.body.segments)).toBe(true)
+    expect(res.body.segments).toHaveLength(4)
+    expect(res.body).toHaveProperty("totalCount")
+    expect(res.body).toHaveProperty("peakSegment")
+    expect(res.body.message).toBeTruthy()
+  })
+
+  it("任務時段熱力圖：approve 後對應 hour bucket 計數 +1", async () => {
+    await db.execute(sql`DELETE FROM kids_accounts`)
+    const kidObj = (await createKid()) as { id: number }
+    const myKidId = kidObj.id
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId: myKidId, title: "時段測試", rewardAmount: 10 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`).send({})
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`).send({})
+    const res = await request(app).get("/api/family/task-hour-distribution?days=30")
+    expect(res.body.totalCount).toBeGreaterThanOrEqual(1)
+    expect(res.body.peakHour).not.toBeNull()
+    expect(res.body.peakSegment).not.toBeNull()
+    expect(res.body.peakSegment.percentage).toBeGreaterThan(0)
+    // 4 段加總 = total
+    const segSum = res.body.segments.reduce(
+      (s: number, x: { taskCount: number }) => s + x.taskCount,
+      0
+    )
+    expect(segSum).toBe(res.body.totalCount)
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
   it("最大獎勵 wins：基本結構 wins/winCount/topWin/grandTotal/message", async () => {
     const res = await request(app).get("/api/family/biggest-wins")
     expect(res.status).toBe(200)
