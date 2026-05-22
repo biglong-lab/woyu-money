@@ -724,6 +724,9 @@ export default function FamilyPage() {
       {/* 批准延遲分析 */}
       <FamilyApprovalLeadTimeCard />
 
+      {/* streak 排行 */}
+      <FamilyStreakRankingCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3678,6 +3681,51 @@ function ParentTodoList() {
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
       )}
+    </div>
+  )
+}
+
+function FamilyStreakRankingCard() {
+  const { data } = useQuery<{
+    totalKids: number
+    activeStreakers: number
+    maxStreak: number
+    champion: { kidName: string; avatar: string; streak: number } | null
+    ranking: Array<{ kidId: number; kidName: string; avatar: string; streak: number }>
+    message: string
+  }>({
+    queryKey: ["/api/family/streak-ranking"],
+  })
+  if (!data || data.totalKids === 0) return null
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-orange-300 bg-gradient-to-br from-orange-50 to-yellow-50 p-3 shadow">
+      <h3 className="font-bold mb-2 flex items-center gap-2">🔥 連續打卡排行</h3>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-2 text-xs">{data.message}</div>
+
+      <div className="space-y-1">
+        {data.ranking.map((k, i) => {
+          const medal = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `${i + 1}.`
+          const isChampion = i === 0 && k.streak > 0
+          return (
+            <div
+              key={k.kidId}
+              className={`rounded-lg p-2 flex items-center gap-2 text-xs ${
+                isChampion ? "bg-yellow-100 border-2 border-yellow-400" : "bg-white"
+              }`}
+            >
+              <div className="w-6 text-center text-sm">{medal}</div>
+              <div className="text-lg">{k.avatar}</div>
+              <div className="flex-1 font-medium">{k.kidName}</div>
+              <div className="text-xl font-bold text-orange-600">
+                {k.streak > 0 ? `🔥 ${k.streak}` : "—"}
+              </div>
+              <div className="text-[10px] text-gray-500 w-8">天</div>
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }

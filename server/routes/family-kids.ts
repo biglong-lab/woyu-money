@@ -8822,6 +8822,61 @@ router.get(
 )
 
 /**
+ * GET /api/family/streak-ranking
+ * 每位 active kid 連續打卡天數排行
+ */
+router.get(
+  "/api/family/streak-ranking",
+  asyncHandler(async (_req, res) => {
+    const kidRows = await db.execute(sql`
+      SELECT id::int AS id, display_name, avatar
+      FROM kids_accounts
+      WHERE is_active = true
+      ORDER BY id ASC
+    `)
+    const kids = (
+      kidRows as unknown as {
+        rows: Array<{ id: number; display_name: string; avatar: string }>
+      }
+    ).rows
+
+    const ranking = await Promise.all(
+      kids.map(async (k) => ({
+        kidId: k.id,
+        kidName: k.display_name,
+        avatar: k.avatar,
+        streak: await calcStreak(k.id),
+      }))
+    )
+
+    ranking.sort((a, b) => b.streak - a.streak)
+
+    const totalKids = ranking.length
+    const champion = ranking.length > 0 && ranking[0].streak > 0 ? ranking[0] : null
+    const activeStreakers = ranking.filter((r) => r.streak > 0).length
+    const maxStreak = champion?.streak ?? 0
+
+    let message: string
+    if (totalKids === 0) {
+      message = "家裡還沒有 active 小孩"
+    } else if (champion) {
+      message = `🏆 ${champion.avatar} ${champion.kidName} 連續 ${champion.streak} 天打卡、家裡 ${activeStreakers}/${totalKids} 位有 streak`
+    } else {
+      message = `🌱 家裡 ${totalKids} 位小孩都還沒開始 streak、今天衝第一天`
+    }
+
+    res.json({
+      totalKids,
+      activeStreakers,
+      maxStreak,
+      champion,
+      ranking,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/approval-lead-time?days=30
  * 小孩 submit 到家長 approve 的平均等待時間（家長回應速度）
  */

@@ -4315,6 +4315,36 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.status).toBe(404)
   })
 
+  it("streak 排行：基本結構 ranking/champion/maxStreak/message", async () => {
+    const res = await request(app).get("/api/family/streak-ranking")
+    expect(res.status).toBe(200)
+    expect(Array.isArray(res.body.ranking)).toBe(true)
+    expect(res.body).toHaveProperty("totalKids")
+    expect(res.body).toHaveProperty("activeStreakers")
+    expect(res.body).toHaveProperty("maxStreak")
+    expect(res.body).toHaveProperty("champion")
+    expect(res.body.message).toBeTruthy()
+  })
+
+  it("streak 排行：approve 今日 task → 該 kid streak>=1 + champion 是該 kid", async () => {
+    await db.execute(sql`DELETE FROM kids_accounts`)
+    const kidObj = (await createKid({ displayName: "打卡王" })) as { id: number }
+    const myKidId = kidObj.id
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId: myKidId, title: "打卡", rewardAmount: 10 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`).send({})
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`).send({})
+    const res = await request(app).get("/api/family/streak-ranking")
+    expect(res.body.totalKids).toBeGreaterThanOrEqual(1)
+    expect(res.body.champion).not.toBeNull()
+    expect(res.body.champion.kidName).toBe("打卡王")
+    expect(res.body.champion.streak).toBeGreaterThanOrEqual(1)
+    expect(res.body.activeStreakers).toBeGreaterThanOrEqual(1)
+    expect(res.body.maxStreak).toBeGreaterThanOrEqual(1)
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
   it("批准延遲：基本結構 taskCount/avgHours/buckets/speedLevel/message", async () => {
     const res = await request(app).get("/api/family/approval-lead-time")
     expect(res.status).toBe(200)
