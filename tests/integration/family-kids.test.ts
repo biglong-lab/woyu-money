@@ -4315,6 +4315,45 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.status).toBe(404)
   })
 
+  it("家長關注度警示：基本結構 kids/kidCount/level/message", async () => {
+    const res = await request(app).get("/api/family/kids-needing-attention")
+    expect(res.status).toBe(200)
+    expect(res.body.days).toBe(7)
+    expect(Array.isArray(res.body.kids)).toBe(true)
+    expect(res.body).toHaveProperty("kidCount")
+    expect(res.body).toHaveProperty("maxDaysSince")
+    expect(["ok", "warn", "alert"]).toContain(res.body.level)
+    expect(res.body.message).toBeTruthy()
+  })
+
+  it("家長關注度警示：新建沒 approve 的 kid 上榜", async () => {
+    await db.execute(sql`DELETE FROM kids_accounts`)
+    const kidObj = (await createKid({ displayName: "被忽略" })) as { id: number }
+    const myKidId = kidObj.id
+    const res = await request(app).get("/api/family/kids-needing-attention?days=7")
+    expect(res.body.kidCount).toBeGreaterThanOrEqual(1)
+    const mine = res.body.kids.find((k: { kidId: number }) => k.kidId === myKidId)
+    expect(mine).toBeDefined()
+    expect(mine.kidName).toBe("被忽略")
+    expect(mine.lastApprove).toBeNull()
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
+  it("家長關注度警示：剛 approve 過的 kid 不上榜", async () => {
+    await db.execute(sql`DELETE FROM kids_accounts`)
+    const kidObj = (await createKid()) as { id: number }
+    const myKidId = kidObj.id
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId: myKidId, title: "剛批准", rewardAmount: 10 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`).send({})
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`).send({})
+    const res = await request(app).get("/api/family/kids-needing-attention?days=7")
+    const found = res.body.kids.find((k: { kidId: number }) => k.kidId === myKidId)
+    expect(found).toBeUndefined()
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
   it("週末/工作日：基本結構 byDay/totalCount/pattern/message", async () => {
     const res = await request(app).get("/api/family/family-weekend-vs-weekday")
     expect(res.status).toBe(200)

@@ -697,6 +697,9 @@ export default function FamilyPage() {
       {/* 週末/工作日分布 (按日 DOW) */}
       <FamilyDayOfWeekDistributionCard />
 
+      {/* 家長關注度警示 */}
+      <FamilyKidsNeedingAttentionCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3651,6 +3654,59 @@ function ParentTodoList() {
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
       )}
+    </div>
+  )
+}
+
+function FamilyKidsNeedingAttentionCard() {
+  const { data } = useQuery<{
+    days: number
+    kids: Array<{
+      kidId: number
+      kidName: string
+      avatar: string
+      lastApprove: string | null
+      daysSinceLastApprove: number
+    }>
+    kidCount: number
+    maxDaysSince: number
+    level: "ok" | "warn" | "alert"
+    message: string
+  }>({
+    queryKey: ["/api/family/kids-needing-attention?days=7"],
+  })
+  if (!data || data.kidCount === 0) return null
+
+  const borderColor = data.level === "alert" ? "border-red-500" : "border-orange-400"
+  const bgGradient =
+    data.level === "alert" ? "from-red-50 to-rose-50" : "from-orange-50 to-amber-50"
+
+  return (
+    <div
+      className={`mb-4 rounded-2xl border-2 ${borderColor} bg-gradient-to-br ${bgGradient} p-3 shadow`}
+    >
+      <h3 className="font-bold mb-2 flex items-center gap-2">
+        {data.level === "alert" ? "🚨" : "⏰"} 家長關注度提醒
+      </h3>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-2 text-xs font-medium">{data.message}</div>
+
+      <div className="space-y-1">
+        {data.kids.map((k) => (
+          <div key={k.kidId} className="bg-white rounded-lg p-2 flex items-center gap-2 text-xs">
+            <div className="text-lg">{k.avatar}</div>
+            <div className="flex-1 min-w-0">
+              <div className="font-medium">{k.kidName}</div>
+              <div className="text-[10px] text-gray-500">
+                {k.lastApprove
+                  ? `上次 approve：${k.lastApprove.slice(0, 10)}（${k.daysSinceLastApprove} 天前）`
+                  : "還沒被 approve 過"}
+              </div>
+            </div>
+            <div className="text-sm font-bold text-red-600">{k.daysSinceLastApprove}d</div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

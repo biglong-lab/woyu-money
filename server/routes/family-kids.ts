@@ -8822,6 +8822,75 @@ router.get(
 )
 
 /**
+ * GET /api/family/kids-needing-attention?days=7
+ * 過去 N 天家長沒任何 approve activity 的 active kids（提醒關注）
+ */
+router.get(
+  "/api/family/kids-needing-attention",
+  asyncHandler(async (req, res) => {
+    const days = Math.min(Math.max(Number(req.query.days) || 7, 1), 60)
+
+    const rows = await db.execute(sql`
+      SELECT
+        ka.id::int AS kid_id,
+        ka.display_name AS kid_name,
+        ka.avatar,
+        MAX(t.approved_at) AS last_approve,
+        (EXTRACT(EPOCH FROM (NOW() - COALESCE(MAX(t.approved_at), ka.created_at)))/86400)::int AS days_since
+      FROM kids_accounts ka
+      LEFT JOIN kids_tasks t ON t.kid_id = ka.id AND t.status = 'approved'
+      WHERE ka.is_active = true
+      GROUP BY ka.id, ka.display_name, ka.avatar, ka.created_at
+      HAVING MAX(t.approved_at) IS NULL
+         OR MAX(t.approved_at) < NOW() - (${days} || ' days')::interval
+      ORDER BY days_since DESC NULLS LAST
+    `)
+
+    const kids = (
+      rows as unknown as {
+        rows: Array<{
+          kid_id: number
+          kid_name: string
+          avatar: string
+          last_approve: string | null
+          days_since: number
+        }>
+      }
+    ).rows.map((r) => ({
+      kidId: r.kid_id,
+      kidName: r.kid_name,
+      avatar: r.avatar,
+      lastApprove: r.last_approve,
+      daysSinceLastApprove: r.days_since,
+    }))
+
+    const maxDays = kids.length > 0 ? Math.max(...kids.map((k) => k.daysSinceLastApprove)) : 0
+
+    let level: "ok" | "warn" | "alert"
+    let message: string
+    if (kids.length === 0) {
+      level = "ok"
+      message = `✅ 過去 ${days} 天每位小孩都被家長 approve 過、互動健康`
+    } else if (maxDays >= 14) {
+      level = "alert"
+      message = `🚨 有 ${kids.length} 位小孩超過 ${maxDays} 天沒被家長 approve、快去看看`
+    } else {
+      level = "warn"
+      message = `⏳ 有 ${kids.length} 位小孩 ${days}+ 天沒互動、家長可以鼓勵一下`
+    }
+
+    res.json({
+      days,
+      kids,
+      kidCount: kids.length,
+      maxDaysSince: maxDays,
+      level,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/family-weekend-vs-weekday?days=30
  * 家庭 N 天 approved task 週末 vs 工作日分布 + 7 日分布
  */
