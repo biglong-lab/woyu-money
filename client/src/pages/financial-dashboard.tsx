@@ -1236,7 +1236,7 @@ function PmPendingAlertCard() {
             </div>
           </div>
           <a
-            href="/income-webhooks"
+            href="/income/inbox"
             className="shrink-0 px-3 py-1.5 bg-white border border-current rounded text-xs font-medium hover:bg-gray-50"
           >
             去確認 →

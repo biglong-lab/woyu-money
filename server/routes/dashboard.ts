@@ -558,7 +558,7 @@ router.get(
     const rows = await db.execute(sql`
       SELECT
         COUNT(*)::int AS pending_count,
-        COALESCE(SUM(w.parsed_amount_twd::numeric), 0)::numeric AS pending_amount,
+        COALESCE(SUM(COALESCE(w.parsed_amount_twd, w.parsed_amount, '0')::numeric), 0)::numeric AS pending_amount,
         MIN(w.parsed_paid_at) AS oldest_pending_date,
         MAX(w.parsed_paid_at) AS latest_pending_date
       FROM income_webhooks w
