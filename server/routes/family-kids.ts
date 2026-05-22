@@ -8822,6 +8822,97 @@ router.get(
 )
 
 /**
+ * GET /api/family/avg-reward-by-category?days=90
+ * 家庭各 category 平均 reward + 比較（家長給獎金公平度）
+ */
+router.get(
+  "/api/family/avg-reward-by-category",
+  asyncHandler(async (req, res) => {
+    const days = Math.min(Math.max(Number(req.query.days) || 90, 1), 365)
+
+    const rows = await db.execute(sql`
+      SELECT
+        t.category,
+        COUNT(*)::int AS task_count,
+        ROUND(AVG(t.reward_amount), 2)::numeric AS avg_reward,
+        MIN(t.reward_amount)::numeric AS min_reward,
+        MAX(t.reward_amount)::numeric AS max_reward,
+        SUM(t.reward_amount)::numeric AS total_reward
+      FROM kids_tasks t
+      JOIN kids_accounts ka ON ka.id = t.kid_id
+      WHERE t.status = 'approved'
+        AND t.approved_at >= NOW() - (${days} || ' days')::interval
+        AND ka.is_active = true
+      GROUP BY t.category
+      ORDER BY avg_reward DESC
+    `)
+
+    const data = (
+      rows as unknown as {
+        rows: Array<{
+          category: string
+          task_count: number
+          avg_reward: string
+          min_reward: string
+          max_reward: string
+          total_reward: string
+        }>
+      }
+    ).rows
+
+    const CATEGORY_META: Record<string, { label: string; emoji: string }> = {
+      housework: { label: "家事", emoji: "🧹" },
+      study: { label: "學習", emoji: "📚" },
+      self_care: { label: "自我照顧", emoji: "🪥" },
+      kindness: { label: "善行", emoji: "❤️" },
+      other: { label: "其他", emoji: "✨" },
+    }
+
+    const categories = data.map((r) => {
+      const meta = CATEGORY_META[r.category] ?? { label: r.category, emoji: "📋" }
+      return {
+        category: r.category,
+        label: meta.label,
+        emoji: meta.emoji,
+        taskCount: r.task_count,
+        avgReward: Number(r.avg_reward),
+        minReward: Number(r.min_reward),
+        maxReward: Number(r.max_reward),
+        totalReward: Number(r.total_reward),
+      }
+    })
+
+    const totalCount = categories.reduce((s, c) => s + c.taskCount, 0)
+    const totalReward = categories.reduce((s, c) => s + c.totalReward, 0)
+    const overallAvg = totalCount > 0 ? Math.round((totalReward / totalCount) * 100) / 100 : 0
+    const topCategory = categories.length > 0 ? categories[0] : null
+    const lowCategory = categories.length > 1 ? categories[categories.length - 1] : null
+
+    let message: string
+    if (categories.length === 0) {
+      message = `過去 ${days} 天家裡還沒有 approved 任務`
+    } else if (topCategory && lowCategory && topCategory.avgReward > lowCategory.avgReward * 1.5) {
+      message = `⚠️ ${topCategory.emoji} ${topCategory.label} 平均 $${topCategory.avgReward} vs ${lowCategory.emoji} ${lowCategory.label} 平均 $${lowCategory.avgReward}、差距明顯`
+    } else if (topCategory) {
+      message = `${topCategory.emoji} 各類別獎金均衡、平均 $${overallAvg}`
+    } else {
+      message = `共 ${totalCount} 筆 approved 任務`
+    }
+
+    res.json({
+      days,
+      categories,
+      totalCount,
+      totalReward: Math.round(totalReward * 100) / 100,
+      overallAvg,
+      topCategory,
+      lowCategory,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/biggest-spendings?days=30&limit=10
  * 家庭 N 天最大單筆花費 ranking
  */

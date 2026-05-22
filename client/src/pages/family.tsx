@@ -712,6 +712,9 @@ export default function FamilyPage() {
       {/* 最大花費 list */}
       <FamilyBiggestSpendingsCard />
 
+      {/* 類別平均獎金 */}
+      <FamilyAvgRewardByCategoryCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3666,6 +3669,71 @@ function ParentTodoList() {
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
       )}
+    </div>
+  )
+}
+
+function FamilyAvgRewardByCategoryCard() {
+  const { data } = useQuery<{
+    days: number
+    categories: Array<{
+      category: string
+      label: string
+      emoji: string
+      taskCount: number
+      avgReward: number
+      minReward: number
+      maxReward: number
+      totalReward: number
+    }>
+    totalCount: number
+    totalReward: number
+    overallAvg: number
+    topCategory: { label: string; avgReward: number } | null
+    lowCategory: { label: string; avgReward: number } | null
+    message: string
+  }>({
+    queryKey: ["/api/family/avg-reward-by-category?days=90"],
+  })
+  if (!data || data.totalCount === 0) return null
+
+  const maxAvg = Math.max(...data.categories.map((c) => c.avgReward), 1)
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-amber-300 bg-gradient-to-br from-amber-50 to-yellow-50 p-3 shadow">
+      <h3 className="font-bold mb-2 flex items-center gap-2">💰 90 天類別獎金水準</h3>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-2 text-xs">{data.message}</div>
+
+      <div className="space-y-2">
+        {data.categories.map((c) => (
+          <div key={c.category} className="bg-white rounded-lg p-2">
+            <div className="flex items-center justify-between mb-1 text-xs">
+              <span className="font-medium">
+                {c.emoji} {c.label}
+              </span>
+              <span className="text-gray-500">
+                avg ${c.avgReward} · {c.taskCount} 次
+              </span>
+            </div>
+            <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+              <div
+                className="bg-gradient-to-r from-amber-300 to-amber-500 h-2 transition-all"
+                style={{ width: `${(c.avgReward / maxAvg) * 100}%` }}
+              />
+            </div>
+            <div className="text-[10px] text-gray-400 mt-1 flex justify-between">
+              <span>min ${c.minReward}</span>
+              <span>max ${c.maxReward}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-2 pt-2 border-t border-amber-200 text-[10px] text-gray-600 text-center">
+        整體平均 ${data.overallAvg} · 總計 ${Math.round(data.totalReward).toLocaleString()}（
+        {data.totalCount} 筆）
+      </div>
     </div>
   )
 }

@@ -4315,6 +4315,41 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.status).toBe(404)
   })
 
+  it("類別平均獎金：基本結構 categories/totalCount/topCategory/overallAvg", async () => {
+    const res = await request(app).get("/api/family/avg-reward-by-category")
+    expect(res.status).toBe(200)
+    expect(Array.isArray(res.body.categories)).toBe(true)
+    expect(res.body.days).toBe(90)
+    expect(res.body).toHaveProperty("totalCount")
+    expect(res.body).toHaveProperty("overallAvg")
+    expect(res.body).toHaveProperty("topCategory")
+    expect(res.body.message).toBeTruthy()
+  })
+
+  it("類別平均獎金：housework $20 + study $100 → topCategory=study", async () => {
+    await db.execute(sql`DELETE FROM kids_accounts`)
+    const kidObj = (await createKid()) as { id: number }
+    const myKidId = kidObj.id
+    const t1 = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId: myKidId, title: "掃地", rewardAmount: 20, category: "housework" })
+    await request(app).post(`/api/family/tasks/${t1.body.id}/submit`).send({})
+    await request(app).post(`/api/family/tasks/${t1.body.id}/approve`).send({})
+    const t2 = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId: myKidId, title: "讀書", rewardAmount: 100, category: "study" })
+    await request(app).post(`/api/family/tasks/${t2.body.id}/submit`).send({})
+    await request(app).post(`/api/family/tasks/${t2.body.id}/approve`).send({})
+    const res = await request(app).get("/api/family/avg-reward-by-category")
+    expect(res.body.topCategory).not.toBeNull()
+    expect(res.body.topCategory.category).toBe("study")
+    expect(res.body.topCategory.avgReward).toBe(100)
+    expect(res.body.lowCategory).not.toBeNull()
+    expect(res.body.lowCategory.category).toBe("housework")
+    expect(res.body.lowCategory.avgReward).toBe(20)
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
   it("最大花費 list：基本結構 spendings/topSpending/grandTotal/message", async () => {
     const res = await request(app).get("/api/family/biggest-spendings")
     expect(res.status).toBe(200)
