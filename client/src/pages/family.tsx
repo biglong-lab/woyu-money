@@ -676,6 +676,9 @@ export default function FamilyPage() {
       {/* 評論互動率 */}
       <FamilyCommentInteractionCard />
 
+      {/* 家庭 reject 率 */}
+      <FamilyRejectionRateCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3630,6 +3633,85 @@ function ParentTodoList() {
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
       )}
+    </div>
+  )
+}
+
+function FamilyRejectionRateCard() {
+  const { data } = useQuery<{
+    days: number
+    approved: number
+    rejected: number
+    submitted: number
+    pending: number
+    decidedTotal: number
+    approvalRate: number
+    rejectionRate: number
+    standardLevel: "ok" | "too_strict" | "too_loose" | "no_data"
+    message: string
+  }>({
+    queryKey: ["/api/family/family-rejection-rate?days=30"],
+  })
+  if (!data || data.decidedTotal === 0) return null
+
+  const borderColor =
+    data.standardLevel === "too_strict"
+      ? "border-red-300"
+      : data.standardLevel === "too_loose"
+        ? "border-orange-300"
+        : "border-green-300"
+  const bgGradient =
+    data.standardLevel === "too_strict"
+      ? "from-red-50 to-rose-50"
+      : data.standardLevel === "too_loose"
+        ? "from-orange-50 to-amber-50"
+        : "from-green-50 to-emerald-50"
+
+  return (
+    <div
+      className={`mb-4 rounded-2xl border-2 ${borderColor} bg-gradient-to-br ${bgGradient} p-3 shadow`}
+    >
+      <h3 className="font-bold mb-2 flex items-center gap-2">⚖️ 30 天家長標準鬆緊</h3>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-2 text-xs">{data.message}</div>
+
+      <div className="bg-white rounded-lg p-2 mb-2">
+        <div className="flex h-3 rounded-full overflow-hidden">
+          <div
+            className="bg-emerald-400"
+            style={{ width: `${data.approvalRate}%` }}
+            title={`批准 ${data.approvalRate}%`}
+          />
+          <div
+            className="bg-red-400"
+            style={{ width: `${data.rejectionRate}%` }}
+            title={`駁回 ${data.rejectionRate}%`}
+          />
+        </div>
+        <div className="flex justify-between text-[10px] text-gray-500 mt-1">
+          <span className="text-emerald-600">✅ 批准 {data.approvalRate}%</span>
+          <span className="text-red-500">❌ 駁回 {data.rejectionRate}%</span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-4 gap-1 text-xs">
+        <div className="bg-white rounded p-1 text-center">
+          <div className="font-bold text-emerald-700">{data.approved}</div>
+          <div className="text-[9px] text-gray-500">已批准</div>
+        </div>
+        <div className="bg-white rounded p-1 text-center">
+          <div className="font-bold text-red-600">{data.rejected}</div>
+          <div className="text-[9px] text-gray-500">已駁回</div>
+        </div>
+        <div className="bg-white rounded p-1 text-center">
+          <div className="font-bold text-blue-600">{data.submitted}</div>
+          <div className="text-[9px] text-gray-500">待批准</div>
+        </div>
+        <div className="bg-white rounded p-1 text-center">
+          <div className="font-bold text-gray-500">{data.pending}</div>
+          <div className="text-[9px] text-gray-500">未完成</div>
+        </div>
+      </div>
     </div>
   )
 }

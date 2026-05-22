@@ -8822,6 +8822,72 @@ router.get(
 )
 
 /**
+ * GET /api/family/family-rejection-rate?days=30
+ * 家庭整體任務 reject 率（家長標準鬆緊指標）
+ */
+router.get(
+  "/api/family/family-rejection-rate",
+  asyncHandler(async (req, res) => {
+    const days = Math.min(Math.max(Number(req.query.days) || 30, 1), 365)
+
+    const rows = await db.execute(sql`
+      SELECT
+        t.status,
+        COUNT(*)::int AS task_count
+      FROM kids_tasks t
+      JOIN kids_accounts ka ON ka.id = t.kid_id
+      WHERE t.created_at >= NOW() - (${days} || ' days')::interval
+        AND ka.is_active = true
+        AND t.status IN ('approved', 'rejected', 'submitted', 'pending')
+      GROUP BY t.status
+    `)
+
+    const stats = (rows as unknown as { rows: Array<{ status: string; task_count: number }> }).rows
+
+    const approved = stats.find((s) => s.status === "approved")?.task_count ?? 0
+    const rejected = stats.find((s) => s.status === "rejected")?.task_count ?? 0
+    const submitted = stats.find((s) => s.status === "submitted")?.task_count ?? 0
+    const pending = stats.find((s) => s.status === "pending")?.task_count ?? 0
+
+    const decidedTotal = approved + rejected
+    const totalCreated = approved + rejected + submitted + pending
+
+    const rejectionRate = decidedTotal > 0 ? Math.round((rejected / decidedTotal) * 100) : 0
+    const approvalRate = decidedTotal > 0 ? Math.round((approved / decidedTotal) * 100) : 0
+
+    let standardLevel: "ok" | "too_strict" | "too_loose" | "no_data"
+    let message: string
+    if (decidedTotal === 0) {
+      standardLevel = "no_data"
+      message = `過去 ${days} 天還沒有已批准/駁回的任務`
+    } else if (rejectionRate >= 30) {
+      standardLevel = "too_strict"
+      message = `⚠️ ${days} 天家長駁回率 ${rejectionRate}%、可能太嚴格？跟小孩討論標準`
+    } else if (rejectionRate <= 2 && decidedTotal >= 10) {
+      standardLevel = "too_loose"
+      message = `⚠️ ${days} 天駁回率僅 ${rejectionRate}%、可能標準太鬆？偶爾要求重做更好`
+    } else {
+      standardLevel = "ok"
+      message = `✅ ${days} 天家長標準健康：批准 ${approvalRate}% / 駁回 ${rejectionRate}%`
+    }
+
+    res.json({
+      days,
+      approved,
+      rejected,
+      submitted,
+      pending,
+      decidedTotal,
+      totalCreated,
+      approvalRate,
+      rejectionRate,
+      standardLevel,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/comment-interaction?days=30
  * 家長 vs 小孩過去 N 天評論統計（互動文化指標）
  */

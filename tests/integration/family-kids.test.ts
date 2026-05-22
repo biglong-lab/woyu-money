@@ -4315,6 +4315,49 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.status).toBe(404)
   })
 
+  it("家庭 reject 率：基本結構 approved/rejected/standardLevel/message", async () => {
+    const res = await request(app).get("/api/family/family-rejection-rate")
+    expect(res.status).toBe(200)
+    expect(res.body.days).toBe(30)
+    expect(res.body).toHaveProperty("approved")
+    expect(res.body).toHaveProperty("rejected")
+    expect(res.body).toHaveProperty("approvalRate")
+    expect(res.body).toHaveProperty("rejectionRate")
+    expect(["ok", "too_strict", "too_loose", "no_data"]).toContain(res.body.standardLevel)
+    expect(res.body.message).toBeTruthy()
+  })
+
+  it("家庭 reject 率：1 approved + 1 rejected → rate 各 50%", async () => {
+    await db.execute(sql`DELETE FROM kids_accounts`)
+    const kidObj = (await createKid()) as { id: number }
+    const myKidId = kidObj.id
+    const t1 = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId: myKidId, title: "批准的", rewardAmount: 10 })
+    await request(app).post(`/api/family/tasks/${t1.body.id}/submit`).send({})
+    await request(app).post(`/api/family/tasks/${t1.body.id}/approve`).send({})
+
+    const t2 = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId: myKidId, title: "被駁回的", rewardAmount: 10 })
+    await request(app).post(`/api/family/tasks/${t2.body.id}/submit`).send({})
+    await request(app).post(`/api/family/tasks/${t2.body.id}/reject`).send({})
+
+    const res = await request(app).get("/api/family/family-rejection-rate?days=30")
+    expect(res.body.approved).toBeGreaterThanOrEqual(1)
+    expect(res.body.rejected).toBeGreaterThanOrEqual(1)
+    expect(res.body.decidedTotal).toBeGreaterThanOrEqual(2)
+    expect(res.body.rejectionRate + res.body.approvalRate).toBe(100)
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
+  it("家庭 reject 率：無 task → standardLevel='no_data'", async () => {
+    await db.execute(sql`DELETE FROM kids_accounts`)
+    const res = await request(app).get("/api/family/family-rejection-rate")
+    expect(res.body.decidedTotal).toBe(0)
+    expect(res.body.standardLevel).toBe("no_data")
+  })
+
   it("評論互動率：基本結構 totalCount/parent/kid/interaction/message", async () => {
     const res = await request(app).get("/api/family/comment-interaction")
     expect(res.status).toBe(200)
