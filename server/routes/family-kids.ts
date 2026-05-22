@@ -8822,6 +8822,81 @@ router.get(
 )
 
 /**
+ * GET /api/family/wish-priority-breakdown
+ * 家庭 wished 狀態願望按 priority（1=低/2=中/3=高）分組
+ */
+router.get(
+  "/api/family/wish-priority-breakdown",
+  asyncHandler(async (_req, res) => {
+    const rows = await db.execute(sql`
+      SELECT
+        w.priority,
+        COUNT(*)::int AS wish_count,
+        COALESCE(SUM(w.estimated_price), 0)::numeric AS total_value,
+        COUNT(DISTINCT w.kid_id)::int AS unique_kids
+      FROM kids_wishes w
+      JOIN kids_accounts ka ON ka.id = w.kid_id
+      WHERE w.status = 'wished'
+        AND ka.is_active = true
+      GROUP BY w.priority
+      ORDER BY w.priority DESC
+    `)
+
+    const data = (
+      rows as unknown as {
+        rows: Array<{
+          priority: number
+          wish_count: number
+          total_value: string
+          unique_kids: number
+        }>
+      }
+    ).rows
+
+    const PRIORITY_META: Record<number, { label: string; emoji: string; color: string }> = {
+      1: { label: "低", emoji: "💭", color: "gray" },
+      2: { label: "中", emoji: "✨", color: "blue" },
+      3: { label: "高", emoji: "🔥", color: "red" },
+    }
+
+    const priorities = [3, 2, 1].map((p) => {
+      const r = data.find((d) => d.priority === p)
+      const meta = PRIORITY_META[p]
+      return {
+        priority: p,
+        label: meta.label,
+        emoji: meta.emoji,
+        color: meta.color,
+        wishCount: r?.wish_count ?? 0,
+        totalValue: Number(r?.total_value ?? 0),
+        uniqueKids: r?.unique_kids ?? 0,
+      }
+    })
+
+    const totalWishes = priorities.reduce((s, p) => s + p.wishCount, 0)
+    const totalValue = priorities.reduce((s, p) => s + p.totalValue, 0)
+    const highPriorityCount = priorities.find((p) => p.priority === 3)?.wishCount ?? 0
+
+    let message: string
+    if (totalWishes === 0) {
+      message = "家裡 wished 願望清單為空、小孩可以新增第一個願望 ✨"
+    } else if (highPriorityCount > 0) {
+      message = `🔥 家裡有 ${highPriorityCount} 個「高優先」願望、共 ${totalWishes} 個 wished、總值 $${Math.round(totalValue)}`
+    } else {
+      message = `✨ 家裡 ${totalWishes} 個 wished 願望、總值 $${Math.round(totalValue)}`
+    }
+
+    res.json({
+      priorities,
+      totalWishes,
+      totalValue: Math.round(totalValue * 100) / 100,
+      highPriorityCount,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/monthly-goals-trend?months=6
  * 過去 N 個月家庭完成 goal 趨勢
  */

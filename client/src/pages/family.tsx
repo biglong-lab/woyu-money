@@ -682,6 +682,9 @@ export default function FamilyPage() {
       {/* 月度達標 trend */}
       <FamilyMonthlyGoalsTrendCard />
 
+      {/* wish priority 分佈 */}
+      <FamilyWishPriorityBreakdownCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3636,6 +3639,65 @@ function ParentTodoList() {
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
       )}
+    </div>
+  )
+}
+
+function FamilyWishPriorityBreakdownCard() {
+  const { data } = useQuery<{
+    priorities: Array<{
+      priority: number
+      label: string
+      emoji: string
+      color: string
+      wishCount: number
+      totalValue: number
+      uniqueKids: number
+    }>
+    totalWishes: number
+    totalValue: number
+    highPriorityCount: number
+    message: string
+  }>({
+    queryKey: ["/api/family/wish-priority-breakdown"],
+  })
+  if (!data || data.totalWishes === 0) return null
+
+  const COLOR_BG: Record<string, string> = {
+    red: "bg-red-100 text-red-700",
+    blue: "bg-blue-100 text-blue-700",
+    gray: "bg-gray-100 text-gray-600",
+  }
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-purple-300 bg-gradient-to-br from-purple-50 to-fuchsia-50 p-3 shadow">
+      <h3 className="font-bold mb-2 flex items-center gap-2">✨ 願望優先級分佈</h3>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-2 text-xs">{data.message}</div>
+
+      <div className="space-y-1">
+        {data.priorities
+          .filter((p) => p.wishCount > 0)
+          .map((p) => (
+            <div
+              key={p.priority}
+              className="bg-white rounded-lg p-2 flex items-center gap-2 text-xs"
+            >
+              <div className={`px-2 py-1 rounded ${COLOR_BG[p.color] ?? "bg-gray-100"}`}>
+                {p.emoji} {p.label}
+              </div>
+              <div className="flex-1">
+                <div className="font-medium">{p.wishCount} 個願望</div>
+                <div className="text-[10px] text-gray-500">{p.uniqueKids} 位小孩</div>
+              </div>
+              <div className="text-sm font-bold text-purple-700">${Math.round(p.totalValue)}</div>
+            </div>
+          ))}
+      </div>
+
+      <div className="mt-2 pt-2 border-t border-purple-200 text-[10px] text-gray-600 text-center">
+        共 {data.totalWishes} 個願望、總值 ${Math.round(data.totalValue).toLocaleString()}
+      </div>
     </div>
   )
 }

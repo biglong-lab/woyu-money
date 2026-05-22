@@ -4315,6 +4315,48 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.status).toBe(404)
   })
 
+  it("wish priority 分佈：基本結構 priorities/totalWishes/highPriorityCount/message", async () => {
+    const res = await request(app).get("/api/family/wish-priority-breakdown")
+    expect(res.status).toBe(200)
+    expect(Array.isArray(res.body.priorities)).toBe(true)
+    expect(res.body.priorities).toHaveLength(3)
+    expect(res.body.priorities[0].priority).toBe(3) // 高在前
+    expect(res.body).toHaveProperty("totalWishes")
+    expect(res.body).toHaveProperty("totalValue")
+    expect(res.body).toHaveProperty("highPriorityCount")
+    expect(res.body.message).toBeTruthy()
+  })
+
+  it("wish priority 分佈：建 priority=3 願望 → highPriorityCount=1", async () => {
+    await db.execute(sql`DELETE FROM kids_accounts`)
+    const kidObj = (await createKid()) as { id: number }
+    const myKidId = kidObj.id
+    await request(app)
+      .post("/api/family/wishes")
+      .send({ kidId: myKidId, title: "急想要", priority: 3, estimatedPrice: 500 })
+    const res = await request(app).get("/api/family/wish-priority-breakdown")
+    expect(res.body.highPriorityCount).toBeGreaterThanOrEqual(1)
+    expect(res.body.totalWishes).toBeGreaterThanOrEqual(1)
+    expect(res.body.totalValue).toBeGreaterThanOrEqual(500)
+    const high = res.body.priorities.find((p: { priority: number }) => p.priority === 3)
+    expect(high.wishCount).toBeGreaterThanOrEqual(1)
+    expect(high.label).toBe("高")
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
+  it("wish priority 分佈：promoted 狀態的願望不算入", async () => {
+    await db.execute(sql`DELETE FROM kids_accounts`)
+    const kidObj = (await createKid()) as { id: number }
+    const myKidId = kidObj.id
+    await db.execute(sql`
+      INSERT INTO kids_wishes (kid_id, title, priority, status, estimated_price)
+      VALUES (${myKidId}, '已升級', 3, 'promoted_to_goal', 100)
+    `)
+    const res = await request(app).get("/api/family/wish-priority-breakdown")
+    expect(res.body.totalWishes).toBe(0)
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
   it("月度達標 trend：基本結構 data/totalGoals/trend/message", async () => {
     const res = await request(app).get("/api/family/monthly-goals-trend")
     expect(res.status).toBe(200)
