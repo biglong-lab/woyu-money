@@ -8822,6 +8822,84 @@ router.get(
 )
 
 /**
+ * GET /api/family/family-weekend-vs-weekday?days=30
+ * 家庭 N 天 approved task 週末 vs 工作日分布 + 7 日分布
+ */
+router.get(
+  "/api/family/family-weekend-vs-weekday",
+  asyncHandler(async (req, res) => {
+    const days = Math.min(Math.max(Number(req.query.days) || 30, 1), 365)
+
+    const rows = await db.execute(sql`
+      SELECT
+        EXTRACT(DOW FROM t.approved_at)::int AS dow,
+        COUNT(*)::int AS task_count
+      FROM kids_tasks t
+      JOIN kids_accounts ka ON ka.id = t.kid_id
+      WHERE t.status = 'approved'
+        AND t.approved_at IS NOT NULL
+        AND t.approved_at >= NOW() - (${days} || ' days')::interval
+        AND ka.is_active = true
+      GROUP BY EXTRACT(DOW FROM t.approved_at)
+    `)
+
+    const flow = (rows as unknown as { rows: Array<{ dow: number; task_count: number }> }).rows
+
+    const dowMap = new Map(flow.map((r) => [r.dow, r.task_count]))
+    const DAY_LABELS = ["週日", "週一", "週二", "週三", "週四", "週五", "週六"]
+
+    const byDay = Array.from({ length: 7 }, (_, i) => ({
+      dow: i,
+      label: DAY_LABELS[i],
+      taskCount: dowMap.get(i) ?? 0,
+      isWeekend: i === 0 || i === 6,
+    }))
+
+    const weekendCount = byDay.filter((d) => d.isWeekend).reduce((s, d) => s + d.taskCount, 0)
+    const weekdayCount = byDay.filter((d) => !d.isWeekend).reduce((s, d) => s + d.taskCount, 0)
+    const totalCount = weekendCount + weekdayCount
+
+    const weekendPct = totalCount > 0 ? Math.round((weekendCount / totalCount) * 100) : 0
+    const weekdayPct = totalCount > 0 ? Math.round((weekdayCount / totalCount) * 100) : 0
+
+    // 每日「平均」更公平：weekend 2 天 vs weekday 5 天
+    const weekendAvg = weekendCount / 2
+    const weekdayAvg = weekdayCount / 5
+    const peakDay =
+      totalCount > 0 ? byDay.reduce((a, b) => (a.taskCount > b.taskCount ? a : b)) : null
+
+    let pattern: "no_data" | "weekend_focused" | "weekday_focused" | "balanced"
+    let message: string
+    if (totalCount === 0) {
+      pattern = "no_data"
+      message = `過去 ${days} 天家裡還沒有 approved 任務`
+    } else if (weekendAvg > weekdayAvg * 1.5) {
+      pattern = "weekend_focused"
+      message = `🏖️ 家裡偏「週末派」(週末日均 ${weekendAvg.toFixed(1)} vs 平日 ${weekdayAvg.toFixed(1)})`
+    } else if (weekdayAvg > weekendAvg * 1.5) {
+      pattern = "weekday_focused"
+      message = `📚 家裡偏「平日派」(平日日均 ${weekdayAvg.toFixed(1)} vs 週末 ${weekendAvg.toFixed(1)})`
+    } else {
+      pattern = "balanced"
+      message = `⚖️ 家裡作息均衡（週末 ${weekendPct}% / 平日 ${weekdayPct}%）`
+    }
+
+    res.json({
+      days,
+      totalCount,
+      weekendCount,
+      weekdayCount,
+      weekendPct,
+      weekdayPct,
+      byDay,
+      peakDay,
+      pattern,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/wish-promotion-rate?days=90
  * 家庭 N 天 wish 升級為 goal 的比例（小孩判斷成熟度）
  */

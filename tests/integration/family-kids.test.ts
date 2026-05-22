@@ -4315,6 +4315,45 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.status).toBe(404)
   })
 
+  it("週末/工作日：基本結構 byDay/totalCount/pattern/message", async () => {
+    const res = await request(app).get("/api/family/family-weekend-vs-weekday")
+    expect(res.status).toBe(200)
+    expect(res.body.days).toBe(30)
+    expect(Array.isArray(res.body.byDay)).toBe(true)
+    expect(res.body.byDay).toHaveLength(7)
+    expect(res.body.byDay[0].dow).toBe(0)
+    expect(res.body.byDay[0].isWeekend).toBe(true)
+    expect(res.body.byDay[6].isWeekend).toBe(true)
+    expect(res.body.byDay[3].isWeekend).toBe(false)
+    expect(["no_data", "weekend_focused", "weekday_focused", "balanced"]).toContain(
+      res.body.pattern
+    )
+    expect(res.body.message).toBeTruthy()
+  })
+
+  it("週末/工作日：approve 任務後 weekendCount+weekdayCount = totalCount", async () => {
+    await db.execute(sql`DELETE FROM kids_accounts`)
+    const kidObj = (await createKid()) as { id: number }
+    const myKidId = kidObj.id
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId: myKidId, title: "週末測試", rewardAmount: 10 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`).send({})
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`).send({})
+    const res = await request(app).get("/api/family/family-weekend-vs-weekday?days=30")
+    expect(res.body.totalCount).toBeGreaterThanOrEqual(1)
+    expect(res.body.peakDay).not.toBeNull()
+    expect(res.body.weekendCount + res.body.weekdayCount).toBe(res.body.totalCount)
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
+  it("週末/工作日：無 task → no_data", async () => {
+    await db.execute(sql`DELETE FROM kids_accounts`)
+    const res = await request(app).get("/api/family/family-weekend-vs-weekday")
+    expect(res.body.totalCount).toBe(0)
+    expect(res.body.pattern).toBe("no_data")
+  })
+
   it("wish 升級率：基本結構 total/promoted/maturityLevel/message", async () => {
     const res = await request(app).get("/api/family/wish-promotion-rate")
     expect(res.status).toBe(200)

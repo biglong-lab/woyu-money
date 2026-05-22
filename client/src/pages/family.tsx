@@ -694,6 +694,9 @@ export default function FamilyPage() {
       {/* wish 升級率 */}
       <FamilyWishPromotionRateCard />
 
+      {/* 週末/工作日分布 (按日 DOW) */}
+      <FamilyDayOfWeekDistributionCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3648,6 +3651,79 @@ function ParentTodoList() {
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
       )}
+    </div>
+  )
+}
+
+function FamilyDayOfWeekDistributionCard() {
+  const { data } = useQuery<{
+    days: number
+    totalCount: number
+    weekendCount: number
+    weekdayCount: number
+    weekendPct: number
+    weekdayPct: number
+    byDay: Array<{ dow: number; label: string; taskCount: number; isWeekend: boolean }>
+    peakDay: { label: string; taskCount: number } | null
+    pattern: "no_data" | "weekend_focused" | "weekday_focused" | "balanced"
+    message: string
+  }>({
+    queryKey: ["/api/family/family-weekend-vs-weekday?days=30"],
+  })
+  if (!data || data.totalCount === 0) return null
+
+  const maxCount = Math.max(...data.byDay.map((d) => d.taskCount), 1)
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-orange-300 bg-gradient-to-br from-orange-50 to-amber-50 p-3 shadow">
+      <h3 className="font-bold mb-2 flex items-center gap-2">📅 30 天作息分布</h3>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-2 text-xs">{data.message}</div>
+
+      <div className="grid grid-cols-2 gap-2 mb-2">
+        <div className="bg-white rounded-lg p-2 text-center">
+          <div className="text-lg">🏖️</div>
+          <div className="font-bold text-orange-700">{data.weekendCount}</div>
+          <div className="text-[10px] text-gray-500">週末（{data.weekendPct}%）</div>
+        </div>
+        <div className="bg-white rounded-lg p-2 text-center">
+          <div className="text-lg">📚</div>
+          <div className="font-bold text-blue-700">{data.weekdayCount}</div>
+          <div className="text-[10px] text-gray-500">平日（{data.weekdayPct}%）</div>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-lg p-2">
+        <div className="text-[10px] text-gray-500 mb-1">每日分布</div>
+        <div className="flex items-end gap-1 h-16">
+          {data.byDay.map((d) => {
+            const heightPct = (d.taskCount / maxCount) * 100
+            return (
+              <div key={d.dow} className="flex-1 flex flex-col items-center justify-end">
+                <div className="text-[8px] font-bold text-amber-700 mb-1">{d.taskCount || ""}</div>
+                <div
+                  className={`w-full ${
+                    d.taskCount > 0
+                      ? d.isWeekend
+                        ? "bg-orange-400"
+                        : "bg-blue-400"
+                      : "bg-gray-100"
+                  } rounded-t transition-all`}
+                  style={{ height: `${Math.max(2, heightPct)}%` }}
+                  title={`${d.label}: ${d.taskCount} 次`}
+                />
+              </div>
+            )
+          })}
+        </div>
+        <div className="flex justify-between text-[8px] text-gray-400 mt-1">
+          {data.byDay.map((d) => (
+            <span key={d.dow} className="flex-1 text-center">
+              {d.label.slice(1)}
+            </span>
+          ))}
+        </div>
+      </div>
     </div>
   )
 }
