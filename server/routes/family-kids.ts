@@ -8822,6 +8822,94 @@ router.get(
 )
 
 /**
+ * GET /api/family/approval-lead-time?days=30
+ * 小孩 submit 到家長 approve 的平均等待時間（家長回應速度）
+ */
+router.get(
+  "/api/family/approval-lead-time",
+  asyncHandler(async (req, res) => {
+    const days = Math.min(Math.max(Number(req.query.days) || 30, 1), 365)
+
+    const rows = await db.execute(sql`
+      SELECT
+        EXTRACT(EPOCH FROM (t.approved_at - t.completed_at))::float AS lead_seconds
+      FROM kids_tasks t
+      JOIN kids_accounts ka ON ka.id = t.kid_id
+      WHERE t.status = 'approved'
+        AND t.completed_at IS NOT NULL
+        AND t.approved_at IS NOT NULL
+        AND t.approved_at >= t.completed_at
+        AND t.approved_at >= NOW() - (${days} || ' days')::interval
+        AND ka.is_active = true
+    `)
+
+    const seconds = (rows as unknown as { rows: Array<{ lead_seconds: number }> }).rows.map(
+      (r) => r.lead_seconds
+    )
+
+    const taskCount = seconds.length
+    const avgSec = taskCount > 0 ? seconds.reduce((s, x) => s + x, 0) / taskCount : 0
+    const sorted = [...seconds].sort((a, b) => a - b)
+    const minSec = sorted[0] ?? 0
+    const maxSec = sorted[sorted.length - 1] ?? 0
+    const medianSec = taskCount > 0 ? sorted[Math.floor(taskCount / 2)] : 0
+
+    // Bucket：< 1h / 1-6h / 6-24h / 1-3d / 3d+
+    const buckets = [
+      { key: "instant", label: "< 1 小時", maxSec: 3600 },
+      { key: "fast", label: "1-6 小時", maxSec: 6 * 3600 },
+      { key: "day", label: "6-24 小時", maxSec: 24 * 3600 },
+      { key: "slow", label: "1-3 天", maxSec: 3 * 86400 },
+      { key: "stale", label: "3 天以上", maxSec: Infinity },
+    ].map((b) => {
+      const idx = ["instant", "fast", "day", "slow", "stale"].indexOf(b.key)
+      const minSec = idx === 0 ? 0 : [3600, 6 * 3600, 24 * 3600, 3 * 86400][idx - 1]
+      const count = seconds.filter((s) => s >= minSec && s < b.maxSec).length
+      return {
+        key: b.key,
+        label: b.label,
+        count,
+        percentage: taskCount > 0 ? Math.round((count / taskCount) * 100) : 0,
+      }
+    })
+
+    const avgHours = Math.round((avgSec / 3600) * 100) / 100
+    const medianHours = Math.round((medianSec / 3600) * 100) / 100
+
+    let speedLevel: "no_data" | "instant" | "fast" | "slow" | "very_slow"
+    let message: string
+    if (taskCount === 0) {
+      speedLevel = "no_data"
+      message = `過去 ${days} 天還沒有 submit→approve 完整紀錄`
+    } else if (avgHours < 1) {
+      speedLevel = "instant"
+      message = `⚡ 家長平均 ${Math.round(avgSec / 60)} 分鐘內批准、即時回應`
+    } else if (avgHours < 6) {
+      speedLevel = "fast"
+      message = `🚀 家長平均 ${avgHours} 小時內批准、回應快速`
+    } else if (avgHours < 24) {
+      speedLevel = "slow"
+      message = `⏳ 家長平均等 ${avgHours} 小時才批准、可以更快一點`
+    } else {
+      speedLevel = "very_slow"
+      message = `⚠️ 家長平均等 ${Math.round(avgHours / 24)} 天才批准、小孩會等到忘記`
+    }
+
+    res.json({
+      days,
+      taskCount,
+      avgHours,
+      medianHours,
+      minHours: Math.round((minSec / 3600) * 100) / 100,
+      maxHours: Math.round((maxSec / 3600) * 100) / 100,
+      buckets,
+      speedLevel,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/monthly-task-creation-trend?months=6
  * 過去 N 個月家長派任務量走勢
  */

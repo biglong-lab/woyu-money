@@ -721,6 +721,9 @@ export default function FamilyPage() {
       {/* 月度派任務趨勢 */}
       <FamilyMonthlyTaskCreationTrendCard />
 
+      {/* 批准延遲分析 */}
+      <FamilyApprovalLeadTimeCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3675,6 +3678,85 @@ function ParentTodoList() {
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
       )}
+    </div>
+  )
+}
+
+function FamilyApprovalLeadTimeCard() {
+  const { data } = useQuery<{
+    days: number
+    taskCount: number
+    avgHours: number
+    medianHours: number
+    minHours: number
+    maxHours: number
+    buckets: Array<{ key: string; label: string; count: number; percentage: number }>
+    speedLevel: "no_data" | "instant" | "fast" | "slow" | "very_slow"
+    message: string
+  }>({
+    queryKey: ["/api/family/approval-lead-time?days=30"],
+  })
+  if (!data || data.taskCount === 0) return null
+
+  const LEVEL_BORDER: Record<string, string> = {
+    instant: "border-emerald-400",
+    fast: "border-blue-300",
+    slow: "border-orange-300",
+    very_slow: "border-red-400",
+  }
+  const LEVEL_BG: Record<string, string> = {
+    instant: "from-emerald-50 to-green-50",
+    fast: "from-blue-50 to-sky-50",
+    slow: "from-orange-50 to-amber-50",
+    very_slow: "from-red-50 to-rose-50",
+  }
+  const BUCKET_COLOR: Record<string, string> = {
+    instant: "bg-emerald-400",
+    fast: "bg-blue-400",
+    day: "bg-yellow-400",
+    slow: "bg-orange-400",
+    stale: "bg-red-400",
+  }
+
+  return (
+    <div
+      className={`mb-4 rounded-2xl border-2 ${LEVEL_BORDER[data.speedLevel] ?? "border-gray-300"} bg-gradient-to-br ${LEVEL_BG[data.speedLevel] ?? "from-gray-50 to-slate-50"} p-3 shadow`}
+    >
+      <h3 className="font-bold mb-2 flex items-center gap-2">⏱️ 家長批准回應速度</h3>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-2 text-xs">{data.message}</div>
+
+      <div className="grid grid-cols-3 gap-2 mb-2">
+        <div className="bg-white rounded-lg p-2 text-center">
+          <div className="font-bold text-emerald-700">{data.avgHours}h</div>
+          <div className="text-[10px] text-gray-500">平均</div>
+        </div>
+        <div className="bg-white rounded-lg p-2 text-center">
+          <div className="font-bold text-blue-700">{data.medianHours}h</div>
+          <div className="text-[10px] text-gray-500">中位數</div>
+        </div>
+        <div className="bg-white rounded-lg p-2 text-center">
+          <div className="font-bold text-rose-700">{Math.round(data.maxHours)}h</div>
+          <div className="text-[10px] text-gray-500">最久</div>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-lg p-2 space-y-1">
+        {data.buckets.map((b) => (
+          <div key={b.key} className="flex items-center gap-2 text-xs">
+            <div className="w-20 text-[10px]">{b.label}</div>
+            <div className="flex-1 bg-gray-100 rounded-full h-2 overflow-hidden">
+              <div
+                className={`${BUCKET_COLOR[b.key] ?? "bg-gray-400"} h-2 transition-all`}
+                style={{ width: `${b.percentage}%` }}
+              />
+            </div>
+            <div className="w-12 text-right text-[10px] font-bold">
+              {b.count}({b.percentage}%)
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

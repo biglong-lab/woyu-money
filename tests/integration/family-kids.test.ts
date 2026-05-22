@@ -4315,6 +4315,36 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.status).toBe(404)
   })
 
+  it("批准延遲：基本結構 taskCount/avgHours/buckets/speedLevel/message", async () => {
+    const res = await request(app).get("/api/family/approval-lead-time")
+    expect(res.status).toBe(200)
+    expect(res.body.days).toBe(30)
+    expect(res.body).toHaveProperty("taskCount")
+    expect(res.body).toHaveProperty("avgHours")
+    expect(Array.isArray(res.body.buckets)).toBe(true)
+    expect(res.body.buckets).toHaveLength(5)
+    expect(["no_data", "instant", "fast", "slow", "very_slow"]).toContain(res.body.speedLevel)
+    expect(res.body.message).toBeTruthy()
+  })
+
+  it("批准延遲：approve 立即後 avgHours < 1 + speedLevel='instant'", async () => {
+    await db.execute(sql`DELETE FROM kids_accounts`)
+    const kidObj = (await createKid()) as { id: number }
+    const myKidId = kidObj.id
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId: myKidId, title: "立即批准", rewardAmount: 10 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`).send({})
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`).send({})
+    const res = await request(app).get("/api/family/approval-lead-time?days=30")
+    expect(res.body.taskCount).toBeGreaterThanOrEqual(1)
+    expect(res.body.avgHours).toBeLessThan(1)
+    expect(["instant", "fast"]).toContain(res.body.speedLevel)
+    const instantBucket = res.body.buckets.find((b: { key: string }) => b.key === "instant")
+    expect(instantBucket.count).toBeGreaterThanOrEqual(1)
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
   it("月度派任務趨勢：基本結構 data/totalTasks/trend/message", async () => {
     const res = await request(app).get("/api/family/monthly-task-creation-trend")
     expect(res.status).toBe(200)
