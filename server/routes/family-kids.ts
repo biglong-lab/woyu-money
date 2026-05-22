@@ -8822,6 +8822,88 @@ router.get(
 )
 
 /**
+ * GET /api/family/biggest-wins?days=30&limit=10
+ * 過去 N 天最大筆獎勵任務 ranking（慶祝大勝利）
+ */
+router.get(
+  "/api/family/biggest-wins",
+  asyncHandler(async (req, res) => {
+    const days = Math.min(Math.max(Number(req.query.days) || 30, 1), 365)
+    const limit = Math.min(Math.max(Number(req.query.limit) || 10, 1), 50)
+
+    const rows = await db.execute(sql`
+      SELECT
+        t.id::int AS task_id,
+        t.title,
+        t.emoji,
+        t.reward_amount::numeric AS reward,
+        t.difficulty,
+        t.category,
+        t.approved_at,
+        ka.id::int AS kid_id,
+        ka.display_name AS kid_name,
+        ka.avatar
+      FROM kids_tasks t
+      JOIN kids_accounts ka ON ka.id = t.kid_id
+      WHERE t.status = 'approved'
+        AND t.approved_at >= NOW() - (${days} || ' days')::interval
+        AND ka.is_active = true
+      ORDER BY t.reward_amount DESC, t.approved_at DESC
+      LIMIT ${limit}
+    `)
+
+    const wins = (
+      rows as unknown as {
+        rows: Array<{
+          task_id: number
+          title: string
+          emoji: string
+          reward: string
+          difficulty: string
+          category: string
+          approved_at: string
+          kid_id: number
+          kid_name: string
+          avatar: string
+        }>
+      }
+    ).rows.map((r) => ({
+      taskId: r.task_id,
+      title: r.title,
+      emoji: r.emoji,
+      reward: Number(r.reward),
+      difficulty: r.difficulty,
+      category: r.category,
+      approvedAt: r.approved_at,
+      kidId: r.kid_id,
+      kidName: r.kid_name,
+      kidAvatar: r.avatar,
+    }))
+
+    const topWin = wins.length > 0 ? wins[0] : null
+    const grandTotal = wins.reduce((s, w) => s + w.reward, 0)
+
+    let message: string
+    if (wins.length === 0) {
+      message = `過去 ${days} 天家裡還沒有 approved 任務`
+    } else if (topWin) {
+      message = `🏆 過去 ${days} 天最大筆是 ${topWin.kidAvatar} ${topWin.kidName} 的「${topWin.title}」($${topWin.reward})`
+    } else {
+      message = `共 ${wins.length} 筆大獎、累計 $${Math.round(grandTotal)}`
+    }
+
+    res.json({
+      days,
+      wins,
+      winCount: wins.length,
+      topWin,
+      grandTotal: Math.round(grandTotal * 100) / 100,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/today-checkin-roster
  * 今日每位 active kid 簽到狀態（簽了沒？心情如何？）
  */

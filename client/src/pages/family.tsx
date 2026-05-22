@@ -661,6 +661,9 @@ export default function FamilyPage() {
       {/* 今日簽到名冊 */}
       <FamilyTodayCheckinRosterCard />
 
+      {/* 最大獎勵 wins */}
+      <FamilyBiggestWinsCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3615,6 +3618,56 @@ function ParentTodoList() {
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
       )}
+    </div>
+  )
+}
+
+function FamilyBiggestWinsCard() {
+  const { data } = useQuery<{
+    days: number
+    wins: Array<{
+      taskId: number
+      title: string
+      emoji: string
+      reward: number
+      difficulty: string
+      approvedAt: string
+      kidName: string
+      kidAvatar: string
+    }>
+    winCount: number
+    topWin: { reward: number; kidName: string; title: string } | null
+    grandTotal: number
+    message: string
+  }>({
+    queryKey: ["/api/family/biggest-wins?days=30&limit=10"],
+  })
+  if (!data || data.winCount === 0) return null
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-yellow-300 bg-gradient-to-br from-yellow-50 to-amber-50 p-3 shadow">
+      <h3 className="font-bold mb-2 flex items-center gap-2">🏆 30 天大獎排行</h3>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-2 text-xs">{data.message}</div>
+
+      <div className="space-y-1 max-h-72 overflow-y-auto">
+        {data.wins.map((w, i) => {
+          const medal = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `${i + 1}.`
+          return (
+            <div key={w.taskId} className="bg-white rounded-lg p-2 flex items-center gap-2 text-xs">
+              <div className="w-6 text-center text-sm">{medal}</div>
+              <div className="text-lg">{w.emoji}</div>
+              <div className="flex-1 min-w-0">
+                <div className="font-medium truncate">{w.title}</div>
+                <div className="text-[10px] text-gray-500">
+                  {w.kidAvatar} {w.kidName} · {w.approvedAt?.slice(0, 10)}
+                </div>
+              </div>
+              <div className="text-base font-bold text-amber-700">${w.reward}</div>
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }

@@ -4315,6 +4315,41 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.status).toBe(404)
   })
 
+  it("最大獎勵 wins：基本結構 wins/winCount/topWin/grandTotal/message", async () => {
+    const res = await request(app).get("/api/family/biggest-wins")
+    expect(res.status).toBe(200)
+    expect(Array.isArray(res.body.wins)).toBe(true)
+    expect(res.body.days).toBe(30)
+    expect(res.body).toHaveProperty("winCount")
+    expect(res.body).toHaveProperty("topWin")
+    expect(res.body).toHaveProperty("grandTotal")
+    expect(res.body.message).toBeTruthy()
+  })
+
+  it("最大獎勵 wins：approve 3 task → 排序 DESC + topWin 最大", async () => {
+    await db.execute(sql`DELETE FROM kids_accounts`)
+    const kidObj = (await createKid({ displayName: "大獎得主" })) as { id: number }
+    const myKidId = kidObj.id
+    for (const amount of [50, 200, 100]) {
+      const t = await request(app)
+        .post("/api/family/tasks")
+        .send({ kidId: myKidId, title: `任務 $${amount}`, rewardAmount: amount })
+      await request(app).post(`/api/family/tasks/${t.body.id}/submit`).send({})
+      await request(app).post(`/api/family/tasks/${t.body.id}/approve`).send({})
+    }
+    const res = await request(app).get("/api/family/biggest-wins?days=30&limit=5")
+    expect(res.status).toBe(200)
+    expect(res.body.winCount).toBeGreaterThanOrEqual(3)
+    expect(res.body.topWin).not.toBeNull()
+    expect(res.body.topWin.reward).toBe(200)
+    expect(res.body.topWin.kidName).toBe("大獎得主")
+    // 排序 DESC
+    const rewards = res.body.wins.slice(0, 3).map((w: { reward: number }) => w.reward)
+    expect(rewards[0]).toBeGreaterThanOrEqual(rewards[1])
+    expect(rewards[1]).toBeGreaterThanOrEqual(rewards[2])
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
   it("今日簽到名冊：基本結構 kids/checkedInCount/uncheckedKids/rate/message", async () => {
     const res = await request(app).get("/api/family/today-checkin-roster")
     expect(res.status).toBe(200)
