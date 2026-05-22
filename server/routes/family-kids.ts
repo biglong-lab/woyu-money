@@ -8822,6 +8822,102 @@ router.get(
 )
 
 /**
+ * GET /api/family/monthly-spending-trend?months=6
+ * 過去 N 個月家庭 spending 走勢（花費習慣）
+ */
+router.get(
+  "/api/family/monthly-spending-trend",
+  asyncHandler(async (req, res) => {
+    const months = Math.min(Math.max(Number(req.query.months) || 6, 1), 24)
+
+    const rows = await db.execute(sql`
+      WITH month_series AS (
+        SELECT date_trunc('month', NOW() - (n || ' months')::interval)::date AS month_start
+        FROM generate_series(0, ${months - 1}) AS n
+      ),
+      monthly_spend AS (
+        SELECT
+          date_trunc('month', s.spend_date)::date AS month_start,
+          COUNT(*)::int AS spend_count,
+          SUM(s.amount)::numeric AS total_spent,
+          COUNT(DISTINCT s.kid_id)::int AS unique_kids
+        FROM kids_spendings s
+        JOIN kids_accounts ka ON ka.id = s.kid_id
+        WHERE s.spend_date >= date_trunc('month', NOW() - ((${months - 1}) || ' months')::interval)
+          AND ka.is_active = true
+        GROUP BY date_trunc('month', s.spend_date)
+      )
+      SELECT
+        TO_CHAR(ms.month_start, 'YYYY-MM') AS month,
+        COALESCE(msp.spend_count, 0) AS spend_count,
+        COALESCE(msp.total_spent, 0)::numeric AS total_spent,
+        COALESCE(msp.unique_kids, 0) AS unique_kids
+      FROM month_series ms
+      LEFT JOIN monthly_spend msp ON msp.month_start = ms.month_start
+      ORDER BY ms.month_start
+    `)
+
+    const data = (
+      rows as unknown as {
+        rows: Array<{
+          month: string
+          spend_count: number
+          total_spent: string
+          unique_kids: number
+        }>
+      }
+    ).rows.map((r) => ({
+      month: r.month,
+      spendCount: r.spend_count,
+      totalSpent: Number(r.total_spent),
+      uniqueKids: r.unique_kids,
+    }))
+
+    const totalSpent = data.reduce((s, m) => s + m.totalSpent, 0)
+    const totalCount = data.reduce((s, m) => s + m.spendCount, 0)
+    const activeMonths = data.filter((m) => m.spendCount > 0).length
+    const peakMonth =
+      totalCount > 0 ? data.reduce((a, b) => (a.totalSpent > b.totalSpent ? a : b)) : null
+
+    let trend: "growing" | "stable" | "shrinking" | "no_data"
+    let message: string
+    if (totalCount === 0) {
+      trend = "no_data"
+      message = `過去 ${months} 個月家裡還沒有花費紀錄`
+    } else if (data.length >= 3) {
+      const recentHalf = data.slice(-Math.ceil(months / 2)).reduce((s, m) => s + m.totalSpent, 0)
+      const earlierHalf = data
+        .slice(0, Math.floor(months / 2))
+        .reduce((s, m) => s + m.totalSpent, 0)
+      if (recentHalf > earlierHalf * 1.5) {
+        trend = "growing"
+        message = `📈 ${months} 個月共花 $${Math.round(totalSpent)}、近期花費上升`
+      } else if (earlierHalf > 0 && recentHalf < earlierHalf * 0.6) {
+        trend = "shrinking"
+        message = `📉 ${months} 個月共花 $${Math.round(totalSpent)}、近期花費下降（更省了）`
+      } else {
+        trend = "stable"
+        message = `📊 ${months} 個月共花 $${Math.round(totalSpent)}（活躍 ${activeMonths} 個月）`
+      }
+    } else {
+      trend = "stable"
+      message = `${months} 個月共花 $${Math.round(totalSpent)}`
+    }
+
+    res.json({
+      months,
+      data,
+      totalSpent: Math.round(totalSpent * 100) / 100,
+      totalCount,
+      activeMonths,
+      peakMonth,
+      trend,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/wishes-aging
  * wished 狀態願望放置天數分桶（看小孩決策延遲傾向）
  */

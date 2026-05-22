@@ -4315,6 +4315,47 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.status).toBe(404)
   })
 
+  it("月度花費 trend：基本結構 data/totalSpent/trend/message", async () => {
+    const res = await request(app).get("/api/family/monthly-spending-trend")
+    expect(res.status).toBe(200)
+    expect(res.body.months).toBe(6)
+    expect(Array.isArray(res.body.data)).toBe(true)
+    expect(res.body.data).toHaveLength(6)
+    expect(res.body).toHaveProperty("totalSpent")
+    expect(res.body).toHaveProperty("peakMonth")
+    expect(["growing", "stable", "shrinking", "no_data"]).toContain(res.body.trend)
+    expect(res.body.message).toBeTruthy()
+  })
+
+  it("月度花費 trend：建 spending 80 後當月 totalSpent>=80 + peakMonth 非空", async () => {
+    await db.execute(sql`DELETE FROM kids_accounts`)
+    const kidObj = (await createKid({ spendRatio: 100, saveRatio: 0, giveRatio: 0 })) as {
+      id: number
+    }
+    const myKidId = kidObj.id
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId: myKidId, title: "賺一下", rewardAmount: 200 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`).send({})
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`).send({})
+    await request(app)
+      .post("/api/family/spendings")
+      .send({ kidId: myKidId, jar: "spend", amount: 80, description: "trend 測試" })
+    const res = await request(app).get("/api/family/monthly-spending-trend?months=3")
+    expect(res.body.totalSpent).toBeGreaterThanOrEqual(80)
+    expect(res.body.peakMonth).not.toBeNull()
+    const last = res.body.data[res.body.data.length - 1]
+    expect(last.totalSpent).toBeGreaterThanOrEqual(80)
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
+  it("月度花費 trend：無 spending → no_data", async () => {
+    await db.execute(sql`DELETE FROM kids_spendings; DELETE FROM kids_accounts;`)
+    const res = await request(app).get("/api/family/monthly-spending-trend")
+    expect(res.body.totalSpent).toBe(0)
+    expect(res.body.trend).toBe("no_data")
+  })
+
   it("願望年齡分布：基本結構 buckets/totalWishes/oldest/averageAge", async () => {
     const res = await request(app).get("/api/family/wishes-aging")
     expect(res.status).toBe(200)

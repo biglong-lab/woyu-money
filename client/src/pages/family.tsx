@@ -706,6 +706,9 @@ export default function FamilyPage() {
       {/* 願望年齡分布 */}
       <FamilyWishesAgingCard />
 
+      {/* 月度花費走勢 */}
+      <FamilyMonthlySpendingTrendCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3660,6 +3663,95 @@ function ParentTodoList() {
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
       )}
+    </div>
+  )
+}
+
+function FamilyMonthlySpendingTrendCard() {
+  const { data } = useQuery<{
+    months: number
+    data: Array<{ month: string; spendCount: number; totalSpent: number; uniqueKids: number }>
+    totalSpent: number
+    totalCount: number
+    activeMonths: number
+    peakMonth: { month: string; totalSpent: number } | null
+    trend: "growing" | "stable" | "shrinking" | "no_data"
+    message: string
+  }>({
+    queryKey: ["/api/family/monthly-spending-trend?months=6"],
+  })
+  if (!data || data.totalCount === 0) return null
+
+  const maxSpent = Math.max(...data.data.map((d) => d.totalSpent), 1)
+
+  const TREND_BORDER: Record<string, string> = {
+    growing: "border-rose-300",
+    stable: "border-blue-300",
+    shrinking: "border-emerald-300",
+  }
+  const TREND_BG: Record<string, string> = {
+    growing: "from-rose-50 to-pink-50",
+    stable: "from-blue-50 to-sky-50",
+    shrinking: "from-emerald-50 to-teal-50",
+  }
+
+  return (
+    <div
+      className={`mb-4 rounded-2xl border-2 ${TREND_BORDER[data.trend] ?? "border-gray-300"} bg-gradient-to-br ${TREND_BG[data.trend] ?? "from-gray-50 to-slate-50"} p-3 shadow`}
+    >
+      <h3 className="font-bold mb-2 flex items-center gap-2">💸 6 個月花費走勢</h3>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-2 text-xs">{data.message}</div>
+
+      <div className="bg-white rounded-lg p-2 mb-2">
+        <div className="flex items-end gap-1 h-20">
+          {data.data.map((m) => {
+            const heightPct = (m.totalSpent / maxSpent) * 100
+            return (
+              <div key={m.month} className="flex-1 flex flex-col items-center justify-end">
+                <div className="text-[9px] font-bold text-rose-700 mb-1">
+                  {m.totalSpent > 0 ? Math.round(m.totalSpent) : ""}
+                </div>
+                <div
+                  className={`w-full ${
+                    m.totalSpent > 0 ? "bg-gradient-to-t from-rose-400 to-rose-600" : "bg-gray-100"
+                  } rounded-t transition-all`}
+                  style={{ height: `${Math.max(2, heightPct)}%` }}
+                  title={`${m.month}: $${Math.round(m.totalSpent)} (${m.spendCount} 筆)`}
+                />
+              </div>
+            )
+          })}
+        </div>
+        <div className="flex justify-between text-[8px] text-gray-400 mt-1">
+          {data.data.map((m) => (
+            <span key={m.month} className="flex-1 text-center">
+              {m.month.slice(5)}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-3 gap-1 text-xs">
+        <div className="bg-white rounded p-1 text-center">
+          <div className="font-bold text-rose-700">
+            ${Math.round(data.totalSpent).toLocaleString()}
+          </div>
+          <div className="text-[9px] text-gray-500">總花費</div>
+        </div>
+        <div className="bg-white rounded p-1 text-center">
+          <div className="font-bold text-blue-600">{data.totalCount}</div>
+          <div className="text-[9px] text-gray-500">總筆數</div>
+        </div>
+        <div className="bg-white rounded p-1 text-center">
+          <div className="font-bold text-amber-600">
+            ${Math.round(data.peakMonth?.totalSpent ?? 0)}
+          </div>
+          <div className="text-[9px] text-gray-500">
+            最大月 {data.peakMonth?.month?.slice(5) ?? "—"}
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
