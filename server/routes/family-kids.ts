@@ -8822,6 +8822,73 @@ router.get(
 )
 
 /**
+ * GET /api/family/savings-summary
+ * 家庭所有 active 目標整體進度聚合（多少存到了 / 還差多少）
+ */
+router.get(
+  "/api/family/savings-summary",
+  asyncHandler(async (_req, res) => {
+    const rows = await db.execute(sql`
+      SELECT
+        COUNT(*)::int AS goal_count,
+        COALESCE(SUM(g.target_amount), 0)::numeric AS total_target,
+        COALESCE(SUM(g.current_amount), 0)::numeric AS total_current,
+        COUNT(DISTINCT g.kid_id)::int AS unique_kids,
+        COUNT(*) FILTER (WHERE g.current_amount >= g.target_amount * 0.8)::int AS near_complete,
+        COUNT(*) FILTER (WHERE g.current_amount < g.target_amount * 0.3)::int AS starting
+      FROM kids_goals g
+      JOIN kids_accounts ka ON ka.id = g.kid_id
+      WHERE g.status = 'active' AND ka.is_active = true
+    `)
+
+    const r = (
+      rows as unknown as {
+        rows: Array<{
+          goal_count: number
+          total_target: string
+          total_current: string
+          unique_kids: number
+          near_complete: number
+          starting: number
+        }>
+      }
+    ).rows[0]
+
+    const goalCount = r?.goal_count ?? 0
+    const totalTarget = Number(r?.total_target ?? 0)
+    const totalCurrent = Number(r?.total_current ?? 0)
+    const uniqueKids = r?.unique_kids ?? 0
+    const nearComplete = r?.near_complete ?? 0
+    const starting = r?.starting ?? 0
+    const overallProgress = totalTarget > 0 ? Math.round((totalCurrent / totalTarget) * 100) : 0
+    const amountToGo = Math.max(0, totalTarget - totalCurrent)
+
+    let message: string
+    if (goalCount === 0) {
+      message = "家裡還沒有進行中的存錢目標、建立第一個吧 🎯"
+    } else if (overallProgress >= 80) {
+      message = `🎉 家裡 ${goalCount} 個目標整體已存 ${overallProgress}%、即將達成全部！`
+    } else if (overallProgress >= 50) {
+      message = `🚀 家裡 ${goalCount} 個目標進度 ${overallProgress}%、過半了！`
+    } else {
+      message = `🌱 家裡 ${goalCount} 個目標起步中（整體 ${overallProgress}%）、繼續加油`
+    }
+
+    res.json({
+      goalCount,
+      uniqueKids,
+      totalTarget: Math.round(totalTarget * 100) / 100,
+      totalCurrent: Math.round(totalCurrent * 100) / 100,
+      amountToGo: Math.round(amountToGo * 100) / 100,
+      overallProgress,
+      nearComplete,
+      starting,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/recent-badges?days=30&limit=20
  * 過去 N 天家庭徽章獲得 timeline
  */

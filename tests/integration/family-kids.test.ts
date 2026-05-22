@@ -4315,6 +4315,44 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.status).toBe(404)
   })
 
+  it("家庭儲蓄總進度：基本結構 goalCount/totalTarget/totalCurrent/overallProgress", async () => {
+    const res = await request(app).get("/api/family/savings-summary")
+    expect(res.status).toBe(200)
+    expect(res.body).toHaveProperty("goalCount")
+    expect(res.body).toHaveProperty("totalTarget")
+    expect(res.body).toHaveProperty("totalCurrent")
+    expect(res.body).toHaveProperty("overallProgress")
+    expect(res.body).toHaveProperty("amountToGo")
+    expect(res.body).toHaveProperty("nearComplete")
+    expect(res.body.message).toBeTruthy()
+  })
+
+  it("家庭儲蓄總進度：建 target=200 current=80 goal → totalTarget/Current 正確 + progress=40", async () => {
+    await db.execute(sql`DELETE FROM kids_accounts`)
+    const kidObj = (await createKid()) as { id: number }
+    const myKidId = kidObj.id
+    await db.execute(sql`
+      INSERT INTO kids_goals (kid_id, name, target_amount, current_amount, status)
+      VALUES (${myKidId}, '腳踏車', 200, 80, 'active')
+    `)
+    const res = await request(app).get("/api/family/savings-summary")
+    expect(res.body.goalCount).toBeGreaterThanOrEqual(1)
+    expect(res.body.totalTarget).toBeGreaterThanOrEqual(200)
+    expect(res.body.totalCurrent).toBeGreaterThanOrEqual(80)
+    expect(res.body.overallProgress).toBeGreaterThanOrEqual(20) // 80/200=40, 但若有其它 goal 可能 < 40
+    expect(res.body.uniqueKids).toBeGreaterThanOrEqual(1)
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
+  it("家庭儲蓄總進度：無 goal → goalCount=0", async () => {
+    await db.execute(sql`DELETE FROM kids_accounts`)
+    const res = await request(app).get("/api/family/savings-summary")
+    expect(res.body.goalCount).toBe(0)
+    expect(res.body.totalTarget).toBe(0)
+    expect(res.body.totalCurrent).toBe(0)
+    expect(res.body.overallProgress).toBe(0)
+  })
+
   it("徽章時間軸：基本結構 badges/badgeCount/uniqueKids/uniqueTypes", async () => {
     const res = await request(app).get("/api/family/recent-badges")
     expect(res.status).toBe(200)

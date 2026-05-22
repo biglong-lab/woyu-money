@@ -670,6 +670,9 @@ export default function FamilyPage() {
       {/* 徽章時間軸 */}
       <FamilyRecentBadgesCard />
 
+      {/* 家庭儲蓄總進度 */}
+      <FamilySavingsSummaryCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3624,6 +3627,64 @@ function ParentTodoList() {
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
       )}
+    </div>
+  )
+}
+
+function FamilySavingsSummaryCard() {
+  const { data } = useQuery<{
+    goalCount: number
+    uniqueKids: number
+    totalTarget: number
+    totalCurrent: number
+    amountToGo: number
+    overallProgress: number
+    nearComplete: number
+    starting: number
+    message: string
+  }>({
+    queryKey: ["/api/family/savings-summary"],
+  })
+  if (!data || data.goalCount === 0) return null
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-green-300 bg-gradient-to-br from-green-50 to-emerald-50 p-3 shadow">
+      <h3 className="font-bold mb-2 flex items-center gap-2">🐷 家庭儲蓄總進度</h3>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-2 text-xs">{data.message}</div>
+
+      <div className="bg-white rounded-lg p-3 mb-2">
+        <div className="flex justify-between text-xs mb-1">
+          <span className="text-gray-600">已存 / 目標</span>
+          <span className="font-bold text-emerald-700">{data.overallProgress}%</span>
+        </div>
+        <div className="w-full bg-emerald-100 rounded-full h-3 overflow-hidden">
+          <div
+            className="bg-gradient-to-r from-emerald-400 to-green-500 h-3 transition-all"
+            style={{ width: `${data.overallProgress}%` }}
+          />
+        </div>
+        <div className="text-[10px] text-gray-500 mt-1">
+          ${Math.round(data.totalCurrent).toLocaleString()} / $
+          {Math.round(data.totalTarget).toLocaleString()} · 還差 $
+          {Math.round(data.amountToGo).toLocaleString()}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-3 gap-1 text-xs">
+        <div className="bg-white rounded p-1 text-center">
+          <div className="font-bold text-emerald-700">{data.goalCount}</div>
+          <div className="text-[10px] text-gray-500">總目標</div>
+        </div>
+        <div className="bg-white rounded p-1 text-center">
+          <div className="font-bold text-orange-600">{data.nearComplete}</div>
+          <div className="text-[10px] text-gray-500">即將達成</div>
+        </div>
+        <div className="bg-white rounded p-1 text-center">
+          <div className="font-bold text-blue-600">{data.uniqueKids}</div>
+          <div className="text-[10px] text-gray-500">參與小孩</div>
+        </div>
+      </div>
     </div>
   )
 }
