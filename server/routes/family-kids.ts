@@ -8822,6 +8822,98 @@ router.get(
 )
 
 /**
+ * GET /api/family/monthly-goals-trend?months=6
+ * 過去 N 個月家庭完成 goal 趨勢
+ */
+router.get(
+  "/api/family/monthly-goals-trend",
+  asyncHandler(async (req, res) => {
+    const months = Math.min(Math.max(Number(req.query.months) || 6, 1), 24)
+
+    const rows = await db.execute(sql`
+      WITH month_series AS (
+        SELECT date_trunc('month', NOW() - (n || ' months')::interval)::date AS month_start
+        FROM generate_series(0, ${months - 1}) AS n
+      ),
+      monthly_goals AS (
+        SELECT
+          date_trunc('month', g.completed_at)::date AS month_start,
+          COUNT(*)::int AS goal_count,
+          SUM(g.target_amount)::numeric AS total_saved
+        FROM kids_goals g
+        JOIN kids_accounts ka ON ka.id = g.kid_id
+        WHERE g.status = 'completed'
+          AND g.completed_at IS NOT NULL
+          AND g.completed_at >= date_trunc('month', NOW() - ((${months - 1}) || ' months')::interval)
+          AND ka.is_active = true
+        GROUP BY date_trunc('month', g.completed_at)
+      )
+      SELECT
+        TO_CHAR(ms.month_start, 'YYYY-MM') AS month,
+        COALESCE(mg.goal_count, 0) AS goal_count,
+        COALESCE(mg.total_saved, 0)::numeric AS total_saved
+      FROM month_series ms
+      LEFT JOIN monthly_goals mg ON mg.month_start = ms.month_start
+      ORDER BY ms.month_start
+    `)
+
+    const monthsList = (
+      rows as unknown as {
+        rows: Array<{ month: string; goal_count: number; total_saved: string }>
+      }
+    ).rows.map((r) => ({
+      month: r.month,
+      goalCount: r.goal_count,
+      totalSaved: Number(r.total_saved),
+    }))
+
+    const totalGoals = monthsList.reduce((s, m) => s + m.goalCount, 0)
+    const totalSaved = monthsList.reduce((s, m) => s + m.totalSaved, 0)
+    const bestMonth =
+      totalGoals > 0 ? monthsList.reduce((a, b) => (a.goalCount > b.goalCount ? a : b)) : null
+    const activeMonths = monthsList.filter((m) => m.goalCount > 0).length
+
+    let trend: "growing" | "stable" | "declining" | "no_data"
+    let message: string
+    if (totalGoals === 0) {
+      trend = "no_data"
+      message = `過去 ${months} 個月家裡還沒有達成的目標`
+    } else if (monthsList.length >= 3) {
+      const recentHalf = monthsList
+        .slice(-Math.ceil(months / 2))
+        .reduce((s, m) => s + m.goalCount, 0)
+      const earlierHalf = monthsList
+        .slice(0, Math.floor(months / 2))
+        .reduce((s, m) => s + m.goalCount, 0)
+      if (recentHalf > earlierHalf * 1.5) {
+        trend = "growing"
+        message = `🚀 ${months} 個月達成 ${totalGoals} 個目標、近期加速儲蓄`
+      } else if (recentHalf < earlierHalf * 0.6 && earlierHalf > 0) {
+        trend = "declining"
+        message = `⚠️ ${months} 個月達成 ${totalGoals} 個目標、近期儲蓄放緩`
+      } else {
+        trend = "stable"
+        message = `📊 ${months} 個月達成 ${totalGoals} 個目標 (約每月 ${Math.round(totalGoals / activeMonths)})`
+      }
+    } else {
+      trend = "stable"
+      message = `${months} 個月達成 ${totalGoals} 個目標`
+    }
+
+    res.json({
+      months,
+      data: monthsList,
+      totalGoals,
+      totalSaved: Math.round(totalSaved * 100) / 100,
+      activeMonths,
+      bestMonth,
+      trend,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/family-rejection-rate?days=30
  * 家庭整體任務 reject 率（家長標準鬆緊指標）
  */

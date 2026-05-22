@@ -4315,6 +4315,51 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.status).toBe(404)
   })
 
+  it("月度達標 trend：基本結構 data/totalGoals/trend/message", async () => {
+    const res = await request(app).get("/api/family/monthly-goals-trend")
+    expect(res.status).toBe(200)
+    expect(res.body.months).toBe(6)
+    expect(Array.isArray(res.body.data)).toBe(true)
+    expect(res.body.data).toHaveLength(6)
+    expect(res.body).toHaveProperty("totalGoals")
+    expect(res.body).toHaveProperty("activeMonths")
+    expect(["growing", "stable", "declining", "no_data"]).toContain(res.body.trend)
+    expect(res.body.message).toBeTruthy()
+  })
+
+  it("月度達標 trend：completed goal 算入當月 + totalSaved 累計", async () => {
+    await db.execute(sql`DELETE FROM kids_accounts`)
+    const kidObj = (await createKid()) as { id: number }
+    const myKidId = kidObj.id
+    await db.execute(sql`
+      INSERT INTO kids_goals (kid_id, name, target_amount, current_amount, status, completed_at)
+      VALUES (${myKidId}, '已達成', 500, 500, 'completed', NOW())
+    `)
+    const res = await request(app).get("/api/family/monthly-goals-trend?months=3")
+    expect(res.body.totalGoals).toBeGreaterThanOrEqual(1)
+    expect(res.body.totalSaved).toBeGreaterThanOrEqual(500)
+    expect(res.body.bestMonth).not.toBeNull()
+    expect(res.body.bestMonth.goalCount).toBeGreaterThanOrEqual(1)
+    // 最後一筆應該是當月、含這個 goal
+    const lastMonth = res.body.data[res.body.data.length - 1]
+    expect(lastMonth.goalCount).toBeGreaterThanOrEqual(1)
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
+  it("月度達標 trend：active goal 不算進去（只算 completed）", async () => {
+    await db.execute(sql`DELETE FROM kids_accounts`)
+    const kidObj = (await createKid()) as { id: number }
+    const myKidId = kidObj.id
+    await db.execute(sql`
+      INSERT INTO kids_goals (kid_id, name, target_amount, current_amount, status)
+      VALUES (${myKidId}, '進行中', 200, 50, 'active')
+    `)
+    const res = await request(app).get("/api/family/monthly-goals-trend?months=3")
+    expect(res.body.totalGoals).toBe(0)
+    expect(res.body.trend).toBe("no_data")
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
   it("家庭 reject 率：基本結構 approved/rejected/standardLevel/message", async () => {
     const res = await request(app).get("/api/family/family-rejection-rate")
     expect(res.status).toBe(200)

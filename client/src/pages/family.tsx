@@ -679,6 +679,9 @@ export default function FamilyPage() {
       {/* 家庭 reject 率 */}
       <FamilyRejectionRateCard />
 
+      {/* 月度達標 trend */}
+      <FamilyMonthlyGoalsTrendCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3633,6 +3636,93 @@ function ParentTodoList() {
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
       )}
+    </div>
+  )
+}
+
+function FamilyMonthlyGoalsTrendCard() {
+  const { data } = useQuery<{
+    months: number
+    data: Array<{ month: string; goalCount: number; totalSaved: number }>
+    totalGoals: number
+    totalSaved: number
+    activeMonths: number
+    bestMonth: { month: string; goalCount: number } | null
+    trend: "growing" | "stable" | "declining" | "no_data"
+    message: string
+  }>({
+    queryKey: ["/api/family/monthly-goals-trend?months=6"],
+  })
+  if (!data || data.totalGoals === 0) return null
+
+  const maxCount = Math.max(...data.data.map((m) => m.goalCount), 1)
+
+  const TREND_BORDER: Record<string, string> = {
+    growing: "border-emerald-300",
+    stable: "border-blue-300",
+    declining: "border-orange-300",
+  }
+  const TREND_BG: Record<string, string> = {
+    growing: "from-emerald-50 to-green-50",
+    stable: "from-blue-50 to-sky-50",
+    declining: "from-orange-50 to-amber-50",
+  }
+
+  return (
+    <div
+      className={`mb-4 rounded-2xl border-2 ${TREND_BORDER[data.trend] ?? "border-gray-300"} bg-gradient-to-br ${TREND_BG[data.trend] ?? "from-gray-50 to-slate-50"} p-3 shadow`}
+    >
+      <h3 className="font-bold mb-2 flex items-center gap-2">🎯 6 個月達標趨勢</h3>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-2 text-xs">{data.message}</div>
+
+      <div className="bg-white rounded-lg p-2 mb-2">
+        <div className="flex items-end gap-1 h-20">
+          {data.data.map((m) => {
+            const heightPct = (m.goalCount / maxCount) * 100
+            return (
+              <div key={m.month} className="flex-1 flex flex-col items-center justify-end">
+                <div className="text-[9px] font-bold text-blue-700 mb-1">{m.goalCount || ""}</div>
+                <div
+                  className={`w-full ${
+                    m.goalCount > 0
+                      ? "bg-gradient-to-t from-emerald-400 to-emerald-600"
+                      : "bg-gray-100"
+                  } rounded-t transition-all`}
+                  style={{ height: `${Math.max(2, heightPct)}%` }}
+                  title={`${m.month}: ${m.goalCount} 個 ($${Math.round(m.totalSaved)})`}
+                />
+              </div>
+            )
+          })}
+        </div>
+        <div className="flex justify-between text-[8px] text-gray-400 mt-1">
+          {data.data.map((m) => (
+            <span key={m.month} className="flex-1 text-center">
+              {m.month.slice(5)}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-3 gap-1 text-xs">
+        <div className="bg-white rounded p-1 text-center">
+          <div className="font-bold text-emerald-700">{data.totalGoals}</div>
+          <div className="text-[9px] text-gray-500">總達成</div>
+        </div>
+        <div className="bg-white rounded p-1 text-center">
+          <div className="font-bold text-blue-600">
+            ${Math.round(data.totalSaved).toLocaleString()}
+          </div>
+          <div className="text-[9px] text-gray-500">總存到</div>
+        </div>
+        <div className="bg-white rounded p-1 text-center">
+          <div className="font-bold text-amber-600">{data.bestMonth?.goalCount ?? 0}</div>
+          <div className="text-[9px] text-gray-500">
+            最佳月 {data.bestMonth?.month?.slice(5) ?? "—"}
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
