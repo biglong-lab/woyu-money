@@ -4315,6 +4315,37 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.status).toBe(404)
   })
 
+  it("月度派任務趨勢：基本結構 data/totalTasks/trend/message", async () => {
+    const res = await request(app).get("/api/family/monthly-task-creation-trend")
+    expect(res.status).toBe(200)
+    expect(res.body.months).toBe(6)
+    expect(Array.isArray(res.body.data)).toBe(true)
+    expect(res.body.data).toHaveLength(6)
+    expect(res.body).toHaveProperty("totalTasks")
+    expect(res.body).toHaveProperty("activeMonths")
+    expect(["growing", "stable", "shrinking", "no_data"]).toContain(res.body.trend)
+    expect(res.body.message).toBeTruthy()
+  })
+
+  it("月度派任務趨勢：建 2 個 task → 當月 taskCount>=2 + peakMonth", async () => {
+    await db.execute(sql`DELETE FROM kids_accounts`)
+    const kidObj = (await createKid()) as { id: number }
+    const myKidId = kidObj.id
+    await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId: myKidId, title: "T1", rewardAmount: 10 })
+    await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId: myKidId, title: "T2", rewardAmount: 20 })
+    const res = await request(app).get("/api/family/monthly-task-creation-trend?months=3")
+    expect(res.body.totalTasks).toBeGreaterThanOrEqual(2)
+    expect(res.body.peakMonth).not.toBeNull()
+    const last = res.body.data[res.body.data.length - 1]
+    expect(last.taskCount).toBeGreaterThanOrEqual(2)
+    expect(last.totalReward).toBeGreaterThanOrEqual(30)
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
   it("今日 spending feed：基本結構 items/totalCount/uniqueKids/message", async () => {
     const res = await request(app).get("/api/family/today-spending-feed")
     expect(res.status).toBe(200)

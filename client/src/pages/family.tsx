@@ -718,6 +718,9 @@ export default function FamilyPage() {
       {/* 今日 spending feed */}
       <FamilyTodaySpendingFeedCard />
 
+      {/* 月度派任務趨勢 */}
+      <FamilyMonthlyTaskCreationTrendCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3672,6 +3675,91 @@ function ParentTodoList() {
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
       )}
+    </div>
+  )
+}
+
+function FamilyMonthlyTaskCreationTrendCard() {
+  const { data } = useQuery<{
+    months: number
+    data: Array<{ month: string; taskCount: number; totalReward: number }>
+    totalTasks: number
+    totalReward: number
+    activeMonths: number
+    peakMonth: { month: string; taskCount: number } | null
+    trend: "growing" | "stable" | "shrinking" | "no_data"
+    message: string
+  }>({
+    queryKey: ["/api/family/monthly-task-creation-trend?months=6"],
+  })
+  if (!data || data.totalTasks === 0) return null
+
+  const maxCount = Math.max(...data.data.map((m) => m.taskCount), 1)
+
+  const TREND_BORDER: Record<string, string> = {
+    growing: "border-emerald-300",
+    stable: "border-blue-300",
+    shrinking: "border-orange-300",
+  }
+  const TREND_BG: Record<string, string> = {
+    growing: "from-emerald-50 to-teal-50",
+    stable: "from-blue-50 to-sky-50",
+    shrinking: "from-orange-50 to-amber-50",
+  }
+
+  return (
+    <div
+      className={`mb-4 rounded-2xl border-2 ${TREND_BORDER[data.trend] ?? "border-gray-300"} bg-gradient-to-br ${TREND_BG[data.trend] ?? "from-gray-50 to-slate-50"} p-3 shadow`}
+    >
+      <h3 className="font-bold mb-2 flex items-center gap-2">📋 6 個月派任務量</h3>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-2 text-xs">{data.message}</div>
+
+      <div className="bg-white rounded-lg p-2 mb-2">
+        <div className="flex items-end gap-1 h-20">
+          {data.data.map((m) => {
+            const heightPct = (m.taskCount / maxCount) * 100
+            return (
+              <div key={m.month} className="flex-1 flex flex-col items-center justify-end">
+                <div className="text-[9px] font-bold text-cyan-700 mb-1">{m.taskCount || ""}</div>
+                <div
+                  className={`w-full ${
+                    m.taskCount > 0 ? "bg-gradient-to-t from-cyan-400 to-cyan-600" : "bg-gray-100"
+                  } rounded-t transition-all`}
+                  style={{ height: `${Math.max(2, heightPct)}%` }}
+                  title={`${m.month}: ${m.taskCount} 個 ($${Math.round(m.totalReward)})`}
+                />
+              </div>
+            )
+          })}
+        </div>
+        <div className="flex justify-between text-[8px] text-gray-400 mt-1">
+          {data.data.map((m) => (
+            <span key={m.month} className="flex-1 text-center">
+              {m.month.slice(5)}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-3 gap-1 text-xs">
+        <div className="bg-white rounded p-1 text-center">
+          <div className="font-bold text-cyan-700">{data.totalTasks}</div>
+          <div className="text-[9px] text-gray-500">總派發</div>
+        </div>
+        <div className="bg-white rounded p-1 text-center">
+          <div className="font-bold text-amber-600">
+            ${Math.round(data.totalReward).toLocaleString()}
+          </div>
+          <div className="text-[9px] text-gray-500">總獎金</div>
+        </div>
+        <div className="bg-white rounded p-1 text-center">
+          <div className="font-bold text-rose-600">{data.peakMonth?.taskCount ?? 0}</div>
+          <div className="text-[9px] text-gray-500">
+            最忙月 {data.peakMonth?.month?.slice(5) ?? "—"}
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

@@ -8822,6 +8822,92 @@ router.get(
 )
 
 /**
+ * GET /api/family/monthly-task-creation-trend?months=6
+ * 過去 N 個月家長派任務量走勢
+ */
+router.get(
+  "/api/family/monthly-task-creation-trend",
+  asyncHandler(async (req, res) => {
+    const months = Math.min(Math.max(Number(req.query.months) || 6, 1), 24)
+
+    const rows = await db.execute(sql`
+      WITH month_series AS (
+        SELECT date_trunc('month', NOW() - (n || ' months')::interval)::date AS month_start
+        FROM generate_series(0, ${months - 1}) AS n
+      ),
+      monthly_tasks AS (
+        SELECT
+          date_trunc('month', t.created_at)::date AS month_start,
+          COUNT(*)::int AS task_count,
+          SUM(t.reward_amount)::numeric AS total_reward
+        FROM kids_tasks t
+        JOIN kids_accounts ka ON ka.id = t.kid_id
+        WHERE t.created_at >= date_trunc('month', NOW() - ((${months - 1}) || ' months')::interval)
+          AND ka.is_active = true
+        GROUP BY date_trunc('month', t.created_at)
+      )
+      SELECT
+        TO_CHAR(ms.month_start, 'YYYY-MM') AS month,
+        COALESCE(mt.task_count, 0) AS task_count,
+        COALESCE(mt.total_reward, 0)::numeric AS total_reward
+      FROM month_series ms
+      LEFT JOIN monthly_tasks mt ON mt.month_start = ms.month_start
+      ORDER BY ms.month_start
+    `)
+
+    const data = (
+      rows as unknown as {
+        rows: Array<{ month: string; task_count: number; total_reward: string }>
+      }
+    ).rows.map((r) => ({
+      month: r.month,
+      taskCount: r.task_count,
+      totalReward: Number(r.total_reward),
+    }))
+
+    const totalTasks = data.reduce((s, m) => s + m.taskCount, 0)
+    const totalReward = data.reduce((s, m) => s + m.totalReward, 0)
+    const activeMonths = data.filter((m) => m.taskCount > 0).length
+    const peakMonth =
+      totalTasks > 0 ? data.reduce((a, b) => (a.taskCount > b.taskCount ? a : b)) : null
+
+    let trend: "growing" | "stable" | "shrinking" | "no_data"
+    let message: string
+    if (totalTasks === 0) {
+      trend = "no_data"
+      message = `過去 ${months} 個月家裡還沒有派任務紀錄`
+    } else if (data.length >= 3) {
+      const recentHalf = data.slice(-Math.ceil(months / 2)).reduce((s, m) => s + m.taskCount, 0)
+      const earlierHalf = data.slice(0, Math.floor(months / 2)).reduce((s, m) => s + m.taskCount, 0)
+      if (recentHalf > earlierHalf * 1.5) {
+        trend = "growing"
+        message = `📈 ${months} 個月共派 ${totalTasks} 個任務、家長越來越積極`
+      } else if (earlierHalf > 0 && recentHalf < earlierHalf * 0.6) {
+        trend = "shrinking"
+        message = `📉 ${months} 個月共派 ${totalTasks} 個任務、近期派發減少`
+      } else {
+        trend = "stable"
+        message = `📊 ${months} 個月共派 ${totalTasks} 個任務（活躍 ${activeMonths} 個月）`
+      }
+    } else {
+      trend = "stable"
+      message = `${months} 個月共派 ${totalTasks} 個任務`
+    }
+
+    res.json({
+      months,
+      data,
+      totalTasks,
+      totalReward: Math.round(totalReward * 100) / 100,
+      activeMonths,
+      peakMonth,
+      trend,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/today-spending-feed?limit=20
  * 今日所有 spending 動態時間線（家長即時看小孩花錢）
  */
