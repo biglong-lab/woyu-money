@@ -4315,6 +4315,53 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.status).toBe(404)
   })
 
+  it("家庭打卡 streak：基本結構 streak/lastCheckinDate/level/message", async () => {
+    const res = await request(app).get("/api/family/family-checkin-streak")
+    expect(res.status).toBe(200)
+    expect(res.body).toHaveProperty("streak")
+    expect(res.body).toHaveProperty("lastCheckinDate")
+    expect(["none", "starting", "good", "great", "legend"]).toContain(res.body.level)
+    expect(res.body.message).toBeTruthy()
+  })
+
+  it("家庭打卡 streak：今天 checkin → streak>=1", async () => {
+    await db.execute(sql`DELETE FROM kids_accounts`)
+    const kidObj = (await createKid()) as { id: number }
+    const myKidId = kidObj.id
+    await request(app).post("/api/family/checkins").send({ kidId: myKidId, mood: "😄 開心" })
+    const res = await request(app).get("/api/family/family-checkin-streak")
+    expect(res.body.streak).toBeGreaterThanOrEqual(1)
+    expect(res.body.level).not.toBe("none")
+    expect(res.body.lastCheckinDate).toBeTruthy()
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
+  it("家庭打卡 streak：今/昨/前都有 checkin → streak=3", async () => {
+    await db.execute(sql`DELETE FROM kids_accounts`)
+    const kidObj = (await createKid()) as { id: number }
+    const myKidId = kidObj.id
+    // 直接 insert 連續 3 天
+    await db.execute(sql`
+      INSERT INTO kids_checkins (kid_id, mood, checkin_date)
+      VALUES
+        (${myKidId}, '😄 開心', CURRENT_DATE),
+        (${myKidId}, '🙂 還好', CURRENT_DATE - INTERVAL '1 day'),
+        (${myKidId}, '😄 開心', CURRENT_DATE - INTERVAL '2 days')
+    `)
+    const res = await request(app).get("/api/family/family-checkin-streak")
+    expect(res.body.streak).toBe(3)
+    expect(res.body.level).toBe("good")
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
+  it("家庭打卡 streak：無 checkin → streak=0 + level='none'", async () => {
+    await db.execute(sql`DELETE FROM kids_accounts`)
+    const res = await request(app).get("/api/family/family-checkin-streak")
+    expect(res.body.streak).toBe(0)
+    expect(res.body.level).toBe("none")
+    expect(res.body.lastCheckinDate).toBeNull()
+  })
+
   it("wish priority 分佈：基本結構 priorities/totalWishes/highPriorityCount/message", async () => {
     const res = await request(app).get("/api/family/wish-priority-breakdown")
     expect(res.status).toBe(200)

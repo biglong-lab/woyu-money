@@ -685,6 +685,9 @@ export default function FamilyPage() {
       {/* wish priority 分佈 */}
       <FamilyWishPriorityBreakdownCard />
 
+      {/* 家庭打卡連續天數 */}
+      <FamilyCheckinStreakCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3639,6 +3642,57 @@ function ParentTodoList() {
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
       )}
+    </div>
+  )
+}
+
+function FamilyCheckinStreakCard() {
+  const { data } = useQuery<{
+    streak: number
+    lastCheckinDate: string | null
+    level: "none" | "starting" | "good" | "great" | "legend"
+    message: string
+  }>({
+    queryKey: ["/api/family/family-checkin-streak"],
+  })
+  if (!data || data.streak === 0) return null
+
+  const LEVEL_BORDER: Record<string, string> = {
+    starting: "border-green-300",
+    good: "border-orange-300",
+    great: "border-red-300",
+    legend: "border-purple-400",
+  }
+  const LEVEL_BG: Record<string, string> = {
+    starting: "from-green-50 to-emerald-50",
+    good: "from-orange-50 to-amber-50",
+    great: "from-red-50 to-rose-50",
+    legend: "from-purple-50 to-fuchsia-50",
+  }
+  const LEVEL_EMOJI: Record<string, string> = {
+    starting: "🌱",
+    good: "🔥",
+    great: "🚀",
+    legend: "🏆",
+  }
+
+  return (
+    <div
+      className={`mb-4 rounded-2xl border-2 ${LEVEL_BORDER[data.level] ?? "border-gray-300"} bg-gradient-to-br ${LEVEL_BG[data.level] ?? "from-gray-50 to-slate-50"} p-3 shadow`}
+    >
+      <h3 className="font-bold mb-2 flex items-center gap-2">
+        {LEVEL_EMOJI[data.level] ?? "📅"} 家庭打卡連續天數
+      </h3>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-2 text-xs">{data.message}</div>
+
+      <div className="bg-white rounded-lg p-4 text-center">
+        <div className="text-5xl font-bold text-red-600">{data.streak}</div>
+        <div className="text-[10px] text-gray-500 mt-1">連續天數</div>
+        {data.lastCheckinDate && (
+          <div className="text-[10px] text-gray-400 mt-1">最後簽到 {data.lastCheckinDate}</div>
+        )}
+      </div>
     </div>
   )
 }

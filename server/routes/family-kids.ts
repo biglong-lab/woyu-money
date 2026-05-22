@@ -8822,6 +8822,86 @@ router.get(
 )
 
 /**
+ * GET /api/family/family-checkin-streak
+ * 家庭整體打卡連續天數（至少一位小孩當日有 checkin 才算連續）
+ */
+router.get(
+  "/api/family/family-checkin-streak",
+  asyncHandler(async (_req, res) => {
+    // 抓過去 60 天有 checkin 的日期 set
+    const rows = await db.execute(sql`
+      SELECT c.checkin_date::text AS day
+      FROM kids_checkins c
+      JOIN kids_accounts ka ON ka.id = c.kid_id
+      WHERE c.checkin_date >= CURRENT_DATE - INTERVAL '60 days'
+        AND ka.is_active = true
+      GROUP BY c.checkin_date
+    `)
+
+    const daysSet = new Set(
+      (rows as unknown as { rows: Array<{ day: string }> }).rows.map((r) => r.day)
+    )
+
+    // 用 local date format（PG 的 date::text 也是 local YYYY-MM-DD、不含 timezone）
+    const fmt = (d: Date) => {
+      const y = d.getFullYear()
+      const m = String(d.getMonth() + 1).padStart(2, "0")
+      const dd = String(d.getDate()).padStart(2, "0")
+      return `${y}-${m}-${dd}`
+    }
+
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const todayStr = fmt(today)
+    const yesterday = new Date(today)
+    yesterday.setDate(yesterday.getDate() - 1)
+    const yesterdayStr = fmt(yesterday)
+
+    let startDate: Date | null = null
+    if (daysSet.has(todayStr)) startDate = today
+    else if (daysSet.has(yesterdayStr)) startDate = yesterday
+
+    let streak = 0
+    let lastCheckinDate: string | null = null
+
+    if (startDate) {
+      const cursor = new Date(startDate)
+      while (daysSet.has(fmt(cursor))) {
+        if (!lastCheckinDate) lastCheckinDate = fmt(cursor)
+        streak++
+        cursor.setDate(cursor.getDate() - 1)
+      }
+    }
+
+    let level: "none" | "starting" | "good" | "great" | "legend"
+    let message: string
+    if (streak === 0) {
+      level = "none"
+      message = "家裡今天還沒有人簽到、開始連續打卡之旅 🌱"
+    } else if (streak < 3) {
+      level = "starting"
+      message = `🌱 家裡連續 ${streak} 天打卡、繼續加油`
+    } else if (streak < 7) {
+      level = "good"
+      message = `🔥 家裡連續 ${streak} 天打卡、養成習慣中`
+    } else if (streak < 30) {
+      level = "great"
+      message = `🚀 家裡連續 ${streak} 天打卡、太棒了！`
+    } else {
+      level = "legend"
+      message = `🏆 家裡連續 ${streak} 天打卡、傳奇家庭！`
+    }
+
+    res.json({
+      streak,
+      lastCheckinDate,
+      level,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/wish-priority-breakdown
  * 家庭 wished 狀態願望按 priority（1=低/2=中/3=高）分組
  */
