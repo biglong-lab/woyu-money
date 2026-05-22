@@ -691,6 +691,9 @@ export default function FamilyPage() {
       {/* 花費三罐分布 */}
       <FamilySpendingSummaryCard />
 
+      {/* wish 升級率 */}
+      <FamilyWishPromotionRateCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3645,6 +3648,91 @@ function ParentTodoList() {
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
       )}
+    </div>
+  )
+}
+
+function FamilyWishPromotionRateCard() {
+  const { data } = useQuery<{
+    days: number
+    total: number
+    promoted: number
+    stillWished: number
+    abandoned: number
+    promotionRate: number
+    abandonmentRate: number
+    decisionRate: number
+    maturityLevel: "no_data" | "starting" | "thinking" | "deciding" | "mature"
+    message: string
+  }>({
+    queryKey: ["/api/family/wish-promotion-rate?days=90"],
+  })
+  if (!data || data.total === 0) return null
+
+  const LEVEL_BORDER: Record<string, string> = {
+    starting: "border-blue-300",
+    thinking: "border-indigo-300",
+    deciding: "border-purple-300",
+    mature: "border-emerald-400",
+  }
+  const LEVEL_BG: Record<string, string> = {
+    starting: "from-blue-50 to-sky-50",
+    thinking: "from-indigo-50 to-blue-50",
+    deciding: "from-purple-50 to-fuchsia-50",
+    mature: "from-emerald-50 to-green-50",
+  }
+
+  return (
+    <div
+      className={`mb-4 rounded-2xl border-2 ${LEVEL_BORDER[data.maturityLevel] ?? "border-gray-300"} bg-gradient-to-br ${LEVEL_BG[data.maturityLevel] ?? "from-gray-50 to-slate-50"} p-3 shadow`}
+    >
+      <h3 className="font-bold mb-2 flex items-center gap-2">💭 90 天願望決策成熟度</h3>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-2 text-xs">{data.message}</div>
+
+      <div className="bg-white rounded-lg p-2 mb-2">
+        <div className="flex h-3 rounded-full overflow-hidden">
+          <div
+            className="bg-emerald-400"
+            style={{ width: `${data.promotionRate}%` }}
+            title={`升級 ${data.promotionRate}%`}
+          />
+          <div
+            className="bg-rose-400"
+            style={{ width: `${data.abandonmentRate}%` }}
+            title={`放棄 ${data.abandonmentRate}%`}
+          />
+          <div
+            className="bg-gray-300"
+            style={{ width: `${100 - data.decisionRate}%` }}
+            title={`還在想 ${100 - data.decisionRate}%`}
+          />
+        </div>
+        <div className="flex justify-between text-[9px] mt-1">
+          <span className="text-emerald-600">🎯 升級 {data.promotionRate}%</span>
+          <span className="text-rose-500">🗑️ 放棄 {data.abandonmentRate}%</span>
+          <span className="text-gray-500">💭 {100 - data.decisionRate}%</span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-4 gap-1 text-xs">
+        <div className="bg-white rounded p-1 text-center">
+          <div className="font-bold text-gray-700">{data.total}</div>
+          <div className="text-[9px] text-gray-500">總願望</div>
+        </div>
+        <div className="bg-white rounded p-1 text-center">
+          <div className="font-bold text-emerald-700">{data.promoted}</div>
+          <div className="text-[9px] text-gray-500">已升級</div>
+        </div>
+        <div className="bg-white rounded p-1 text-center">
+          <div className="font-bold text-indigo-600">{data.stillWished}</div>
+          <div className="text-[9px] text-gray-500">還在想</div>
+        </div>
+        <div className="bg-white rounded p-1 text-center">
+          <div className="font-bold text-rose-500">{data.abandoned}</div>
+          <div className="text-[9px] text-gray-500">放棄</div>
+        </div>
+      </div>
     </div>
   )
 }

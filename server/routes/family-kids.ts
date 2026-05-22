@@ -8822,6 +8822,86 @@ router.get(
 )
 
 /**
+ * GET /api/family/wish-promotion-rate?days=90
+ * 家庭 N 天 wish 升級為 goal 的比例（小孩判斷成熟度）
+ */
+router.get(
+  "/api/family/wish-promotion-rate",
+  asyncHandler(async (req, res) => {
+    const days = Math.min(Math.max(Number(req.query.days) || 90, 1), 365)
+
+    const rows = await db.execute(sql`
+      SELECT
+        COUNT(*)::int AS total_wishes,
+        COUNT(*) FILTER (WHERE w.status = 'promoted_to_goal')::int AS promoted,
+        COUNT(*) FILTER (WHERE w.status = 'wished')::int AS still_wished,
+        COUNT(*) FILTER (WHERE w.status = 'abandoned')::int AS abandoned,
+        COUNT(DISTINCT w.kid_id)::int AS unique_kids
+      FROM kids_wishes w
+      JOIN kids_accounts ka ON ka.id = w.kid_id
+      WHERE w.created_at >= NOW() - (${days} || ' days')::interval
+        AND ka.is_active = true
+    `)
+
+    const r = (
+      rows as unknown as {
+        rows: Array<{
+          total_wishes: number
+          promoted: number
+          still_wished: number
+          abandoned: number
+          unique_kids: number
+        }>
+      }
+    ).rows[0]
+
+    const total = r?.total_wishes ?? 0
+    const promoted = r?.promoted ?? 0
+    const stillWished = r?.still_wished ?? 0
+    const abandoned = r?.abandoned ?? 0
+    const uniqueKids = r?.unique_kids ?? 0
+
+    const decided = promoted + abandoned
+    const promotionRate = total > 0 ? Math.round((promoted / total) * 100) : 0
+    const abandonmentRate = total > 0 ? Math.round((abandoned / total) * 100) : 0
+    const decisionRate = total > 0 ? Math.round((decided / total) * 100) : 0
+
+    let maturityLevel: "no_data" | "starting" | "thinking" | "deciding" | "mature"
+    let message: string
+    if (total === 0) {
+      maturityLevel = "no_data"
+      message = `過去 ${days} 天家裡還沒有願望紀錄`
+    } else if (decisionRate < 20) {
+      maturityLevel = "starting"
+      message = `🌱 ${days} 天有 ${total} 個願望、大多還在觀望（${decisionRate}% 決策率）`
+    } else if (decisionRate < 50) {
+      maturityLevel = "thinking"
+      message = `💭 ${days} 天 ${total} 個願望中 ${decisionRate}% 已決策（${promoted} 升級 / ${abandoned} 放棄）`
+    } else if (promotionRate >= 50) {
+      maturityLevel = "mature"
+      message = `🎯 ${days} 天 ${promotionRate}% 願望升級為目標、判斷成熟`
+    } else {
+      maturityLevel = "deciding"
+      message = `⚖️ ${days} 天 ${total} 個願望、${decisionRate}% 已決策（${promoted} 升級 / ${abandoned} 放棄）`
+    }
+
+    res.json({
+      days,
+      total,
+      promoted,
+      stillWished,
+      abandoned,
+      uniqueKids,
+      promotionRate,
+      abandonmentRate,
+      decisionRate,
+      maturityLevel,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/spending-summary?days=30
  * 家庭 N 天三罐花費分布（spend/save/give outflow）
  */

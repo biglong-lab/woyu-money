@@ -4315,6 +4315,46 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.status).toBe(404)
   })
 
+  it("wish 升級率：基本結構 total/promoted/maturityLevel/message", async () => {
+    const res = await request(app).get("/api/family/wish-promotion-rate")
+    expect(res.status).toBe(200)
+    expect(res.body.days).toBe(90)
+    expect(res.body).toHaveProperty("total")
+    expect(res.body).toHaveProperty("promoted")
+    expect(res.body).toHaveProperty("stillWished")
+    expect(res.body).toHaveProperty("abandoned")
+    expect(res.body).toHaveProperty("promotionRate")
+    expect(["no_data", "starting", "thinking", "deciding", "mature"]).toContain(
+      res.body.maturityLevel
+    )
+    expect(res.body.message).toBeTruthy()
+  })
+
+  it("wish 升級率：建 promoted + wished 各 1 → promotionRate>=50", async () => {
+    await db.execute(sql`DELETE FROM kids_accounts`)
+    const kidObj = (await createKid()) as { id: number }
+    const myKidId = kidObj.id
+    await db.execute(sql`
+      INSERT INTO kids_wishes (kid_id, title, status)
+      VALUES
+        (${myKidId}, '升級了', 'promoted_to_goal'),
+        (${myKidId}, '還在想', 'wished')
+    `)
+    const res = await request(app).get("/api/family/wish-promotion-rate?days=30")
+    expect(res.body.total).toBeGreaterThanOrEqual(2)
+    expect(res.body.promoted).toBeGreaterThanOrEqual(1)
+    expect(res.body.stillWished).toBeGreaterThanOrEqual(1)
+    expect(res.body.promotionRate).toBeGreaterThanOrEqual(50)
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
+  it("wish 升級率：無 wish → no_data", async () => {
+    await db.execute(sql`DELETE FROM kids_accounts`)
+    const res = await request(app).get("/api/family/wish-promotion-rate")
+    expect(res.body.total).toBe(0)
+    expect(res.body.maturityLevel).toBe("no_data")
+  })
+
   it("花費三罐分布：基本結構 jars/totalAmount/topJar/message", async () => {
     const res = await request(app).get("/api/family/spending-summary")
     expect(res.status).toBe(200)
