@@ -4315,6 +4315,37 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.status).toBe(404)
   })
 
+  it("task emoji top：基本結構 emojis/emojiCount/topEmoji/totalCount", async () => {
+    const res = await request(app).get("/api/family/top-task-emojis")
+    expect(res.status).toBe(200)
+    expect(res.body.days).toBe(90)
+    expect(Array.isArray(res.body.emojis)).toBe(true)
+    expect(res.body).toHaveProperty("emojiCount")
+    expect(res.body).toHaveProperty("topEmoji")
+    expect(res.body).toHaveProperty("totalCount")
+    expect(res.body.message).toBeTruthy()
+  })
+
+  it("task emoji top：建 3 個 🚀 + 1 個 🌟 → topEmoji=🚀", async () => {
+    await db.execute(sql`DELETE FROM kids_accounts`)
+    const kidObj = (await createKid()) as { id: number }
+    const myKidId = kidObj.id
+    for (let i = 0; i < 3; i++) {
+      await request(app)
+        .post("/api/family/tasks")
+        .send({ kidId: myKidId, title: `任務 ${i}`, emoji: "🚀", rewardAmount: 10 })
+    }
+    await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId: myKidId, title: "另一個", emoji: "🌟", rewardAmount: 10 })
+    const res = await request(app).get("/api/family/top-task-emojis?days=30")
+    expect(res.body.topEmoji).not.toBeNull()
+    expect(res.body.topEmoji.emoji).toBe("🚀")
+    expect(res.body.topEmoji.useCount).toBeGreaterThanOrEqual(3)
+    expect(res.body.emojis.length).toBeGreaterThanOrEqual(2)
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
   it("家長關注度警示：基本結構 kids/kidCount/level/message", async () => {
     const res = await request(app).get("/api/family/kids-needing-attention")
     expect(res.status).toBe(200)

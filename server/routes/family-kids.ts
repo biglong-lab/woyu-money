@@ -8822,6 +8822,69 @@ router.get(
 )
 
 /**
+ * GET /api/family/top-task-emojis?days=90&limit=10
+ * 家庭 N 天 task emoji 使用排行（家庭文化）
+ */
+router.get(
+  "/api/family/top-task-emojis",
+  asyncHandler(async (req, res) => {
+    const days = Math.min(Math.max(Number(req.query.days) || 90, 1), 365)
+    const limit = Math.min(Math.max(Number(req.query.limit) || 10, 1), 30)
+
+    const rows = await db.execute(sql`
+      SELECT
+        t.emoji,
+        COUNT(*)::int AS use_count,
+        COUNT(DISTINCT t.kid_id)::int AS unique_kids
+      FROM kids_tasks t
+      JOIN kids_accounts ka ON ka.id = t.kid_id
+      WHERE t.created_at >= NOW() - (${days} || ' days')::interval
+        AND ka.is_active = true
+        AND t.emoji IS NOT NULL
+        AND length(trim(t.emoji)) > 0
+      GROUP BY t.emoji
+      ORDER BY use_count DESC
+      LIMIT ${limit}
+    `)
+
+    const emojis = (
+      rows as unknown as {
+        rows: Array<{ emoji: string; use_count: number; unique_kids: number }>
+      }
+    ).rows.map((r) => ({
+      emoji: r.emoji,
+      useCount: r.use_count,
+      uniqueKids: r.unique_kids,
+    }))
+
+    const totalCount = emojis.reduce((s, e) => s + e.useCount, 0)
+    const topEmoji = emojis.length > 0 ? emojis[0] : null
+    const emojisWithPct = emojis.map((e) => ({
+      ...e,
+      percentage: totalCount > 0 ? Math.round((e.useCount / totalCount) * 100) : 0,
+    }))
+
+    let message: string
+    if (emojis.length === 0) {
+      message = `過去 ${days} 天家裡還沒有 emoji 任務紀錄`
+    } else if (topEmoji) {
+      message = `${topEmoji.emoji} 家裡 ${days} 天最愛用「${topEmoji.emoji}」(${topEmoji.useCount} 次)`
+    } else {
+      message = `共 ${emojis.length} 種 emoji、${totalCount} 次使用`
+    }
+
+    res.json({
+      days,
+      emojis: emojisWithPct,
+      emojiCount: emojis.length,
+      totalCount,
+      topEmoji,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/kids-needing-attention?days=7
  * 過去 N 天家長沒任何 approve activity 的 active kids（提醒關注）
  */
