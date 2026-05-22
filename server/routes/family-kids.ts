@@ -8822,6 +8822,76 @@ router.get(
 )
 
 /**
+ * GET /api/family/comment-interaction?days=30
+ * 家長 vs 小孩過去 N 天評論統計（互動文化指標）
+ */
+router.get(
+  "/api/family/comment-interaction",
+  asyncHandler(async (req, res) => {
+    const days = Math.min(Math.max(Number(req.query.days) || 30, 1), 365)
+
+    const rows = await db.execute(sql`
+      SELECT
+        c.author,
+        COUNT(*)::int AS comment_count,
+        COUNT(DISTINCT c.task_id)::int AS unique_tasks
+      FROM kids_task_comments c
+      JOIN kids_tasks t ON t.id = c.task_id
+      JOIN kids_accounts ka ON ka.id = t.kid_id
+      WHERE c.created_at >= NOW() - (${days} || ' days')::interval
+        AND ka.is_active = true
+      GROUP BY c.author
+    `)
+
+    const stats = (
+      rows as unknown as {
+        rows: Array<{ author: string; comment_count: number; unique_tasks: number }>
+      }
+    ).rows
+
+    const parentRow = stats.find((s) => s.author === "parent")
+    const kidRow = stats.find((s) => s.author === "kid")
+
+    const parentCount = parentRow?.comment_count ?? 0
+    const kidCount = kidRow?.comment_count ?? 0
+    const totalCount = parentCount + kidCount
+    const parentTasks = parentRow?.unique_tasks ?? 0
+    const kidTasks = kidRow?.unique_tasks ?? 0
+
+    const parentPct = totalCount > 0 ? Math.round((parentCount / totalCount) * 100) : 0
+    const kidPct = totalCount > 0 ? Math.round((kidCount / totalCount) * 100) : 0
+
+    let interaction: "balanced" | "parent_heavy" | "kid_heavy" | "low" | "none"
+    let message: string
+    if (totalCount === 0) {
+      interaction = "none"
+      message = `過去 ${days} 天家裡還沒有任何評論互動、開始討論吧 💬`
+    } else if (totalCount < 5) {
+      interaction = "low"
+      message = `⏳ 互動少（${totalCount} 則）、可以多在任務下面留言交流`
+    } else if (parentPct >= 70) {
+      interaction = "parent_heavy"
+      message = `👨‍👩‍👧 家長主導討論（${parentPct}%）、可以鼓勵小孩多回應`
+    } else if (kidPct >= 70) {
+      interaction = "kid_heavy"
+      message = `🧒 小孩主動分享多（${kidPct}%）、家長也可以多給回饋`
+    } else {
+      interaction = "balanced"
+      message = `💬 雙向互動健康！家長 ${parentPct}% vs 小孩 ${kidPct}%`
+    }
+
+    res.json({
+      days,
+      totalCount,
+      parent: { count: parentCount, percentage: parentPct, uniqueTasks: parentTasks },
+      kid: { count: kidCount, percentage: kidPct, uniqueTasks: kidTasks },
+      interaction,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/savings-summary
  * 家庭所有 active 目標整體進度聚合（多少存到了 / 還差多少）
  */

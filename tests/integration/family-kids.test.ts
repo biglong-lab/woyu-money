@@ -4315,6 +4315,53 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.status).toBe(404)
   })
 
+  it("評論互動率：基本結構 totalCount/parent/kid/interaction/message", async () => {
+    const res = await request(app).get("/api/family/comment-interaction")
+    expect(res.status).toBe(200)
+    expect(res.body).toHaveProperty("totalCount")
+    expect(res.body.parent).toHaveProperty("count")
+    expect(res.body.parent).toHaveProperty("percentage")
+    expect(res.body.kid).toHaveProperty("count")
+    expect(["balanced", "parent_heavy", "kid_heavy", "low", "none"]).toContain(res.body.interaction)
+    expect(res.body.message).toBeTruthy()
+  })
+
+  it("評論互動率：插入 parent+kid comments → percentage 正確", async () => {
+    await db.execute(sql`DELETE FROM kids_accounts`)
+    const kidObj = (await createKid()) as { id: number }
+    const myKidId = kidObj.id
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId: myKidId, title: "互動測試", rewardAmount: 10 })
+    const taskId = t.body.id
+    // 插 5 parent + 5 kid comments
+    for (let i = 0; i < 5; i++) {
+      await db.execute(sql`
+        INSERT INTO kids_task_comments (task_id, author, message)
+        VALUES (${taskId}, 'parent', '家長 ' || ${i.toString()})
+      `)
+      await db.execute(sql`
+        INSERT INTO kids_task_comments (task_id, author, message)
+        VALUES (${taskId}, 'kid', '小孩 ' || ${i.toString()})
+      `)
+    }
+    const res = await request(app).get("/api/family/comment-interaction?days=30")
+    expect(res.body.totalCount).toBeGreaterThanOrEqual(10)
+    expect(res.body.parent.count).toBeGreaterThanOrEqual(5)
+    expect(res.body.kid.count).toBeGreaterThanOrEqual(5)
+    expect(res.body.parent.percentage).toBeGreaterThan(30)
+    expect(res.body.parent.percentage).toBeLessThan(70)
+    expect(res.body.interaction).toBe("balanced")
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
+  it("評論互動率：無評論 → interaction='none'", async () => {
+    await db.execute(sql`DELETE FROM kids_accounts`)
+    const res = await request(app).get("/api/family/comment-interaction")
+    expect(res.body.totalCount).toBe(0)
+    expect(res.body.interaction).toBe("none")
+  })
+
   it("家庭儲蓄總進度：基本結構 goalCount/totalTarget/totalCurrent/overallProgress", async () => {
     const res = await request(app).get("/api/family/savings-summary")
     expect(res.status).toBe(200)

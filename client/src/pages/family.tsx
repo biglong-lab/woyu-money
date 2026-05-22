@@ -673,6 +673,9 @@ export default function FamilyPage() {
       {/* 家庭儲蓄總進度 */}
       <FamilySavingsSummaryCard />
 
+      {/* 評論互動率 */}
+      <FamilyCommentInteractionCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3627,6 +3630,76 @@ function ParentTodoList() {
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
       )}
+    </div>
+  )
+}
+
+function FamilyCommentInteractionCard() {
+  const { data } = useQuery<{
+    days: number
+    totalCount: number
+    parent: { count: number; percentage: number; uniqueTasks: number }
+    kid: { count: number; percentage: number; uniqueTasks: number }
+    interaction: "balanced" | "parent_heavy" | "kid_heavy" | "low" | "none"
+    message: string
+  }>({
+    queryKey: ["/api/family/comment-interaction?days=30"],
+  })
+  if (!data || data.totalCount === 0) return null
+
+  const BG_COLORS: Record<string, string> = {
+    balanced: "from-green-50 to-teal-50 border-green-300",
+    parent_heavy: "from-blue-50 to-indigo-50 border-blue-300",
+    kid_heavy: "from-purple-50 to-pink-50 border-purple-300",
+    low: "from-amber-50 to-yellow-50 border-amber-300",
+  }
+  const cls = BG_COLORS[data.interaction] ?? "from-gray-50 to-slate-50 border-gray-300"
+
+  return (
+    <div
+      className={`mb-4 rounded-2xl border-2 ${cls.split(" ").slice(-1)[0]} bg-gradient-to-br ${cls.split(" ").slice(0, 2).join(" ")} p-3 shadow`}
+    >
+      <h3 className="font-bold mb-2 flex items-center gap-2">💬 30 天評論互動</h3>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-2 text-xs">{data.message}</div>
+
+      <div className="bg-white rounded-lg p-2 mb-2">
+        <div className="flex items-center gap-2 text-xs mb-1">
+          <div className="flex-1">
+            <span className="text-blue-600">👨‍👩‍👧 家長 {data.parent.count}</span>
+          </div>
+          <div className="flex-1 text-right">
+            <span className="text-purple-600">🧒 小孩 {data.kid.count}</span>
+          </div>
+        </div>
+        <div className="flex h-3 rounded-full overflow-hidden">
+          <div
+            className="bg-blue-400"
+            style={{ width: `${data.parent.percentage}%` }}
+            title={`家長 ${data.parent.percentage}%`}
+          />
+          <div
+            className="bg-purple-400"
+            style={{ width: `${data.kid.percentage}%` }}
+            title={`小孩 ${data.kid.percentage}%`}
+          />
+        </div>
+        <div className="flex justify-between text-[10px] text-gray-500 mt-1">
+          <span>{data.parent.percentage}%</span>
+          <span>{data.kid.percentage}%</span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2 text-xs">
+        <div className="bg-white rounded p-2 text-center">
+          <div className="font-bold text-blue-700">{data.parent.uniqueTasks}</div>
+          <div className="text-[10px] text-gray-500">家長留言 task 數</div>
+        </div>
+        <div className="bg-white rounded p-2 text-center">
+          <div className="font-bold text-purple-700">{data.kid.uniqueTasks}</div>
+          <div className="text-[10px] text-gray-500">小孩留言 task 數</div>
+        </div>
+      </div>
     </div>
   )
 }
