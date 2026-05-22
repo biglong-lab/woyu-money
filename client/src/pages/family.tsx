@@ -715,6 +715,9 @@ export default function FamilyPage() {
       {/* 類別平均獎金 */}
       <FamilyAvgRewardByCategoryCard />
 
+      {/* 今日 spending feed */}
+      <FamilyTodaySpendingFeedCard />
+
       {/* 家庭今日氛圍 */}
       <FamilyMoodToday />
 
@@ -3669,6 +3672,72 @@ function ParentTodoList() {
           {collapsed ? `看全部 (${data.todos.length - 3} 筆)` : "收起"}
         </button>
       )}
+    </div>
+  )
+}
+
+function FamilyTodaySpendingFeedCard() {
+  const { data } = useQuery<{
+    items: Array<{
+      spendingId: number
+      amount: number
+      description: string
+      emoji: string
+      jar: string
+      recipient: string | null
+      createdAt: string
+      kidName: string
+      kidAvatar: string
+    }>
+    totalCount: number
+    totalAmount: number
+    uniqueKids: number
+    message: string
+  }>({
+    queryKey: ["/api/family/today-spending-feed?limit=20"],
+  })
+  if (!data || data.totalCount === 0) return null
+
+  const JAR_COLOR: Record<string, string> = {
+    spend: "border-rose-400",
+    save: "border-emerald-400",
+    give: "border-pink-400",
+  }
+  const JAR_EMOJI: Record<string, string> = {
+    spend: "💸",
+    save: "🐷",
+    give: "❤️",
+  }
+
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-slate-300 bg-gradient-to-br from-slate-50 to-gray-50 p-3 shadow">
+      <h3 className="font-bold mb-2 flex items-center gap-2">📋 今日花費即時動態</h3>
+
+      <div className="bg-white/70 rounded-lg p-2 mb-2 text-xs">{data.message}</div>
+
+      <div className="space-y-1 max-h-72 overflow-y-auto">
+        {data.items.map((it) => (
+          <div
+            key={it.spendingId}
+            className={`bg-white rounded-lg p-2 flex items-center gap-2 text-xs border-l-4 ${JAR_COLOR[it.jar] ?? "border-gray-300"}`}
+          >
+            <div className="text-lg">{it.emoji}</div>
+            <div className="flex-1 min-w-0">
+              <div className="font-medium truncate">
+                {it.description}
+                {it.recipient && (
+                  <span className="text-gray-500 text-[10px]"> → {it.recipient}</span>
+                )}
+              </div>
+              <div className="text-[10px] text-gray-500">
+                {it.kidAvatar} {it.kidName} · {JAR_EMOJI[it.jar] ?? "•"} ·{" "}
+                {it.createdAt?.slice(11, 16)}
+              </div>
+            </div>
+            <div className="text-sm font-bold text-slate-700">${it.amount}</div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

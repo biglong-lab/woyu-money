@@ -8822,6 +8822,83 @@ router.get(
 )
 
 /**
+ * GET /api/family/today-spending-feed?limit=20
+ * 今日所有 spending 動態時間線（家長即時看小孩花錢）
+ */
+router.get(
+  "/api/family/today-spending-feed",
+  asyncHandler(async (req, res) => {
+    const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 100)
+
+    const rows = await db.execute(sql`
+      SELECT
+        s.id::int AS spending_id,
+        s.amount::numeric AS amount,
+        s.description,
+        s.emoji,
+        s.jar,
+        s.recipient,
+        s.created_at,
+        ka.id::int AS kid_id,
+        ka.display_name AS kid_name,
+        ka.avatar
+      FROM kids_spendings s
+      JOIN kids_accounts ka ON ka.id = s.kid_id
+      WHERE s.spend_date = CURRENT_DATE
+        AND ka.is_active = true
+      ORDER BY s.created_at DESC
+      LIMIT ${limit}
+    `)
+
+    const items = (
+      rows as unknown as {
+        rows: Array<{
+          spending_id: number
+          amount: string
+          description: string
+          emoji: string
+          jar: string
+          recipient: string | null
+          created_at: string
+          kid_id: number
+          kid_name: string
+          avatar: string
+        }>
+      }
+    ).rows.map((r) => ({
+      spendingId: r.spending_id,
+      amount: Number(r.amount),
+      description: r.description,
+      emoji: r.emoji,
+      jar: r.jar,
+      recipient: r.recipient,
+      createdAt: r.created_at,
+      kidId: r.kid_id,
+      kidName: r.kid_name,
+      kidAvatar: r.avatar,
+    }))
+
+    const totalAmount = items.reduce((s, i) => s + i.amount, 0)
+    const uniqueKids = new Set(items.map((i) => i.kidId)).size
+
+    let message: string
+    if (items.length === 0) {
+      message = "今天家裡還沒有花費紀錄"
+    } else {
+      message = `📋 今天家裡 ${uniqueKids} 位小孩共 ${items.length} 筆花費、累計 $${Math.round(totalAmount)}`
+    }
+
+    res.json({
+      items,
+      totalCount: items.length,
+      totalAmount: Math.round(totalAmount * 100) / 100,
+      uniqueKids,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/avg-reward-by-category?days=90
  * 家庭各 category 平均 reward + 比較（家長給獎金公平度）
  */

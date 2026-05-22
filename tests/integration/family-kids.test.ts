@@ -4315,6 +4315,46 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.status).toBe(404)
   })
 
+  it("今日 spending feed：基本結構 items/totalCount/uniqueKids/message", async () => {
+    const res = await request(app).get("/api/family/today-spending-feed")
+    expect(res.status).toBe(200)
+    expect(Array.isArray(res.body.items)).toBe(true)
+    expect(res.body).toHaveProperty("totalCount")
+    expect(res.body).toHaveProperty("totalAmount")
+    expect(res.body).toHaveProperty("uniqueKids")
+    expect(res.body.message).toBeTruthy()
+  })
+
+  it("今日 spending feed：建 spending 後出現於 feed + 排序 DESC", async () => {
+    await db.execute(sql`DELETE FROM kids_spendings; DELETE FROM kids_accounts;`)
+    const kidObj = (await createKid({ spendRatio: 100, saveRatio: 0, giveRatio: 0 })) as {
+      id: number
+    }
+    const myKidId = kidObj.id
+    const t = await request(app)
+      .post("/api/family/tasks")
+      .send({ kidId: myKidId, title: "賺", rewardAmount: 200 })
+    await request(app).post(`/api/family/tasks/${t.body.id}/submit`).send({})
+    await request(app).post(`/api/family/tasks/${t.body.id}/approve`).send({})
+    const s1 = await request(app)
+      .post("/api/family/spendings")
+      .send({ kidId: myKidId, jar: "spend", amount: 30, description: "第 1 筆" })
+    const s2 = await request(app)
+      .post("/api/family/spendings")
+      .send({ kidId: myKidId, jar: "spend", amount: 50, description: "第 2 筆（較晚）" })
+    const res = await request(app).get("/api/family/today-spending-feed?limit=10")
+    expect(res.body.totalCount).toBeGreaterThanOrEqual(2)
+    // 較晚的 s2 應在前
+    const firstId = res.body.items[0].spendingId
+    expect(firstId).toBe(s2.body.id)
+    const secondMatched = res.body.items.find(
+      (i: { spendingId: number }) => i.spendingId === s1.body.id
+    )
+    expect(secondMatched).toBeDefined()
+    expect(res.body.totalAmount).toBeGreaterThanOrEqual(80)
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
   it("類別平均獎金：基本結構 categories/totalCount/topCategory/overallAvg", async () => {
     const res = await request(app).get("/api/family/avg-reward-by-category")
     expect(res.status).toBe(200)
