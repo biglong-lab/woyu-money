@@ -10,6 +10,7 @@
 import { generateItemsForMonth } from "./storage/recurring-expense-templates"
 import { captureFromPM } from "./storage/forecast-snapshots"
 import { syncFromPMS } from "./storage/pms-forecast-sync"
+import { syncPmRevenues } from "./storage/pm-bridge"
 import { log } from "./vite"
 
 class RecurringExpenseScheduler {
@@ -41,6 +42,28 @@ class RecurringExpenseScheduler {
     await this.checkMonthlyGeneration()
     await this.checkDailySnapshot()
     await this.checkPmsSync()
+    await this.checkPmRevenueSync()
+  }
+
+  /** 每日從 PM revenues 拉細項到 income_webhooks（autoConfirm=false、需人工確認）*/
+  private async checkPmRevenueSync() {
+    try {
+      const tpe = new Date(Date.now() + 8 * 60 * 60 * 1000)
+      const today = tpe.toISOString().slice(0, 10)
+      if ((this as unknown as { lastPmRevenueSyncDate?: string }).lastPmRevenueSyncDate === today)
+        return
+      // 拉最近 30 天（防 PM 補登過去日期）；syncPmRevenues 用 pm_${id} 防重
+      const sinceDate = new Date(Date.now() - 30 * 86_400_000 + 8 * 60 * 60 * 1000)
+        .toISOString()
+        .slice(0, 10)
+      const result = await syncPmRevenues(sinceDate, today)
+      ;(this as unknown as { lastPmRevenueSyncDate?: string }).lastPmRevenueSyncDate = today
+      log(
+        `pm revenue sync ${today}: 新增 ${result.synced}、跳過 ${result.skipped}、錯誤 ${result.errors}`
+      )
+    } catch (err) {
+      console.error("[RecurringExpenseScheduler] pm revenue sync 失敗:", err)
+    }
   }
 
   /** 每日從 PMS pull performance_entries（不定期填入的 N 個月預估）*/
