@@ -4315,6 +4315,50 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
     expect(res.status).toBe(404)
   })
 
+  it("願望年齡分布：基本結構 buckets/totalWishes/oldest/averageAge", async () => {
+    const res = await request(app).get("/api/family/wishes-aging")
+    expect(res.status).toBe(200)
+    expect(Array.isArray(res.body.buckets)).toBe(true)
+    expect(res.body.buckets).toHaveLength(4)
+    expect(res.body.buckets[0].key).toBe("fresh")
+    expect(res.body.buckets[3].key).toBe("ancient")
+    expect(res.body).toHaveProperty("totalWishes")
+    expect(res.body).toHaveProperty("oldest")
+    expect(res.body).toHaveProperty("averageAge")
+    expect(res.body).toHaveProperty("ancientCount")
+    expect(res.body.message).toBeTruthy()
+  })
+
+  it("願望年齡分布：建 wished 願望 → 進入 fresh bucket（< 7 天）", async () => {
+    await db.execute(sql`DELETE FROM kids_accounts`)
+    const kidObj = (await createKid()) as { id: number }
+    const myKidId = kidObj.id
+    await request(app)
+      .post("/api/family/wishes")
+      .send({ kidId: myKidId, title: "新願望", priority: 2, estimatedPrice: 100 })
+    const res = await request(app).get("/api/family/wishes-aging")
+    expect(res.body.totalWishes).toBeGreaterThanOrEqual(1)
+    const freshBucket = res.body.buckets.find((b: { key: string }) => b.key === "fresh")
+    expect(freshBucket.wishCount).toBeGreaterThanOrEqual(1)
+    expect(res.body.oldest).not.toBeNull()
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
+  it("願望年齡分布：模擬 100 天前願望 → 進入 ancient bucket", async () => {
+    await db.execute(sql`DELETE FROM kids_accounts`)
+    const kidObj = (await createKid()) as { id: number }
+    const myKidId = kidObj.id
+    await db.execute(sql`
+      INSERT INTO kids_wishes (kid_id, title, status, priority, created_at)
+      VALUES (${myKidId}, '古老願望', 'wished', 2, NOW() - INTERVAL '100 days')
+    `)
+    const res = await request(app).get("/api/family/wishes-aging")
+    expect(res.body.ancientCount).toBeGreaterThanOrEqual(1)
+    const ancientBucket = res.body.buckets.find((b: { key: string }) => b.key === "ancient")
+    expect(ancientBucket.wishCount).toBeGreaterThanOrEqual(1)
+    await db.execute(sql`DELETE FROM kids_accounts WHERE id = ${myKidId}`)
+  })
+
   it("task emoji top：基本結構 emojis/emojiCount/topEmoji/totalCount", async () => {
     const res = await request(app).get("/api/family/top-task-emojis")
     expect(res.status).toBe(200)

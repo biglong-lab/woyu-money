@@ -8822,6 +8822,110 @@ router.get(
 )
 
 /**
+ * GET /api/family/wishes-aging
+ * wished 狀態願望放置天數分桶（看小孩決策延遲傾向）
+ */
+router.get(
+  "/api/family/wishes-aging",
+  asyncHandler(async (_req, res) => {
+    const rows = await db.execute(sql`
+      SELECT
+        w.id::int AS wish_id,
+        w.title,
+        w.emoji,
+        w.priority,
+        w.estimated_price::numeric AS price,
+        w.created_at,
+        EXTRACT(DAY FROM (NOW() - w.created_at))::int AS age_days,
+        ka.id::int AS kid_id,
+        ka.display_name AS kid_name,
+        ka.avatar
+      FROM kids_wishes w
+      JOIN kids_accounts ka ON ka.id = w.kid_id
+      WHERE w.status = 'wished'
+        AND ka.is_active = true
+      ORDER BY w.created_at ASC
+    `)
+
+    const wishes = (
+      rows as unknown as {
+        rows: Array<{
+          wish_id: number
+          title: string
+          emoji: string
+          priority: number
+          price: string | null
+          created_at: string
+          age_days: number
+          kid_id: number
+          kid_name: string
+          avatar: string
+        }>
+      }
+    ).rows.map((r) => ({
+      wishId: r.wish_id,
+      title: r.title,
+      emoji: r.emoji,
+      priority: r.priority,
+      price: r.price ? Number(r.price) : null,
+      createdAt: r.created_at,
+      ageDays: r.age_days,
+      kidId: r.kid_id,
+      kidName: r.kid_name,
+      kidAvatar: r.avatar,
+    }))
+
+    const BUCKETS = [
+      { key: "fresh", label: "新願望", maxDays: 7, emoji: "🆕" },
+      { key: "thinking", label: "考慮中", maxDays: 30, emoji: "💭" },
+      { key: "stale", label: "放置久", maxDays: 90, emoji: "⏳" },
+      { key: "ancient", label: "陳舊", maxDays: Infinity, emoji: "🦴" },
+    ] as const
+
+    const buckets = BUCKETS.map((b) => {
+      const inBucket = wishes.filter((w) => {
+        const idx = BUCKETS.findIndex((bk) => bk.key === b.key)
+        const minDays = idx === 0 ? 0 : BUCKETS[idx - 1].maxDays
+        return w.ageDays >= minDays && w.ageDays < b.maxDays
+      })
+      return {
+        key: b.key,
+        label: b.label,
+        emoji: b.emoji,
+        wishCount: inBucket.length,
+        totalValue: inBucket.reduce((s, w) => s + (w.price ?? 0), 0),
+      }
+    })
+
+    const totalWishes = wishes.length
+    const oldest = wishes.length > 0 ? wishes[0] : null
+    const averageAge =
+      totalWishes > 0 ? Math.round(wishes.reduce((s, w) => s + w.ageDays, 0) / totalWishes) : 0
+    const ancientCount = buckets.find((b) => b.key === "ancient")?.wishCount ?? 0
+
+    let message: string
+    if (totalWishes === 0) {
+      message = "家裡 wished 願望清單為空 ✨"
+    } else if (ancientCount > 0) {
+      message = `🦴 有 ${ancientCount} 個願望放超過 90 天、可以鼓勵小孩決定升級或放棄`
+    } else if (oldest && oldest.ageDays > 60) {
+      message = `⏳ 最老願望放了 ${oldest.ageDays} 天（${oldest.kidName}「${oldest.title}」)`
+    } else {
+      message = `✨ 家裡 ${totalWishes} 個 wished 願望、平均放置 ${averageAge} 天`
+    }
+
+    res.json({
+      totalWishes,
+      buckets,
+      oldest,
+      averageAge,
+      ancientCount,
+      message,
+    })
+  })
+)
+
+/**
  * GET /api/family/top-task-emojis?days=90&limit=10
  * 家庭 N 天 task emoji 使用排行（家庭文化）
  */
