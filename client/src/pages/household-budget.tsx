@@ -428,12 +428,12 @@ export default function HouseholdBudget() {
                 快速記帳
               </Button>
             </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
+            <DialogContent className="max-h-[90vh] overflow-y-auto p-0 gap-0">
+              <DialogHeader className="sticky top-0 z-10 bg-white border-b p-4 m-0">
                 <DialogTitle>快速記帳</DialogTitle>
                 <DialogDescription>快速記錄今天的支出</DialogDescription>
               </DialogHeader>
-              <form onSubmit={quickAddForm.handleSubmit(onQuickAdd)} className="space-y-4">
+              <form onSubmit={quickAddForm.handleSubmit(onQuickAdd)} className="space-y-4 p-4 pb-2">
                 <div>
                   <div className="flex items-center justify-between mb-1">
                     <Label htmlFor="amount">
@@ -594,18 +594,6 @@ export default function HouseholdBudget() {
                     </Button>
                   )}
                 </div>
-                {/* 連續模式 toggle */}
-                <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={continueMode}
-                    onChange={(e) => setContinueMode(e.target.checked)}
-                    className="w-4 h-4"
-                    data-testid="checkbox-continue-mode"
-                  />
-                  🔁 連續記帳模式（記完不關、自動清金額繼續記）
-                </label>
-
                 {/* 上一筆「+1 再記」快速按鈕 */}
                 {lastEntry && (
                   <button
@@ -625,16 +613,58 @@ export default function HouseholdBudget() {
                     )}
                   </button>
                 )}
+              </form>
 
-                <div className="flex justify-end gap-2">
-                  <Button type="button" variant="outline" onClick={() => setShowQuickAdd(false)}>
-                    {continueMode ? "完成關閉" : "取消"}
+              {/* Sticky footer — 雙明確按鈕、不用 toggle */}
+              <div className="sticky bottom-0 z-10 bg-white border-t p-3 flex flex-col gap-2">
+                <div className="flex justify-between items-center text-[10px] text-gray-400 px-1">
+                  <a
+                    href="/household-category-management"
+                    className="underline hover:text-amber-600"
+                    data-testid="link-manage-categories"
+                  >
+                    ⚙️ 找不到分類？管理 →
+                  </a>
+                  <span>ESC 或點外部關閉</span>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setContinueMode(false)
+                      setShowQuickAdd(false)
+                    }}
+                    data-testid="button-cancel-quickadd"
+                  >
+                    取消
                   </Button>
-                  <Button type="submit" disabled={addExpenseMutation.isPending}>
-                    {continueMode ? "記錄、繼續" : "記錄"}
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => {
+                      setContinueMode(true)
+                      quickAddForm.handleSubmit(onQuickAdd)()
+                    }}
+                    disabled={addExpenseMutation.isPending}
+                    className="bg-amber-100 text-amber-800 hover:bg-amber-200 border-amber-300"
+                    data-testid="button-submit-continue"
+                  >
+                    記、繼續
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      setContinueMode(false)
+                      quickAddForm.handleSubmit(onQuickAdd)()
+                    }}
+                    disabled={addExpenseMutation.isPending}
+                    data-testid="button-submit-quickadd"
+                  >
+                    記錄
                   </Button>
                 </div>
-              </form>
+              </div>
             </DialogContent>
           </Dialog>
 
@@ -645,7 +675,7 @@ export default function HouseholdBudget() {
                 設定預算
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>設定每月預算</DialogTitle>
                 <DialogDescription>設定每月生活費預算，建立預算概念</DialogDescription>
@@ -701,6 +731,17 @@ export default function HouseholdBudget() {
             data-testid="button-export-monthly-report"
           >
             📄 匯出月報
+          </Button>
+
+          <Button
+            variant="outline"
+            className="flex items-center gap-2"
+            onClick={() => {
+              window.location.href = "/household-category-management"
+            }}
+            data-testid="button-manage-categories"
+          >
+            ⚙️ 分類管理
           </Button>
         </div>
       </div>
