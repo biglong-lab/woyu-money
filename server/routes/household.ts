@@ -404,6 +404,100 @@ router.post(
 )
 
 /**
+ * GET /api/household/yearly-overview?endMonth=YYYY-MM
+ * 過去 12 個月（含 endMonth）的花費 + 預算、用於年度回顧 widget
+ */
+router.get(
+  "/api/household/yearly-overview",
+  asyncHandler(async (req, res) => {
+    const { year: endYear, month: endMonth } = parseYearMonth(
+      req.query.endMonth as string | undefined
+    )
+
+    // 算 12 個月區間（含當月）
+    const months: { year: number; month: number; monthStr: string }[] = []
+    for (let i = 11; i >= 0; i--) {
+      let y = endYear
+      let m = endMonth - i
+      while (m <= 0) {
+        m += 12
+        y -= 1
+      }
+      months.push({ year: y, month: m, monthStr: `${y}-${String(m).padStart(2, "0")}` })
+    }
+
+    const startStr = months[0].monthStr + "-01"
+    const lastYear = months[11].year
+    const lastMonth = months[11].month
+    const endNextYear = lastMonth === 12 ? lastYear + 1 : lastYear
+    const endNextMonth = lastMonth === 12 ? 1 : lastMonth + 1
+    const endStr = `${endNextYear}-${String(endNextMonth).padStart(2, "0")}-01`
+
+    // 一次撈 12 個月花費總和
+    const spendRows = await db.execute(sql`
+      SELECT to_char(date, 'YYYY-MM') AS m, COALESCE(SUM(amount::numeric), 0)::text AS amt
+      FROM household_expenses
+      WHERE date >= ${startStr}::date AND date < ${endStr}::date
+      GROUP BY to_char(date, 'YYYY-MM')
+    `)
+    const spendMap = new Map<string, number>()
+    for (const r of (spendRows as unknown as { rows: { m: string; amt: string }[] }).rows) {
+      spendMap.set(r.m, parseFloat(r.amt))
+    }
+
+    // 一次撈 12 個月預算（categoryId=0 為總預算）
+    const budgetRows = await db.execute(sql`
+      SELECT year, month, budget_amount::text AS amt
+      FROM household_budgets
+      WHERE category_id = ${TOTAL_BUDGET_CATEGORY_ID}
+        AND (year * 100 + month) >= ${months[0].year * 100 + months[0].month}
+        AND (year * 100 + month) <= ${lastYear * 100 + lastMonth}
+    `)
+    const budgetMap = new Map<string, number>()
+    for (const r of (
+      budgetRows as unknown as { rows: { year: number; month: number; amt: string }[] }
+    ).rows) {
+      const key = `${r.year}-${String(r.month).padStart(2, "0")}`
+      budgetMap.set(key, parseFloat(r.amt))
+    }
+
+    const items = months.map((m) => {
+      const spent = spendMap.get(m.monthStr) ?? 0
+      const budget = budgetMap.get(m.monthStr) ?? 0
+      const overrun = budget > 0 && spent > budget
+      const usagePct = budget > 0 ? Math.round((spent / budget) * 100) : null
+      return {
+        month: m.monthStr,
+        spent: Math.round(spent),
+        budget: Math.round(budget),
+        overrun,
+        usagePct,
+      }
+    })
+
+    const totalSpent = items.reduce((s, i) => s + i.spent, 0)
+    const totalBudget = items.reduce((s, i) => s + i.budget, 0)
+    const monthsWithSpend = items.filter((i) => i.spent > 0).length
+    const avgMonthly = monthsWithSpend > 0 ? Math.round(totalSpent / monthsWithSpend) : 0
+    const overrunMonths = items.filter((i) => i.overrun).length
+    const maxSpent = items.reduce((max, i) => Math.max(max, i.spent), 0)
+
+    res.json({
+      endMonth: months[11].monthStr,
+      items,
+      summary: {
+        totalSpent,
+        totalBudget,
+        avgMonthly,
+        overrunMonths,
+        maxSpent,
+        monthsTracked: monthsWithSpend,
+      },
+    })
+  })
+)
+
+/**
  * GET /api/household/monthly-report?month=YYYY-MM
  * 回傳 markdown 月報、包含：預算 / 實際 / 分類佔比 / Top 10 大筆 / 上月對比
  * 月底自動結算 + 月初回顧用

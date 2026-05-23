@@ -574,6 +574,9 @@ export default function HouseholdBudget() {
       {/* 本月 vs 上月同期 + 6 月 sparkline */}
       <MonthlyComparisonCard selectedMonth={selectedMonth} currentSpent={totalSpent} />
 
+      {/* 年度回顧（過去 12 個月） */}
+      <YearlyOverviewCard selectedMonth={selectedMonth} />
+
       {/* 本月預算概況 */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
@@ -1105,6 +1108,138 @@ function MonthlyComparisonCard({
             {labels.map((l) => (
               <span key={l} className="flex-1 text-center">
                 {l.slice(5)}
+              </span>
+            ))}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+interface YearlyItem {
+  month: string
+  spent: number
+  budget: number
+  overrun: boolean
+  usagePct: number | null
+}
+interface YearlyOverview {
+  endMonth: string
+  items: YearlyItem[]
+  summary: {
+    totalSpent: number
+    totalBudget: number
+    avgMonthly: number
+    overrunMonths: number
+    maxSpent: number
+    monthsTracked: number
+  }
+}
+
+function YearlyOverviewCard({ selectedMonth }: { selectedMonth: string }) {
+  const { data, isLoading } = useQuery<YearlyOverview>({
+    queryKey: [`/api/household/yearly-overview?endMonth=${selectedMonth}`],
+    staleTime: 10 * 60 * 1000,
+  })
+
+  if (isLoading || !data) return null
+  if (data.summary.monthsTracked === 0) return null
+
+  const max = Math.max(data.summary.maxSpent, 1)
+  const accCoverage =
+    data.summary.totalBudget > 0
+      ? Math.round((data.summary.totalSpent / data.summary.totalBudget) * 100)
+      : null
+
+  return (
+    <Card className="border-2 border-purple-300 bg-gradient-to-br from-purple-50 to-fuchsia-50">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          📅 年度回顧（過去 12 個月）
+        </CardTitle>
+        <CardDescription>
+          至 {data.endMonth} 為止、追蹤 {data.summary.monthsTracked} 個月
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
+          <div className="bg-white rounded-lg p-2 text-center">
+            <div className="text-[10px] text-gray-500">12 月累計花費</div>
+            <div className="font-bold text-purple-700">
+              NT$ {data.summary.totalSpent.toLocaleString()}
+            </div>
+          </div>
+          <div className="bg-white rounded-lg p-2 text-center">
+            <div className="text-[10px] text-gray-500">12 月累計預算</div>
+            <div className="font-bold text-gray-700">
+              NT$ {data.summary.totalBudget.toLocaleString()}
+            </div>
+            {accCoverage !== null && (
+              <div
+                className={`text-[10px] ${
+                  accCoverage > 100 ? "text-rose-600" : "text-emerald-600"
+                }`}
+              >
+                使用 {accCoverage}%
+              </div>
+            )}
+          </div>
+          <div className="bg-white rounded-lg p-2 text-center">
+            <div className="text-[10px] text-gray-500">平均月花費</div>
+            <div className="font-bold text-indigo-700">
+              NT$ {data.summary.avgMonthly.toLocaleString()}
+            </div>
+          </div>
+          <div className="bg-white rounded-lg p-2 text-center">
+            <div className="text-[10px] text-gray-500">超支月數</div>
+            <div
+              className={`font-bold ${
+                data.summary.overrunMonths > 0 ? "text-rose-600" : "text-emerald-600"
+              }`}
+            >
+              {data.summary.overrunMonths} / 12
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg p-3">
+          <div className="text-[10px] text-gray-500 mb-2">月度花費（紅色表示超支）</div>
+          <div className="flex items-end gap-1 h-24">
+            {data.items.map((it) => {
+              const h = (it.spent / max) * 100
+              const isCurrent = it.month === selectedMonth
+              return (
+                <div key={it.month} className="flex-1 flex flex-col items-center justify-end group">
+                  <div
+                    className={`w-full rounded-t transition-all relative ${
+                      it.spent > 0
+                        ? it.overrun
+                          ? "bg-gradient-to-t from-rose-400 to-rose-600"
+                          : isCurrent
+                            ? "bg-gradient-to-t from-purple-400 to-purple-600"
+                            : "bg-gradient-to-t from-indigo-300 to-indigo-500"
+                        : "bg-gray-100"
+                    }`}
+                    style={{ height: `${Math.max(2, h)}%` }}
+                    title={`${it.month}: NT$ ${it.spent.toLocaleString()}${
+                      it.budget > 0 ? ` / 預算 ${it.budget.toLocaleString()}` : ""
+                    }${it.overrun ? " ⚠️ 超支" : ""}`}
+                  >
+                    {it.overrun && (
+                      <span className="absolute -top-3 left-1/2 -translate-x-1/2 text-[9px]">
+                        ⚠️
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+          <div className="flex justify-between text-[8px] text-gray-400 mt-2">
+            {data.items.map((it) => (
+              <span key={it.month} className="flex-1 text-center">
+                {it.month.slice(5)}
               </span>
             ))}
           </div>
