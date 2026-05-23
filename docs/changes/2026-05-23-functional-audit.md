@@ -202,6 +202,13 @@
   - 規則 3 (missing)：過去 3 月有 ≥ 3 筆但本月空白的固定分類（僅月過 50%+ 提示）
   - 新增 `AnomaliesCard`、3 種 severity + 3 種 type icon
   - 階段 3 報表深度 + AI 助手全完成、進階段 4 家庭多人協作（commit `d3c5211`）
+- `2026-05-23` **階段 5.3** Family-Kids Endpoint 使用率評估：
+  - 新增 `scripts/endpoint-usage-report.ts`：parse routes + `:param` 轉 regex + boundary 防 prefix 吞
+  - 跑本地產出 `docs/runbooks/family-kids-endpoint-usage.md`
+  - 結果：207 個 endpoints、205 有引用、**2 個 unused**：
+    * `GET /api/family/badges`
+    * `POST /api/family/pots/:id/complete`
+  - 純評估、不刪除（commit `1ca493f`）
 - `2026-05-23` **階段 5.2** Schema 使用率評估報告：
   - 新增 `scripts/schema-usage-report.ts`：掃 64 張表、4 狀態分類（active/dormant/cold/empty）
   - 跑本地產出 `docs/runbooks/schema-usage.md`
