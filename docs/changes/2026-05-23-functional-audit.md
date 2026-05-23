@@ -202,6 +202,12 @@
   - 規則 3 (missing)：過去 3 月有 ≥ 3 筆但本月空白的固定分類（僅月過 50%+ 提示）
   - 新增 `AnomaliesCard`、3 種 severity + 3 種 type icon
   - 階段 3 報表深度 + AI 助手全完成、進階段 4 家庭多人協作（commit `d3c5211`）
+- `2026-05-23` **階段 4.4** 家庭共同存錢目標：
+  - 新增 2 張表：`family_savings_goals`（目標）+ `family_savings_contributions`（每筆 contribution 可追溯）
+  - 後端 5 endpoints：列表 / 建立 / contribute（達標自動 achieved + insert contribution）/ archive / 明細
+  - 新增 `FamilySavingsGoalsCard`：progress bar、新增 dialog、inline 加錢 dialog、達成 🎉 toast
+  - 放在 /family 頁、FamilyCrossDomainCard 後
+  - 階段 4 家庭多人協作全完成（4.1 邀請 + 4.2 預算歷程 + 4.3 跨領域 + 4.4 存錢目標）（commit `fcda513`）
 - `2026-05-23` **階段 4.3** 跨領域整合視圖：
   - 新增 `GET /api/family/cross-domain-overview?month=YYYY-MM`
   - 聚合 5 KPI：家用支出 / 小孩任務 / PM 確認收入 / PMS 完成收入 / 待批准
