@@ -168,4 +168,5 @@
 - `2026-05-23` **階段 1.2c** 抽 today 主題 3 cards（TodayCheckinRoster / TodaySpendingFeed / TodayTasksList）到 `today-cards.tsx`；family.tsx 10,225 → 10,059（-166）（commit `30e973f`）
 - `2026-05-23` **階段 1.2d** 抽 stats 趨勢類 4 cards（ApprovalLeadTime / MonthlyTaskCreationTrend / MonthlySpendingTrend / MonthlyGoalsTrend）到 `stats-cards.tsx`；family.tsx 10,059 → 9,726（-333）（commit `2abcadd`）
 - `2026-05-23` **階段 1.2e** 抽排行 / bucket 4 cards（StreakRanking / BiggestSpendings / BiggestWins / WishesAging）到 `ranking-cards.tsx`；family.tsx 9,726 → 9,515（-211）（commit `b4efbee`）
-- `2026-05-23` **階段 1.3** /income/inbox 加「⚡ 一鍵確認 PM 全部」按鈕 + 後端 `POST /api/income/webhooks/auto-confirm-by-source` endpoint、用 source.defaultProjectId 自動 confirm 全部 pending（解決 372 筆 $773K 積壓的核心入口）
+- `2026-05-23` **階段 1.3** /income/inbox 加「⚡ 一鍵確認 PM 全部」按鈕 + 後端 `POST /api/income/webhooks/auto-confirm-by-source` endpoint、用 source.defaultProjectId 自動 confirm 全部 pending（解決 372 筆 $773K 積壓的核心入口）（commit `a8116b5`）
+- `2026-05-23` **階段 1.4** log 改可觀察：新增 `server/storage/tick-log.ts` in-memory ring buffer（max 100）+ scheduler 各 tick 結果記錄（forecast-snapshot / pms-sync / pm-revenue-sync）+ `GET /api/admin/cron-tick-logs` endpoint；同步 `console.log` 進 docker logs 方便外部觀察

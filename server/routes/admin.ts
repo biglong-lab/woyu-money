@@ -7,6 +7,7 @@ import fs from "fs"
 import path from "path"
 import { paymentFileUpload } from "./upload-config"
 import { asyncHandler, AppError } from "../middleware/error-handler"
+import { getRecentTicks, getTicksSummary } from "../storage/tick-log"
 
 const router = Router()
 
@@ -706,6 +707,22 @@ router.put(
 
     const updatedFile = await storage.updateFileAttachment(fileId, { description })
     res.json(updatedFile)
+  })
+)
+
+/**
+ * GET /api/admin/cron-tick-logs?limit=50
+ * 看最近 cron tick 結果（in-memory ring buffer、重啟即失）
+ */
+router.get(
+  "/api/admin/cron-tick-logs",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 100)
+    res.json({
+      summary: getTicksSummary(),
+      ticks: getRecentTicks(limit),
+    })
   })
 )
 

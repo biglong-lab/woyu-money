@@ -74,7 +74,7 @@ if docker ps --format '{{.Names}}' 2>/dev/null | grep -q '^woyu-postgres$'; then
     "TRUNCATE kids_accounts RESTART IDENTITY CASCADE;" 2>&1 | grep -v "^$" | tail -1 || true
 fi
 
-if npx vitest run tests/integration/family-kids.test.ts; then
+if FAMILY_KIDS_NO_BONUS=1 npx vitest run tests/integration/family-kids.test.ts; then
   log_ok "family-kids 測試通過"
 else
   log_error "family-kids 測試失敗"

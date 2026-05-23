@@ -11,6 +11,7 @@ import { generateItemsForMonth } from "./storage/recurring-expense-templates"
 import { captureFromPM } from "./storage/forecast-snapshots"
 import { syncFromPMS } from "./storage/pms-forecast-sync"
 import { syncPmRevenues } from "./storage/pm-bridge"
+import { recordTick } from "./storage/tick-log"
 import { log } from "./vite"
 
 class RecurringExpenseScheduler {
@@ -56,13 +57,15 @@ class RecurringExpenseScheduler {
       const sinceDate = new Date(Date.now() - 30 * 86_400_000 + 8 * 60 * 60 * 1000)
         .toISOString()
         .slice(0, 10)
+      const t0 = Date.now()
       const result = await syncPmRevenues(sinceDate, today)
       ;(this as unknown as { lastPmRevenueSyncDate?: string }).lastPmRevenueSyncDate = today
-      log(
-        `pm revenue sync ${today}: 新增 ${result.synced}、跳過 ${result.skipped}、錯誤 ${result.errors}`
-      )
+      const msg = `${today}: 新增 ${result.synced}、跳過 ${result.skipped}、錯誤 ${result.errors}`
+      log(`pm revenue sync ${msg}`)
+      recordTick("pm-revenue-sync", result.errors === 0, msg, Date.now() - t0)
     } catch (err) {
       console.error("[RecurringExpenseScheduler] pm revenue sync 失敗:", err)
+      recordTick("pm-revenue-sync", false, String(err))
     }
   }
 
@@ -74,15 +77,20 @@ class RecurringExpenseScheduler {
       // 用獨立 flag 避免和 forecast snapshot 共用 lastSnapshotDate
       if ((this as unknown as { lastPmsSyncDate?: string }).lastPmsSyncDate === today) return
 
+      const t0 = Date.now()
       const result = await syncFromPMS(14) // 拉最近 14 天（防 PMS 補填）
       ;(this as unknown as { lastPmsSyncDate?: string }).lastPmsSyncDate = today
       if (result.ok) {
-        log(`pms sync ${today}: 新增 ${result.inserted}、更新 ${result.skipped}`)
+        const msg = `${today}: 新增 ${result.inserted}、更新 ${result.skipped}`
+        log(`pms sync ${msg}`)
+        recordTick("pms-sync", true, msg, Date.now() - t0)
       } else {
         log(`pms sync ${today} 失敗: ${result.error}`)
+        recordTick("pms-sync", false, `${today}: ${result.error}`, Date.now() - t0)
       }
     } catch (err) {
       console.error("[RecurringExpenseScheduler] pms sync 失敗:", err)
+      recordTick("pms-sync", false, String(err))
     }
   }
 
@@ -114,15 +122,20 @@ class RecurringExpenseScheduler {
 
       if (this.lastSnapshotDate === today) return
 
+      const t0 = Date.now()
       const result = await captureFromPM()
       this.lastSnapshotDate = today
       if (result.ok) {
-        log(`forecast capture ${today}: 新增 ${result.inserted}、跳過 ${result.skipped}`)
+        const msg = `${today}: 新增 ${result.inserted}、跳過 ${result.skipped}`
+        log(`forecast capture ${msg}`)
+        recordTick("forecast-snapshot", true, msg, Date.now() - t0)
       } else {
         log(`forecast capture ${today} 失敗: ${result.error}`)
+        recordTick("forecast-snapshot", false, `${today}: ${result.error}`, Date.now() - t0)
       }
     } catch (err) {
       console.error("[RecurringExpenseScheduler] daily snapshot 失敗:", err)
+      recordTick("forecast-snapshot", false, String(err))
     }
   }
 
