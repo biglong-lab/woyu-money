@@ -289,12 +289,14 @@ export default function RevenueForecastPage() {
     const monthEnd = new Date(y, m, 0).getDate()
 
     const seasonalAcc = seasonal?.currentAccumulated ?? 0
-    const snapshotLatest = trend[trend.length - 1]
+    // 只取「PM 累積快照」（合計列）、忽略 pms-bridge 各館列、否則 trend.last 可能是 0
+    const pmSnapshots = trend.filter((s) => s.source === "pm-daily-snapshot")
+    const snapshotLatest = pmSnapshots[pmSnapshots.length - 1] ?? trend[trend.length - 1]
     const snapshotAcc = snapshotLatest ? parseFloat(snapshotLatest.accumulatedRevenue) : 0
 
-    // 取兩者較大的（payment_items 通常更新更即時）
-    const useSeasonal = seasonalAcc > snapshotAcc
-    const accumulated = Math.max(seasonalAcc, snapshotAcc)
+    // 使用者要求「PM 是多少就是多少」、優先 PM snapshot、不再 fallback payment_items（避免不一致）
+    const useSeasonal = snapshotAcc === 0 && seasonalAcc > 0
+    const accumulated = snapshotAcc > 0 ? snapshotAcc : seasonalAcc
 
     if (accumulated === 0 && trend.length === 0) return null
 

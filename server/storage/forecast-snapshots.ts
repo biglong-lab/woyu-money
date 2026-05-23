@@ -353,49 +353,42 @@ export async function getSeasonalForecast(
   ci95: { lower: number; upper: number }
   confidence: "high" | "medium" | "low" | "insufficient"
 }> {
-  // 1. 取本月截至今日累積（改用 payment_items income、跟 history 同口徑）
-  const projectIdMapPrefetch: Record<number, number> = {
-    1: 3,
-    2: 4,
-    3: 9,
-    4: 10,
-    5: 20,
-    6: 26,
-  }
+  // 1. 取本月截至今日累積（直接用 PM 端 daily_revenue_snapshots、source of truth）
+  // 使用者要求：PM 端是多少就是多少、不要有人工確認 / 入帳 fallback 的差異
+  // → 不再 fallback payment_items；直接讀 revenue_forecast_snapshots 最新一筆
   const today = new Date()
   const todayStr = today.toISOString().slice(0, 10)
-  const projectFilterPrefetch =
-    companyId === null
-      ? sql`AND project_id IN (3, 4, 9, 10, 20, 26)`
-      : sql`AND project_id = ${projectIdMapPrefetch[companyId] ?? 0}`
 
-  const currentResult = await db.execute(sql`
-    SELECT COALESCE(SUM(total_amount::numeric), 0)::text AS current_acc
-    FROM payment_items
-    WHERE item_type = 'income' AND NOT is_deleted AND source = 'webhook'
-      AND TO_CHAR(start_date, 'YYYY-MM') = ${targetMonth}
-      AND start_date <= ${todayStr}::date
-      ${projectFilterPrefetch}
+  const latestSnapshotRows = await db.execute(sql`
+    SELECT snapshot_date::text AS snapshot_date,
+           accumulated_revenue::text AS accumulated_revenue
+    FROM revenue_forecast_snapshots
+    WHERE target_month = ${targetMonth}
+      AND source = 'pm-daily-snapshot'
+      AND ${companyId === null ? sql`company_id IS NULL` : sql`company_id = ${companyId}`}
+    ORDER BY snapshot_date DESC
+    LIMIT 1
   `)
-  const currentAccFromPayments = parseFloat(
-    (currentResult as unknown as { rows: Array<{ current_acc: string }> }).rows[0]?.current_acc ??
-      "0"
-  )
+  const latestRow = (
+    latestSnapshotRows as unknown as {
+      rows: Array<{ snapshot_date: string; accumulated_revenue: string }>
+    }
+  ).rows[0]
+  const currentAccFromPm = latestRow ? parseFloat(latestRow.accumulated_revenue) : 0
+  const latestSnapshotDate = latestRow?.snapshot_date ?? todayStr
 
-  // 為了避免後續 logic 大改、做個 mock currentSnapshots
-  // （後面只用 latest.accumulatedRevenue 和 latest.snapshotDate）
   const currentSnapshots: RevenueForecastSnapshot[] =
-    currentAccFromPayments > 0
+    currentAccFromPm > 0 || latestRow
       ? [
           {
             id: 0,
-            snapshotDate: todayStr,
+            snapshotDate: latestSnapshotDate,
             companyId,
             targetMonth,
-            accumulatedRevenue: currentAccFromPayments.toString(),
+            accumulatedRevenue: currentAccFromPm.toString(),
             bookedRevenue: "0",
             daysAheadOfTarget: 0,
-            source: "payment-items",
+            source: "pm-daily-snapshot",
             notes: null,
             createdAt: new Date(),
           },
