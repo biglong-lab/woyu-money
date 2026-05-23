@@ -170,4 +170,5 @@
 - `2026-05-23` **階段 1.2e** 抽排行 / bucket 4 cards（StreakRanking / BiggestSpendings / BiggestWins / WishesAging）到 `ranking-cards.tsx`；family.tsx 9,726 → 9,515（-211）（commit `b4efbee`）
 - `2026-05-23` **階段 1.3** /income/inbox 加「⚡ 一鍵確認 PM 全部」按鈕 + 後端 `POST /api/income/webhooks/auto-confirm-by-source` endpoint、用 source.defaultProjectId 自動 confirm 全部 pending（解決 372 筆 $773K 積壓的核心入口）（commit `a8116b5`）
 - `2026-05-23` **階段 1.4** log 改可觀察：新增 `server/storage/tick-log.ts` in-memory ring buffer（max 100）+ scheduler 各 tick 結果記錄（forecast-snapshot / pms-sync / pm-revenue-sync）+ `GET /api/admin/cron-tick-logs` endpoint；用 `process.stdout.write` 進 docker logs 方便外部觀察（commit `bea048b`）
-- `2026-05-23` **階段 2.1** FAB 加「🏠 家用記帳」action（deeplink `/household-budget?quickAdd=1`）+ 頁面響應 query 自動開 quick-add dialog；FAB 桌面 + 手機都顯示（移除 hidden md:block、手機 bottom-20 避開 TabBar）
+- `2026-05-23` **階段 2.1** FAB 加「🏠 家用記帳」action（deeplink `/household-budget?quickAdd=1`）+ 頁面響應 query 自動開 quick-add dialog；FAB 桌面 + 手機都顯示（移除 hidden md:block、手機 bottom-20 避開 TabBar）（commit `20d95cc`）
+- `2026-05-23` **階段 2.2** quick-add dialog「拍照存證」placeholder 換真的 `ReceiptUploadButton`、提交時 receiptImages array 帶到 `/api/household/expenses`（後端已支援 `receipt_images` jsonb）；下輪做 AI 自動辨識金額/分類填表

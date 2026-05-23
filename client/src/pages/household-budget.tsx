@@ -31,6 +31,7 @@ import { useCopyAmount } from "@/hooks/use-copy-amount"
 import type { HouseholdExpense } from "@shared/schema/household"
 import type { DebtCategory } from "@shared/schema/category"
 import { BackToTop } from "@/components/back-to-top"
+import { ReceiptUploadButton } from "@/components/receipt-upload-button"
 
 // API 回應型別定義（對齊 server /api/household/budget 和 /api/household/stats）
 interface MonthlyBudgetResponse {
@@ -85,6 +86,7 @@ interface AddExpensePayload {
   description: string
   paymentMethod: string
   date: string
+  receiptImages?: string[]
 }
 
 interface SetBudgetPayload {
@@ -124,6 +126,7 @@ export default function HouseholdBudget() {
   const { toast } = useToast()
   const copyAmount = useCopyAmount()
   const [showQuickAdd, setShowQuickAdd] = useState(false)
+  const [quickAddReceiptUrl, setQuickAddReceiptUrl] = useState<string | null>(null)
 
   // ?quickAdd=1 → 自動開快速記帳（FAB 從其他頁來的 deeplink）
   useEffect(() => {
@@ -170,17 +173,19 @@ export default function HouseholdBudget() {
         ...data,
         amount: parseFloat(data.amount),
         categoryId: parseInt(data.categoryId),
+        receiptImages: quickAddReceiptUrl ? [quickAddReceiptUrl] : undefined,
       }
       return await apiRequest("POST", "/api/household/expenses", formattedData)
     },
     onSuccess: () => {
       toast({
         title: "記帳成功",
-        description: "支出已記錄",
+        description: quickAddReceiptUrl ? "支出已記錄、附收據" : "支出已記錄",
       })
       invalidateHousehold()
       setShowQuickAdd(false)
       quickAddForm.reset()
+      setQuickAddReceiptUrl(null)
     },
     onError: (e: Error) => {
       toast({
@@ -384,12 +389,17 @@ export default function HouseholdBudget() {
                     {...quickAddForm.register("date", { required: true })}
                   />
                 </div>
-                <div className="flex items-center gap-2">
-                  <Button type="button" variant="outline" className="flex items-center gap-2">
-                    <Camera className="w-4 h-4" />
-                    拍照存證
-                  </Button>
-                  <span className="text-sm text-muted-foreground">有空再整理</span>
+                <div>
+                  <Label>
+                    收據照片{" "}
+                    <span className="text-xs text-gray-400 font-normal">
+                      （選填、拍照即可附存證）
+                    </span>
+                  </Label>
+                  <ReceiptUploadButton
+                    value={quickAddReceiptUrl}
+                    onChange={setQuickAddReceiptUrl}
+                  />
                 </div>
                 <div className="flex justify-end gap-2">
                   <Button type="button" variant="outline" onClick={() => setShowQuickAdd(false)}>
