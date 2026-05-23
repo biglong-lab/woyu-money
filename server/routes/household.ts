@@ -404,6 +404,207 @@ router.post(
 )
 
 /**
+ * GET /api/household/ai-insights?month=YYYY-MM
+ * 純規則洞察：4-6 條本月消費觀察
+ *  - 預算使用率 vs 月過時間
+ *  - 最大分類佔比（> 30% flag）
+ *  - 與上月顯著差異（±20%）
+ *  - Top 1 大筆（> 本月 15%）
+ *  - 高頻分類（筆數）
+ *  - 沒設預算的提醒
+ */
+router.get(
+  "/api/household/ai-insights",
+  asyncHandler(async (req, res) => {
+    const { year, month } = parseYearMonth(req.query.month as string | undefined)
+    const monthStr = `${year}-${String(month).padStart(2, "0")}`
+    const startDate = `${monthStr}-01`
+    const endY = month === 12 ? year + 1 : year
+    const endM = month === 12 ? 1 : month + 1
+    const endDate = `${endY}-${String(endM).padStart(2, "0")}-01`
+    const prevY = month === 1 ? year - 1 : year
+    const prevM = month === 1 ? 12 : month - 1
+    const prevStart = `${prevY}-${String(prevM).padStart(2, "0")}-01`
+
+    // 預算
+    const budgetRows = await db.execute(sql`
+      SELECT budget_amount::text AS amt FROM household_budgets
+      WHERE year = ${year} AND month = ${month} AND category_id = ${TOTAL_BUDGET_CATEGORY_ID}
+      LIMIT 1
+    `)
+    const budgetAmount = parseFloat(
+      (budgetRows as unknown as { rows: { amt: string }[] }).rows[0]?.amt ?? "0"
+    )
+
+    // 本月 / 上月 sum
+    const sumRows = await db.execute(sql`
+      SELECT
+        COALESCE(SUM(CASE WHEN date >= ${startDate}::date AND date < ${endDate}::date THEN amount::numeric ELSE 0 END), 0)::text AS curr,
+        COALESCE(SUM(CASE WHEN date >= ${prevStart}::date AND date < ${startDate}::date THEN amount::numeric ELSE 0 END), 0)::text AS prev,
+        COUNT(*) FILTER (WHERE date >= ${startDate}::date AND date < ${endDate}::date)::int AS curr_count
+      FROM household_expenses
+      WHERE date >= ${prevStart}::date AND date < ${endDate}::date
+    `)
+    const sr = (
+      sumRows as unknown as { rows: { curr: string; prev: string; curr_count: number }[] }
+    ).rows[0]
+    const currTotal = parseFloat(sr?.curr ?? "0")
+    const prevTotal = parseFloat(sr?.prev ?? "0")
+    const currCount = sr?.curr_count ?? 0
+
+    // 本月分類
+    const catRows = await db.execute(sql`
+      SELECT
+        COALESCE(fc.category_name, '(未分類)') AS name,
+        COALESCE(SUM(he.amount::numeric), 0)::text AS amt,
+        COUNT(*)::int AS cnt
+      FROM household_expenses he
+      LEFT JOIN fixed_categories fc ON he.category_id = fc.id
+      WHERE he.date >= ${startDate}::date AND he.date < ${endDate}::date
+      GROUP BY fc.category_name
+      ORDER BY SUM(he.amount::numeric) DESC
+    `)
+    const cats = (
+      catRows as unknown as { rows: { name: string; amt: string; cnt: number }[] }
+    ).rows.map((r) => ({ name: r.name, amount: parseFloat(r.amt), count: r.cnt }))
+
+    // 最大筆
+    const topRows = await db.execute(sql`
+      SELECT amount::text AS amt, description, date::text AS d
+      FROM household_expenses
+      WHERE date >= ${startDate}::date AND date < ${endDate}::date
+      ORDER BY amount::numeric DESC
+      LIMIT 1
+    `)
+    const top = (
+      topRows as unknown as { rows: { amt: string; description: string | null; d: string }[] }
+    ).rows[0]
+
+    const insights: Array<{
+      tone: "info" | "good" | "warn" | "alert"
+      icon: string
+      title: string
+      detail: string
+    }> = []
+
+    // 1. 預算進度
+    if (budgetAmount > 0) {
+      const today = new Date()
+      const isCurrMonth = today.getFullYear() === year && today.getMonth() + 1 === month
+      const daysInMonth = new Date(year, month, 0).getDate()
+      const dayOfMonth = isCurrMonth ? today.getDate() : daysInMonth
+      const timeProgress = Math.round((dayOfMonth / daysInMonth) * 100)
+      const usagePct = Math.round((currTotal / budgetAmount) * 100)
+      const diff = usagePct - timeProgress
+      if (usagePct >= 100) {
+        insights.push({
+          tone: "alert",
+          icon: "🚨",
+          title: "預算已超支",
+          detail: `已用 ${usagePct}% 預算（NT$ ${Math.round(currTotal).toLocaleString()} / ${Math.round(budgetAmount).toLocaleString()}）、超出 NT$ ${Math.round(currTotal - budgetAmount).toLocaleString()}`,
+        })
+      } else if (diff > 15) {
+        insights.push({
+          tone: "warn",
+          icon: "⚠️",
+          title: "花得比進度快",
+          detail: `已用 ${usagePct}% 預算、但月份才過 ${timeProgress}%、提前 ${diff} 個百分點、依此速度恐超支`,
+        })
+      } else if (diff < -15 && isCurrMonth) {
+        insights.push({
+          tone: "good",
+          icon: "✅",
+          title: "節約有方",
+          detail: `已用 ${usagePct}% 預算、月份過 ${timeProgress}%、保持下去可剩 NT$ ${Math.round(budgetAmount - (currTotal / dayOfMonth) * daysInMonth).toLocaleString()}`,
+        })
+      } else {
+        insights.push({
+          tone: "info",
+          icon: "📊",
+          title: "預算節奏正常",
+          detail: `已用 ${usagePct}% 預算、月份過 ${timeProgress}%、節奏一致`,
+        })
+      }
+    } else {
+      insights.push({
+        tone: "warn",
+        icon: "💡",
+        title: "尚未設定本月預算",
+        detail: "建議參考上月實際花費設定預算、可即時掌握開銷狀況",
+      })
+    }
+
+    // 2. 最大分類佔比
+    if (cats.length > 0 && currTotal > 0) {
+      const top1 = cats[0]
+      const pct = Math.round((top1.amount / currTotal) * 100)
+      if (pct >= 30) {
+        insights.push({
+          tone: pct >= 50 ? "warn" : "info",
+          icon: pct >= 50 ? "🎯" : "📌",
+          title: `「${top1.name}」佔了 ${pct}%`,
+          detail: `本月最大開銷分類 NT$ ${Math.round(top1.amount).toLocaleString()}（${top1.count} 筆）${pct >= 50 ? "、單一分類過高、可檢視是否合理" : ""}`,
+        })
+      }
+    }
+
+    // 3. 與上月差異
+    if (prevTotal > 0 && currTotal > 0) {
+      const diffPct = Math.round(((currTotal - prevTotal) / prevTotal) * 100)
+      if (Math.abs(diffPct) >= 20) {
+        const isUp = diffPct > 0
+        insights.push({
+          tone: isUp ? "warn" : "good",
+          icon: isUp ? "📈" : "📉",
+          title: isUp ? `比上月多花 ${diffPct}%` : `比上月省 ${Math.abs(diffPct)}%`,
+          detail: `本月 NT$ ${Math.round(currTotal).toLocaleString()} vs 上月 NT$ ${Math.round(prevTotal).toLocaleString()}、差距 ${isUp ? "+" : ""}NT$ ${Math.round(currTotal - prevTotal).toLocaleString()}`,
+        })
+      }
+    }
+
+    // 4. Top 1 大筆
+    if (top && currTotal > 0) {
+      const topAmt = parseFloat(top.amt)
+      const pct = Math.round((topAmt / currTotal) * 100)
+      if (pct >= 15) {
+        insights.push({
+          tone: "info",
+          icon: "💰",
+          title: `單筆最大 NT$ ${Math.round(topAmt).toLocaleString()}`,
+          detail: `${top.d.slice(0, 10)} · ${top.description ?? "(無說明)"}、佔本月 ${pct}%`,
+        })
+      }
+    }
+
+    // 5. 高頻分類（記帳次數最多）
+    if (cats.length > 0) {
+      const byCount = [...cats].sort((a, b) => b.count - a.count)
+      const topFreq = byCount[0]
+      if (topFreq.count >= 5) {
+        insights.push({
+          tone: "info",
+          icon: "🔁",
+          title: `「${topFreq.name}」記了 ${topFreq.count} 次`,
+          detail: `本月最常記帳的分類、平均單筆 NT$ ${Math.round(topFreq.amount / topFreq.count).toLocaleString()}`,
+        })
+      }
+    }
+
+    // 6. 完全沒記
+    if (currCount === 0) {
+      insights.push({
+        tone: "warn",
+        icon: "📝",
+        title: "本月還沒記過帳",
+        detail: "趁記憶清楚時補上、保持記帳節奏比補後更有效",
+      })
+    }
+
+    res.json({ month: monthStr, count: insights.length, insights })
+  })
+)
+
+/**
  * GET /api/household/yearly-overview?endMonth=YYYY-MM
  * 過去 12 個月（含 endMonth）的花費 + 預算、用於年度回顧 widget
  */

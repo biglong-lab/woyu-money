@@ -574,6 +574,9 @@ export default function HouseholdBudget() {
       {/* 本月 vs 上月同期 + 6 月 sparkline */}
       <MonthlyComparisonCard selectedMonth={selectedMonth} currentSpent={totalSpent} />
 
+      {/* AI 消費觀察（純規則洞察） */}
+      <AIInsightsCard selectedMonth={selectedMonth} />
+
       {/* 年度回顧（過去 12 個月） */}
       <YearlyOverviewCard selectedMonth={selectedMonth} />
 
@@ -1111,6 +1114,68 @@ function MonthlyComparisonCard({
               </span>
             ))}
           </div>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+interface AIInsight {
+  tone: "info" | "good" | "warn" | "alert"
+  icon: string
+  title: string
+  detail: string
+}
+interface AIInsightsResponse {
+  month: string
+  count: number
+  insights: AIInsight[]
+}
+
+function AIInsightsCard({ selectedMonth }: { selectedMonth: string }) {
+  const { data, isLoading } = useQuery<AIInsightsResponse>({
+    queryKey: [`/api/household/ai-insights?month=${selectedMonth}`],
+    staleTime: 5 * 60 * 1000,
+  })
+
+  if (isLoading || !data || data.insights.length === 0) return null
+
+  const toneClass: Record<AIInsight["tone"], string> = {
+    info: "border-blue-200 bg-blue-50",
+    good: "border-emerald-200 bg-emerald-50",
+    warn: "border-amber-200 bg-amber-50",
+    alert: "border-rose-200 bg-rose-50",
+  }
+  const toneText: Record<AIInsight["tone"], string> = {
+    info: "text-blue-900",
+    good: "text-emerald-900",
+    warn: "text-amber-900",
+    alert: "text-rose-900",
+  }
+
+  return (
+    <Card className="border-2 border-violet-300 bg-gradient-to-br from-violet-50 to-purple-50">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">🤖 本月消費觀察</CardTitle>
+        <CardDescription>
+          {data.month} · 自動分析 {data.count} 條洞察
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-2">
+          {data.insights.map((ins, i) => (
+            <div
+              key={i}
+              className={`rounded-lg border p-2 ${toneClass[ins.tone]}`}
+              data-testid={`insight-${ins.tone}-${i}`}
+            >
+              <div className={`flex items-center gap-2 font-medium text-sm ${toneText[ins.tone]}`}>
+                <span className="text-base">{ins.icon}</span>
+                {ins.title}
+              </div>
+              <div className="text-xs text-gray-600 mt-1 pl-7">{ins.detail}</div>
+            </div>
+          ))}
         </div>
       </CardContent>
     </Card>
