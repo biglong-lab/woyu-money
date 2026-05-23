@@ -180,3 +180,8 @@
   - 按鈕智能偵測 pm-bridge source 是否設 defaultProjectId、未設改顯「⚙️ 先設 PM 預設專案」並直接跳 /income/sources
   - 已設則正常顯「⚡ 一鍵確認 PM 全部」
   - 失敗 toast 改帶「去設定 →」按鈕跳轉
+- `2026-05-23` **階段 3.1** 月底結算月報（markdown）：
+  - 後端新增 `GET /api/household/monthly-report?month=YYYY-MM[&format=download]`
+  - 回傳整體 / 與上月對比 / 分類佔比表 / Top 10 大筆 的 markdown
+  - household-budget 頁頭加「📄 匯出月報」按鈕、一鍵下載 .md
+  - 階段 2 全完成、進階段 3 報表深度 + AI 助手（commit `49d6620`）
