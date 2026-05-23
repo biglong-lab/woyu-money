@@ -190,3 +190,8 @@
   - 一次撈 12 月 spending + budgets、回傳 items[] + summary
   - 新增 `YearlyOverviewCard`：12 月 bar chart、超支月紅色 + ⚠️ 標記
   - 4 column summary：累計花費 / 累計預算 + 使用率 / 平均月 / 超支月數（commit `8b8ecc7`）
+- `2026-05-23` **階段 3.3** AI 消費觀察（純規則洞察、無外部 API）：
+  - 後端新增 `GET /api/household/ai-insights?month=YYYY-MM`
+  - 6 條規則：預算進度 vs 月過 / 最大分類佔比 / 上月差異 / Top 1 大筆 / 高頻分類 / 沒記帳/沒設預算
+  - 新增 `AIInsightsCard`、4 種 tone（info/good/warn/alert）+ icon
+  - 不需 Claude API key、即時生效、本地 PG 算完回傳（commit `71fadf8`）
