@@ -35,6 +35,7 @@ import { ReceiptUploadButton } from "@/components/receipt-upload-button"
 import { AmountKeypad } from "@/components/amount-keypad"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { PeriodFeedCard } from "@/components/household/period-feed-card"
+import { getCategoryDecor } from "@/lib/category-emoji"
 
 // API 回應型別定義（對齊 server /api/household/budget 和 /api/household/stats）
 interface MonthlyBudgetResponse {
@@ -477,6 +478,7 @@ export default function HouseholdBudget() {
                         {topCategories.map((tc) => {
                           const isSelected =
                             quickAddForm.watch("categoryId") === String(tc.categoryId)
+                          const decor = getCategoryDecor(tc.categoryName)
                           return (
                             <button
                               key={tc.categoryId}
@@ -490,15 +492,16 @@ export default function HouseholdBudget() {
                                 "inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs border transition-all",
                                 "active:scale-95",
                                 isSelected
-                                  ? "bg-amber-100 text-amber-800 border-amber-300 font-semibold"
-                                  : "bg-white text-gray-700 border-gray-200 hover:border-gray-300"
+                                  ? "border-amber-400 font-semibold ring-2 ring-amber-200"
+                                  : "border-gray-200 hover:border-gray-300"
                               )}
+                              style={{
+                                backgroundColor: isSelected ? `${decor.color}22` : "white",
+                                color: isSelected ? decor.color : "#374151",
+                              }}
                               data-testid={`category-chip-${tc.categoryId}`}
                             >
-                              <span
-                                className="w-2 h-2 rounded-full"
-                                style={{ backgroundColor: tc.color }}
-                              />
+                              <span className="text-sm">{decor.emoji}</span>
                               {tc.categoryName}
                               <span className="text-gray-400">×{tc.uses}</span>
                             </button>
