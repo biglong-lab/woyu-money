@@ -36,6 +36,7 @@ import {
   FamilyBiggestWinsCard,
   FamilyWishesAgingCard,
 } from "@/components/family/ranking-cards"
+import { FamilyMembersCard } from "@/components/family/family-members-card"
 import { motion } from "framer-motion"
 import confetti from "canvas-confetti"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -666,6 +667,9 @@ export default function FamilyPage() {
 
       {/* 本週家庭善心故事 */}
       <FamilyKindnessStoryCard />
+
+      {/* 家庭成員管理（階段 4.1 邀請基底） */}
+      <FamilyMembersCard />
 
       {/* 未批准提醒（家長忘記 approve）*/}
       <FamilyStalePendingTasksCard />
