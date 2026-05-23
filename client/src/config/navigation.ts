@@ -365,7 +365,8 @@ export const systemNavItems: NavItem[] = [
 // 導航分類配置（新架構：財務助理優先 + 兩大核心 + 系統管理）
 export const navigationCategories: NavCategory[] = [
   { title: "主要功能", items: mainNavItems },
-  { title: "財務助理", items: decisionNavItems },
+  { title: "💡 核心決策", items: coreDecisionNavItems },
+  { title: "🧰 工具箱", items: toolboxNavItems },
   { title: "付款方式管理", items: managementNavItems },
   { title: "統一查看", items: viewNavItems },
   { title: "系統管理", items: systemNavItems },

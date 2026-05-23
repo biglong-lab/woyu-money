@@ -32,7 +32,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Badge } from "@/components/ui/badge"
 import { CommandPaletteTriggerButton } from "@/components/command-palette"
 import { useAuth } from "@/hooks/use-auth"
@@ -195,9 +195,26 @@ export default function TopNavigation() {
   const [location] = useLocation()
   const [isOpen, setIsOpen] = useState(false)
   // 核心決策預設展開、工具箱與其他分類預設收合
-  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({
-    "decision-core": true,
+  // 展開狀態持久化（localStorage、跨頁面/重新整理保留）
+  const STORAGE_KEY = "topnav.expandedCategories"
+  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>(() => {
+    if (typeof window === "undefined") return { "decision-core": true }
+    try {
+      const saved = window.localStorage.getItem(STORAGE_KEY)
+      if (saved) return JSON.parse(saved) as Record<string, boolean>
+    } catch {
+      // ignore parse errors
+    }
+    return { "decision-core": true }
   })
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    try {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(expandedCategories))
+    } catch {
+      // ignore quota errors
+    }
+  }, [expandedCategories])
   const { user, logoutMutation } = useAuth()
 
   // 查詢待處理單據數量
