@@ -926,13 +926,7 @@ export default function FinancialDashboardPage() {
             <li>✅ 已實現收入：每日從 PM 系統拉 daily_revenue_snapshots</li>
             <li>✅ 已實現支出：手動 + AI 掃描 + PM 帳單 webhook + 週期性模板自動產出</li>
             <li>✅ 人事成本：v3 拆 7 筆（薪資/勞保/健保/勞退 × 雇主/員工自付）</li>
-            <li>
-              ⏳ 未來預訂：可在「
-              <a href="/forecast-input" className="text-indigo-600 underline">
-                預訂金額輸入
-              </a>
-              」頁手動填、或由 PMS 系統推送
-            </li>
+            <li>⏳ 未來預訂：由 PMS 系統自動推送（無需手動）</li>
             <li>📊 推估模型：「離月底 N 天累積比率」法、資料累積 3+ 月後信心會升級</li>
           </ul>
         </CardContent>

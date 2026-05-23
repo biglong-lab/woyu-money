@@ -915,7 +915,7 @@ export default function HouseholdBudget() {
               <div className="sticky bottom-0 z-10 bg-white border-t p-3 flex flex-col gap-2">
                 <div className="flex justify-between items-center text-[10px] text-gray-400 px-1">
                   <a
-                    href="/household-category-management"
+                    href="/categories"
                     className="underline hover:text-amber-600"
                     data-testid="link-manage-categories"
                   >
@@ -1033,7 +1033,7 @@ export default function HouseholdBudget() {
             variant="outline"
             className="flex items-center gap-2"
             onClick={() => {
-              window.location.href = "/household-category-management"
+              window.location.href = "/categories"
             }}
             data-testid="button-manage-categories"
           >

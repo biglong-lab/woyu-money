@@ -36,12 +36,10 @@ import RevenueReports from "@/pages/revenue-reports"
 import RevenueCompare from "@/pages/revenue-compare"
 import Settings from "@/pages/settings"
 import AccountSettings from "@/pages/account-settings"
-import CategoryManagement from "@/pages/category-management"
 import ContractDetail from "@/pages/contract-detail"
 import IntegratedPaymentAnalysisOptimized from "@/pages/integrated-payment-analysis-optimized"
 import PaymentProjectStatsOptimized from "@/pages/payment-project-stats-optimized"
 import PaymentReports from "@/pages/payment-reports"
-import SimpleCategoryManagement from "@/pages/simple-category-management"
 import CategoriesUnifiedPage from "@/pages/categories-unified"
 import DataQualityPage from "@/pages/data-quality"
 import PropertyGroupsManagement from "@/pages/property-groups-management"
@@ -52,16 +50,9 @@ import FamilyKidPage from "@/pages/family-kid"
 import PropertyPLReport from "@/pages/property-pl-report"
 import VarianceReport from "@/pages/variance-report"
 import FinancialOverviewV2 from "@/pages/financial-overview-v2"
-import ProjectSpecificItemsManagement from "@/pages/project-specific-items-management"
-import UnifiedProjectTemplateManagement from "@/pages/unified-project-template-management"
-import ProjectTemplateManagement from "@/pages/project-template-management"
 import UserManagement from "@/pages/user-management"
-import FeatureShowcase from "@/pages/feature-showcase"
-
-import UnifiedPaymentSimple from "@/pages/unified-payment-simple"
 import PaymentProject from "@/pages/payment-project"
 import PaymentSchedule from "@/pages/payment-schedule-optimized"
-import FinancialOverview from "@/pages/financial-overview"
 import RecycleBin from "@/pages/recycle-bin"
 import ProjectBudgetManagement from "@/pages/project-budget-management"
 import DocumentInbox from "@/pages/document-inbox"
@@ -70,7 +61,6 @@ import FinancialStatements from "@/pages/financial-statements"
 import HRCostReports from "@/pages/hr-cost-reports"
 import TaxReports from "@/pages/tax-reports"
 import HouseholdBudget from "@/pages/household-budget"
-import HouseholdCategoryManagement from "@/pages/household-category-management"
 import IncomeSourcesManagement from "@/pages/income-sources-management"
 import IncomeWebhooksInbox from "@/pages/income-webhooks-inbox"
 import ExpenseWebhooksInbox from "@/pages/expense-webhooks-inbox"
@@ -86,7 +76,6 @@ import RevenueForecastPage from "@/pages/revenue-forecast"
 import ScenarioSimulatorPage from "@/pages/scenario-simulator"
 import LateFeeSettingsPage from "@/pages/late-fee-settings"
 import FinancialDashboardPage from "@/pages/financial-dashboard"
-import ForecastInputPage from "@/pages/forecast-input"
 
 function Router() {
   const [quickPaymentOpen, setQuickPaymentOpen] = useState(false)
@@ -143,7 +132,6 @@ function Router() {
                 <ProtectedRoute path="/payment-records" component={PaymentRecords} />
 
                 {/* Analysis and Reports */}
-                <ProtectedRoute path="/financial-overview" component={FinancialOverview} />
                 <ProtectedRoute
                   path="/payment-analysis"
                   component={IntegratedPaymentAnalysisOptimized}
@@ -166,27 +154,11 @@ function Router() {
                 {/* Category Management — PR-3 統一頁，舊路徑保留供回滾 */}
                 <ProtectedRoute path="/categories" component={CategoriesUnifiedPage} />
                 <ProtectedRoute path="/settings/data-quality" component={DataQualityPage} />
-                <ProtectedRoute path="/categories-legacy" component={SimpleCategoryManagement} />
-                <ProtectedRoute path="/category-management" component={CategoryManagement} />
                 <ProtectedRoute path="/property-groups" component={PropertyGroupsManagement} />
                 <ProtectedRoute path="/budget-estimates" component={BudgetEstimates} />
                 <ProtectedRoute path="/property-pl" component={PropertyPLReport} />
                 <ProtectedRoute path="/variance-report" component={VarianceReport} />
                 <ProtectedRoute path="/financial-overview-v2" component={FinancialOverviewV2} />
-
-                {/* Template Management */}
-                <ProtectedRoute
-                  path="/project-specific-items"
-                  component={ProjectSpecificItemsManagement}
-                />
-                <ProtectedRoute
-                  path="/unified-project-template-management"
-                  component={UnifiedProjectTemplateManagement}
-                />
-                <ProtectedRoute
-                  path="/project-template-management"
-                  component={ProjectTemplateManagement}
-                />
 
                 {/* System Management */}
                 <ProtectedRoute path="/user-management" component={UserManagement} />
@@ -196,10 +168,6 @@ function Router() {
 
                 {/* Household Management */}
                 <ProtectedRoute path="/household-budget" component={HouseholdBudget} />
-                <ProtectedRoute
-                  path="/household-category-management"
-                  component={HouseholdCategoryManagement}
-                />
 
                 {/* Income Webhook Gateway — 進帳多系統接入 */}
                 <ProtectedRoute path="/income/sources" component={IncomeSourcesManagement} />
@@ -233,13 +201,8 @@ function Router() {
                 <ProtectedRoute path="/cost-overview" component={CostOverview} />
                 <ProtectedRoute path="/family" component={FamilyPage} />
                 <ProtectedRoute path="/family/kid/:id" component={FamilyKidPage} />
-                <ProtectedRoute path="/forecast-input" component={ForecastInputPage} />
-
-                {/* Feature Showcase */}
-                <ProtectedRoute path="/features" component={FeatureShowcase} />
 
                 {/* Other Features */}
-                <ProtectedRoute path="/unified-payment" component={UnifiedPaymentSimple} />
                 <ProtectedRoute path="/settings" component={Settings} />
                 <ProtectedRoute path="/account" component={AccountSettings} />
                 <ProtectedRoute path="/contract/:id" component={ContractDetail} />
