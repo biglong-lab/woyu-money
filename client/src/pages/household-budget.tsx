@@ -32,6 +32,8 @@ import type { HouseholdExpense } from "@shared/schema/household"
 import type { DebtCategory } from "@shared/schema/category"
 import { BackToTop } from "@/components/back-to-top"
 import { ReceiptUploadButton } from "@/components/receipt-upload-button"
+import { AmountKeypad } from "@/components/amount-keypad"
+import { useIsMobile } from "@/hooks/use-mobile"
 
 // API 回應型別定義（對齊 server /api/household/budget 和 /api/household/stats）
 interface MonthlyBudgetResponse {
@@ -127,8 +129,14 @@ export default function HouseholdBudget() {
 
   const { toast } = useToast()
   const copyAmount = useCopyAmount()
+  const isMobile = useIsMobile()
   const [showQuickAdd, setShowQuickAdd] = useState(false)
   const [quickAddReceiptUrl, setQuickAddReceiptUrl] = useState<string | null>(null)
+  // 大鍵盤切換：手機預設開、桌面預設關
+  const [useKeypad, setUseKeypad] = useState<boolean>(false)
+  useEffect(() => {
+    if (isMobile) setUseKeypad(true)
+  }, [isMobile])
 
   // ?quickAdd=1 → 自動開快速記帳（FAB 從其他頁來的 deeplink）
   useEffect(() => {
@@ -391,18 +399,37 @@ export default function HouseholdBudget() {
               </DialogHeader>
               <form onSubmit={quickAddForm.handleSubmit(onQuickAdd)} className="space-y-4">
                 <div>
-                  <Label htmlFor="amount">
-                    金額 <span className="text-red-500">*</span>
-                  </Label>
-                  <Input
-                    id="amount"
-                    type="number"
-                    step="0.01"
-                    placeholder="輸入金額"
-                    onFocus={(e) => e.target.select()}
-                    autoFocus
-                    {...quickAddForm.register("amount", { required: true })}
-                  />
+                  <div className="flex items-center justify-between mb-1">
+                    <Label htmlFor="amount">
+                      金額 <span className="text-red-500">*</span>
+                    </Label>
+                    <button
+                      type="button"
+                      onClick={() => setUseKeypad((v) => !v)}
+                      className="text-[10px] text-gray-500 underline"
+                    >
+                      {useKeypad ? "切換鍵盤輸入" : "切換大鍵盤"}
+                    </button>
+                  </div>
+                  {!useKeypad && (
+                    <Input
+                      id="amount"
+                      type="number"
+                      step="0.01"
+                      placeholder="輸入金額"
+                      onFocus={(e) => e.target.select()}
+                      autoFocus
+                      inputMode="decimal"
+                      {...quickAddForm.register("amount", { required: true })}
+                    />
+                  )}
+                  {useKeypad && (
+                    <AmountKeypad
+                      value={quickAddForm.watch("amount") || ""}
+                      onChange={(v) => quickAddForm.setValue("amount", v, { shouldValidate: true })}
+                      onConfirm={() => quickAddForm.handleSubmit(onQuickAdd)()}
+                    />
+                  )}
                 </div>
                 <div>
                   <Label htmlFor="categoryId">
