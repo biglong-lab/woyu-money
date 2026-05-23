@@ -404,6 +404,172 @@ router.post(
 )
 
 /**
+ * GET /api/household/anomalies?month=YYYY-MM
+ * 異常偵測 3 條規則：
+ *  1. 單筆 > 該分類過去 3 月平均 + 2σ（離群值）
+ *  2. 同日同分類重複筆數 > 3（可能重複輸入）
+ *  3. 過去 3 月有但本月沒記過的固定分類（缺記提醒）
+ */
+router.get(
+  "/api/household/anomalies",
+  asyncHandler(async (req, res) => {
+    const { year, month } = parseYearMonth(req.query.month as string | undefined)
+    const monthStr = `${year}-${String(month).padStart(2, "0")}`
+    const startDate = `${monthStr}-01`
+    const endY = month === 12 ? year + 1 : year
+    const endM = month === 12 ? 1 : month + 1
+    const endDate = `${endY}-${String(endM).padStart(2, "0")}-01`
+
+    // 過去 3 月起點
+    let py = year
+    let pm = month - 3
+    while (pm <= 0) {
+      pm += 12
+      py -= 1
+    }
+    const past3Start = `${py}-${String(pm).padStart(2, "0")}-01`
+
+    interface Anomaly {
+      type: "outlier" | "duplicate" | "missing"
+      severity: "info" | "warn" | "alert"
+      title: string
+      detail: string
+      expenseId?: number
+    }
+    const anomalies: Anomaly[] = []
+
+    // 規則 1: 離群值 — 對本月每筆、跟過去 3 月同分類的 avg + stddev 比
+    const outlierRows = await db.execute(sql`
+      WITH past_stats AS (
+        SELECT
+          category_id,
+          AVG(amount::numeric) AS avg_amt,
+          STDDEV(amount::numeric) AS sd_amt,
+          COUNT(*)::int AS n
+        FROM household_expenses
+        WHERE date >= ${past3Start}::date AND date < ${startDate}::date
+        GROUP BY category_id
+      )
+      SELECT
+        he.id,
+        he.amount::numeric AS amt,
+        he.date::text AS d,
+        he.description,
+        COALESCE(fc.category_name, '(未分類)') AS cname,
+        ps.avg_amt::numeric AS avg_amt,
+        ps.sd_amt::numeric AS sd_amt,
+        ps.n
+      FROM household_expenses he
+      LEFT JOIN fixed_categories fc ON he.category_id = fc.id
+      JOIN past_stats ps ON ps.category_id = he.category_id
+      WHERE he.date >= ${startDate}::date AND he.date < ${endDate}::date
+        AND ps.n >= 5
+        AND ps.sd_amt IS NOT NULL
+        AND ps.sd_amt > 0
+        AND he.amount::numeric > ps.avg_amt + 2 * ps.sd_amt
+      ORDER BY he.amount::numeric DESC
+      LIMIT 5
+    `)
+    for (const r of (
+      outlierRows as unknown as {
+        rows: {
+          id: number
+          amt: string
+          d: string
+          description: string | null
+          cname: string
+          avg_amt: string
+          sd_amt: string
+        }[]
+      }
+    ).rows) {
+      const amt = parseFloat(r.amt)
+      const avg = parseFloat(r.avg_amt)
+      const sd = parseFloat(r.sd_amt)
+      const sigma = sd > 0 ? Math.round(((amt - avg) / sd) * 10) / 10 : 0
+      anomalies.push({
+        type: "outlier",
+        severity: sigma > 3 ? "alert" : "warn",
+        title: `「${r.cname}」異常大筆 NT$ ${Math.round(amt).toLocaleString()}`,
+        detail: `${r.d.slice(0, 10)} · ${r.description ?? "(無說明)"} · 高於該分類過去 3 月平均 ${Math.round(avg).toLocaleString()} 約 ${sigma}σ`,
+        expenseId: r.id,
+      })
+    }
+
+    // 規則 2: 同日同分類重複筆數 > 3
+    const dupRows = await db.execute(sql`
+      SELECT
+        he.date::text AS d,
+        COALESCE(fc.category_name, '(未分類)') AS cname,
+        COUNT(*)::int AS cnt,
+        COALESCE(SUM(he.amount::numeric), 0)::text AS total
+      FROM household_expenses he
+      LEFT JOIN fixed_categories fc ON he.category_id = fc.id
+      WHERE he.date >= ${startDate}::date AND he.date < ${endDate}::date
+      GROUP BY he.date, fc.category_name
+      HAVING COUNT(*) > 3
+      ORDER BY COUNT(*) DESC
+      LIMIT 5
+    `)
+    for (const r of (
+      dupRows as unknown as { rows: { d: string; cname: string; cnt: number; total: string }[] }
+    ).rows) {
+      anomalies.push({
+        type: "duplicate",
+        severity: "warn",
+        title: `${r.d.slice(0, 10)} 「${r.cname}」記了 ${r.cnt} 次`,
+        detail: `同日同分類共 NT$ ${Math.round(parseFloat(r.total)).toLocaleString()}、檢查是否重複輸入`,
+      })
+    }
+
+    // 規則 3: 固定分類本月未記
+    const missingRows = await db.execute(sql`
+      WITH past_cats AS (
+        SELECT category_id, COUNT(*)::int AS n
+        FROM household_expenses
+        WHERE date >= ${past3Start}::date AND date < ${startDate}::date
+          AND category_id IS NOT NULL
+        GROUP BY category_id
+        HAVING COUNT(*) >= 3
+      ),
+      curr_cats AS (
+        SELECT DISTINCT category_id
+        FROM household_expenses
+        WHERE date >= ${startDate}::date AND date < ${endDate}::date
+          AND category_id IS NOT NULL
+      )
+      SELECT
+        COALESCE(fc.category_name, '(未分類)') AS cname,
+        pc.n AS past_count
+      FROM past_cats pc
+      LEFT JOIN fixed_categories fc ON pc.category_id = fc.id
+      WHERE pc.category_id NOT IN (SELECT category_id FROM curr_cats)
+      ORDER BY pc.n DESC
+      LIMIT 5
+    `)
+    // 只在月過 50%+ 才提示（月初剛開始記不需要警告）
+    const today = new Date()
+    const isCurrMonth = today.getFullYear() === year && today.getMonth() + 1 === month
+    const daysInMonth = new Date(year, month, 0).getDate()
+    const dayOfMonth = isCurrMonth ? today.getDate() : daysInMonth
+    const monthPct = Math.round((dayOfMonth / daysInMonth) * 100)
+    if (monthPct >= 50) {
+      for (const r of (missingRows as unknown as { rows: { cname: string; past_count: number }[] })
+        .rows) {
+        anomalies.push({
+          type: "missing",
+          severity: "info",
+          title: `「${r.cname}」本月還沒記過`,
+          detail: `過去 3 月共記 ${r.past_count} 次的固定分類、月過 ${monthPct}% 仍空白、檢查是否漏記`,
+        })
+      }
+    }
+
+    res.json({ month: monthStr, count: anomalies.length, anomalies })
+  })
+)
+
+/**
  * GET /api/household/ai-insights?month=YYYY-MM
  * 純規則洞察：4-6 條本月消費觀察
  *  - 預算使用率 vs 月過時間

@@ -577,6 +577,9 @@ export default function HouseholdBudget() {
       {/* AI 消費觀察（純規則洞察） */}
       <AIInsightsCard selectedMonth={selectedMonth} />
 
+      {/* 異常偵測（離群值 / 重複 / 缺記） */}
+      <AnomaliesCard selectedMonth={selectedMonth} />
+
       {/* 年度回顧（過去 12 個月） */}
       <YearlyOverviewCard selectedMonth={selectedMonth} />
 
@@ -1114,6 +1117,72 @@ function MonthlyComparisonCard({
               </span>
             ))}
           </div>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+interface Anomaly {
+  type: "outlier" | "duplicate" | "missing"
+  severity: "info" | "warn" | "alert"
+  title: string
+  detail: string
+  expenseId?: number
+}
+interface AnomaliesResponse {
+  month: string
+  count: number
+  anomalies: Anomaly[]
+}
+
+function AnomaliesCard({ selectedMonth }: { selectedMonth: string }) {
+  const { data, isLoading } = useQuery<AnomaliesResponse>({
+    queryKey: [`/api/household/anomalies?month=${selectedMonth}`],
+    staleTime: 5 * 60 * 1000,
+  })
+
+  if (isLoading || !data || data.anomalies.length === 0) return null
+
+  const sevBorder: Record<Anomaly["severity"], string> = {
+    info: "border-blue-200 bg-blue-50",
+    warn: "border-amber-200 bg-amber-50",
+    alert: "border-rose-200 bg-rose-50",
+  }
+  const sevText: Record<Anomaly["severity"], string> = {
+    info: "text-blue-900",
+    warn: "text-amber-900",
+    alert: "text-rose-900",
+  }
+  const typeIcon: Record<Anomaly["type"], string> = {
+    outlier: "🎯",
+    duplicate: "🔁",
+    missing: "📭",
+  }
+
+  return (
+    <Card className="border-2 border-orange-300 bg-gradient-to-br from-orange-50 to-amber-50">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">🚨 異常偵測</CardTitle>
+        <CardDescription>
+          {data.month} · 偵測到 {data.count} 個可能需要檢查的項目
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-2">
+          {data.anomalies.map((a, i) => (
+            <div
+              key={i}
+              className={`rounded-lg border p-2 ${sevBorder[a.severity]}`}
+              data-testid={`anomaly-${a.type}-${i}`}
+            >
+              <div className={`flex items-center gap-2 font-medium text-sm ${sevText[a.severity]}`}>
+                <span className="text-base">{typeIcon[a.type]}</span>
+                {a.title}
+              </div>
+              <div className="text-xs text-gray-600 mt-1 pl-7">{a.detail}</div>
+            </div>
+          ))}
         </div>
       </CardContent>
     </Card>
