@@ -608,13 +608,15 @@ export interface PmVsPmsRow {
 export async function getPmVsPmsMonthly(): Promise<PmVsPmsRow[]> {
   const result = await db.execute(sql`
     WITH pm_actual AS (
-      SELECT
-        TO_CHAR(start_date, 'YYYY-MM') AS month,
-        SUM(total_amount::numeric)::bigint AS pm_final
-      FROM payment_items
-      WHERE item_type = 'income' AND NOT is_deleted
-        AND start_date >= '2024-01-01'::date
-      GROUP BY 1
+      -- 「PM 實際入帳」改用 PM daily snapshot 最新一筆（合計列）
+      -- 使用者要求「PM 是多少就是多少」、所有頁面對齊同一 source
+      SELECT DISTINCT ON (target_month)
+        target_month AS month,
+        accumulated_revenue::bigint AS pm_final
+      FROM revenue_forecast_snapshots
+      WHERE source = 'pm-daily-snapshot'
+        AND company_id IS NULL
+      ORDER BY target_month, snapshot_date DESC
     ),
     -- 每個（target_month, company_id）取最新 snapshot
     pms_latest AS (
