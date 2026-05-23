@@ -6,6 +6,9 @@ import { asyncHandler, AppError } from "../middleware/error-handler"
 import { db } from "../db"
 import { sql } from "drizzle-orm"
 import { localMonthTPE } from "@shared/date-utils"
+import { recognizeDocument } from "../document-ai"
+import fs from "fs"
+import path from "path"
 
 const router = Router()
 
@@ -361,6 +364,42 @@ router.post(
 
     const filePaths = files.map((file) => `/uploads/receipts/${file.filename}`)
     res.json({ imagePaths: filePaths })
+  })
+)
+
+/**
+ * POST /api/household/recognize-receipt
+ * Body: { imageUrl: "/uploads/receipts/xxx.jpg" }
+ * 從上傳的收據圖跑 AI 辨識、回 { vendor, amount, date, category, description }
+ * 給 quick-add dialog 自動填表單用、節省手 key 時間
+ */
+router.post(
+  "/api/household/recognize-receipt",
+  asyncHandler(async (req, res) => {
+    const imageUrl = String(req.body?.imageUrl ?? "")
+    if (!imageUrl) throw new AppError(400, "imageUrl 必填")
+    if (!imageUrl.startsWith("/uploads/")) throw new AppError(400, "imageUrl 必須以 /uploads/ 開頭")
+
+    // 路徑安全：禁止 .. 跳出 uploads 目錄
+    const safe = path.normalize(imageUrl).replace(/^\/+/, "")
+    if (!safe.startsWith("uploads/") || safe.includes("..")) {
+      throw new AppError(400, "imageUrl 不合法")
+    }
+    const absPath = path.join(process.cwd(), safe)
+    if (!fs.existsSync(absPath)) throw new AppError(404, "檔案不存在")
+
+    const buf = fs.readFileSync(absPath)
+    const base64 = buf.toString("base64")
+    const ext = path.extname(safe).toLowerCase()
+    const mimeType = ext === ".png" ? "image/png" : ext === ".webp" ? "image/webp" : "image/jpeg"
+
+    const result = await recognizeDocument(base64, mimeType, "bill")
+    res.json({
+      success: result.success,
+      confidence: result.confidence,
+      extracted: result.extractedData,
+      error: result.error,
+    })
   })
 )
 

@@ -171,4 +171,5 @@
 - `2026-05-23` **階段 1.3** /income/inbox 加「⚡ 一鍵確認 PM 全部」按鈕 + 後端 `POST /api/income/webhooks/auto-confirm-by-source` endpoint、用 source.defaultProjectId 自動 confirm 全部 pending（解決 372 筆 $773K 積壓的核心入口）（commit `a8116b5`）
 - `2026-05-23` **階段 1.4** log 改可觀察：新增 `server/storage/tick-log.ts` in-memory ring buffer（max 100）+ scheduler 各 tick 結果記錄（forecast-snapshot / pms-sync / pm-revenue-sync）+ `GET /api/admin/cron-tick-logs` endpoint；用 `process.stdout.write` 進 docker logs 方便外部觀察（commit `bea048b`）
 - `2026-05-23` **階段 2.1** FAB 加「🏠 家用記帳」action（deeplink `/household-budget?quickAdd=1`）+ 頁面響應 query 自動開 quick-add dialog；FAB 桌面 + 手機都顯示（移除 hidden md:block、手機 bottom-20 避開 TabBar）（commit `20d95cc`）
-- `2026-05-23` **階段 2.2** quick-add dialog「拍照存證」placeholder 換真的 `ReceiptUploadButton`、提交時 receiptImages array 帶到 `/api/household/expenses`（後端已支援 `receipt_images` jsonb）；下輪做 AI 自動辨識金額/分類填表
+- `2026-05-23` **階段 2.2** quick-add dialog「拍照存證」placeholder 換真的 `ReceiptUploadButton`、提交時 receiptImages array 帶到 `/api/household/expenses`（後端已支援 `receipt_images` jsonb）（commit `802866c`）
+- `2026-05-23` **階段 2.3** 拍照 → AI 自動填表：新增 `POST /api/household/recognize-receipt`（從 /uploads/ URL 讀檔 + recognizeDocument 跑 Gemini 辨識）+ quick-add UI「✨ AI 自動填金額/品項/日期」按鈕、自動 setValue 金額/日期/備註/分類（模糊匹配 householdCategories）

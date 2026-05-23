@@ -196,6 +196,81 @@ export default function HouseholdBudget() {
     },
   })
 
+  // AI 辨識收據自動填表
+  const recognizeMutation = useMutation<
+    {
+      success: boolean
+      confidence: number
+      extracted: {
+        vendor?: string
+        amount?: number
+        date?: string
+        category?: string
+        description?: string
+      }
+      error?: string
+    },
+    Error,
+    string
+  >({
+    mutationFn: (imageUrl: string) =>
+      apiRequest("POST", "/api/household/recognize-receipt", { imageUrl }) as Promise<{
+        success: boolean
+        confidence: number
+        extracted: {
+          vendor?: string
+          amount?: number
+          date?: string
+          category?: string
+          description?: string
+        }
+        error?: string
+      }>,
+    onSuccess: (data) => {
+      if (!data.success) {
+        toast({ title: "辨識失敗", description: data.error || "請手動填", variant: "destructive" })
+        return
+      }
+      const e = data.extracted
+      const filled: string[] = []
+      if (e.amount != null && e.amount > 0) {
+        quickAddForm.setValue("amount", String(e.amount))
+        filled.push(`金額 $${e.amount}`)
+      }
+      if (e.date) {
+        // 嘗試解析 YYYY-MM-DD 格式
+        const m = e.date.match(/(\d{4})[-/](\d{1,2})[-/](\d{1,2})/)
+        if (m) {
+          const iso = `${m[1]}-${m[2].padStart(2, "0")}-${m[3].padStart(2, "0")}`
+          quickAddForm.setValue("date", iso)
+          filled.push(`日期 ${iso}`)
+        }
+      }
+      if (e.vendor || e.description) {
+        const desc = [e.vendor, e.description].filter(Boolean).join(" - ")
+        quickAddForm.setValue("description", desc)
+        filled.push("備註")
+      }
+      // category 模糊匹配 householdCategories 名稱
+      if (e.category && householdCategories.length > 0) {
+        const matched = householdCategories.find(
+          (c) => c.categoryName.includes(e.category!) || e.category!.includes(c.categoryName)
+        )
+        if (matched) {
+          quickAddForm.setValue("categoryId", String(matched.id))
+          filled.push(`分類 ${matched.categoryName}`)
+        }
+      }
+      toast({
+        title: `✨ 辨識完成（信心 ${Math.round(data.confidence * 100)}%）`,
+        description: filled.length > 0 ? `已自動填：${filled.join("、")}` : "未取得可用資料",
+      })
+    },
+    onError: (err) => {
+      toast({ title: "辨識請求失敗", description: err.message, variant: "destructive" })
+    },
+  })
+
   // 刪除支出
   const deleteExpenseMutation = useMutation({
     mutationFn: (id: number) => apiRequest("DELETE", `/api/household-expenses/${id}`),
@@ -400,6 +475,18 @@ export default function HouseholdBudget() {
                     value={quickAddReceiptUrl}
                     onChange={setQuickAddReceiptUrl}
                   />
+                  {quickAddReceiptUrl && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="mt-2 gap-1 text-purple-700 border-purple-300 hover:bg-purple-50"
+                      disabled={recognizeMutation.isPending}
+                      onClick={() => recognizeMutation.mutate(quickAddReceiptUrl)}
+                    >
+                      {recognizeMutation.isPending ? "🤖 辨識中…" : "✨ AI 自動填金額/品項/日期"}
+                    </Button>
+                  )}
                 </div>
                 <div className="flex justify-end gap-2">
                   <Button type="button" variant="outline" onClick={() => setShowQuickAdd(false)}>
