@@ -202,6 +202,13 @@
   - 規則 3 (missing)：過去 3 月有 ≥ 3 筆但本月空白的固定分類（僅月過 50%+ 提示）
   - 新增 `AnomaliesCard`、3 種 severity + 3 種 type icon
   - 階段 3 報表深度 + AI 助手全完成、進階段 4 家庭多人協作（commit `d3c5211`）
+- `2026-05-23` **階段 4.3** 跨領域整合視圖：
+  - 新增 `GET /api/family/cross-domain-overview?month=YYYY-MM`
+  - 聚合 5 KPI：家用支出 / 小孩任務 / PM 確認收入 / PMS 完成收入 / 待批准
+  - safeSum wrapper：單一 query 失敗不拖垮整體（log to stdout、回 0）
+  - 計算總收 / 總支 / 淨流入流出
+  - 新增 `FamilyCrossDomainCard`、含月份切換 + 5 KPI tile + 3 summary row
+  - 放在 /family 頁、FamilyMembersCard 前（commit `77b8b4a`）
 - `2026-05-23` **階段 4.2** 家庭預算變更歷程基底：
   - 新增 schema `household_budget_changes`（每次變更記人、舊金額、新金額、差額、原因）
   - 修改 `POST /api/household/budget` 變更後 insert change log（同金額重複保存自動跳過）
