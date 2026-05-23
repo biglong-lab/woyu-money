@@ -202,3 +202,10 @@
   - 規則 3 (missing)：過去 3 月有 ≥ 3 筆但本月空白的固定分類（僅月過 50%+ 提示）
   - 新增 `AnomaliesCard`、3 種 severity + 3 種 type icon
   - 階段 3 報表深度 + AI 助手全完成、進階段 4 家庭多人協作（commit `d3c5211`）
+- `2026-05-23` **階段 4.1** 家庭成員邀請基底：
+  - 新增 schema `family_members`（family_id / user_id / email / role / status / invite_token）
+  - 後端 `GET /api/family/members`、`POST /api/family/members/invite`、`POST /api/family/members/:id/cancel`
+  - 不發 email、回傳 inviteLink 讓使用者手動轉發
+  - 新增 `FamilyMembersCard`、放在 /family 頁、含邀請 dialog + 取消按鈕
+  - 此階段先做骨架、不影響現有權限系統、不動現有資料
+  - 生產 schema 用 pg_dump CREATE TABLE SQL 透過 SSH cat | docker exec psql 手動套用（避免 drizzle-kit push interactive 風險）（commit `b07a019`）
