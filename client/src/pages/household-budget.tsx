@@ -78,6 +78,7 @@ interface QuickAddFormData {
 
 interface BudgetFormData {
   monthlyBudget: string
+  reason?: string
 }
 
 interface AddExpensePayload {
@@ -92,6 +93,7 @@ interface AddExpensePayload {
 interface SetBudgetPayload {
   budgetAmount: number
   month: string
+  reason?: string
 }
 
 export default function HouseholdBudget() {
@@ -288,6 +290,7 @@ export default function HouseholdBudget() {
       const budgetData: SetBudgetPayload = {
         budgetAmount: parseFloat(data.monthlyBudget),
         month: selectedMonth,
+        reason: data.reason?.trim() || undefined,
       }
       return await apiRequest("POST", "/api/household/budget", budgetData)
     },
@@ -527,6 +530,14 @@ export default function HouseholdBudget() {
                     {...budgetForm.register("monthlyBudget", { required: true })}
                   />
                 </div>
+                <div>
+                  <Label htmlFor="budgetReason">變更原因（選填、留下紀錄）</Label>
+                  <Input
+                    id="budgetReason"
+                    placeholder="例如：因油價上漲、調整交通預算"
+                    {...budgetForm.register("reason")}
+                  />
+                </div>
                 <div className="flex justify-end gap-2">
                   <Button type="button" variant="outline" onClick={() => setShowBudgetSetup(false)}>
                     取消
@@ -582,6 +593,9 @@ export default function HouseholdBudget() {
 
       {/* 年度回顧（過去 12 個月） */}
       <YearlyOverviewCard selectedMonth={selectedMonth} />
+
+      {/* 預算變更歷程（階段 4.2 共決基底） */}
+      <BudgetChangesCard selectedMonth={selectedMonth} />
 
       {/* 本月預算概況 */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -1117,6 +1131,105 @@ function MonthlyComparisonCard({
               </span>
             ))}
           </div>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+interface BudgetChange {
+  id: number
+  year: number
+  month: number
+  oldAmount: string | null
+  newAmount: string
+  diffAmount: string | null
+  changedByUserId: number | null
+  changedByName: string | null
+  reason: string | null
+  action: "create" | "update"
+  createdAt: string
+  username: string | null
+  userFullName: string | null
+}
+
+function BudgetChangesCard({ selectedMonth }: { selectedMonth: string }) {
+  const { data = [], isLoading } = useQuery<BudgetChange[]>({
+    queryKey: [`/api/household/budget/changes?month=${selectedMonth}`],
+  })
+
+  if (isLoading || data.length === 0) return null
+
+  return (
+    <Card className="border-2 border-slate-300 bg-gradient-to-br from-slate-50 to-gray-50">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">📜 預算變更歷程</CardTitle>
+        <CardDescription>
+          {selectedMonth} · 共 {data.length} 次變更（最近 50 筆）
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-2">
+          {data.map((c) => {
+            const who = c.userFullName || c.username || c.changedByName || "—"
+            const ts = new Date(c.createdAt).toLocaleString("zh-TW", {
+              year: "numeric",
+              month: "2-digit",
+              day: "2-digit",
+              hour: "2-digit",
+              minute: "2-digit",
+            })
+            const isCreate = c.action === "create"
+            const newAmt = Math.round(parseFloat(c.newAmount)).toLocaleString()
+            const oldAmt = c.oldAmount ? Math.round(parseFloat(c.oldAmount)).toLocaleString() : null
+            const diff = c.diffAmount ? Math.round(parseFloat(c.diffAmount)) : 0
+            return (
+              <div
+                key={c.id}
+                className="rounded-lg border bg-white p-2"
+                data-testid={`budget-change-${c.id}`}
+              >
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <div className="flex items-center gap-2 text-sm">
+                    <Badge
+                      variant="outline"
+                      className={
+                        isCreate
+                          ? "border-emerald-300 text-emerald-700"
+                          : "border-blue-300 text-blue-700"
+                      }
+                    >
+                      {isCreate ? "✨ 新建" : "✏️ 修改"}
+                    </Badge>
+                    <span className="font-medium">{who}</span>
+                    <span className="text-[10px] text-gray-400">{ts}</span>
+                  </div>
+                  <div className="text-sm font-bold">
+                    {oldAmt ? (
+                      <>
+                        <span className="text-gray-500 line-through">NT$ {oldAmt}</span>
+                        <span className="mx-1 text-gray-400">→</span>
+                        <span className="text-gray-900">NT$ {newAmt}</span>
+                        <span
+                          className={`ml-2 text-xs ${diff > 0 ? "text-rose-600" : diff < 0 ? "text-emerald-600" : "text-gray-500"}`}
+                        >
+                          {diff > 0 ? "+" : ""}
+                          {diff.toLocaleString()}
+                        </span>
+                      </>
+                    ) : (
+                      <span className="text-gray-900">NT$ {newAmt}</span>
+                    )}
+                  </div>
+                </div>
+                {c.reason && (
+                  <div className="text-xs text-gray-600 mt-1 pl-2 border-l-2 border-slate-300">
+                    💬 {c.reason}
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </div>
       </CardContent>
     </Card>

@@ -158,23 +158,27 @@ router.get(
 router.post(
   "/api/household/budget",
   asyncHandler(async (req, res) => {
-    const { month: monthStr, budgetAmount, notes } = req.body ?? {}
+    const { month: monthStr, budgetAmount, notes, reason } = req.body ?? {}
     const { year, month } = parseYearMonth(monthStr)
     const amt = String(budgetAmount ?? "")
     if (!/^\d+(\.\d{1,2})?$/.test(amt) || Number(amt) < 0) {
       throw new AppError(400, "budgetAmount 需為非負數字（最多兩位小數）")
     }
 
-    // 手動 upsert（household_budgets 沒有 UNIQUE constraint、ON CONFLICT 用不了）
+    // 取舊預算（給 change log）
     const existRows = await db.execute(sql`
-      SELECT id FROM household_budgets
+      SELECT id, budget_amount::text AS "budgetAmount" FROM household_budgets
       WHERE year = ${year} AND month = ${month} AND category_id = ${TOTAL_BUDGET_CATEGORY_ID}
       LIMIT 1
     `)
-    const existing = (existRows as unknown as { rows: { id: number }[] }).rows[0]
+    const existing = (existRows as unknown as { rows: { id: number; budgetAmount: string }[] })
+      .rows[0]
+    const oldAmount = existing ? parseFloat(existing.budgetAmount) : null
 
     let result: { id: number; budgetAmount: string } | undefined
+    let action: "create" | "update" = "create"
     if (existing) {
+      action = "update"
       const updateRes = await db.execute(sql`
         UPDATE household_budgets
         SET budget_amount = ${amt}, notes = COALESCE(${notes ?? null}, notes), updated_at = NOW()
@@ -190,11 +194,70 @@ router.post(
       `)
       result = (insertRes as unknown as { rows: { id: number; budgetAmount: string }[] }).rows[0]
     }
+
+    // 寫變更歷程（階段 4.2）— 跳過「同金額重複保存」
+    const newAmount = parseFloat(amt)
+    const isNoop = action === "update" && oldAmount !== null && oldAmount === newAmount
+    if (!isNoop) {
+      const reqUser = (req as { user?: { id: number; fullName?: string; username?: string } }).user
+      const diff = oldAmount === null ? newAmount : newAmount - oldAmount
+      try {
+        await db.execute(sql`
+          INSERT INTO household_budget_changes
+            (family_id, year, month, category_id, old_amount, new_amount, diff_amount,
+             changed_by_user_id, changed_by_name, reason, action, created_at)
+          VALUES
+            (1, ${year}, ${month}, ${TOTAL_BUDGET_CATEGORY_ID},
+             ${oldAmount}, ${newAmount}, ${diff},
+             ${reqUser?.id ?? null},
+             ${reqUser?.fullName ?? reqUser?.username ?? null},
+             ${reason ?? null},
+             ${action}, NOW())
+        `)
+      } catch (e) {
+        // log 寫失敗不應影響主流程
+        process.stdout.write(`[budget-change-log] insert failed: ${(e as Error).message}\n`)
+      }
+    }
+
     res.status(201).json({
       month: `${year}-${String(month).padStart(2, "0")}`,
       budgetAmount: result?.budgetAmount ?? amt,
       id: result?.id ?? null,
     })
+  })
+)
+
+/**
+ * GET /api/household/budget/changes?month=YYYY-MM
+ * 取該月預算變更歷程（按時間倒序）
+ */
+router.get(
+  "/api/household/budget/changes",
+  asyncHandler(async (req, res) => {
+    const { year, month } = parseYearMonth(req.query.month as string | undefined)
+    const rows = await db.execute(sql`
+      SELECT
+        hbc.id,
+        hbc.year,
+        hbc.month,
+        hbc.old_amount::text AS "oldAmount",
+        hbc.new_amount::text AS "newAmount",
+        hbc.diff_amount::text AS "diffAmount",
+        hbc.changed_by_user_id AS "changedByUserId",
+        hbc.changed_by_name AS "changedByName",
+        hbc.reason,
+        hbc.action,
+        hbc.created_at AS "createdAt",
+        u.username,
+        u.full_name AS "userFullName"
+      FROM household_budget_changes hbc
+      LEFT JOIN users u ON u.id = hbc.changed_by_user_id
+      WHERE hbc.year = ${year} AND hbc.month = ${month}
+      ORDER BY hbc.created_at DESC
+      LIMIT 50
+    `)
+    res.json((rows as unknown as { rows: unknown[] }).rows)
   })
 )
 
