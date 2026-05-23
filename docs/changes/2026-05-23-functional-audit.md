@@ -195,3 +195,10 @@
   - 6 條規則：預算進度 vs 月過 / 最大分類佔比 / 上月差異 / Top 1 大筆 / 高頻分類 / 沒記帳/沒設預算
   - 新增 `AIInsightsCard`、4 種 tone（info/good/warn/alert）+ icon
   - 不需 Claude API key、即時生效、本地 PG 算完回傳（commit `71fadf8`）
+- `2026-05-23` **階段 3.4** 異常偵測：
+  - 後端新增 `GET /api/household/anomalies?month=YYYY-MM`
+  - 規則 1 (outlier)：單筆 > 該分類過去 3 月平均 + 2σ（baseline 需 ≥ 5 筆）
+  - 規則 2 (duplicate)：同日同分類筆數 > 3
+  - 規則 3 (missing)：過去 3 月有 ≥ 3 筆但本月空白的固定分類（僅月過 50%+ 提示）
+  - 新增 `AnomaliesCard`、3 種 severity + 3 種 type icon
+  - 階段 3 報表深度 + AI 助手全完成、進階段 4 家庭多人協作（commit `d3c5211`）
