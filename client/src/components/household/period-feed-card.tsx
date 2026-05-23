@@ -10,12 +10,12 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
 import { apiRequest } from "@/lib/queryClient"
 import { cn } from "@/lib/utils"
-import { Calendar, CalendarDays, CalendarRange, Trash2 } from "lucide-react"
+import { Calendar, CalendarDays, CalendarRange } from "lucide-react"
 import { getCategoryDecor } from "@/lib/category-emoji"
+import { SwipeableExpenseRow } from "@/components/household/swipeable-expense-row"
 
 type Period = "today" | "week" | "month"
 
@@ -118,59 +118,64 @@ export function PeriodFeedCard() {
         )}
         {!isLoading && data && data.expenses.length > 0 && (
           <div className="space-y-1.5 max-h-96 overflow-y-auto">
+            <div className="text-[9px] text-gray-400 text-center pb-1">← 左滑刪除 · 右滑複製 →</div>
             {data.expenses.map((e) => {
               const decor = getCategoryDecor(e.categoryName)
               return (
-                <div
+                <SwipeableExpenseRow
                   key={e.id}
-                  className="flex items-center gap-2 bg-white rounded-lg border p-2 group"
-                  data-testid={`expense-row-${e.id}`}
+                  onDelete={() => deleteMutation.mutate(e.id)}
+                  onDuplicate={() => {
+                    // 透過 custom event 通知父頁面開啟 quick-add 填表
+                    window.dispatchEvent(
+                      new CustomEvent("household:duplicate-expense", {
+                        detail: {
+                          amount: e.amount,
+                          categoryId: e.categoryId,
+                          description: e.description || "",
+                          paymentMethod: e.paymentMethod || "cash",
+                        },
+                      })
+                    )
+                  }}
+                  className="border"
                 >
-                  <div
-                    className="w-10 h-10 rounded-lg shrink-0 flex items-center justify-center text-lg"
-                    style={{ backgroundColor: `${decor.color}22`, color: decor.color }}
-                  >
-                    {decor.emoji}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-medium text-gray-700 truncate">
-                        {e.categoryName}
-                      </span>
-                      <span className="text-[9px] text-gray-400 shrink-0">
-                        {e.date.slice(5, 10)}
-                      </span>
+                  <div className="flex items-center gap-2 p-2" data-testid={`expense-row-${e.id}`}>
+                    <div
+                      className="w-10 h-10 rounded-lg shrink-0 flex items-center justify-center text-lg"
+                      style={{ backgroundColor: `${decor.color}22`, color: decor.color }}
+                    >
+                      {decor.emoji}
                     </div>
-                    {e.description && (
-                      <div className="text-[10px] text-gray-500 truncate">{e.description}</div>
-                    )}
-                  </div>
-                  <div className="text-right shrink-0">
-                    <div className="text-sm font-bold text-amber-700">
-                      NT$ {Math.round(parseFloat(e.amount)).toLocaleString()}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-medium text-gray-700 truncate">
+                          {e.categoryName}
+                        </span>
+                        <span className="text-[9px] text-gray-400 shrink-0">
+                          {e.date.slice(5, 10)}
+                        </span>
+                      </div>
+                      {e.description && (
+                        <div className="text-[10px] text-gray-500 truncate">{e.description}</div>
+                      )}
                     </div>
-                    <div className="text-[9px] text-gray-400">
-                      {e.paymentMethod === "cash"
-                        ? "💵"
-                        : e.paymentMethod === "card"
-                          ? "💳"
-                          : e.paymentMethod === "mobile_payment"
-                            ? "📱"
-                            : "🏦"}
+                    <div className="text-right shrink-0">
+                      <div className="text-sm font-bold text-amber-700">
+                        NT$ {Math.round(parseFloat(e.amount)).toLocaleString()}
+                      </div>
+                      <div className="text-[9px] text-gray-400">
+                        {e.paymentMethod === "cash"
+                          ? "💵"
+                          : e.paymentMethod === "card"
+                            ? "💳"
+                            : e.paymentMethod === "mobile_payment"
+                              ? "📱"
+                              : "🏦"}
+                      </div>
                     </div>
                   </div>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="opacity-0 group-hover:opacity-100 transition-opacity h-7 w-7 p-0"
-                    onClick={() => {
-                      if (window.confirm("確定刪除這筆？")) deleteMutation.mutate(e.id)
-                    }}
-                    data-testid={`button-delete-${e.id}`}
-                  >
-                    <Trash2 className="w-3 h-3 text-rose-600" />
-                  </Button>
-                </div>
+                </SwipeableExpenseRow>
               )
             })}
           </div>

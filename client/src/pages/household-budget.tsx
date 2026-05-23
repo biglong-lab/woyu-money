@@ -189,6 +189,32 @@ export default function HouseholdBudget() {
       window.history.replaceState({}, "", url.toString())
     }
   }, [])
+
+  // 監聽手勢「複製為新一筆」event（從 SwipeableExpenseRow 觸發）
+  useEffect(() => {
+    function onDuplicateRequest(e: Event): void {
+      const detail = (
+        e as CustomEvent<{
+          amount: string
+          categoryId: number | null
+          description: string
+          paymentMethod: string | null
+        }>
+      ).detail
+      if (!detail) return
+      if (detail.amount) {
+        quickAddForm.setValue("amount", detail.amount, { shouldValidate: true })
+      }
+      if (detail.categoryId) {
+        quickAddForm.setValue("categoryId", String(detail.categoryId), { shouldValidate: true })
+      }
+      if (detail.description) quickAddForm.setValue("description", detail.description)
+      if (detail.paymentMethod) quickAddForm.setValue("paymentMethod", detail.paymentMethod)
+      setShowQuickAdd(true)
+    }
+    window.addEventListener("household:duplicate-expense", onDuplicateRequest)
+    return () => window.removeEventListener("household:duplicate-expense", onDuplicateRequest)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
   const [showBudgetSetup, setShowBudgetSetup] = useState(false)
   const queryClient = useQueryClient()
 

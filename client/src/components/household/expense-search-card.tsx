@@ -13,7 +13,7 @@
  * 預設摺疊、點擊展開（節省版面）
  */
 import { useState, useEffect, useMemo } from "react"
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -28,6 +28,9 @@ import {
 import { cn } from "@/lib/utils"
 import { Search, X, ChevronDown, ChevronUp, Filter } from "lucide-react"
 import { getCategoryDecor } from "@/lib/category-emoji"
+import { SwipeableExpenseRow } from "@/components/household/swipeable-expense-row"
+import { apiRequest } from "@/lib/queryClient"
+import { useToast } from "@/hooks/use-toast"
 
 interface HouseholdCategory {
   id: number
@@ -106,6 +109,21 @@ export function ExpenseSearchCard() {
     queryKey: ["/api/categories/household"],
     staleTime: 10 * 60 * 1000,
     enabled: open,
+  })
+
+  const queryClient = useQueryClient()
+  const { toast } = useToast()
+  const deleteMutation = useMutation<unknown, Error, number>({
+    mutationFn: (id) => apiRequest("DELETE", `/api/household/expenses/${id}`),
+    onSuccess: () => {
+      toast({ title: "已刪除" })
+      queryClient.invalidateQueries({
+        predicate: (q) => String(q.queryKey[0] ?? "").startsWith("/api/household/"),
+      })
+    },
+    onError: (e) => {
+      toast({ title: "刪除失敗", description: e.message, variant: "destructive" })
+    },
   })
 
   function toggleCategory(id: number): void {
@@ -311,37 +329,57 @@ export function ExpenseSearchCard() {
           )}
           {!isLoading && data && data.expenses.length > 0 && (
             <div className="space-y-1 max-h-[60vh] overflow-y-auto">
+              <div className="text-[9px] text-gray-400 text-center pb-1">
+                ← 左滑刪除 · 右滑複製 →
+              </div>
               {data.expenses.map((e) => {
                 const decor = getCategoryDecor(e.categoryName)
                 return (
-                  <div
+                  <SwipeableExpenseRow
                     key={e.id}
-                    className="flex items-center gap-2 bg-white rounded-lg border p-2"
-                    data-testid={`search-result-${e.id}`}
+                    onDelete={() => deleteMutation.mutate(e.id)}
+                    onDuplicate={() => {
+                      window.dispatchEvent(
+                        new CustomEvent("household:duplicate-expense", {
+                          detail: {
+                            amount: e.amount,
+                            categoryId: e.categoryId,
+                            description: e.description || "",
+                            paymentMethod: e.paymentMethod || "cash",
+                          },
+                        })
+                      )
+                    }}
+                    className="border"
                   >
                     <div
-                      className="w-9 h-9 rounded-lg shrink-0 flex items-center justify-center text-base"
-                      style={{ backgroundColor: `${decor.color}22`, color: decor.color }}
+                      className="flex items-center gap-2 p-2"
+                      data-testid={`search-result-${e.id}`}
                     >
-                      {decor.emoji}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-medium text-gray-700 truncate">
-                          {e.categoryName}
-                        </span>
-                        <span className="text-[9px] text-gray-400 shrink-0">
-                          {e.date.slice(0, 10)}
-                        </span>
+                      <div
+                        className="w-9 h-9 rounded-lg shrink-0 flex items-center justify-center text-base"
+                        style={{ backgroundColor: `${decor.color}22`, color: decor.color }}
+                      >
+                        {decor.emoji}
                       </div>
-                      {e.description && (
-                        <div className="text-[10px] text-gray-500 truncate">{e.description}</div>
-                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-medium text-gray-700 truncate">
+                            {e.categoryName}
+                          </span>
+                          <span className="text-[9px] text-gray-400 shrink-0">
+                            {e.date.slice(0, 10)}
+                          </span>
+                        </div>
+                        {e.description && (
+                          <div className="text-[10px] text-gray-500 truncate">{e.description}</div>
+                        )}
+                      </div>
+                      <div className="text-sm font-bold text-amber-700 shrink-0">
+                        NT$ {Math.round(parseFloat(e.amount)).toLocaleString()}
+                      </div>
                     </div>
-                    <div className="text-sm font-bold text-amber-700 shrink-0">
-                      NT$ {Math.round(parseFloat(e.amount)).toLocaleString()}
-                    </div>
-                  </div>
+                  </SwipeableExpenseRow>
                 )
               })}
             </div>
