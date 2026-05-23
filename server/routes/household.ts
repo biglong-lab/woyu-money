@@ -647,6 +647,119 @@ router.delete(
 )
 
 /**
+ * 家用收入 endpoints
+ *   GET    /api/household/incomes?month=YYYY-MM   列出（預設本月）
+ *   POST   /api/household/incomes                 建立
+ *   DELETE /api/household/incomes/:id             刪除
+ *   GET    /api/household/incomes/summary?month=  本月收入總計 + 分類分布
+ */
+router.get(
+  "/api/household/incomes",
+  asyncHandler(async (req, res) => {
+    const { year, month } = parseYearMonth(req.query.month as string | undefined)
+    const startDate = `${year}-${String(month).padStart(2, "0")}-01`
+    const endY = month === 12 ? year + 1 : year
+    const endM = month === 12 ? 1 : month + 1
+    const endDate = `${endY}-${String(endM).padStart(2, "0")}-01`
+    const limit = Math.min(Math.max(parseInt((req.query.limit as string) || "200", 10), 1), 500)
+
+    const rows = await db.execute(sql`
+      SELECT
+        id,
+        family_id      AS "familyId",
+        amount::text   AS amount,
+        category,
+        date::text     AS date,
+        description,
+        payment_method AS "paymentMethod",
+        created_at     AS "createdAt"
+      FROM household_incomes
+      WHERE date >= ${startDate}::date AND date < ${endDate}::date
+      ORDER BY date DESC, id DESC
+      LIMIT ${limit}
+    `)
+    res.json((rows as unknown as { rows: unknown[] }).rows)
+  })
+)
+
+router.post(
+  "/api/household/incomes",
+  asyncHandler(async (req, res) => {
+    const body = req.body ?? {}
+    const amt = parseFloat(String(body.amount ?? ""))
+    if (isNaN(amt) || amt <= 0) throw new AppError(400, "金額需為正數")
+    const category = String(body.category ?? "").trim()
+    if (!category) throw new AppError(400, "請選擇分類")
+    const dateStr = String(body.date ?? "")
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) throw new AppError(400, "日期格式 YYYY-MM-DD")
+
+    const result = await db.execute(sql`
+      INSERT INTO household_incomes
+        (family_id, amount, category, date, description, payment_method, created_at, updated_at)
+      VALUES
+        (1, ${amt}, ${category}, ${dateStr}::date,
+         ${body.description ?? null},
+         ${body.paymentMethod ?? "bank_transfer"},
+         NOW(), NOW())
+      RETURNING id, amount::text AS amount, category, date::text AS date, description,
+                payment_method AS "paymentMethod"
+    `)
+    res.status(201).json((result as unknown as { rows: unknown[] }).rows[0])
+  })
+)
+
+router.delete(
+  "/api/household/incomes/:id",
+  asyncHandler(async (req, res) => {
+    const id = parseInt(req.params.id, 10)
+    if (isNaN(id)) throw new AppError(400, "無效的 ID")
+    const result = await db.execute(sql`
+      DELETE FROM household_incomes WHERE id = ${id}
+      RETURNING id
+    `)
+    const row = (result as unknown as { rows: { id: number }[] }).rows[0]
+    if (!row) throw new AppError(404, "找不到該筆收入")
+    res.status(204).send()
+  })
+)
+
+router.get(
+  "/api/household/incomes/summary",
+  asyncHandler(async (req, res) => {
+    const { year, month } = parseYearMonth(req.query.month as string | undefined)
+    const startDate = `${year}-${String(month).padStart(2, "0")}-01`
+    const endY = month === 12 ? year + 1 : year
+    const endM = month === 12 ? 1 : month + 1
+    const endDate = `${endY}-${String(endM).padStart(2, "0")}-01`
+
+    const rows = await db.execute(sql`
+      SELECT
+        category,
+        COALESCE(SUM(amount::numeric), 0)::text AS total,
+        COUNT(*)::int AS count
+      FROM household_incomes
+      WHERE date >= ${startDate}::date AND date < ${endDate}::date
+      GROUP BY category
+      ORDER BY SUM(amount::numeric) DESC
+    `)
+    const list = (rows as unknown as { rows: { category: string; total: string; count: number }[] })
+      .rows
+    const totalIncome = list.reduce((s, r) => s + parseFloat(r.total), 0)
+
+    res.json({
+      month: `${year}-${String(month).padStart(2, "0")}`,
+      totalIncome: Math.round(totalIncome),
+      breakdown: list.map((r) => ({
+        category: r.category,
+        amount: Math.round(parseFloat(r.total)),
+        count: r.count,
+        pct: totalIncome > 0 ? Math.round((parseFloat(r.total) / totalIncome) * 100) : 0,
+      })),
+    })
+  })
+)
+
+/**
  * GET /api/household/snapshot
  * 首頁快照：今日已花 / 本月已花 / 預算 / 剩餘 / 7 天 bar
  * 一個 endpoint 把所有首頁卡需要的資料一次回傳

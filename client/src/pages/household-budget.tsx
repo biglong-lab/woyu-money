@@ -162,6 +162,11 @@ export default function HouseholdBudget() {
     description: string
     categoryId: string
   } | null>(null)
+  // 支出 / 收入 切換
+  const [entryType, setEntryType] = useState<"expense" | "income">("expense")
+  // 收入分類（記帳工具常見 6 類）
+  const INCOME_CATEGORIES = ["薪資", "獎金", "投資", "副業", "退款", "其他"] as const
+  const [incomeCategory, setIncomeCategory] = useState<(typeof INCOME_CATEGORIES)[number]>("薪資")
 
   // 過去 30 天最常用的 6 個分類
   const { data: topCategories = [] } = useQuery<
@@ -280,6 +285,39 @@ export default function HouseholdBudget() {
       predicate: (q) => String(q.queryKey[0] ?? "").startsWith("/api/household/"),
     })
   }
+
+  // 收入 mutation
+  const addIncomeMutation = useMutation({
+    mutationFn: async (data: {
+      amount: string
+      category: string
+      description: string
+      date: string
+      paymentMethod: string
+    }) => {
+      return await apiRequest("POST", "/api/household/incomes", {
+        amount: parseFloat(data.amount),
+        category: data.category,
+        description: data.description || null,
+        date: data.date,
+        paymentMethod: data.paymentMethod || "bank_transfer",
+      })
+    },
+    onSuccess: () => {
+      toast({ title: "💰 收入已記錄", description: `${incomeCategory} 入帳` })
+      invalidateHousehold()
+      if (continueMode) {
+        quickAddForm.setValue("amount", "")
+        quickAddForm.setValue("description", "")
+      } else {
+        setShowQuickAdd(false)
+        quickAddForm.reset()
+      }
+    },
+    onError: (e: Error) => {
+      toast({ title: "記錄失敗", description: e.message, variant: "destructive" })
+    },
+  })
   const addExpenseMutation = useMutation({
     mutationFn: async (data: QuickAddFormData) => {
       const formattedData: AddExpensePayload = {
@@ -436,10 +474,27 @@ export default function HouseholdBudget() {
   })
 
   const onQuickAdd = (data: QuickAddFormData) => {
-    if (!data.categoryId || !data.amount) {
+    if (!data.amount) {
       toast({
-        title: "請填寫必要欄位",
-        description: "請選擇分類並輸入金額",
+        title: "請輸入金額",
+        variant: "destructive",
+      })
+      return
+    }
+    if (entryType === "income") {
+      addIncomeMutation.mutate({
+        amount: data.amount,
+        category: incomeCategory,
+        description: data.description,
+        date: data.date,
+        paymentMethod: data.paymentMethod,
+      })
+      return
+    }
+    // 支出：分類必填
+    if (!data.categoryId) {
+      toast({
+        title: "請選擇分類",
         variant: "destructive",
       })
       return
@@ -511,7 +566,40 @@ export default function HouseholdBudget() {
             <DialogContent className="max-h-[90vh] overflow-y-auto p-0 gap-0">
               <DialogHeader className="sticky top-0 z-10 bg-white border-b p-4 m-0">
                 <DialogTitle>快速記帳</DialogTitle>
-                <DialogDescription>快速記錄今天的支出</DialogDescription>
+                <DialogDescription>
+                  {entryType === "expense"
+                    ? "快速記錄今天的支出"
+                    : "記錄收入（薪資 / 獎金 / 投資 / 副業）"}
+                </DialogDescription>
+                {/* 支出 / 收入 切換 tab */}
+                <div className="flex bg-gray-100 rounded-lg p-1 mt-2">
+                  <button
+                    type="button"
+                    onClick={() => setEntryType("expense")}
+                    className={cn(
+                      "flex-1 py-1.5 text-xs font-medium rounded transition-all active:scale-95",
+                      entryType === "expense"
+                        ? "bg-rose-500 text-white shadow"
+                        : "text-gray-600 hover:bg-gray-200"
+                    )}
+                    data-testid="tab-entry-expense"
+                  >
+                    💸 支出
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEntryType("income")}
+                    className={cn(
+                      "flex-1 py-1.5 text-xs font-medium rounded transition-all active:scale-95",
+                      entryType === "income"
+                        ? "bg-emerald-500 text-white shadow"
+                        : "text-gray-600 hover:bg-gray-200"
+                    )}
+                    data-testid="tab-entry-income"
+                  >
+                    💰 收入
+                  </button>
+                </div>
               </DialogHeader>
               <form onSubmit={quickAddForm.handleSubmit(onQuickAdd)} className="space-y-4 p-4 pb-2">
                 <div>
@@ -585,71 +673,106 @@ export default function HouseholdBudget() {
                     />
                   )}
                 </div>
-                <div>
-                  <Label htmlFor="categoryId">
-                    分類 <span className="text-red-500">*</span>
-                  </Label>
-                  {topCategories.length > 0 && (
-                    <div className="mb-2">
-                      <div className="text-[10px] text-gray-500 mb-1">📌 常用</div>
-                      <div className="flex flex-wrap gap-1.5">
-                        {topCategories.map((tc) => {
-                          const isSelected =
-                            quickAddForm.watch("categoryId") === String(tc.categoryId)
-                          const decor = getCategoryDecor(tc.categoryName)
-                          return (
-                            <button
-                              key={tc.categoryId}
-                              type="button"
-                              onClick={() =>
-                                quickAddForm.setValue("categoryId", String(tc.categoryId), {
-                                  shouldValidate: true,
-                                })
-                              }
-                              className={cn(
-                                "inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs border transition-all",
-                                "active:scale-95",
-                                isSelected
-                                  ? "border-amber-400 font-semibold ring-2 ring-amber-200"
-                                  : "border-gray-200 hover:border-gray-300"
-                              )}
-                              style={{
-                                backgroundColor: isSelected ? `${decor.color}22` : "white",
-                                color: isSelected ? decor.color : "#374151",
-                              }}
-                              data-testid={`category-chip-${tc.categoryId}`}
-                            >
-                              <span className="text-sm">{decor.emoji}</span>
-                              {tc.categoryName}
-                              <span className="text-gray-400">×{tc.uses}</span>
-                            </button>
-                          )
-                        })}
-                      </div>
+                {entryType === "income" ? (
+                  <div>
+                    <Label>
+                      收入分類 <span className="text-red-500">*</span>
+                    </Label>
+                    <div className="flex flex-wrap gap-1.5 mt-1">
+                      {INCOME_CATEGORIES.map((cat) => {
+                        const selected = incomeCategory === cat
+                        return (
+                          <button
+                            key={cat}
+                            type="button"
+                            onClick={() => setIncomeCategory(cat)}
+                            className={cn(
+                              "inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm border transition-all active:scale-95",
+                              selected
+                                ? "bg-emerald-100 text-emerald-800 border-emerald-400 font-semibold ring-2 ring-emerald-200"
+                                : "bg-white text-gray-700 border-gray-200 hover:border-gray-300"
+                            )}
+                            data-testid={`income-category-${cat}`}
+                          >
+                            {cat === "薪資" && "💼"}
+                            {cat === "獎金" && "🎁"}
+                            {cat === "投資" && "📈"}
+                            {cat === "副業" && "🛠️"}
+                            {cat === "退款" && "↩️"}
+                            {cat === "其他" && "📦"}
+                            {cat}
+                          </button>
+                        )
+                      })}
                     </div>
-                  )}
-                  <Select
-                    value={quickAddForm.watch("categoryId")}
-                    onValueChange={(value: string) => quickAddForm.setValue("categoryId", value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="或從完整分類選擇" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {householdCategories.map((category: HouseholdCategory) => (
-                        <SelectItem key={category.id} value={category.id.toString()}>
-                          <span className="flex items-center gap-2">
-                            <div
-                              className="w-3 h-3 rounded-full"
-                              style={{ backgroundColor: category.color }}
-                            />
-                            {category.categoryName}
-                          </span>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                  </div>
+                ) : (
+                  <div>
+                    <Label htmlFor="categoryId">
+                      分類 <span className="text-red-500">*</span>
+                    </Label>
+                    {topCategories.length > 0 && (
+                      <div className="mb-2">
+                        <div className="text-[10px] text-gray-500 mb-1">📌 常用</div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {topCategories.map((tc) => {
+                            const isSelected =
+                              quickAddForm.watch("categoryId") === String(tc.categoryId)
+                            const decor = getCategoryDecor(tc.categoryName)
+                            return (
+                              <button
+                                key={tc.categoryId}
+                                type="button"
+                                onClick={() =>
+                                  quickAddForm.setValue("categoryId", String(tc.categoryId), {
+                                    shouldValidate: true,
+                                  })
+                                }
+                                className={cn(
+                                  "inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs border transition-all",
+                                  "active:scale-95",
+                                  isSelected
+                                    ? "border-amber-400 font-semibold ring-2 ring-amber-200"
+                                    : "border-gray-200 hover:border-gray-300"
+                                )}
+                                style={{
+                                  backgroundColor: isSelected ? `${decor.color}22` : "white",
+                                  color: isSelected ? decor.color : "#374151",
+                                }}
+                                data-testid={`category-chip-${tc.categoryId}`}
+                              >
+                                <span className="text-sm">{decor.emoji}</span>
+                                {tc.categoryName}
+                                <span className="text-gray-400">×{tc.uses}</span>
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
+                    <Select
+                      value={quickAddForm.watch("categoryId")}
+                      onValueChange={(value: string) => quickAddForm.setValue("categoryId", value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="或從完整分類選擇" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {householdCategories.map((category: HouseholdCategory) => (
+                          <SelectItem key={category.id} value={category.id.toString()}>
+                            <span className="flex items-center gap-2">
+                              <div
+                                className="w-3 h-3 rounded-full"
+                                style={{ backgroundColor: category.color }}
+                              />
+                              {category.categoryName}
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
                 <div>
                   <Label htmlFor="description">
                     備註 <span className="text-xs text-gray-400 font-normal">（選填）</span>
@@ -735,30 +858,32 @@ export default function HouseholdBudget() {
                     {...quickAddForm.register("date", { required: true })}
                   />
                 </div>
-                <div>
-                  <Label>
-                    收據照片{" "}
-                    <span className="text-xs text-gray-400 font-normal">
-                      （選填、拍照即可附存證）
-                    </span>
-                  </Label>
-                  <ReceiptUploadButton
-                    value={quickAddReceiptUrl}
-                    onChange={setQuickAddReceiptUrl}
-                  />
-                  {quickAddReceiptUrl && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="mt-2 gap-1 text-purple-700 border-purple-300 hover:bg-purple-50"
-                      disabled={recognizeMutation.isPending}
-                      onClick={() => recognizeMutation.mutate(quickAddReceiptUrl)}
-                    >
-                      {recognizeMutation.isPending ? "🤖 辨識中…" : "✨ AI 自動填金額/品項/日期"}
-                    </Button>
-                  )}
-                </div>
+                {entryType === "expense" && (
+                  <div>
+                    <Label>
+                      收據照片{" "}
+                      <span className="text-xs text-gray-400 font-normal">
+                        （選填、拍照即可附存證）
+                      </span>
+                    </Label>
+                    <ReceiptUploadButton
+                      value={quickAddReceiptUrl}
+                      onChange={setQuickAddReceiptUrl}
+                    />
+                    {quickAddReceiptUrl && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="mt-2 gap-1 text-purple-700 border-purple-300 hover:bg-purple-50"
+                        disabled={recognizeMutation.isPending}
+                        onClick={() => recognizeMutation.mutate(quickAddReceiptUrl)}
+                      >
+                        {recognizeMutation.isPending ? "🤖 辨識中…" : "✨ AI 自動填金額/品項/日期"}
+                      </Button>
+                    )}
+                  </div>
+                )}
                 {/* 上一筆「+1 再記」快速按鈕 */}
                 {lastEntry && (
                   <button
