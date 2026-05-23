@@ -81,8 +81,9 @@ router.get(
       .from(paymentProjects)
       .where(sql`COALESCE(is_active, true) = true AND COALESCE(is_deleted, false) = false`)
 
-    // ── 2. 收入：daily_revenues 月加總（依 project_id）
+    // ── 2. 收入：daily_revenues 月加總（依 project_id）+ income_webhooks（PM/PMS）
     // 注意：daily_revenues 欄位名是 date（不是 revenue_date），且無 is_deleted
+    // audit 2026-05-24 P0 #2：補上 income_webhooks PM/PMS 收入（confirmed status）
     const revenueRows = await db.execute<{
       project_id: number
       total: string
@@ -98,6 +99,40 @@ router.get(
     const revenueMap = new Map<number, number>()
     for (const r of revenueRows.rows as { project_id: number; total: string }[]) {
       revenueMap.set(Number(r.project_id), Number(r.total))
+    }
+
+    // PM company_id → project_id 對應（hardcoded、跟 pms-calibration 一致）
+    // 未來改成 project_company_mapping 表
+    const PM_COMPANY_TO_PROJECT: Record<number, number> = {
+      1: 3, // 浯島文旅
+      2: 4, // 浯島輕旅
+      3: 9, // 小六路厝
+      4: 10, // 總兵招待所
+      5: 20, // 魁星背包棧
+      6: 26, // 大號文創
+    }
+    const webhookRows = await db.execute<{
+      company_id: number | null
+      total: string
+    }>(sql`
+      SELECT
+        (w.raw_payload->>'company_id')::int AS company_id,
+        SUM(COALESCE(w.parsed_amount_twd, w.parsed_amount, '0')::numeric)::text AS total
+      FROM income_webhooks w
+      JOIN income_sources s ON s.id = w.source_id
+      WHERE w.status = 'confirmed'
+        AND s.source_key = 'pm-bridge'
+        AND EXTRACT(YEAR FROM COALESCE(w.parsed_paid_at, w.processed_at))::int = ${year}
+        AND EXTRACT(MONTH FROM COALESCE(w.parsed_paid_at, w.processed_at))::int = ${month}
+        AND (w.raw_payload->>'company_id') IS NOT NULL
+      GROUP BY (w.raw_payload->>'company_id')::int
+    `)
+    for (const r of webhookRows.rows as { company_id: number | null; total: string }[]) {
+      const cid = r.company_id
+      if (cid === null) continue
+      const projectId = PM_COMPANY_TO_PROJECT[cid]
+      if (!projectId) continue
+      revenueMap.set(projectId, (revenueMap.get(projectId) ?? 0) + Number(r.total))
     }
 
     // ── 3. 直接開銷：payment_records 該月加總（含分類） ──

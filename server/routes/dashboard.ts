@@ -37,7 +37,8 @@ router.get(
     // 1. payment_items 排除「人力成本」專案下的所有薪資 / 勞健保 / 勞退項目
     // 2. monthly_hr_costs.total_cost 月度合計（HR 的 source of truth、完整 8 員工）
     const rows = await db.execute(sql`
-      WITH income_split AS (
+      WITH payment_income AS (
+        -- 民宿經營 / 投資 / 其他 payment_items income
         SELECT TO_CHAR(start_date, 'YYYY-MM') AS m,
                SUM(CASE WHEN start_date <= ${today}::date THEN total_amount::numeric ELSE 0 END)::bigint AS actual,
                SUM(CASE WHEN start_date >  ${today}::date THEN total_amount::numeric ELSE 0 END)::bigint AS planned
@@ -45,6 +46,22 @@ router.get(
         WHERE item_type = 'income' AND NOT is_deleted
           AND start_date >= ${yearStart}::date AND start_date <= ${lookaheadEnd}::date
         GROUP BY 1
+      ),
+      household_income AS (
+        -- 家用收入（薪資 / 獎金 / 投資 / 副業…）— audit 2026-05-24 P0 #1
+        SELECT TO_CHAR(date, 'YYYY-MM') AS m,
+               SUM(CASE WHEN date <= ${today}::date THEN amount::numeric ELSE 0 END)::bigint AS actual,
+               SUM(CASE WHEN date >  ${today}::date THEN amount::numeric ELSE 0 END)::bigint AS planned
+        FROM household_incomes
+        WHERE date >= ${yearStart}::date AND date <= ${lookaheadEnd}::date
+        GROUP BY 1
+      ),
+      income_split AS (
+        SELECT COALESCE(p.m, h.m) AS m,
+               (COALESCE(p.actual, 0) + COALESCE(h.actual, 0))::bigint AS actual,
+               (COALESCE(p.planned, 0) + COALESCE(h.planned, 0))::bigint AS planned
+        FROM payment_income p
+        FULL OUTER JOIN household_income h ON p.m = h.m
       ),
       expense_non_hr_split AS (
         SELECT

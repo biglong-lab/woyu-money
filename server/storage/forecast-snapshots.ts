@@ -426,24 +426,38 @@ export async function getSeasonalForecast(
   const history: Array<{ month: string; accAtSameDay: number; finalAcc: number; ratio: number }> =
     []
 
-  // companyId → project_id mapping（payment_items income 用 project_id）
-  const projectIdMap: Record<number, number> = { 1: 3, 2: 4, 3: 9, 4: 10, 5: 20, 6: 26 }
-  const projectFilter =
-    companyId === null
-      ? sql`AND project_id IN (3, 4, 9, 10, 20, 26)`
-      : sql`AND project_id = ${projectIdMap[companyId] ?? 0}`
+  // audit 2026-05-24 P0 #5：歷史比率改用 revenue_forecast_snapshots（PM daily snapshot）
+  // 之前用 payment_items 算、跟「截至 N 日」用的 PM snapshot 口徑不同、會出現
+  // 「PM 當下 $1M / 季節預估 $300K」的詭異組合
+  // 統一用 PM snapshot：歷史每月的「累積至 day N」和「月底最終累積」
+  const companyFilter =
+    companyId === null ? sql`company_id IS NULL` : sql`company_id = ${companyId}`
 
   for (const hm of pastMonths) {
-    // sameDayAcc：該月 1 日 ~ daysElapsed 日的 payment_items income SUM
-    // finalAcc：該月全月 payment_items income SUM
+    // sameDayAcc：該月「day N」的 PM snapshot accumulated_revenue
+    // finalAcc：該月最後一日的 PM snapshot accumulated_revenue
     const result = await db.execute(sql`
+      WITH same_day AS (
+        SELECT accumulated_revenue::numeric AS acc
+        FROM revenue_forecast_snapshots
+        WHERE target_month = ${hm}
+          AND source = 'pm-daily-snapshot'
+          AND ${companyFilter}
+          AND EXTRACT(DAY FROM snapshot_date) = ${daysElapsed}
+        LIMIT 1
+      ),
+      final_day AS (
+        SELECT accumulated_revenue::numeric AS acc
+        FROM revenue_forecast_snapshots
+        WHERE target_month = ${hm}
+          AND source = 'pm-daily-snapshot'
+          AND ${companyFilter}
+        ORDER BY snapshot_date DESC
+        LIMIT 1
+      )
       SELECT
-        COALESCE(SUM(total_amount::numeric) FILTER (WHERE EXTRACT(DAY FROM start_date) <= ${daysElapsed}), 0)::text AS same_day_acc,
-        COALESCE(SUM(total_amount::numeric), 0)::text AS final_acc
-      FROM payment_items
-      WHERE item_type = 'income' AND NOT is_deleted AND source = 'webhook'
-        AND TO_CHAR(start_date, 'YYYY-MM') = ${hm}
-        ${projectFilter}
+        COALESCE((SELECT acc FROM same_day), 0)::text AS same_day_acc,
+        COALESCE((SELECT acc FROM final_day), 0)::text AS final_acc
     `)
     const row = (result as unknown as { rows: Array<{ same_day_acc: string; final_acc: string }> })
       .rows[0]
