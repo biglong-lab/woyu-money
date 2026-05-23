@@ -73,3 +73,37 @@ docs/
 | `changes/{date}-*.md` | 500 行/檔 |
 
 超過 → 拆子檔。
+
+---
+
+## 完整索引（自動維護建議：跑 `npx tsx scripts/doc-index-check.ts`）
+
+### Root
+- [Integration API 規範](integration-api.md) — 通用 API 整合嫁接框架 v2.0
+- [Income Webhook API 規範](income-webhook-api.md) — PM/PMS 收入 webhook 對接
+- [Category 合併指南](category-merge.md)
+- [OpenAPI Spec](openapi.yaml) — 自動生成的 API 規範
+
+### Architecture
+- [Forecasting Engine](architecture/forecasting-engine.md) — 收入預估引擎
+
+### Runbooks
+- [部署 SOP](runbooks/deploy.md)
+- [DB Migration](runbooks/db-migration.md)
+- [Git 分叉處理](runbooks/git-divergence.md)
+- [Schema 使用率報告](runbooks/schema-usage.md) — 64 表狀態（5.2）
+- [Endpoint 使用率報告](runbooks/family-kids-endpoint-usage.md) — 207 個 endpoint（5.3）
+- [Doc 索引狀態](runbooks/doc-index-status.md) — 本檔的自我檢查報告（5.4）
+
+### Domains
+- [Category 合併](category-merge.md)
+- [Income Webhook API](income-webhook-api.md)
+
+### Changes
+- [2026-05-14 Navigation Focus Optimization](changes/2026-05-14-navigation-focus-optimization.md)
+- [2026-05-14 Document Inbox Upload Fix](changes/2026-05-14-document-inbox-upload-fix.md)
+- [2026-05-16 Integration API Spec](changes/2026-05-16-integration-api-spec.md)
+- [2026-05-17 Financial Coverage Overhaul](changes/2026-05-17-financial-coverage-overhaul.md)
+- [2026-05-18 Forecasting Engine](changes/2026-05-18-forecasting-engine.md)
+- [2026-05-19 UX Detail Optimization Loop](changes/2026-05-19-ux-detail-optimization-loop.md)
+- [2026-05-23 Functional Audit + 5 階段優化](changes/2026-05-23-functional-audit.md) — 完整 5 階段優化路線執行紀錄
