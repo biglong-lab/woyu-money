@@ -247,20 +247,37 @@ export default function RevenueForecastPage() {
       }
     }
 
-    // PMS 累積已下單（source = pms-bridge）
-    // 合計模式時、同日多館需加總（companyId=all 抓到的是各館明細）
-    // 注意：必須只取 snapshot_date 落在 target_month 範圍內的點
-    // 否則上個月底的 snapshot（如 4/29、4/30）會被 getDate() 誤放到本月 29、30 日位置
+    // PMS 預期月底總額 = PMS booked（未實現訂單、各館加總）+ PM accumulated（已實現）
+    //
+    // 修正紀錄（2026-05-24）：PMS booked_revenue 設計是「截至 snapshot 那天、target_month 月內
+    // 尚未實現的訂單」。隨時間流逝、已實現的會從 booked 扣除、轉到 PM accumulated。
+    // 直接顯示 booked 會看到「往下掉」、誤導使用者。
+    // 正確顯示：booked + PM accumulated = 該日的「總訂單原始額」、單調遞增。
     const addBooked = (snaps: Snapshot[]) => {
+      // 先建立 PM 同日 accumulated 對照
+      const pmByDay = new Map<number, number>()
+      for (const s of snaps) {
+        if (s.source !== "pm-daily-snapshot") continue
+        if (s.snapshotDate.slice(0, 7) !== targetMonth) continue
+        if (s.companyId !== null) continue // 只取合計列、不重覆計算各館
+        pmByDay.set(new Date(s.snapshotDate).getDate(), parseFloat(s.accumulatedRevenue))
+      }
+      // 加 PMS booked 各館合計
       for (const s of snaps) {
         if (s.source !== "pms-bridge") continue
-        // 過濾：只取 snapshot_date 在 target_month 內的點
         if (s.snapshotDate.slice(0, 7) !== targetMonth) continue
         const day = new Date(s.snapshotDate).getDate()
         if (!byDay.has(day)) byDay.set(day, { day })
         const existing = (byDay.get(day)!["PMS 累積"] as number | undefined) ?? 0
         byDay.get(day)!["PMS 累積"] = existing + parseFloat(s.bookedRevenue)
       }
+      // 對每日：PMS 累積 += PM accumulated（補回已實現的部分、避免「下降」假象）
+      pmByDay.forEach((pmAcc, day) => {
+        const entry = byDay.get(day)
+        if (entry && entry["PMS 累積"] !== undefined) {
+          entry["PMS 累積"] = (entry["PMS 累積"] as number) + pmAcc
+        }
+      })
     }
 
     addAccumulated(targetMonth, trend)
@@ -862,7 +879,7 @@ export default function RevenueForecastPage() {
                   dot={{ r: 4, fill: "#ea580c", stroke: "#fff", strokeWidth: 1 }}
                   activeDot={{ r: 6 }}
                   connectNulls
-                  name="PMS 累積（已下單、含未來訂單）"
+                  name="PMS 訂單總額（已實現 + 未來訂單）"
                 />
                 {compareMonths.map((m, i) => (
                   <Line
