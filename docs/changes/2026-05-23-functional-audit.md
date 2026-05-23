@@ -185,3 +185,8 @@
   - 回傳整體 / 與上月對比 / 分類佔比表 / Top 10 大筆 的 markdown
   - household-budget 頁頭加「📄 匯出月報」按鈕、一鍵下載 .md
   - 階段 2 全完成、進階段 3 報表深度 + AI 助手（commit `49d6620`）
+- `2026-05-23` **階段 3.2** 年度回顧 widget：
+  - 後端新增 `GET /api/household/yearly-overview?endMonth=YYYY-MM`
+  - 一次撈 12 月 spending + budgets、回傳 items[] + summary
+  - 新增 `YearlyOverviewCard`：12 月 bar chart、超支月紅色 + ⚠️ 標記
+  - 4 column summary：累計花費 / 累計預算 + 使用率 / 平均月 / 超支月數（commit `8b8ecc7`）
