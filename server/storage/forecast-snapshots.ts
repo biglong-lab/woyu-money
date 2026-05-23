@@ -621,9 +621,9 @@ export interface PmVsPmsRow {
  */
 export async function getPmVsPmsMonthly(): Promise<PmVsPmsRow[]> {
   const result = await db.execute(sql`
-    WITH pm_actual AS (
-      -- 「PM 實際入帳」改用 PM daily snapshot 最新一筆（合計列）
-      -- 使用者要求「PM 是多少就是多少」、所有頁面對齊同一 source
+    WITH pm_snapshot AS (
+      -- 優先：PM daily snapshot 最新一筆（合計列、最權威）
+      -- 但只有 2026-02 之後才有 snapshot 資料
       SELECT DISTINCT ON (target_month)
         target_month AS month,
         accumulated_revenue::bigint AS pm_final
@@ -631,6 +631,25 @@ export async function getPmVsPmsMonthly(): Promise<PmVsPmsRow[]> {
       WHERE source = 'pm-daily-snapshot'
         AND company_id IS NULL
       ORDER BY target_month, snapshot_date DESC
+    ),
+    pm_legacy AS (
+      -- Fallback：早於 2026-02 的歷史月份、用 payment_items income webhook
+      -- （那時還沒建 PM snapshot、但 webhook 訂單 / 手動補單已歸檔）
+      SELECT
+        TO_CHAR(start_date, 'YYYY-MM') AS month,
+        SUM(total_amount::numeric)::bigint AS pm_final
+      FROM payment_items
+      WHERE item_type = 'income' AND NOT is_deleted
+        AND start_date >= '2024-01-01'::date
+      GROUP BY 1
+    ),
+    pm_actual AS (
+      -- COALESCE：PM snapshot 優先、否則用 payment_items
+      SELECT
+        COALESCE(s.month, l.month) AS month,
+        COALESCE(s.pm_final, l.pm_final) AS pm_final
+      FROM pm_snapshot s
+      FULL OUTER JOIN pm_legacy l ON l.month = s.month
     ),
     -- 每個（target_month, company_id）取最新 snapshot
     pms_latest AS (
