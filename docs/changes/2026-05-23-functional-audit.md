@@ -162,4 +162,5 @@
 （下方依時序追加）
 
 - `2026-05-23` 初版 audit 寫入、推進啟動（commit `c67c7aa`）
-- `2026-05-23` **階段 1.1** ✅ pre-push hook 跑測試前 `TRUNCATE kids_accounts RESTART IDENTITY CASCADE`、411/411 一次過 5.14 秒、不再 retry（pending commit）
+- `2026-05-23` **階段 1.1** ✅ pre-push hook 跑測試前 `TRUNCATE kids_accounts RESTART IDENTITY CASCADE`、411/411 一次過 5.14 秒、不再 retry（commit `5048ccc`）
+- `2026-05-23` **階段 1.2a** family.tsx 起步拆檔：建 `components/family/social-cards.tsx`、抽出 `FamilyTopTaskEmojisCard`（驗證模式可行；下輪繼續批量抽）（pending commit）
