@@ -202,6 +202,44 @@
   - 規則 3 (missing)：過去 3 月有 ≥ 3 筆但本月空白的固定分類（僅月過 50%+ 提示）
   - 新增 `AnomaliesCard`、3 種 severity + 3 種 type icon
   - 階段 3 報表深度 + AI 助手全完成、進階段 4 家庭多人協作（commit `d3c5211`）
+- `2026-05-23` **階段 5.4** 文件索引完整性檢查（audit roadmap 收尾）：
+  - 新增 `scripts/doc-index-check.ts`：掃 docs/、比對 README、偵測 broken
+  - 跑本地產 `docs/runbooks/doc-index-status.md`
+  - 第一次跑：18 文件僅 6 索引（33%）+ 0 broken
+  - 補齊 `docs/README.md` 索引（Root/Architecture/Runbooks/Changes 4 區）
+  - 第二次跑：**18/18 = 100% 已索引、0 broken**
+  - 階段 5 技術債清理全完成（5.1~5.4）
+  - **整個 audit roadmap（5 階段、20+ 子項）全部達成 ✅**（commit `5b9307d`）
+
+---
+
+## 七、收尾摘要
+
+**2026-05-23 functional audit + 全 5 階段優化路線執行完畢。**
+
+| 階段 | 主題 | 子項數 | 狀態 |
+|------|------|--------|------|
+| 1 | 痛點修復 | 4 | ✅ |
+| 2 | 大人記帳體驗 | 6 | ✅ |
+| 3 | 報表深度 + AI 助手 | 4 | ✅ |
+| 4 | 家庭多人協作 | 4 | ✅ |
+| 5 | 技術債清理 | 4 | ✅ |
+
+**重大里程碑**：
+- family.tsx 10,488 → 9,515 行（-973、16 個 component 拆出）
+- 新增 7 張 schema 表（family_members / family_savings_goals / family_savings_contributions / household_budget_changes 等）
+- 新增 30+ 個 endpoint + 20+ 個 UI widget
+- 4 個 scripts 觀測產出（schema-usage / endpoint-usage / cron-tick-logs / doc-index-check）
+- 全程 commit 24+ 次、SSH 手動部署 24+ 次、生產零事故
+- 文件索引完整度：33% → 100%
+- pre-push race 改善：411 測試 5.5 秒一次過
+
+**剩餘待辦（已紀錄、可後續處理）**：
+- 24 張 empty schema 候選清理（需逐一寫 ADR）
+- 2 個 family-kids unused endpoint（badges GET / pots/:id/complete POST）
+- 邀請接受流程（accept-invite 頁面）+ email 發送（需 Resend 配置）
+- 共決投票機制（建立在預算變更歷程之上）
+
 - `2026-05-23` **階段 5.3** Family-Kids Endpoint 使用率評估：
   - 新增 `scripts/endpoint-usage-report.ts`：parse routes + `:param` 轉 regex + boundary 防 prefix 吞
   - 跑本地產出 `docs/runbooks/family-kids-endpoint-usage.md`
