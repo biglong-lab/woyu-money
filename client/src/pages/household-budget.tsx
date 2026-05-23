@@ -45,6 +45,10 @@ import { ReceiptUploadButton } from "@/components/receipt-upload-button"
 import { AmountKeypad } from "@/components/amount-keypad"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { PeriodFeedCard } from "@/components/household/period-feed-card"
+import {
+  ExpenseTemplatesCard,
+  type ExpenseTemplate,
+} from "@/components/household/expense-templates-card"
 import { getCategoryDecor } from "@/lib/category-emoji"
 import { useVoiceInput } from "@/hooks/use-voice-input"
 
@@ -882,6 +886,19 @@ export default function HouseholdBudget() {
 
       {/* 今天/本週/本月 花費清單（Phase 4） */}
       <PeriodFeedCard />
+
+      {/* 固定支出範本（一鍵套用） */}
+      <ExpenseTemplatesCard
+        onApply={(t: ExpenseTemplate) => {
+          // 開啟 quick-add 並填表
+          quickAddForm.setValue("amount", t.amount, { shouldValidate: true })
+          if (t.categoryId)
+            quickAddForm.setValue("categoryId", String(t.categoryId), { shouldValidate: true })
+          quickAddForm.setValue("paymentMethod", t.paymentMethod || "cash")
+          if (t.description) quickAddForm.setValue("description", t.description)
+          setShowQuickAdd(true)
+        }}
+      />
 
       {/* 預算超支即時警示 */}
       <BudgetOverrunAlertsCard />

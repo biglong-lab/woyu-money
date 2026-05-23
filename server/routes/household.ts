@@ -726,6 +726,115 @@ router.get(
 )
 
 /**
+ * 家用支出範本 endpoints
+ *   GET    /api/household/templates           列出 active 範本
+ *   POST   /api/household/templates           建立
+ *   PUT    /api/household/templates/:id       更新
+ *   DELETE /api/household/templates/:id       軟刪除（is_active=false）
+ */
+router.get(
+  "/api/household/templates",
+  asyncHandler(async (_req, res) => {
+    const rows = await db.execute(sql`
+      SELECT
+        id,
+        family_id      AS "familyId",
+        name,
+        emoji,
+        amount::text   AS amount,
+        category_id    AS "categoryId",
+        payment_method AS "paymentMethod",
+        description,
+        day_of_month   AS "dayOfMonth",
+        sort_order     AS "sortOrder",
+        is_active      AS "isActive",
+        created_at     AS "createdAt"
+      FROM household_expense_templates
+      WHERE family_id = 1 AND is_active = true
+      ORDER BY sort_order ASC, created_at DESC
+    `)
+    res.json((rows as unknown as { rows: unknown[] }).rows)
+  })
+)
+
+router.post(
+  "/api/household/templates",
+  asyncHandler(async (req, res) => {
+    const body = req.body ?? {}
+    const name = String(body.name ?? "").trim()
+    if (!name) throw new AppError(400, "請填寫範本名稱")
+    const amt = parseFloat(String(body.amount ?? ""))
+    if (isNaN(amt) || amt < 0) throw new AppError(400, "金額需為正數")
+    const result = await db.execute(sql`
+      INSERT INTO household_expense_templates
+        (family_id, name, emoji, amount, category_id, payment_method,
+         description, day_of_month, sort_order, is_active, created_at, updated_at)
+      VALUES
+        (1, ${name},
+         ${body.emoji ?? "📋"},
+         ${amt},
+         ${body.categoryId ?? null},
+         ${body.paymentMethod ?? "cash"},
+         ${body.description ?? null},
+         ${body.dayOfMonth ?? null},
+         ${body.sortOrder ?? 0},
+         true, NOW(), NOW())
+      RETURNING id, name, emoji, amount::text AS amount, category_id AS "categoryId",
+                payment_method AS "paymentMethod", day_of_month AS "dayOfMonth",
+                description, sort_order AS "sortOrder"
+    `)
+    res.status(201).json((result as unknown as { rows: unknown[] }).rows[0])
+  })
+)
+
+router.put(
+  "/api/household/templates/:id",
+  asyncHandler(async (req, res) => {
+    const id = parseInt(req.params.id, 10)
+    if (isNaN(id)) throw new AppError(400, "無效的 ID")
+    const body = req.body ?? {}
+    const amt =
+      body.amount !== undefined && body.amount !== null ? parseFloat(String(body.amount)) : null
+    if (amt !== null && (isNaN(amt) || amt < 0)) throw new AppError(400, "金額需為正數")
+    const result = await db.execute(sql`
+      UPDATE household_expense_templates
+      SET
+        name           = COALESCE(${body.name ?? null}, name),
+        emoji          = COALESCE(${body.emoji ?? null}, emoji),
+        amount         = COALESCE(${amt}, amount),
+        category_id    = COALESCE(${body.categoryId ?? null}, category_id),
+        payment_method = COALESCE(${body.paymentMethod ?? null}, payment_method),
+        description    = COALESCE(${body.description ?? null}, description),
+        day_of_month   = COALESCE(${body.dayOfMonth ?? null}, day_of_month),
+        sort_order     = COALESCE(${body.sortOrder ?? null}, sort_order),
+        updated_at     = NOW()
+      WHERE id = ${id}
+      RETURNING id, name, amount::text AS amount
+    `)
+    const row = (result as unknown as { rows: { id: number }[] }).rows[0]
+    if (!row) throw new AppError(404, "找不到範本")
+    res.json(row)
+  })
+)
+
+router.delete(
+  "/api/household/templates/:id",
+  asyncHandler(async (req, res) => {
+    const id = parseInt(req.params.id, 10)
+    if (isNaN(id)) throw new AppError(400, "無效的 ID")
+    const result = await db.execute(sql`
+      UPDATE household_expense_templates
+      SET is_active = false, updated_at = NOW()
+      WHERE id = ${id}
+      RETURNING id
+    `)
+    const row = (result as unknown as { rows: { id: number }[] }).rows[0]
+    if (!row) throw new AppError(404, "找不到範本")
+    res.json({ success: true, id: row.id })
+  })
+)
+
+/**
  * GET /api/household/suggest-category?description=xxx&limit=3
  * 依過去 90 天記帳的 description → categoryId 統計、回最可能分類
  *
