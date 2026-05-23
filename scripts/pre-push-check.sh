@@ -63,6 +63,17 @@ fi
 
 # ============ 檢查 3：測試（暫時只跑 family-kids 避免全測試 supertest socket timeout 問題）============
 log_info "檢查 3/4：執行 family-kids 測試..."
+
+# 跑測試前 TRUNCATE family-kids 相關表（CASCADE 連 spendings/tasks/jars/goals/...）
+# 為什麼：多測試共用 kids_accounts、上一個測試 approve task 後 jar +50、下一個
+# 測試 createKid() 拿到「乾淨 kid」但同 id 下一輪 jar 仍累積、kid-net-worth
+# 等斷言「jars.spend===500」會失敗。TRUNCATE CASCADE 一刀切。
+if docker ps --format '{{.Names}}' 2>/dev/null | grep -q '^woyu-postgres$'; then
+  log_info "  TRUNCATE family-kids fixture 表（CASCADE）..."
+  docker exec woyu-postgres psql -U woyu -d woyu_money -c \
+    "TRUNCATE kids_accounts RESTART IDENTITY CASCADE;" 2>&1 | grep -v "^$" | tail -1 || true
+fi
+
 if npx vitest run tests/integration/family-kids.test.ts; then
   log_ok "family-kids 測試通過"
 else
