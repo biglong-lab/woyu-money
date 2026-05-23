@@ -10,7 +10,8 @@ import {
   managementNavItems,
   viewNavItems,
   systemNavItems,
-  decisionNavItems,
+  coreDecisionNavItems,
+  toolboxNavItems,
 } from "@/config/navigation"
 import { useQuery } from "@tanstack/react-query"
 import { useState, useRef, useEffect } from "react"
@@ -584,7 +585,8 @@ export function MobileTabBar() {
       <PopupMenu
         title="報表 & 設定"
         sections={[
-          { label: "💡 財務助理", color: "amber", items: decisionNavItems },
+          { label: "💡 核心決策", color: "amber", items: coreDecisionNavItems },
+          { label: "🧰 工具箱", color: "amber", items: toolboxNavItems },
           { label: "📊 查看 & 報表", color: "green", items: viewNavItems },
           { label: "⚙️ 系統管理", color: "orange", items: systemNavItems },
         ]}

@@ -39,7 +39,8 @@ import { useAuth } from "@/hooks/use-auth"
 import { useQuery } from "@tanstack/react-query"
 import {
   mainNavItems,
-  decisionNavItems,
+  coreDecisionNavItems,
+  toolboxNavItems,
   managementNavItems,
   viewNavItems,
   systemNavItems,
@@ -57,11 +58,18 @@ interface CategoryConfig {
 
 const categoryConfigs: CategoryConfig[] = [
   {
-    id: "decision",
-    title: "💡 財務助理",
+    id: "decision-core",
+    title: "💡 核心決策",
     titleClass: "text-amber-900",
     hoverClass: "hover:bg-amber-50",
-    items: decisionNavItems,
+    items: coreDecisionNavItems,
+  },
+  {
+    id: "decision-toolbox",
+    title: "🧰 工具箱",
+    titleClass: "text-amber-700",
+    hoverClass: "hover:bg-amber-50",
+    items: toolboxNavItems,
   },
   {
     id: "management",
@@ -186,7 +194,10 @@ function CollapsibleCategory({
 export default function TopNavigation() {
   const [location] = useLocation()
   const [isOpen, setIsOpen] = useState(false)
-  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({})
+  // 核心決策預設展開、工具箱與其他分類預設收合
+  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({
+    "decision-core": true,
+  })
   const { user, logoutMutation } = useAuth()
 
   // 查詢待處理單據數量

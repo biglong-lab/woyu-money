@@ -106,75 +106,76 @@ export const familyNavItem: NavItem = {
 // 註：/forecast-input 已下架，PMS 系統已自動同步「不定期填入」資料
 // 路由保留可訪問供舊連結，但不顯示在導航
 
-export const decisionNavItems: NavItem[] = [
-  dashboardNavItem,
-  costOverviewNavItem,
+// 核心決策（3 個主入口、最常用）
+// 扁平化建議（audit 2026-05-24 P1）：14 項 → 3 主 + 工具箱可摺疊
+export const coreDecisionNavItems: NavItem[] = [
+  dashboardNavItem, // 全局：YTD + 3 月預估
+  costOverviewNavItem, // 細節：四大成本
+  {
+    title: "現金流決策中心",
+    href: "/cashflow-decision-center",
+    icon: TrendingUp,
+    description: "未來 3-6 月收支預估 + 缺口警示",
+  },
+]
+
+// 工具箱（10 項、可摺疊、依使用頻率排序）
+export const toolboxNavItems: NavItem[] = [
   familyNavItem,
   forecastNavItem,
   scenarioNavItem,
   {
-    title: "財務總覽",
-    href: "/financial-overview-v2",
-    icon: BarChart3,
-    description: "預估 vs 實際 / 緊急事項 / 各館組損益一頁看完",
-  },
-  {
-    title: "月度預估自動產生",
-    href: "/budget-estimates",
-    icon: Sparkles,
-    badge: "新",
-    description: "一鍵產生整月預估表（合約 + 過去 6 月平均）",
-  },
-  {
     title: "館別損益報表",
     href: "/property-pl",
     icon: PieChart,
-    badge: "新",
     description: "各館收入、開銷、共用攤提、淨利率一覽",
-  },
-  {
-    title: "月度差異對賬",
-    href: "/variance-report",
-    icon: Scale,
-    badge: "新",
-    description: "預估 vs 實際差異 + 漏記提醒 + 系統洞察",
   },
   {
     title: "現金分配助理",
     href: "/cash-allocation",
     icon: Wallet,
-    badge: "新",
-    description: "輸入可動用金額，系統建議先付哪幾筆",
+    description: "輸入可動用金額、系統建議先付哪幾筆",
+  },
+  {
+    title: "月度預估自動產生",
+    href: "/budget-estimates",
+    icon: Sparkles,
+    description: "一鍵產生整月預估表（合約 + 過去 6 月平均）",
+  },
+  {
+    title: "月度差異對賬",
+    href: "/variance-report",
+    icon: Scale,
+    description: "預估 vs 實際差異 + 漏記提醒",
   },
   {
     title: "勞健保滯納金監控",
     href: "/labor-insurance-watch",
     icon: AlertTriangle,
-    badge: "新",
-    description: "年度損失儀表 + 三層提醒（20/25/28）",
+    description: "年度損失儀表 + 三層提醒",
   },
   {
     title: "租金月度矩陣",
     href: "/rental-matrix",
     icon: Calendar,
-    badge: "新",
     description: "合約×12月狀態圖 + 一鍵本月已付",
-  },
-  {
-    title: "現金流決策中心",
-    href: "/cashflow-decision-center",
-    icon: TrendingUp,
-    badge: "新",
-    description: "未來 3-6 月收支預估 + 缺口警示",
   },
   {
     title: "收據對應助手",
     href: "/receipt-match-helper",
     icon: Receipt,
-    badge: "新",
-    description: "拍收據自動匹配既有項目，不重複建立",
+    description: "拍收據自動匹配既有項目、不重複建立",
+  },
+  {
+    title: "財務總覽 v2",
+    href: "/financial-overview-v2",
+    icon: BarChart3,
+    description: "預估 vs 實際 / 各館組損益一頁看完",
   },
 ]
+
+// 保留 decisionNavItems export 對舊呼叫者相容（合併 core + toolbox）
+export const decisionNavItems: NavItem[] = [...coreDecisionNavItems, ...toolboxNavItems]
 
 // 付款方式管理分類
 export const managementNavItems: NavItem[] = [
