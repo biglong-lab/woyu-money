@@ -35,6 +35,7 @@ import type { PaymentItem, PaymentRecord, PaymentSchedule } from "@shared/schema
 import { QuickAddDrawer, useQuickCameraUpload } from "@/components/quick-add-drawer"
 import { QuickPaymentDialog } from "@/components/quick-payment-dialog"
 import { TodayFocusCard } from "@/components/today-focus-card"
+import { HouseholdQuickSnapshotCard } from "@/components/household/household-quick-snapshot-card"
 import { FinancialAssistantQuickCard } from "@/components/financial-assistant-quick-card"
 import { FinancialHealthSummaryCard } from "@/components/financial-health-summary-card"
 import { ActiveRentalsCard } from "@/components/active-rentals-card"
@@ -433,6 +434,9 @@ export default function PaymentHome() {
 
       {/* ===== 今日焦點（破解「看到欠款就逃避」的惡性循環）— 第一眼就看到「今天 1 件事」===== */}
       <TodayFocusCard />
+
+      {/* ===== 家用記帳快照（首頁就能看花費 / 預算 / 7 天趨勢）===== */}
+      <HouseholdQuickSnapshotCard />
 
       {/* ===== 財務助理快速入口（決策工具）— 解決今天的事之後、下一步要往哪走 ===== */}
       <FinancialAssistantQuickCard />

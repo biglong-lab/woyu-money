@@ -647,6 +647,109 @@ router.delete(
 )
 
 /**
+ * GET /api/household/snapshot
+ * 首頁快照：今日已花 / 本月已花 / 預算 / 剩餘 / 7 天 bar
+ * 一個 endpoint 把所有首頁卡需要的資料一次回傳
+ */
+router.get(
+  "/api/household/snapshot",
+  asyncHandler(async (_req, res) => {
+    const now = new Date()
+    const y = now.getFullYear()
+    const m = now.getMonth() + 1
+    const monthStr = `${y}-${String(m).padStart(2, "0")}`
+    const monthStart = `${monthStr}-01`
+    const todayStr = `${y}-${String(m).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`
+    const tomorrow = new Date(now)
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    const tomorrowStr = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, "0")}-${String(tomorrow.getDate()).padStart(2, "0")}`
+    const nextMonthY = m === 12 ? y + 1 : y
+    const nextMonthM = m === 12 ? 1 : m + 1
+    const monthEnd = `${nextMonthY}-${String(nextMonthM).padStart(2, "0")}-01`
+
+    // 今日 + 本月 sum（一次 query）
+    const sumsRows = await db.execute(sql`
+      SELECT
+        COALESCE(SUM(CASE WHEN date >= ${todayStr}::date AND date < ${tomorrowStr}::date THEN amount::numeric ELSE 0 END), 0)::text AS today_spent,
+        COALESCE(SUM(CASE WHEN date >= ${monthStart}::date AND date < ${monthEnd}::date THEN amount::numeric ELSE 0 END), 0)::text AS month_spent,
+        COUNT(*) FILTER (WHERE date >= ${todayStr}::date AND date < ${tomorrowStr}::date)::int AS today_count,
+        COUNT(*) FILTER (WHERE date >= ${monthStart}::date AND date < ${monthEnd}::date)::int AS month_count
+      FROM household_expenses
+      WHERE date >= ${monthStart}::date AND date < ${monthEnd}::date
+    `)
+    const sums = (
+      sumsRows as unknown as {
+        rows: {
+          today_spent: string
+          month_spent: string
+          today_count: number
+          month_count: number
+        }[]
+      }
+    ).rows[0]
+    const todaySpent = parseFloat(sums?.today_spent ?? "0")
+    const monthSpent = parseFloat(sums?.month_spent ?? "0")
+    const todayCount = sums?.today_count ?? 0
+    const monthCount = sums?.month_count ?? 0
+
+    // 本月預算
+    const budgetRows = await db.execute(sql`
+      SELECT budget_amount::text AS amt FROM household_budgets
+      WHERE year = ${y} AND month = ${m} AND category_id = ${TOTAL_BUDGET_CATEGORY_ID}
+      LIMIT 1
+    `)
+    const monthBudget = parseFloat(
+      (budgetRows as unknown as { rows: { amt: string }[] }).rows[0]?.amt ?? "0"
+    )
+
+    // 過去 7 天 bar（含今日）
+    const sevenAgo = new Date(now)
+    sevenAgo.setDate(sevenAgo.getDate() - 6)
+    const sevenAgoStr = `${sevenAgo.getFullYear()}-${String(sevenAgo.getMonth() + 1).padStart(2, "0")}-${String(sevenAgo.getDate()).padStart(2, "0")}`
+    const dailyRows = await db.execute(sql`
+      SELECT
+        to_char(date, 'YYYY-MM-DD') AS d,
+        COALESCE(SUM(amount::numeric), 0)::text AS total
+      FROM household_expenses
+      WHERE date >= ${sevenAgoStr}::date AND date < ${tomorrowStr}::date
+      GROUP BY to_char(date, 'YYYY-MM-DD')
+    `)
+    const dailyMap = new Map<string, number>()
+    for (const r of (dailyRows as unknown as { rows: { d: string; total: string }[] }).rows) {
+      dailyMap.set(r.d, parseFloat(r.total))
+    }
+    const past7Days: { date: string; total: number }[] = []
+    for (let i = 6; i >= 0; i--) {
+      const dt = new Date(now)
+      dt.setDate(dt.getDate() - i)
+      const key = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`
+      past7Days.push({ date: key, total: Math.round(dailyMap.get(key) ?? 0) })
+    }
+
+    const remaining = monthBudget - monthSpent
+    const usagePct = monthBudget > 0 ? Math.round((monthSpent / monthBudget) * 100) : null
+    const daysInMonth = new Date(y, m, 0).getDate()
+    const timeProgress = Math.round((now.getDate() / daysInMonth) * 100)
+
+    res.json({
+      month: monthStr,
+      today: { date: todayStr, spent: Math.round(todaySpent), count: todayCount },
+      monthSummary: {
+        spent: Math.round(monthSpent),
+        count: monthCount,
+        budget: Math.round(monthBudget),
+        remaining: Math.round(remaining),
+        usagePct,
+        timeProgress,
+        isOver: usagePct !== null && usagePct >= 100,
+        isAhead: usagePct !== null && usagePct > timeProgress + 15,
+      },
+      past7Days,
+    })
+  })
+)
+
+/**
  * GET /api/household/period-summary?period=today|week|month&date=YYYY-MM-DD
  * 取指定期間的「花了什麼」即時清單
  *  - today：當日（依使用者本地時區、Asia/Taipei）
