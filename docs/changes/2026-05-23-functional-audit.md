@@ -202,6 +202,12 @@
   - 規則 3 (missing)：過去 3 月有 ≥ 3 筆但本月空白的固定分類（僅月過 50%+ 提示）
   - 新增 `AnomaliesCard`、3 種 severity + 3 種 type icon
   - 階段 3 報表深度 + AI 助手全完成、進階段 4 家庭多人協作（commit `d3c5211`）
+- `2026-05-23` **階段 5.2** Schema 使用率評估報告：
+  - 新增 `scripts/schema-usage-report.ts`：掃 64 張表、4 狀態分類（active/dormant/cold/empty）
+  - 跑本地產出 `docs/runbooks/schema-usage.md`
+  - 結果：34 active / 1 dormant / 5 cold / **24 empty** 候選清理
+  - 不執行刪除、純評估報告 + 處理建議 SOP
+  - 後續可由 ADR + migration 逐一處理 24 張 empty 表（commit `8ef3221`）
 - `2026-05-23` **階段 5.1** Cron 觀測 UI（技術債清理啟動）：
   - 新增 `/admin/cron-health` ProtectedRoute 頁面
   - 用既有 `GET /api/admin/cron-tick-logs`（階段 1.4 已建）顯示：
