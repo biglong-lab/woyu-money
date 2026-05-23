@@ -144,4 +144,120 @@ router.post(
   })
 )
 
+/**
+ * GET /api/family/cross-domain-overview?month=YYYY-MM
+ * 階段 4.3 跨領域整合視圖：聚合家用 / 小孩任務 / PM 收入 / PMS 收入 / 待批准
+ *
+ * 設計：
+ *  - 每個來源獨立 query、其中一個失敗（表不存在 / FK 對不上）不應拖垮整體
+ *  - 所有金額一律 ::numeric → text 回傳、前端 parseFloat
+ */
+router.get(
+  "/api/family/cross-domain-overview",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const monthRaw = (req.query.month as string | undefined) || ""
+    const ym = /^\d{4}-\d{2}$/.test(monthRaw) ? monthRaw : new Date().toISOString().slice(0, 7)
+    const [y, m] = ym.split("-").map(Number)
+    const startDate = `${ym}-01`
+    const endY = m === 12 ? y + 1 : y
+    const endM = m === 12 ? 1 : m + 1
+    const endDate = `${endY}-${String(endM).padStart(2, "0")}-01`
+
+    async function safeSum(label: string, query: () => Promise<unknown>): Promise<number> {
+      try {
+        const result = (await query()) as { rows: { sum: string | null }[] }
+        return parseFloat(result.rows[0]?.sum ?? "0") || 0
+      } catch (e) {
+        process.stdout.write(`[cross-domain] ${label} failed: ${(e as Error).message}\n`)
+        return 0
+      }
+    }
+
+    const householdExpense = await safeSum("household", () =>
+      db.execute(sql`
+        SELECT COALESCE(SUM(amount::numeric), 0)::text AS sum
+        FROM household_expenses
+        WHERE date >= ${startDate}::date AND date < ${endDate}::date
+      `)
+    )
+
+    const kidsApproved = await safeSum("kids_tasks", () =>
+      db.execute(sql`
+        SELECT COALESCE(SUM(reward_amount::numeric), 0)::text AS sum
+        FROM kids_tasks
+        WHERE status = 'approved'
+          AND approved_at >= ${startDate}::timestamp
+          AND approved_at <  ${endDate}::timestamp
+      `)
+    )
+
+    // PM 確認收入（source_key='pm-bridge' && status='confirmed'）
+    const pmConfirmed = await safeSum("pm_confirmed", () =>
+      db.execute(sql`
+        SELECT COALESCE(SUM(COALESCE(w.parsed_amount_twd, w.parsed_amount, '0')::numeric), 0)::text AS sum
+        FROM income_webhooks w
+        JOIN income_sources s ON s.id = w.source_id
+        WHERE s.source_key = 'pm-bridge'
+          AND w.status = 'confirmed'
+          AND COALESCE(w.parsed_paid_at, w.processed_at, w.reviewed_at) >= ${startDate}::timestamp
+          AND COALESCE(w.parsed_paid_at, w.processed_at, w.reviewed_at) <  ${endDate}::timestamp
+      `)
+    )
+
+    // PMS 完成收入（source_key 含 'pms'、status='confirmed'）
+    const pmsConfirmed = await safeSum("pms_confirmed", () =>
+      db.execute(sql`
+        SELECT COALESCE(SUM(COALESCE(w.parsed_amount_twd, w.parsed_amount, '0')::numeric), 0)::text AS sum
+        FROM income_webhooks w
+        JOIN income_sources s ON s.id = w.source_id
+        WHERE s.source_key LIKE '%pms%'
+          AND w.status = 'confirmed'
+          AND COALESCE(w.parsed_paid_at, w.processed_at, w.reviewed_at) >= ${startDate}::timestamp
+          AND COALESCE(w.parsed_paid_at, w.processed_at, w.reviewed_at) <  ${endDate}::timestamp
+      `)
+    )
+
+    // 待批准（全來源、不限 source_key）— 用 created_at 落在本月
+    const pendingAmt = await safeSum("pending", () =>
+      db.execute(sql`
+        SELECT COALESCE(SUM(COALESCE(parsed_amount_twd, parsed_amount, '0')::numeric), 0)::text AS sum
+        FROM income_webhooks
+        WHERE status = 'pending'
+      `)
+    )
+
+    let pendingCount = 0
+    try {
+      const cnt = (await db.execute(sql`
+        SELECT COUNT(*)::int AS n FROM income_webhooks WHERE status = 'pending'
+      `)) as unknown as { rows: { n: number }[] }
+      pendingCount = cnt.rows[0]?.n ?? 0
+    } catch (e) {
+      process.stdout.write(`[cross-domain] pending count failed: ${(e as Error).message}\n`)
+    }
+
+    const totalIncome = pmConfirmed + pmsConfirmed
+    const totalExpense = householdExpense + kidsApproved
+    const netDiff = totalIncome - totalExpense
+
+    res.json({
+      month: ym,
+      kpis: {
+        householdExpense: Math.round(householdExpense),
+        kidsApproved: Math.round(kidsApproved),
+        pmConfirmed: Math.round(pmConfirmed),
+        pmsConfirmed: Math.round(pmsConfirmed),
+        pendingAmount: Math.round(pendingAmt),
+        pendingCount,
+      },
+      totals: {
+        totalIncome: Math.round(totalIncome),
+        totalExpense: Math.round(totalExpense),
+        netDiff: Math.round(netDiff),
+      },
+    })
+  })
+)
+
 export default router

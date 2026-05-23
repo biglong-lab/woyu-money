@@ -37,6 +37,7 @@ import {
   FamilyWishesAgingCard,
 } from "@/components/family/ranking-cards"
 import { FamilyMembersCard } from "@/components/family/family-members-card"
+import { FamilyCrossDomainCard } from "@/components/family/family-cross-domain-card"
 import { motion } from "framer-motion"
 import confetti from "canvas-confetti"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -667,6 +668,9 @@ export default function FamilyPage() {
 
       {/* 本週家庭善心故事 */}
       <FamilyKindnessStoryCard />
+
+      {/* 跨領域整合視圖（階段 4.3） */}
+      <FamilyCrossDomainCard />
 
       {/* 家庭成員管理（階段 4.1 邀請基底） */}
       <FamilyMembersCard />
