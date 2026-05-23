@@ -79,6 +79,7 @@ import RentalMatrix from "@/pages/rental-matrix"
 import CashflowDecisionCenter from "@/pages/cashflow-decision-center"
 import ReceiptMatchHelper from "@/pages/receipt-match-helper"
 import IntegrationsCenter from "@/pages/integrations-center"
+import AdminCronHealthPage from "@/pages/admin-cron-health"
 import RecurringExpensesPage from "@/pages/recurring-expenses"
 import RevenueForecastPage from "@/pages/revenue-forecast"
 import ScenarioSimulatorPage from "@/pages/scenario-simulator"
@@ -222,6 +223,7 @@ function Router() {
                 {/* Receipt Match Helper — 收據對應助手 */}
                 <ProtectedRoute path="/receipt-match-helper" component={ReceiptMatchHelper} />
                 <ProtectedRoute path="/integrations" component={IntegrationsCenter} />
+                <ProtectedRoute path="/admin/cron-health" component={AdminCronHealthPage} />
                 <ProtectedRoute path="/recurring-expenses" component={RecurringExpensesPage} />
                 <ProtectedRoute path="/revenue-forecast" component={RevenueForecastPage} />
                 <ProtectedRoute path="/scenario-simulator" component={ScenarioSimulatorPage} />
