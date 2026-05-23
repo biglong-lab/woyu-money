@@ -17,6 +17,7 @@ import MobileTabBar from "@/components/mobile-tab-bar"
 import AppBreadcrumb from "@/components/app-breadcrumb"
 import QuickActionFAB from "@/components/quick-action-fab"
 import { BudgetOverrunNotifier } from "@/components/budget-overrun-notifier"
+import { DailyReminderNotifier } from "@/components/household/daily-reminder-notifier"
 import QuickPaymentDialog from "@/components/quick-payment-dialog"
 import { AiAssistantSheet } from "@/components/ai-assistant-sheet"
 import { ScrollToTopButton } from "@/components/scroll-to-top-button"
@@ -255,6 +256,8 @@ function Router() {
             <QuickPaymentDialog open={quickPaymentOpen} onOpenChange={setQuickPaymentOpen} />
             {/* 預算超支瀏覽器通知（背景輪詢、severity 升級才提醒）*/}
             <BudgetOverrunNotifier />
+            {/* 每日 21:00 後沒記帳的提醒（保連續 streak） */}
+            <DailyReminderNotifier />
             {/* AI 助手側邊抽屜 */}
             <AiAssistantSheet open={aiSheetOpen} onOpenChange={setAiSheetOpen} />
             {/* 滾動回頂部按鈕（行動版 + 桌面版皆顯示） */}
