@@ -202,6 +202,13 @@
   - 規則 3 (missing)：過去 3 月有 ≥ 3 筆但本月空白的固定分類（僅月過 50%+ 提示）
   - 新增 `AnomaliesCard`、3 種 severity + 3 種 type icon
   - 階段 3 報表深度 + AI 助手全完成、進階段 4 家庭多人協作（commit `d3c5211`）
+- `2026-05-23` **階段 4.2** 家庭預算變更歷程基底：
+  - 新增 schema `household_budget_changes`（每次變更記人、舊金額、新金額、差額、原因）
+  - 修改 `POST /api/household/budget` 變更後 insert change log（同金額重複保存自動跳過）
+  - 新增 `GET /api/household/budget/changes?month=YYYY-MM`（最近 50 筆）
+  - 預算 Dialog 加「變更原因」欄位（選填）
+  - 新增 `BudgetChangesCard`：新建 / 修改 標籤 + 舊→新金額 + 差額（漲紅跌綠）+ 留言
+  - schema ADD only、不影響現有預算流程、為共決投票機制鋪路（commit `f952258`）
 - `2026-05-23` **階段 4.1** 家庭成員邀請基底：
   - 新增 schema `family_members`（family_id / user_id / email / role / status / invite_token）
   - 後端 `GET /api/family/members`、`POST /api/family/members/invite`、`POST /api/family/members/:id/cancel`
