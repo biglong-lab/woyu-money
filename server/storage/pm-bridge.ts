@@ -33,9 +33,9 @@ function createPmPool(): Pool {
 
 interface PmRevenue {
   id: number
-  date: string        // ISO date string
+  date: string // ISO date string
   source: string | null
-  amount: string      // decimal string
+  amount: string // decimal string
   description: string | null
   company_id: number | null
   order_number: string | null
@@ -49,9 +49,9 @@ interface PmCompany {
 }
 
 export interface SyncResult {
-  synced: number      // 新匯入筆數
-  skipped: number     // 已存在、略過筆數
-  errors: number      // 錯誤筆數
+  synced: number // 新匯入筆數
+  skipped: number // 已存在、略過筆數
+  errors: number // 錯誤筆數
   period: { startDate: string; endDate: string }
   sourceId: number
 }
@@ -83,7 +83,7 @@ export async function ensurePmBridgeSource(): Promise<number> {
       description: "從 PM 旅館管理系統直接同步收入記錄（唯讀橋接）",
       authType: "token",
       isActive: true,
-      autoConfirm: false,
+      autoConfirm: true, // PM 同步進來直接 confirm、不需人工逐筆確認
       fieldMapping: {},
       allowedIps: [],
       defaultCurrency: "TWD",
@@ -109,9 +109,7 @@ async function fetchPmRevenues(
   const pool = createPmPool()
   try {
     // 取得館舍名稱對照
-    const companyResult = await pool.query<PmCompany>(
-      "SELECT id, name FROM companies ORDER BY id"
-    )
+    const companyResult = await pool.query<PmCompany>("SELECT id, name FROM companies ORDER BY id")
     const companies = new Map<number, string>()
     companyResult.rows.forEach((c) => companies.set(c.id, c.name))
 
@@ -192,7 +190,9 @@ export async function syncPmRevenues(
         continue
       }
 
-      const companyName = rev.company_id ? (companies.get(rev.company_id) ?? `館舍#${rev.company_id}`) : null
+      const companyName = rev.company_id
+        ? (companies.get(rev.company_id) ?? `館舍#${rev.company_id}`)
+        : null
       const source = rev.source ?? "未分類"
 
       // 組合描述
@@ -206,7 +206,7 @@ export async function syncPmRevenues(
       // 例：2026-02-15T16:00:00Z = 台灣 2026-02-16 00:00
       const utcDate = new Date(rev.date)
       const twDate = new Date(utcDate.getTime() + 8 * 60 * 60 * 1000)
-      const dateStr = twDate.toISOString().slice(0, 10)  // 台灣當地 YYYY-MM-DD
+      const dateStr = twDate.toISOString().slice(0, 10) // 台灣當地 YYYY-MM-DD
 
       // 組合原始 payload（完整保留 PM 資料）
       const rawPayload = {
@@ -223,6 +223,10 @@ export async function syncPmRevenues(
         notes: rev.notes,
       }
 
+      // PM 同步進來直接視為 confirmed（不需要人工逐筆確認）
+      // 使用者反映：PM 是每日 21:00 結帳後的固定金額、進來多少就是多少
+      // 所有報表用同一個 source（income_webhooks confirmed）保持數字一致
+      const nowTs = new Date()
       await db.insert(incomeWebhooks).values({
         sourceId,
         externalTransactionId: externalTxId,
@@ -235,7 +239,10 @@ export async function syncPmRevenues(
         parsedOrderId: rev.order_number ?? undefined,
         parsedPayerName: companyName ?? source,
         signatureValid: true,
-        status: "pending",
+        status: "confirmed",
+        reviewedAt: nowTs,
+        reviewNote: "PM 自動同步、無需人工確認",
+        processedAt: nowTs,
         requestIp: "internal",
         requestHeaders: { "x-bridge": "pm-db-sync" },
       })
