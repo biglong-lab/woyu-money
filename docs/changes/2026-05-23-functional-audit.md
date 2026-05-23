@@ -166,4 +166,5 @@
 - `2026-05-23` **階段 1.2a** family.tsx 起步拆檔：建 `components/family/social-cards.tsx`、抽出 `FamilyTopTaskEmojisCard`（commit `183eb6e`）
 - `2026-05-23` **階段 1.2b** 批量抽 4 個 social cards（KindnessMilestone/KindnessStory/TopRecipients/CommentInteraction）；family.tsx 10,488 → 10,225 行（-263）（commit `f45e167`）
 - `2026-05-23` **階段 1.2c** 抽 today 主題 3 cards（TodayCheckinRoster / TodaySpendingFeed / TodayTasksList）到 `today-cards.tsx`；family.tsx 10,225 → 10,059（-166）（commit `30e973f`）
-- `2026-05-23` **階段 1.2d** 抽 stats 趨勢類 4 cards（ApprovalLeadTime / MonthlyTaskCreationTrend / MonthlySpendingTrend / MonthlyGoalsTrend）到 `stats-cards.tsx`；family.tsx 10,059 → 9,726（-333）；累計 -762 行 / 12 components 移出
+- `2026-05-23` **階段 1.2d** 抽 stats 趨勢類 4 cards（ApprovalLeadTime / MonthlyTaskCreationTrend / MonthlySpendingTrend / MonthlyGoalsTrend）到 `stats-cards.tsx`；family.tsx 10,059 → 9,726（-333）（commit `2abcadd`）
+- `2026-05-23` **階段 1.2e** 抽排行 / bucket 4 cards（StreakRanking / BiggestSpendings / BiggestWins / WishesAging）到 `ranking-cards.tsx`；family.tsx 9,726 → 9,515（-211）；累計 -973 行 / 16 components 移出
