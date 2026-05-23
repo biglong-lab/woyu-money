@@ -107,3 +107,4 @@ docs/
 - [2026-05-18 Forecasting Engine](changes/2026-05-18-forecasting-engine.md)
 - [2026-05-19 UX Detail Optimization Loop](changes/2026-05-19-ux-detail-optimization-loop.md)
 - [2026-05-23 Functional Audit + 5 階段優化](changes/2026-05-23-functional-audit.md) — 完整 5 階段優化路線執行紀錄
+- [2026-05-23 家用記帳超級好用化](changes/2026-05-23-household-budget-overhaul.md) — 13 個強化迭代（tab bar / 大鍵盤 / 智能分類 / 語音 / 範本 / 搜尋 / 手勢 / 首頁快照 / 收入 / 結餘 / CSV / streak / 每日提醒）

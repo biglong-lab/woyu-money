@@ -1,12 +1,12 @@
 # 文件索引完整性報告
 
-> 生成時間：2026-05-23T10:52:29.522Z
+> 生成時間：2026-05-23T13:16:54.167Z
 > 索引檔：`docs/README.md`
 
 ## 統計
 
-- 文件總數（不含索引本身）：**18**
-- 🟢 已索引：**18**（100%）
+- 文件總數（不含索引本身）：**19**
+- 🟢 已索引：**19**（100%）
 - 🔴 未索引：**0**
 - ⚠️ Broken links（索引連結但檔案不存在）：**0**
 
@@ -39,7 +39,7 @@
 
 ### changes/
 
-> 7 個 · 0 未索引
+> 8 個 · 0 未索引
 
 | 狀態 | 路徑 | 大小 |
 |------|------|------|
@@ -49,7 +49,8 @@
 | 🟢 | `changes/2026-05-17-financial-coverage-overhaul.md` | 6.3KB |
 | 🟢 | `changes/2026-05-18-forecasting-engine.md` | 4.7KB |
 | 🟢 | `changes/2026-05-19-ux-detail-optimization-loop.md` | 10.7KB |
-| 🟢 | `changes/2026-05-23-functional-audit.md` | 14.9KB |
+| 🟢 | `changes/2026-05-23-functional-audit.md` | 16.7KB |
+| 🟢 | `changes/2026-05-23-household-budget-overhaul.md` | 9.1KB |
 
 ### runbooks/
 
