@@ -726,6 +726,118 @@ router.get(
 )
 
 /**
+ * GET /api/household/expenses/search
+ * 進階搜尋 / 篩選 / 排序
+ *
+ * Query:
+ *  - search        文字搜尋（模糊比對 description、LOWER）
+ *  - categoryIds   逗號分隔的 category id（OR）、例 1,3,5
+ *  - minAmount     最低金額（inclusive）
+ *  - maxAmount     最高金額（inclusive）
+ *  - startDate     開始日 YYYY-MM-DD（inclusive）
+ *  - endDate       結束日 YYYY-MM-DD（exclusive、與既有月查詢一致）
+ *  - sort          date_desc | date_asc | amount_desc | amount_asc（預設 date_desc）
+ *  - limit         max 500、預設 100
+ *
+ * 回 { total, count, totalAmount, expenses[] }
+ */
+router.get(
+  "/api/household/expenses/search",
+  asyncHandler(async (req, res) => {
+    const search = ((req.query.search as string) || "").trim()
+    const categoryIdsRaw = (req.query.categoryIds as string) || ""
+    const categoryIds = categoryIdsRaw
+      .split(",")
+      .map((s) => parseInt(s.trim(), 10))
+      .filter((n) => !isNaN(n) && n > 0)
+    const minAmountRaw = (req.query.minAmount as string) || ""
+    const maxAmountRaw = (req.query.maxAmount as string) || ""
+    const minAmount =
+      minAmountRaw && !isNaN(parseFloat(minAmountRaw)) ? parseFloat(minAmountRaw) : null
+    const maxAmount =
+      maxAmountRaw && !isNaN(parseFloat(maxAmountRaw)) ? parseFloat(maxAmountRaw) : null
+    const startDate = (req.query.startDate as string) || ""
+    const endDate = (req.query.endDate as string) || ""
+    const sort = ((req.query.sort as string) || "date_desc").toLowerCase()
+    const limit = Math.min(Math.max(parseInt((req.query.limit as string) || "100", 10), 1), 500)
+
+    const sortClauseMap: Record<string, ReturnType<typeof sql>> = {
+      date_desc: sql`he.date DESC, he.id DESC`,
+      date_asc: sql`he.date ASC, he.id ASC`,
+      amount_desc: sql`he.amount::numeric DESC, he.date DESC`,
+      amount_asc: sql`he.amount::numeric ASC, he.date DESC`,
+    }
+    const sortClause = sortClauseMap[sort] ?? sortClauseMap["date_desc"]
+
+    // 動態組 WHERE conditions
+    const conds: ReturnType<typeof sql>[] = []
+    if (search) {
+      conds.push(sql`LOWER(COALESCE(he.description, '')) LIKE ${"%" + search.toLowerCase() + "%"}`)
+    }
+    if (categoryIds.length > 0) {
+      conds.push(sql`he.category_id = ANY(${categoryIds}::int[])`)
+    }
+    if (minAmount !== null) {
+      conds.push(sql`he.amount::numeric >= ${minAmount}`)
+    }
+    if (maxAmount !== null) {
+      conds.push(sql`he.amount::numeric <= ${maxAmount}`)
+    }
+    if (/^\d{4}-\d{2}-\d{2}$/.test(startDate)) {
+      conds.push(sql`he.date >= ${startDate}::date`)
+    }
+    if (/^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
+      conds.push(sql`he.date < ${endDate}::date`)
+    }
+    // 安全 fallback：完全沒 filter 時、限本年內、避免一次撈全部
+    if (conds.length === 0) {
+      conds.push(sql`he.date >= NOW() - INTERVAL '365 days'`)
+    }
+
+    let whereClause = sql``
+    for (let i = 0; i < conds.length; i++) {
+      whereClause = i === 0 ? sql`WHERE ${conds[i]}` : sql`${whereClause} AND ${conds[i]}`
+    }
+
+    const rows = await db.execute(sql`
+      SELECT
+        he.id,
+        he.category_id AS "categoryId",
+        COALESCE(fc.category_name, '(未分類)') AS "categoryName",
+        he.amount::text AS amount,
+        he.date::text AS date,
+        he.payment_method AS "paymentMethod",
+        he.description,
+        he.receipt_images AS "receiptImages",
+        he.tags,
+        he.created_at AS "createdAt"
+      FROM household_expenses he
+      LEFT JOIN fixed_categories fc ON fc.id = he.category_id
+      ${whereClause}
+      ORDER BY ${sortClause}
+      LIMIT ${limit}
+    `)
+    const list = (rows as unknown as { rows: { amount: string }[] }).rows
+    const totalAmount = list.reduce((s, r) => s + parseFloat(r.amount), 0)
+
+    res.json({
+      count: list.length,
+      totalAmount: Math.round(totalAmount),
+      filters: {
+        search,
+        categoryIds,
+        minAmount,
+        maxAmount,
+        startDate: startDate || null,
+        endDate: endDate || null,
+        sort,
+      },
+      expenses: list,
+    })
+  })
+)
+
+/**
  * 家用支出範本 endpoints
  *   GET    /api/household/templates           列出 active 範本
  *   POST   /api/household/templates           建立

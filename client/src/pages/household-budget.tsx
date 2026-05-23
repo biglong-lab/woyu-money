@@ -49,6 +49,7 @@ import {
   ExpenseTemplatesCard,
   type ExpenseTemplate,
 } from "@/components/household/expense-templates-card"
+import { ExpenseSearchCard } from "@/components/household/expense-search-card"
 import { getCategoryDecor } from "@/lib/category-emoji"
 import { useVoiceInput } from "@/hooks/use-voice-input"
 
@@ -886,6 +887,9 @@ export default function HouseholdBudget() {
 
       {/* 今天/本週/本月 花費清單（Phase 4） */}
       <PeriodFeedCard />
+
+      {/* 進階搜尋 / 篩選 / 排序 */}
+      <ExpenseSearchCard />
 
       {/* 固定支出範本（一鍵套用） */}
       <ExpenseTemplatesCard
