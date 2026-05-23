@@ -164,4 +164,5 @@
 - `2026-05-23` 初版 audit 寫入、推進啟動（commit `c67c7aa`）
 - `2026-05-23` **階段 1.1** ✅ pre-push hook 跑測試前 `TRUNCATE kids_accounts RESTART IDENTITY CASCADE`、411/411 一次過 5.14 秒、不再 retry（commit `5048ccc`）
 - `2026-05-23` **階段 1.2a** family.tsx 起步拆檔：建 `components/family/social-cards.tsx`、抽出 `FamilyTopTaskEmojisCard`（commit `183eb6e`）
-- `2026-05-23` **階段 1.2b** 批量抽 4 個 social cards（KindnessMilestone/KindnessStory/TopRecipients/CommentInteraction）；family.tsx 10,488 → 10,225 行（-263）；下輪繼續抽 stats / today / social 主題
+- `2026-05-23` **階段 1.2b** 批量抽 4 個 social cards（KindnessMilestone/KindnessStory/TopRecipients/CommentInteraction）；family.tsx 10,488 → 10,225 行（-263）（commit `f45e167`）
+- `2026-05-23` **階段 1.2c** 抽 today 主題 3 cards（TodayCheckinRoster / TodaySpendingFeed / TodayTasksList）到 `today-cards.tsx`；family.tsx 10,225 → 10,059（-166）；下輪繼續 stats 主題
