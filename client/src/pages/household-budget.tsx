@@ -25,7 +25,7 @@ import { Badge } from "@/components/ui/badge"
 import { Plus, Camera, Wallet, TrendingDown, TrendingUp, Calendar, Trash2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { apiRequest } from "@/lib/queryClient"
-import { localDateISO, formatNT } from "@/lib/utils"
+import { localDateISO, formatNT, cn } from "@/lib/utils"
 import { useDocumentTitle } from "@/hooks/use-document-title"
 import { useCopyAmount } from "@/hooks/use-copy-amount"
 import type { HouseholdExpense } from "@shared/schema/household"
@@ -137,6 +137,27 @@ export default function HouseholdBudget() {
   useEffect(() => {
     if (isMobile) setUseKeypad(true)
   }, [isMobile])
+  // 「+1 再記」連續模式
+  const [continueMode, setContinueMode] = useState<boolean>(false)
+  const [lastEntry, setLastEntry] = useState<{
+    amount: string
+    description: string
+    categoryId: string
+  } | null>(null)
+
+  // 過去 30 天最常用的 6 個分類
+  const { data: topCategories = [] } = useQuery<
+    Array<{
+      categoryId: number
+      categoryName: string
+      color: string
+      uses: number
+      lastUsedAt: string
+    }>
+  >({
+    queryKey: ["/api/household/top-categories?limit=6&days=30"],
+    staleTime: 5 * 60 * 1000,
+  })
 
   // ?quickAdd=1 → 自動開快速記帳（FAB 從其他頁來的 deeplink）
   useEffect(() => {
@@ -187,15 +208,28 @@ export default function HouseholdBudget() {
       }
       return await apiRequest("POST", "/api/household/expenses", formattedData)
     },
-    onSuccess: () => {
+    onSuccess: (_data, vars) => {
       toast({
-        title: "記帳成功",
-        description: quickAddReceiptUrl ? "支出已記錄、附收據" : "支出已記錄",
+        title: "✅ 記帳成功",
+        description: quickAddReceiptUrl ? "已記錄、附收據" : "支出已記錄",
       })
       invalidateHousehold()
-      setShowQuickAdd(false)
-      quickAddForm.reset()
-      setQuickAddReceiptUrl(null)
+      // 保存上一筆給「+1 再記」用
+      setLastEntry({
+        amount: vars.amount,
+        description: vars.description,
+        categoryId: vars.categoryId,
+      })
+      if (continueMode) {
+        // 連續模式：只清金額、保留分類 / 付款方式 / 日期
+        quickAddForm.setValue("amount", "")
+        quickAddForm.setValue("description", "")
+        setQuickAddReceiptUrl(null)
+      } else {
+        setShowQuickAdd(false)
+        quickAddForm.reset()
+        setQuickAddReceiptUrl(null)
+      }
     },
     onError: (e: Error) => {
       toast({
@@ -435,11 +469,49 @@ export default function HouseholdBudget() {
                   <Label htmlFor="categoryId">
                     分類 <span className="text-red-500">*</span>
                   </Label>
+                  {topCategories.length > 0 && (
+                    <div className="mb-2">
+                      <div className="text-[10px] text-gray-500 mb-1">📌 常用</div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {topCategories.map((tc) => {
+                          const isSelected =
+                            quickAddForm.watch("categoryId") === String(tc.categoryId)
+                          return (
+                            <button
+                              key={tc.categoryId}
+                              type="button"
+                              onClick={() =>
+                                quickAddForm.setValue("categoryId", String(tc.categoryId), {
+                                  shouldValidate: true,
+                                })
+                              }
+                              className={cn(
+                                "inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs border transition-all",
+                                "active:scale-95",
+                                isSelected
+                                  ? "bg-amber-100 text-amber-800 border-amber-300 font-semibold"
+                                  : "bg-white text-gray-700 border-gray-200 hover:border-gray-300"
+                              )}
+                              data-testid={`category-chip-${tc.categoryId}`}
+                            >
+                              <span
+                                className="w-2 h-2 rounded-full"
+                                style={{ backgroundColor: tc.color }}
+                              />
+                              {tc.categoryName}
+                              <span className="text-gray-400">×{tc.uses}</span>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
                   <Select
+                    value={quickAddForm.watch("categoryId")}
                     onValueChange={(value: string) => quickAddForm.setValue("categoryId", value)}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="選擇分類" />
+                      <SelectValue placeholder="或從完整分類選擇" />
                     </SelectTrigger>
                     <SelectContent>
                       {householdCategories.map((category: HouseholdCategory) => (
@@ -518,12 +590,44 @@ export default function HouseholdBudget() {
                     </Button>
                   )}
                 </div>
+                {/* 連續模式 toggle */}
+                <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={continueMode}
+                    onChange={(e) => setContinueMode(e.target.checked)}
+                    className="w-4 h-4"
+                    data-testid="checkbox-continue-mode"
+                  />
+                  🔁 連續記帳模式（記完不關、自動清金額繼續記）
+                </label>
+
+                {/* 上一筆「+1 再記」快速按鈕 */}
+                {lastEntry && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      quickAddForm.setValue("amount", lastEntry.amount)
+                      quickAddForm.setValue("description", lastEntry.description || "")
+                      quickAddForm.setValue("categoryId", lastEntry.categoryId)
+                    }}
+                    className="w-full px-3 py-2 rounded-lg border-2 border-dashed border-amber-300 bg-amber-50 text-xs text-amber-700 hover:bg-amber-100 active:scale-[0.99] transition-all"
+                    data-testid="button-plus-one-again"
+                  >
+                    📋 +1 同上：NT${" "}
+                    {Math.round(parseFloat(lastEntry.amount || "0")).toLocaleString()}
+                    {lastEntry.description && (
+                      <span className="text-gray-500"> · {lastEntry.description.slice(0, 20)}</span>
+                    )}
+                  </button>
+                )}
+
                 <div className="flex justify-end gap-2">
                   <Button type="button" variant="outline" onClick={() => setShowQuickAdd(false)}>
-                    取消
+                    {continueMode ? "完成關閉" : "取消"}
                   </Button>
                   <Button type="submit" disabled={addExpenseMutation.isPending}>
-                    記錄
+                    {continueMode ? "記錄、繼續" : "記錄"}
                   </Button>
                 </div>
               </form>

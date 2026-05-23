@@ -633,6 +633,36 @@ router.get(
 )
 
 /**
+ * GET /api/household/top-categories?limit=6&days=30
+ * 取過去 N 天最常用的分類（依筆數排序）
+ * 用於 quick add 介面置頂 N 個常用分類
+ */
+router.get(
+  "/api/household/top-categories",
+  asyncHandler(async (req, res) => {
+    const limit = Math.min(Math.max(parseInt((req.query.limit as string) || "6", 10), 1), 20)
+    const days = Math.min(Math.max(parseInt((req.query.days as string) || "30", 10), 1), 365)
+    const rows = await db.execute(sql`
+      SELECT
+        he.category_id AS "categoryId",
+        COALESCE(fc.category_name, '(未分類)') AS "categoryName",
+        COALESCE(fc.color, '#9CA3AF') AS color,
+        COUNT(*)::int AS uses,
+        COALESCE(SUM(he.amount::numeric), 0)::text AS "totalAmount",
+        MAX(he.date)::text AS "lastUsedAt"
+      FROM household_expenses he
+      LEFT JOIN fixed_categories fc ON he.category_id = fc.id
+      WHERE he.date >= NOW() - (${days}::int * INTERVAL '1 day')
+        AND he.category_id IS NOT NULL
+      GROUP BY he.category_id, fc.category_name, fc.color
+      ORDER BY uses DESC, MAX(he.date) DESC
+      LIMIT ${limit}
+    `)
+    res.json((rows as unknown as { rows: unknown[] }).rows)
+  })
+)
+
+/**
  * GET /api/household/ai-insights?month=YYYY-MM
  * 純規則洞察：4-6 條本月消費觀察
  *  - 預算使用率 vs 月過時間
