@@ -118,13 +118,16 @@ export async function captureFromPM(): Promise<CaptureResult> {
 
     for (const targetMonth of months) {
       // 從 PM 拉該月每家公司「截至今日」累積（含今日）
+      // 改用 revenues 表（4048 筆完整資料、含所有訂單）、不用 daily_revenue_snapshots
+      // 因為 daily_revenue_snapshots 是「每日結帳記錄」、2026-02-19 才開始記、且很多日沒紀錄
       const result = await pool.query<{
         company_id: number
         accumulated: string
       }>(
-        `SELECT company_id, COALESCE(SUM(total_revenue), 0)::text AS accumulated
-         FROM daily_revenue_snapshots
-         WHERE TO_CHAR(date, 'YYYY-MM') = $1
+        `SELECT company_id, COALESCE(SUM(amount::numeric), 0)::text AS accumulated
+         FROM revenues
+         WHERE deleted_at IS NULL
+           AND TO_CHAR(date, 'YYYY-MM') = $1
            AND date <= $2::date
          GROUP BY company_id`,
         [targetMonth, todayStr]
