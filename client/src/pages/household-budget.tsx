@@ -538,6 +538,24 @@ export default function HouseholdBudget() {
               </form>
             </DialogContent>
           </Dialog>
+
+          <Button
+            variant="outline"
+            className="flex items-center gap-2"
+            onClick={() => {
+              const url = `/api/household/monthly-report?month=${selectedMonth}&format=download`
+              const link = document.createElement("a")
+              link.href = url
+              link.download = `household-report-${selectedMonth}.md`
+              document.body.appendChild(link)
+              link.click()
+              document.body.removeChild(link)
+              toast({ title: "✅ 月報已下載", description: `${selectedMonth} 結算月報` })
+            }}
+            data-testid="button-export-monthly-report"
+          >
+            📄 匯出月報
+          </Button>
         </div>
       </div>
 

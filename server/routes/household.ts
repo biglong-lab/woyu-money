@@ -403,4 +403,165 @@ router.post(
   })
 )
 
+/**
+ * GET /api/household/monthly-report?month=YYYY-MM
+ * 回傳 markdown 月報、包含：預算 / 實際 / 分類佔比 / Top 10 大筆 / 上月對比
+ * 月底自動結算 + 月初回顧用
+ */
+router.get(
+  "/api/household/monthly-report",
+  asyncHandler(async (req, res) => {
+    const { year, month } = parseYearMonth(req.query.month as string | undefined)
+    const monthStr = `${year}-${String(month).padStart(2, "0")}`
+    const startDate = `${monthStr}-01`
+    const endYear = month === 12 ? year + 1 : year
+    const endMonth = month === 12 ? 1 : month + 1
+    const endDate = `${endYear}-${String(endMonth).padStart(2, "0")}-01`
+
+    // 上月區間（同期比較）
+    const prevYear = month === 1 ? year - 1 : year
+    const prevMonth = month === 1 ? 12 : month - 1
+    const prevStart = `${prevYear}-${String(prevMonth).padStart(2, "0")}-01`
+
+    // 總預算
+    const budgetRows = await db.execute(sql`
+      SELECT budget_amount::text AS amt FROM household_budgets
+      WHERE year = ${year} AND month = ${month} AND category_id = ${TOTAL_BUDGET_CATEGORY_ID}
+      LIMIT 1
+    `)
+    const budgetAmount = parseFloat(
+      (budgetRows as unknown as { rows: { amt: string }[] }).rows[0]?.amt ?? "0"
+    )
+
+    // 本月 + 上月 總計
+    const sumRows = await db.execute(sql`
+      SELECT
+        COALESCE(SUM(CASE WHEN date >= ${startDate}::date AND date < ${endDate}::date THEN amount::numeric ELSE 0 END), 0)::text AS curr,
+        COUNT(*) FILTER (WHERE date >= ${startDate}::date AND date < ${endDate}::date)::int AS curr_count,
+        COALESCE(SUM(CASE WHEN date >= ${prevStart}::date AND date < ${startDate}::date THEN amount::numeric ELSE 0 END), 0)::text AS prev
+      FROM household_expenses
+      WHERE date >= ${prevStart}::date AND date < ${endDate}::date
+    `)
+    const sumR = (
+      sumRows as unknown as {
+        rows: { curr: string; curr_count: number; prev: string }[]
+      }
+    ).rows[0]
+    const totalSpent = parseFloat(sumR?.curr ?? "0")
+    const prevSpent = parseFloat(sumR?.prev ?? "0")
+    const count = sumR?.curr_count ?? 0
+
+    // 分類分布
+    const catRows = await db.execute(sql`
+      SELECT
+        COALESCE(fc.category_name, '(未分類)') AS category_name,
+        COALESCE(SUM(he.amount::numeric), 0)::text AS amt,
+        COUNT(*)::int AS cnt
+      FROM household_expenses he
+      LEFT JOIN fixed_categories fc ON he.category_id = fc.id
+      WHERE he.date >= ${startDate}::date AND he.date < ${endDate}::date
+      GROUP BY fc.category_name
+      ORDER BY SUM(he.amount::numeric) DESC
+    `)
+    const categories = (
+      catRows as unknown as { rows: { category_name: string; amt: string; cnt: number }[] }
+    ).rows.map((r) => ({
+      name: r.category_name,
+      amount: parseFloat(r.amt),
+      count: r.cnt,
+      pct: totalSpent > 0 ? Math.round((parseFloat(r.amt) / totalSpent) * 100) : 0,
+    }))
+
+    // Top 10 大筆
+    const topRows = await db.execute(sql`
+      SELECT
+        he.date::text AS d,
+        he.amount::text AS amt,
+        he.description,
+        COALESCE(fc.category_name, '(未分類)') AS category_name
+      FROM household_expenses he
+      LEFT JOIN fixed_categories fc ON he.category_id = fc.id
+      WHERE he.date >= ${startDate}::date AND he.date < ${endDate}::date
+      ORDER BY he.amount::numeric DESC
+      LIMIT 10
+    `)
+    const top = (
+      topRows as unknown as {
+        rows: { d: string; amt: string; description: string | null; category_name: string }[]
+      }
+    ).rows
+
+    // 組 Markdown
+    const remaining = budgetAmount - totalSpent
+    const usagePct = budgetAmount > 0 ? Math.round((totalSpent / budgetAmount) * 100) : 0
+    const diff = totalSpent - prevSpent
+    const diffPct = prevSpent > 0 ? Math.round((diff / prevSpent) * 100) : 0
+    const trendEmoji = Math.abs(diffPct) < 5 ? "≈" : diff > 0 ? "📈" : "📉"
+
+    const lines: string[] = []
+    lines.push(`# ${monthStr} 家用記帳月報`)
+    lines.push("")
+    lines.push(`> 結算時間：${new Date().toISOString()}`)
+    lines.push("")
+    lines.push(`## 📊 整體`)
+    lines.push("")
+    lines.push(`| 項目 | 金額 |`)
+    lines.push(`|------|------|`)
+    lines.push(`| 預算 | NT$ ${Math.round(budgetAmount).toLocaleString()} |`)
+    lines.push(`| 實際花費 | NT$ ${Math.round(totalSpent).toLocaleString()}（${count} 筆）|`)
+    lines.push(
+      `| ${remaining >= 0 ? "剩餘" : "超支"} | NT$ ${Math.round(Math.abs(remaining)).toLocaleString()} |`
+    )
+    lines.push(
+      `| 預算使用率 | ${usagePct}% ${budgetAmount > 0 && usagePct > 100 ? "⚠️ 超支" : ""} |`
+    )
+    lines.push("")
+    lines.push(`## 📈 與上月對比（${String(prevMonth).padStart(2, "0")} 月）`)
+    lines.push("")
+    lines.push(`- 上月花費：NT$ ${Math.round(prevSpent).toLocaleString()}`)
+    lines.push(`- 本月花費：NT$ ${Math.round(totalSpent).toLocaleString()}`)
+    lines.push(
+      `- 變化：${trendEmoji} ${diff >= 0 ? "+" : ""}NT$ ${Math.round(diff).toLocaleString()}（${diffPct >= 0 ? "+" : ""}${diffPct}%）`
+    )
+    lines.push("")
+    if (categories.length > 0) {
+      lines.push(`## 🗂️ 分類佔比`)
+      lines.push("")
+      lines.push(`| 分類 | 金額 | 比例 | 筆數 |`)
+      lines.push(`|------|------|------|------|`)
+      for (const c of categories) {
+        lines.push(
+          `| ${c.name} | NT$ ${Math.round(c.amount).toLocaleString()} | ${c.pct}% | ${c.count} |`
+        )
+      }
+      lines.push("")
+    }
+    if (top.length > 0) {
+      lines.push(`## 🏆 Top 10 大筆`)
+      lines.push("")
+      lines.push(`| # | 日期 | 金額 | 分類 | 說明 |`)
+      lines.push(`|---|------|------|------|------|`)
+      top.forEach((t, i) => {
+        lines.push(
+          `| ${i + 1} | ${t.d.slice(0, 10)} | NT$ ${Math.round(parseFloat(t.amt)).toLocaleString()} | ${t.category_name} | ${(t.description ?? "—").replace(/\|/g, "\\|")} |`
+        )
+      })
+      lines.push("")
+    }
+    lines.push(`---`)
+    lines.push(`> 由 Money 自動生成 · /api/household/monthly-report?month=${monthStr}`)
+
+    const markdown = lines.join("\n")
+
+    // Content-Type 依 query
+    if (req.query.format === "download") {
+      res.setHeader("Content-Type", "text/markdown; charset=utf-8")
+      res.setHeader("Content-Disposition", `attachment; filename="household-report-${monthStr}.md"`)
+      res.send(markdown)
+    } else {
+      res.json({ month: monthStr, markdown })
+    }
+  })
+)
+
 export default router
