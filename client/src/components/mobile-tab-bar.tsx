@@ -14,10 +14,59 @@ import {
 } from "@/config/navigation"
 import { useQuery } from "@tanstack/react-query"
 import { useState, useRef, useEffect } from "react"
-import { Home, Inbox, Plus, CreditCard, X, BarChart3, Wallet, Camera } from "lucide-react"
+import {
+  Home,
+  Inbox,
+  Plus,
+  CreditCard,
+  X,
+  BarChart3,
+  Wallet,
+  Camera,
+  Users,
+  Building,
+  PiggyBank,
+  FileText,
+} from "lucide-react"
 import { QuickAddDrawer, useQuickCameraUpload } from "@/components/quick-add-drawer"
 import { QuickPaymentDialog } from "@/components/quick-payment-dialog"
-import { useMoneyMode } from "@/hooks/use-money-mode"
+import { usePageContext, type PageContext } from "@/hooks/use-page-context"
+
+function contextLabel(c: PageContext): string {
+  switch (c) {
+    case "household":
+      return "💰 家用記帳"
+    case "family":
+      return "👨‍👩‍👧 家庭"
+    case "payment":
+      return "🏨 民宿付款"
+    case "property":
+      return "🏢 物業管理"
+    case "finance":
+      return "📊 財務報表"
+    case "inbox":
+      return "📥 收件箱"
+    default:
+      return "💰 家用記帳"
+  }
+}
+
+function centerButtonTitle(c: PageContext): string {
+  switch (c) {
+    case "household":
+      return "記一筆"
+    case "family":
+      return "派任務"
+    case "payment":
+      return "快速付款"
+    case "property":
+      return "新增"
+    case "finance":
+      return "快速操作"
+    default:
+      return "記一筆"
+  }
+}
 
 interface TabItemProps {
   title: string
@@ -247,7 +296,7 @@ interface QuickMenuProps {
   onCamera: () => void
   onGallery: () => void
   onCashAllocation: () => void
-  householdFirst?: boolean
+  context: PageContext
 }
 
 function QuickMenu({
@@ -258,7 +307,7 @@ function QuickMenu({
   onCamera,
   onGallery,
   onCashAllocation,
-  householdFirst = false,
+  context,
 }: QuickMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null)
 
@@ -334,12 +383,92 @@ function QuickMenu({
       onCashAllocation()
     },
   }
+  // 家庭場景專屬
+  const familyTaskAction = {
+    label: "派任務",
+    icon: "📋",
+    color: "bg-pink-50 text-pink-700",
+    onClick: () => {
+      onClose()
+      window.location.href = "/family"
+    },
+  }
+  const familySavingsAction = {
+    label: "存錢目標",
+    icon: "🐷",
+    color: "bg-rose-50 text-rose-700",
+    onClick: () => {
+      onClose()
+      window.location.href = "/family"
+    },
+  }
+  // 物業 / 財務
+  const rentalMatrixAction = {
+    label: "租金矩陣",
+    icon: "📅",
+    color: "bg-emerald-50 text-emerald-700",
+    onClick: () => {
+      onClose()
+      window.location.href = "/rental-matrix"
+    },
+  }
+  const forecastAction = {
+    label: "現金流預測",
+    icon: "📈",
+    color: "bg-violet-50 text-violet-700",
+    onClick: () => {
+      onClose()
+      window.location.href = "/revenue-forecast"
+    },
+  }
 
-  // 家用模式：記一筆 / 拍收據 / 從相簿 / 記錄付款 / 現金分配
-  // 民宿模式：拍單據 / 從相簿 / 手動記帳 / 記錄付款 / 現金分配（原順序）
-  const quickActions = householdFirst
-    ? [householdAction, cameraAction, galleryAction, quickPayAction, cashAllocAction]
-    : [cameraAction, galleryAction, manualHostelAction, quickPayAction, cashAllocAction]
+  // 依 context 排序 actions（前面的最常用）
+  let quickActions: (typeof householdAction)[] = []
+  switch (context) {
+    case "household":
+    case "default":
+      quickActions = [householdAction, cameraAction, galleryAction, quickPayAction, cashAllocAction]
+      break
+    case "family":
+      quickActions = [
+        familyTaskAction,
+        familySavingsAction,
+        householdAction,
+        cameraAction,
+        galleryAction,
+      ]
+      break
+    case "payment":
+      quickActions = [
+        quickPayAction,
+        cameraAction,
+        galleryAction,
+        manualHostelAction,
+        cashAllocAction,
+      ]
+      break
+    case "property":
+      quickActions = [
+        rentalMatrixAction,
+        quickPayAction,
+        cameraAction,
+        householdAction,
+        cashAllocAction,
+      ]
+      break
+    case "finance":
+      quickActions = [
+        forecastAction,
+        householdAction,
+        cashAllocAction,
+        quickPayAction,
+        cameraAction,
+      ]
+      break
+    case "inbox":
+      quickActions = [cameraAction, galleryAction, householdAction, quickPayAction, cashAllocAction]
+      break
+  }
 
   return (
     <div className="fixed inset-0 z-[100] bg-black/30 backdrop-blur-sm md:hidden">
@@ -374,8 +503,13 @@ export function MobileTabBar() {
   const [showQuickAdd, setShowQuickAdd] = useState(false)
   const [showQuickPay, setShowQuickPay] = useState(false)
   const { openCamera, openGallery } = useQuickCameraUpload()
-  const { mode, toggle: toggleMode } = useMoneyMode()
-  const isHousehold = mode === "household"
+  const pageContext = usePageContext()
+  // household 場景優先（包含 default fallback、家用記帳是預設）
+  const isHousehold = pageContext === "household" || pageContext === "default"
+  const isFamily = pageContext === "family"
+  const isPayment = pageContext === "payment"
+  const isProperty = pageContext === "property"
+  const isFinance = pageContext === "finance"
 
   // 獲取單據收件箱未處理數量
   const { data: inboxStats } = useQuery<{ pending?: number }>({
@@ -459,13 +593,13 @@ export function MobileTabBar() {
         color="green"
       />
 
-      {/* 快速記帳選單 */}
+      {/* 快速動作選單（依場景） */}
       <QuickMenu
         isOpen={openMenu === "quick"}
         onClose={() => setOpenMenu(null)}
         onQuickAdd={() => {
           if (isHousehold) {
-            // 家用模式直接跳家用快記
+            // 家用場景直接跳家用快記
             window.location.href = "/household-budget?quickAdd=1"
           } else {
             setShowQuickAdd(true)
@@ -477,7 +611,7 @@ export function MobileTabBar() {
         onCashAllocation={() => {
           window.location.href = "/cash-allocation"
         }}
-        householdFirst={isHousehold}
+        context={pageContext}
       />
 
       {/* 底部 Tab Bar */}
@@ -491,52 +625,52 @@ export function MobileTabBar() {
           "pb-safe"
         )}
       >
-        {/* 模式切換 chip — 在 tab bar 上方、極小 */}
-        <button
-          onClick={() => {
-            toggleMode()
-            if (typeof navigator !== "undefined" && "vibrate" in navigator) {
-              try {
-                navigator.vibrate(15)
-              } catch {
-                /* ignore */
-              }
-            }
-          }}
-          aria-label={`目前模式：${isHousehold ? "家用記帳" : "民宿管理"}、點切換`}
+        {/* 場景標示 chip — 顯示目前場景、純資訊不可點 */}
+        <div
           className={cn(
             "absolute -top-7 left-1/2 -translate-x-1/2",
-            "px-3 py-1 rounded-full text-[10px] font-medium shadow-md border",
-            "flex items-center gap-1.5 active:scale-95 transition-transform",
-            isHousehold
-              ? "bg-amber-50 text-amber-700 border-amber-200"
-              : "bg-blue-50 text-blue-700 border-blue-200"
+            "px-2.5 py-0.5 rounded-full text-[10px] font-medium shadow-sm border",
+            "pointer-events-none",
+            isHousehold && "bg-amber-50 text-amber-700 border-amber-200",
+            isFamily && "bg-pink-50 text-pink-700 border-pink-200",
+            isPayment && "bg-blue-50 text-blue-700 border-blue-200",
+            isProperty && "bg-emerald-50 text-emerald-700 border-emerald-200",
+            isFinance && "bg-violet-50 text-violet-700 border-violet-200"
           )}
-          data-testid="button-mode-toggle"
+          aria-label={`目前場景：${contextLabel(pageContext)}`}
+          data-testid="indicator-page-context"
         >
-          {isHousehold ? "💰 家用" : "🏨 民宿"}
-          <span className="text-gray-400">⇄</span>
-        </button>
+          {contextLabel(pageContext)}
+        </div>
 
         <div className="flex items-center justify-around">
-          {/* 首頁 */}
+          {/* 通用：首頁 */}
           <TabItem
             title="首頁"
             href="/"
             icon={Home}
             isActive={location === "/"}
-            badge={isHousehold ? undefined : urgentCount}
+            badge={isPayment ? urgentCount : undefined}
           />
 
-          {/* 家用模式：家用記帳；民宿模式：項目管理 */}
-          {isHousehold ? (
+          {/* 第 2 入口：依場景 */}
+          {isHousehold && (
             <TabItem
-              title="家用"
+              title="預算"
               href="/household-budget"
               icon={Wallet}
-              isActive={location === "/household-budget"}
+              isActive={location.startsWith("/household-budget")}
             />
-          ) : (
+          )}
+          {isFamily && (
+            <TabItem
+              title="家庭"
+              href="/family"
+              icon={Users}
+              isActive={location === "/family" || location.startsWith("/family/")}
+            />
+          )}
+          {isPayment && (
             <TabItem
               title="項目"
               icon={CreditCard}
@@ -544,10 +678,30 @@ export function MobileTabBar() {
               onClick={() => toggleMenu("payment")}
             />
           )}
+          {isProperty && (
+            <TabItem
+              title="物業"
+              href="/property-groups"
+              icon={Building}
+              isActive={location.startsWith("/property") || location.startsWith("/rental")}
+            />
+          )}
+          {isFinance && (
+            <TabItem
+              title="報表"
+              href="/financial-dashboard"
+              icon={BarChart3}
+              isActive={
+                location.startsWith("/financial-") ||
+                location.startsWith("/budget") ||
+                location.startsWith("/forecast")
+              }
+            />
+          )}
 
-          {/* 中間大按鈕 — 記帳（有緊急時紅色脈搏）*/}
+          {/* 中間大按鈕 — 依場景變色 + 變動作 */}
           <div className="relative flex items-center justify-center -mt-4">
-            {!isHousehold && urgentCount > 0 && openMenu !== "quick" && (
+            {isPayment && urgentCount > 0 && openMenu !== "quick" && (
               <span
                 className="absolute inset-0 m-auto w-14 h-14 rounded-full bg-red-500 opacity-50 animate-ping pointer-events-none"
                 aria-hidden="true"
@@ -555,19 +709,28 @@ export function MobileTabBar() {
             )}
             <button
               onClick={() => toggleMenu("quick")}
-              aria-label={openMenu === "quick" ? "關閉快速記帳選單" : "開啟快速記帳選單"}
+              aria-label={openMenu === "quick" ? "關閉選單" : "開啟快速動作選單"}
               aria-expanded={openMenu === "quick"}
-              title={isHousehold ? "記一筆" : "快速記帳"}
+              title={centerButtonTitle(pageContext)}
               className={cn(
                 "relative w-14 h-14 rounded-full flex items-center justify-center shadow-lg transition-all duration-200",
                 "active:scale-90",
-                openMenu === "quick"
-                  ? "bg-gray-700 rotate-45"
-                  : isHousehold
-                    ? "bg-gradient-to-br from-amber-500 to-orange-600"
-                    : urgentCount > 0
-                      ? "bg-gradient-to-br from-red-500 to-red-700 ring-2 ring-red-300"
-                      : "bg-gradient-to-br from-blue-500 to-blue-700"
+                openMenu === "quick" && "bg-gray-700 rotate-45",
+                openMenu !== "quick" &&
+                  isHousehold &&
+                  "bg-gradient-to-br from-amber-500 to-orange-600",
+                openMenu !== "quick" && isFamily && "bg-gradient-to-br from-pink-500 to-rose-600",
+                openMenu !== "quick" &&
+                  isPayment &&
+                  (urgentCount > 0
+                    ? "bg-gradient-to-br from-red-500 to-red-700 ring-2 ring-red-300"
+                    : "bg-gradient-to-br from-blue-500 to-blue-700"),
+                openMenu !== "quick" &&
+                  isProperty &&
+                  "bg-gradient-to-br from-emerald-500 to-teal-600",
+                openMenu !== "quick" &&
+                  isFinance &&
+                  "bg-gradient-to-br from-violet-500 to-purple-600"
               )}
             >
               {openMenu === "quick" ? (
@@ -578,10 +741,19 @@ export function MobileTabBar() {
             </button>
           </div>
 
-          {/* 家用模式：拍照（直接進 camera）；民宿模式：單據收件 */}
-          {isHousehold ? (
+          {/* 第 4 入口：依場景 */}
+          {isHousehold && (
             <TabItem title="拍照" icon={Camera} isActive={false} onClick={openCamera} />
-          ) : (
+          )}
+          {isFamily && (
+            <TabItem
+              title="存錢"
+              icon={PiggyBank}
+              isActive={false}
+              onClick={() => (window.location.href = "/family")}
+            />
+          )}
+          {isPayment && (
             <TabItem
               title="單據"
               href="/document-inbox"
@@ -590,8 +762,26 @@ export function MobileTabBar() {
               badge={inboxStats?.pending}
             />
           )}
+          {isProperty && (
+            <TabItem
+              title="租金"
+              href="/rental-matrix"
+              icon={FileText}
+              isActive={location === "/rental-matrix"}
+            />
+          )}
+          {isFinance && (
+            <TabItem
+              title="預測"
+              href="/revenue-forecast"
+              icon={BarChart3}
+              isActive={
+                location.startsWith("/revenue-forecast") || location.startsWith("/scenario")
+              }
+            />
+          )}
 
-          {/* 更多（💡 助理 + 📊 報表 + ⚙️ 設定 三組分區） */}
+          {/* 通用：更多 */}
           <TabItem
             title="更多"
             icon={BarChart3}
