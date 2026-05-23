@@ -173,4 +173,5 @@
 - `2026-05-23` **階段 2.1** FAB 加「🏠 家用記帳」action（deeplink `/household-budget?quickAdd=1`）+ 頁面響應 query 自動開 quick-add dialog；FAB 桌面 + 手機都顯示（移除 hidden md:block、手機 bottom-20 避開 TabBar）（commit `20d95cc`）
 - `2026-05-23` **階段 2.2** quick-add dialog「拍照存證」placeholder 換真的 `ReceiptUploadButton`、提交時 receiptImages array 帶到 `/api/household/expenses`（後端已支援 `receipt_images` jsonb）（commit `802866c`）
 - `2026-05-23` **階段 2.3** 拍照 → AI 自動填表：新增 `POST /api/household/recognize-receipt`（從 /uploads/ URL 讀檔 + recognizeDocument 跑 Gemini 辨識）+ quick-add UI「✨ AI 自動填金額/品項/日期」按鈕、自動 setValue 金額/日期/備註/分類（模糊匹配 householdCategories）（commit `868b0e4`）
-- `2026-05-23` **階段 2.4** 月初預算建議 widget：`BudgetSuggestionCard` 顯示上月實際花費 vs 本月建議（×1.05 緩衝）+ 目前設定 3 column 對照、超支時橘色警示、一鍵套用建議到 setBudgetMutation
+- `2026-05-23` **階段 2.4** 月初預算建議 widget：`BudgetSuggestionCard` 顯示上月實際花費 vs 本月建議（×1.05 緩衝）+ 目前設定 3 column 對照、超支時橘色警示、一鍵套用建議到 setBudgetMutation（commit `d76bbae`）
+- `2026-05-23` **階段 2.5** 超支瀏覽器通知：`BudgetOverrunNotifier` 注入 App layout、每 5 分鐘輪詢 `/api/budget/overrun-alerts`、用 localStorage 比對 severity 升級才觸發 Notification API（無需 VAPID / web-push、零部署風險）
