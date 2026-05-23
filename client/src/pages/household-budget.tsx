@@ -22,7 +22,17 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
-import { Plus, Camera, Wallet, TrendingDown, TrendingUp, Calendar, Trash2 } from "lucide-react"
+import {
+  Plus,
+  Camera,
+  Wallet,
+  TrendingDown,
+  TrendingUp,
+  Calendar,
+  Trash2,
+  Mic,
+  MicOff,
+} from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { apiRequest } from "@/lib/queryClient"
 import { localDateISO, formatNT, cn } from "@/lib/utils"
@@ -36,6 +46,7 @@ import { AmountKeypad } from "@/components/amount-keypad"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { PeriodFeedCard } from "@/components/household/period-feed-card"
 import { getCategoryDecor } from "@/lib/category-emoji"
+import { useVoiceInput } from "@/hooks/use-voice-input"
 
 // API 回應型別定義（對齊 server /api/household/budget 和 /api/household/stats）
 interface MonthlyBudgetResponse {
@@ -194,6 +205,22 @@ export default function HouseholdBudget() {
     const t = setTimeout(() => setDebouncedDesc(watchedDescription.trim()), 400)
     return () => clearTimeout(t)
   }, [watchedDescription])
+
+  // 語音輸入
+  const voice = useVoiceInput()
+  // 語音解析完成 → 自動填表單
+  useEffect(() => {
+    if (!voice.parsed) return
+    const { amount, description } = voice.parsed
+    if (amount) quickAddForm.setValue("amount", amount, { shouldValidate: true })
+    if (description) quickAddForm.setValue("description", description)
+    // 解析完不重複觸發
+    voice.reset()
+    toast({
+      title: "🎤 語音辨識完成",
+      description: `${amount ? `NT$ ${amount}` : ""} ${description ?? ""}`.trim() || "已填入",
+    })
+  }, [voice.parsed]) // eslint-disable-line react-hooks/exhaustive-deps
   const { data: categorySuggestions } = useQuery<{
     suggestions: Array<{
       categoryId: number
@@ -457,18 +484,56 @@ export default function HouseholdBudget() {
               </DialogHeader>
               <form onSubmit={quickAddForm.handleSubmit(onQuickAdd)} className="space-y-4 p-4 pb-2">
                 <div>
-                  <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center justify-between mb-1 gap-2">
                     <Label htmlFor="amount">
                       金額 <span className="text-red-500">*</span>
                     </Label>
-                    <button
-                      type="button"
-                      onClick={() => setUseKeypad((v) => !v)}
-                      className="text-[10px] text-gray-500 underline"
-                    >
-                      {useKeypad ? "切換鍵盤輸入" : "切換大鍵盤"}
-                    </button>
+                    <div className="flex items-center gap-2">
+                      {voice.isSupported && (
+                        <button
+                          type="button"
+                          onClick={() => (voice.isListening ? voice.stop() : voice.start())}
+                          className={cn(
+                            "inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] border transition-all active:scale-95",
+                            voice.isListening
+                              ? "bg-rose-500 text-white border-rose-600 animate-pulse shadow"
+                              : "bg-violet-50 text-violet-700 border-violet-200 hover:bg-violet-100"
+                          )}
+                          data-testid="button-voice-input"
+                          title={
+                            voice.isListening
+                              ? "點擊結束錄音"
+                              : "語音記帳、例如「150 元 早餐 全家」"
+                          }
+                        >
+                          {voice.isListening ? (
+                            <MicOff className="w-3 h-3" />
+                          ) : (
+                            <Mic className="w-3 h-3" />
+                          )}
+                          {voice.isListening ? "聆聽中…" : "語音"}
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setUseKeypad((v) => !v)}
+                        className="text-[10px] text-gray-500 underline"
+                      >
+                        {useKeypad ? "切換鍵盤輸入" : "切換大鍵盤"}
+                      </button>
+                    </div>
                   </div>
+                  {/* 語音即時轉錄 */}
+                  {voice.isListening && (
+                    <div className="mb-2 px-3 py-2 rounded-lg bg-violet-50 border border-violet-200 text-xs text-violet-800">
+                      🎤 正在聆聽：{voice.transcript || "（請說話、例如「150 元 早餐 全家」）"}
+                    </div>
+                  )}
+                  {voice.error && (
+                    <div className="mb-2 px-3 py-2 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-700">
+                      {voice.error}
+                    </div>
+                  )}
                   {!useKeypad && (
                     <Input
                       id="amount"
