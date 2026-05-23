@@ -15,6 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { Wallet, Plus, TrendingUp } from "lucide-react"
+import { StreakChip } from "@/components/household/streak-chip"
 
 interface SnapshotResponse {
   month: string
@@ -66,7 +67,7 @@ export function HouseholdQuickSnapshotCard() {
       )}
     >
       <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-2">
           <Link href="/household-budget">
             <CardTitle className="flex items-center gap-2 text-base cursor-pointer hover:underline">
               <Wallet className="w-4 h-4" />
@@ -74,17 +75,20 @@ export function HouseholdQuickSnapshotCard() {
               <span className="text-[10px] text-gray-500 font-normal">→</span>
             </CardTitle>
           </Link>
-          <Button
-            size="sm"
-            className="gap-1 bg-gradient-to-br from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 active:scale-95"
-            onClick={() => {
-              window.location.href = "/household-budget?quickAdd=1"
-            }}
-            data-testid="button-home-quickadd"
-          >
-            <Plus className="w-4 h-4" />
-            記一筆
-          </Button>
+          <div className="flex items-center gap-2">
+            <StreakChip />
+            <Button
+              size="sm"
+              className="gap-1 bg-gradient-to-br from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 active:scale-95"
+              onClick={() => {
+                window.location.href = "/household-budget?quickAdd=1"
+              }}
+              data-testid="button-home-quickadd"
+            >
+              <Plus className="w-4 h-4" />
+              記一筆
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-3">

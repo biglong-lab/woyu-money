@@ -52,6 +52,7 @@ import {
 import { ExpenseSearchCard } from "@/components/household/expense-search-card"
 import { IncomeExpenseBalanceCard } from "@/components/household/income-expense-balance-card"
 import { ExportCsvDropdown } from "@/components/household/export-csv-dropdown"
+import { StreakChip } from "@/components/household/streak-chip"
 import { getCategoryDecor } from "@/lib/category-emoji"
 import { useVoiceInput } from "@/hooks/use-voice-input"
 
@@ -531,7 +532,10 @@ export default function HouseholdBudget() {
       {/* 頁面標題 */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-3xl font-bold">家用記帳</h1>
+          <div className="flex items-center gap-2 flex-wrap">
+            <h1 className="text-3xl font-bold">家用記帳</h1>
+            <StreakChip size="md" />
+          </div>
           <p className="text-muted-foreground">簡單記錄，輕鬆管理每月預算</p>
         </div>
         <div className="flex gap-2 items-center flex-wrap">

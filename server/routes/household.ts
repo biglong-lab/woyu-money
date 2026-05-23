@@ -760,6 +760,109 @@ router.get(
 )
 
 /**
+ * GET /api/household/streak
+ * 連續記帳天數 streak
+ *  - current: 從今天往回算、連續每天都有記帳（household_expenses OR household_incomes）
+ *    若今天沒記、容忍 1 天緩衝（昨天有記也算 current=1）
+ *  - longest: 歷史最長連續天數
+ *  - lastRecordDate: 最後一次記帳日期
+ *  - daysActive: 過去 90 天有記帳的天數（活躍度）
+ */
+router.get(
+  "/api/household/streak",
+  asyncHandler(async (_req, res) => {
+    // 取過去 365 天有記帳的 distinct date（expense + income union）
+    const rows = await db.execute(sql`
+      WITH all_dates AS (
+        SELECT DISTINCT date::date AS d FROM household_expenses
+        WHERE date >= NOW() - INTERVAL '365 days'
+        UNION
+        SELECT DISTINCT date::date AS d FROM household_incomes
+        WHERE date >= NOW() - INTERVAL '365 days'
+      )
+      SELECT d::text FROM all_dates ORDER BY d DESC
+    `)
+    const dates = (rows as unknown as { rows: { d: string }[] }).rows.map((r) => r.d.slice(0, 10))
+
+    if (dates.length === 0) {
+      return res.json({
+        current: 0,
+        longest: 0,
+        lastRecordDate: null,
+        daysActive: 0,
+        isOnFireToday: false,
+      })
+    }
+
+    // 計算當前 streak
+    // 從今天往前找連續日期：若今天有 → 從今天往回；若今天沒有但昨天有 → 從昨天往回（容忍）
+    const today = new Date()
+    const todayStr = formatYMD(today)
+    const yesterday = new Date(today)
+    yesterday.setDate(yesterday.getDate() - 1)
+    const yesterdayStr = formatYMD(yesterday)
+
+    const dateSet = new Set(dates)
+    let current = 0
+    let startDate: Date | null = null
+    const isOnFireToday = dateSet.has(todayStr)
+    if (dateSet.has(todayStr)) {
+      startDate = new Date(today)
+    } else if (dateSet.has(yesterdayStr)) {
+      startDate = new Date(yesterday)
+    }
+    if (startDate) {
+      const cur = new Date(startDate)
+      while (dateSet.has(formatYMD(cur))) {
+        current++
+        cur.setDate(cur.getDate() - 1)
+      }
+    }
+
+    // 計算歷史最長 streak
+    const sortedAsc = [...dates].sort()
+    let longest = 0
+    let run = 0
+    let prev: Date | null = null
+    for (const ds of sortedAsc) {
+      const cur = new Date(ds)
+      if (prev) {
+        const diffDays = Math.round((cur.getTime() - prev.getTime()) / (1000 * 60 * 60 * 24))
+        if (diffDays === 1) {
+          run++
+        } else if (diffDays === 0) {
+          // 同一天、不計
+        } else {
+          run = 1
+        }
+      } else {
+        run = 1
+      }
+      if (run > longest) longest = run
+      prev = cur
+    }
+
+    // 過去 90 天活躍度
+    const since90 = new Date(today)
+    since90.setDate(since90.getDate() - 90)
+    const since90Str = formatYMD(since90)
+    const daysActive = dates.filter((d) => d >= since90Str).length
+
+    res.json({
+      current,
+      longest,
+      lastRecordDate: dates[0] ?? null,
+      daysActive,
+      isOnFireToday,
+    })
+  })
+)
+
+function formatYMD(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+}
+
+/**
  * GET /api/household/snapshot
  * 首頁快照：今日已花 / 本月已花 / 預算 / 剩餘 / 7 天 bar
  * 一個 endpoint 把所有首頁卡需要的資料一次回傳
