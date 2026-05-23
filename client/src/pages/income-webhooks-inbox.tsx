@@ -658,6 +658,33 @@ export default function IncomeWebhooksInboxPage() {
     },
   })
 
+  // ─── 一鍵 auto-confirm by source（用 source defaultProjectId）─────
+  const autoConfirmMutation = useMutation<
+    { ok: boolean; successCount: number; failCount: number; totalPending: number },
+    Error,
+    { sourceKey: string }
+  >({
+    mutationFn: (data) =>
+      apiRequest("POST", "/api/income/webhooks/auto-confirm-by-source", data) as Promise<{
+        ok: boolean
+        successCount: number
+        failCount: number
+        totalPending: number
+      }>,
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/income/webhooks"] })
+      queryClient.invalidateQueries({ queryKey: ["/api/income/webhooks/pending-count"] })
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/pm-pending-summary"] })
+      setSelectedIds(new Set())
+      toast({
+        title: `一鍵確認完成：${data.successCount}/${data.totalPending} 筆${data.failCount > 0 ? `（${data.failCount} 筆失敗）` : ""}`,
+      })
+    },
+    onError: (err: Error) => {
+      toast({ title: "一鍵確認失敗", description: err.message, variant: "destructive" })
+    },
+  })
+
   // ─── 選取邏輯 ──────────────────────────────
   const pendingWebhooks = webhooks.filter((w) => w.status === "pending")
 
@@ -699,7 +726,7 @@ export default function IncomeWebhooksInboxPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <Button
             variant="outline"
             size="sm"
@@ -708,6 +735,26 @@ export default function IncomeWebhooksInboxPage() {
           >
             <Building2 className="h-4 w-4" />從 PM 同步
           </Button>
+
+          {statusFilter === "pending" && pendingWebhooks.length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                if (
+                  window.confirm(
+                    `將用「pm-bridge」source 預設專案一鍵 confirm 全部 PM-bridge pending、繼續嗎？\n\n（需先在 /income/sources 設好 defaultProjectId）`
+                  )
+                ) {
+                  autoConfirmMutation.mutate({ sourceKey: "pm-bridge" })
+                }
+              }}
+              disabled={autoConfirmMutation.isPending}
+              className="gap-2 text-emerald-700 border-emerald-300 hover:bg-emerald-50"
+            >
+              <CheckCircle2 className="h-4 w-4" />⚡ 一鍵確認 PM 全部
+            </Button>
+          )}
 
           {selectedIds.size > 0 && statusFilter === "pending" && (
             <Button onClick={() => setShowBatchConfirm(true)} className="gap-2">

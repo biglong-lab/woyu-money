@@ -447,6 +447,68 @@ export async function batchConfirmWebhooks(
   }
 }
 
+/**
+ * 依 source 的 defaultProjectId/defaultCategoryId 一鍵 confirm 所有 pending webhooks
+ * 用途：PM-bridge 累積大量 pending、使用者要一次清空
+ *
+ * 安全網：source 必須先設 defaultProjectId、否則拒絕（避免錯誤歸類）
+ */
+export async function autoConfirmBySource(
+  userId: number,
+  sourceKey: string,
+  reviewNote?: string
+): Promise<{
+  ok: boolean
+  error?: string
+  successCount: number
+  failCount: number
+  totalPending: number
+}> {
+  // 1. 找 source
+  const [source] = await db
+    .select()
+    .from(incomeSources)
+    .where(eq(incomeSources.sourceKey, sourceKey))
+    .limit(1)
+  if (!source) {
+    return { ok: false, error: "找不到 source", successCount: 0, failCount: 0, totalPending: 0 }
+  }
+  if (!source.defaultProjectId) {
+    return {
+      ok: false,
+      error: "此 source 未設預設專案、請先到 /income/sources 設定 defaultProjectId",
+      successCount: 0,
+      failCount: 0,
+      totalPending: 0,
+    }
+  }
+
+  // 2. 找所有 pending
+  const pending = await db
+    .select({ id: incomeWebhooks.id })
+    .from(incomeWebhooks)
+    .where(and(eq(incomeWebhooks.sourceId, source.id), eq(incomeWebhooks.status, "pending")))
+
+  if (pending.length === 0) {
+    return { ok: true, successCount: 0, failCount: 0, totalPending: 0 }
+  }
+
+  // 3. 逐筆 confirmWebhook（reuse 既有邏輯）
+  let successCount = 0
+  let failCount = 0
+  for (const p of pending) {
+    const r = await confirmWebhook(p.id, userId, {
+      projectId: source.defaultProjectId,
+      categoryId: source.defaultCategoryId ?? undefined,
+      reviewNote: reviewNote ?? `auto-confirm by source ${sourceKey}`,
+    })
+    if (r.success) successCount++
+    else failCount++
+  }
+
+  return { ok: true, successCount, failCount, totalPending: pending.length }
+}
+
 export async function rejectWebhook(
   webhookId: number,
   userId: number,

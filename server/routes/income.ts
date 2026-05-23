@@ -19,6 +19,7 @@ import {
   receiveWebhook,
   confirmWebhook,
   batchConfirmWebhooks,
+  autoConfirmBySource,
   rejectWebhook,
   reprocessWebhook,
   verifyBearerToken,
@@ -187,6 +188,31 @@ router.post(
       }
       throw err
     }
+  })
+)
+
+/**
+ * POST /api/income/webhooks/auto-confirm-by-source
+ * 依 source.defaultProjectId 一鍵 confirm 所有 pending
+ * Body: { sourceKey: 'pm-bridge', reviewNote?: string }
+ *
+ * 解決 372 筆 $773K 積壓的核心入口、不需指定 projectId/categoryId、
+ * 用 source 預設值。
+ */
+router.post(
+  "/api/income/webhooks/auto-confirm-by-source",
+  asyncHandler(async (req, res) => {
+    const userId = (req.user as { id: number } | undefined)?.id
+    if (!userId) throw new AppError(401, "請先登入")
+
+    const sourceKey = String(req.body?.sourceKey ?? "")
+    if (!sourceKey) throw new AppError(400, "sourceKey 必填")
+    const reviewNote =
+      typeof req.body?.reviewNote === "string" ? req.body.reviewNote.slice(0, 500) : undefined
+
+    const result = await autoConfirmBySource(userId, sourceKey, reviewNote)
+    if (!result.ok) throw new AppError(400, result.error ?? "auto-confirm 失敗")
+    res.json(result)
   })
 )
 
