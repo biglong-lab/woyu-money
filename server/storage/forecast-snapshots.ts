@@ -651,25 +651,57 @@ export async function getPmVsPmsMonthly(): Promise<PmVsPmsRow[]> {
       FROM pm_snapshot s
       FULL OUTER JOIN pm_legacy l ON l.month = s.month
     ),
-    -- 每個（target_month, company_id）取最新 snapshot
+    -- 每個（target_month, company_id）取「該月底時點」的 snapshot
+    -- PMS booked_revenue 在不同時點代表不同意義：
+    --   本月：booked = 剩餘未實現（已實現會從 PMS booked 扣除）
+    --   過去月：booked = 整月訂單總額（不會扣）
+    -- 所以策略：
+    --   過去月：取 snapshot_date 在「target_month 月底 + 7 天緩衝」內最後一筆（完整訂單）
+    --   本月 / 未來月：取 snapshot_date <= today 最新一筆（最新統計）
     pms_latest AS (
       SELECT DISTINCT ON (target_month, company_id)
         target_month,
         company_id,
         booked_revenue::numeric AS booked,
-        source
+        source,
+        snapshot_date
       FROM revenue_forecast_snapshots
       WHERE source IN ('pms-bridge', 'pms-historical')
         AND company_id IS NOT NULL
+        -- 過去月：snapshot 必須在 target_month 月底 + 7 天緩衝內
+        -- 本月 / 未來：允許到今天
+        AND (
+          -- 過去月（target_month 結束日 < 今天）：限制在月底 + 7d 內
+          ((target_month || '-01')::date + INTERVAL '1 month' < NOW()::date
+           AND snapshot_date < (target_month || '-01')::date + INTERVAL '1 month' + INTERVAL '7 days')
+          -- 本月 / 未來：snapshot ≤ today
+          OR
+          ((target_month || '-01')::date + INTERVAL '1 month' >= NOW()::date
+           AND snapshot_date <= NOW()::date)
+        )
       ORDER BY target_month, company_id, snapshot_date DESC
     ),
-    pms_monthend AS (
+    pms_booked_sum AS (
       SELECT
         target_month AS month,
-        SUM(booked)::bigint AS pms_final,
+        SUM(booked)::bigint AS booked_sum,
         STRING_AGG(DISTINCT source, ',') AS sources
       FROM pms_latest
       GROUP BY 1
+    ),
+    pms_monthend AS (
+      -- 過去月：PMS booked 已是完整訂單（不需加 PM）
+      -- 本月 / 未來月：PMS booked 是「剩餘未實現」、需加 PM accumulated = 完整訂單
+      SELECT
+        p.month,
+        CASE
+          WHEN (p.month || '-01')::date + INTERVAL '1 month' < NOW()::date
+            THEN p.booked_sum  -- 過去月
+          ELSE p.booked_sum + COALESCE(pa.pm_final, 0)  -- 本月 / 未來月
+        END AS pms_final,
+        p.sources
+      FROM pms_booked_sum p
+      LEFT JOIN pm_actual pa ON pa.month = p.month
     )
     SELECT
       COALESCE(pms.month, pm.month) AS month,
