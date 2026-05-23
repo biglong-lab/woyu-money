@@ -289,7 +289,7 @@ router.get(
         he.created_at AS "createdAt"
       FROM household_expenses he
       LEFT JOIN debt_categories dc ON dc.id = he.category_id
-      WHERE he.date >= ${startDate}::date AND he.date < ${endDate}::date
+      WHERE NOT he.is_deleted AND he.date >= ${startDate}::date AND he.date < ${endDate}::date
       ORDER BY he.date DESC, he.id DESC
       LIMIT ${limit}
     `)
@@ -361,7 +361,7 @@ router.get(
     const totalRows = await db.execute(sql`
       SELECT COALESCE(SUM(amount::numeric), 0)::text AS total, COUNT(*)::int AS count
       FROM household_expenses
-      WHERE date >= ${startDate}::date AND date < ${endDate}::date
+      WHERE NOT is_deleted AND date >= ${startDate}::date AND date < ${endDate}::date
     `)
     const totalRow = (totalRows as unknown as { rows: { total: string; count: number }[] }).rows[0]
     const totalSpent = parseFloat(totalRow?.total ?? "0")
@@ -376,7 +376,7 @@ router.get(
         COUNT(*)::int AS count
       FROM household_expenses he
       LEFT JOIN debt_categories dc ON dc.id = he.category_id
-      WHERE he.date >= ${startDate}::date AND he.date < ${endDate}::date
+      WHERE NOT he.is_deleted AND he.date >= ${startDate}::date AND he.date < ${endDate}::date
       GROUP BY he.category_id, dc.category_name
       ORDER BY SUM(he.amount::numeric) DESC
     `)
@@ -510,7 +510,7 @@ router.get(
           STDDEV(amount::numeric) AS sd_amt,
           COUNT(*)::int AS n
         FROM household_expenses
-        WHERE date >= ${past3Start}::date AND date < ${startDate}::date
+        WHERE NOT is_deleted AND date >= ${past3Start}::date AND date < ${startDate}::date
         GROUP BY category_id
       )
       SELECT
@@ -525,7 +525,7 @@ router.get(
       FROM household_expenses he
       LEFT JOIN fixed_categories fc ON he.category_id = fc.id
       JOIN past_stats ps ON ps.category_id = he.category_id
-      WHERE he.date >= ${startDate}::date AND he.date < ${endDate}::date
+      WHERE NOT he.is_deleted AND he.date >= ${startDate}::date AND he.date < ${endDate}::date
         AND ps.n >= 5
         AND ps.sd_amt IS NOT NULL
         AND ps.sd_amt > 0
@@ -568,7 +568,7 @@ router.get(
         COALESCE(SUM(he.amount::numeric), 0)::text AS total
       FROM household_expenses he
       LEFT JOIN fixed_categories fc ON he.category_id = fc.id
-      WHERE he.date >= ${startDate}::date AND he.date < ${endDate}::date
+      WHERE NOT he.is_deleted AND he.date >= ${startDate}::date AND he.date < ${endDate}::date
       GROUP BY he.date, fc.category_name
       HAVING COUNT(*) > 3
       ORDER BY COUNT(*) DESC
@@ -590,7 +590,7 @@ router.get(
       WITH past_cats AS (
         SELECT category_id, COUNT(*)::int AS n
         FROM household_expenses
-        WHERE date >= ${past3Start}::date AND date < ${startDate}::date
+        WHERE NOT is_deleted AND date >= ${past3Start}::date AND date < ${startDate}::date
           AND category_id IS NOT NULL
         GROUP BY category_id
         HAVING COUNT(*) >= 3
@@ -598,7 +598,7 @@ router.get(
       curr_cats AS (
         SELECT DISTINCT category_id
         FROM household_expenses
-        WHERE date >= ${startDate}::date AND date < ${endDate}::date
+        WHERE NOT is_deleted AND date >= ${startDate}::date AND date < ${endDate}::date
           AND category_id IS NOT NULL
       )
       SELECT
@@ -775,7 +775,7 @@ router.get(
     const rows = await db.execute(sql`
       WITH all_dates AS (
         SELECT DISTINCT date::date AS d FROM household_expenses
-        WHERE date >= NOW() - INTERVAL '365 days'
+        WHERE NOT is_deleted AND date >= NOW() - INTERVAL '365 days'
         UNION
         SELECT DISTINCT date::date AS d FROM household_incomes
         WHERE date >= NOW() - INTERVAL '365 days'
@@ -891,7 +891,7 @@ router.get(
         COUNT(*) FILTER (WHERE date >= ${todayStr}::date AND date < ${tomorrowStr}::date)::int AS today_count,
         COUNT(*) FILTER (WHERE date >= ${monthStart}::date AND date < ${monthEnd}::date)::int AS month_count
       FROM household_expenses
-      WHERE date >= ${monthStart}::date AND date < ${monthEnd}::date
+      WHERE NOT is_deleted AND date >= ${monthStart}::date AND date < ${monthEnd}::date
     `)
     const sums = (
       sumsRows as unknown as {
@@ -927,7 +927,7 @@ router.get(
         to_char(date, 'YYYY-MM-DD') AS d,
         COALESCE(SUM(amount::numeric), 0)::text AS total
       FROM household_expenses
-      WHERE date >= ${sevenAgoStr}::date AND date < ${tomorrowStr}::date
+      WHERE NOT is_deleted AND date >= ${sevenAgoStr}::date AND date < ${tomorrowStr}::date
       GROUP BY to_char(date, 'YYYY-MM-DD')
     `)
     const dailyMap = new Map<string, number>()
@@ -1049,7 +1049,7 @@ router.get(
         COALESCE(fc.color, '#9CA3AF') AS color
       FROM household_expenses he
       LEFT JOIN fixed_categories fc ON he.category_id = fc.id
-      WHERE he.date >= ${startDate}::date AND he.date < ${endDate}::date
+      WHERE NOT he.is_deleted AND he.date >= ${startDate}::date AND he.date < ${endDate}::date
       ORDER BY he.date DESC, he.id DESC
       LIMIT 200
     `)
@@ -1324,7 +1324,7 @@ router.get(
           COUNT(*)::int AS occurrences
         FROM household_expenses he
         LEFT JOIN fixed_categories fc ON he.category_id = fc.id
-        WHERE he.date >= NOW() - INTERVAL '90 days'
+        WHERE NOT he.is_deleted AND he.date >= NOW() - INTERVAL '90 days'
           AND he.category_id IS NOT NULL
           AND he.description IS NOT NULL
           AND he.description <> ''
@@ -1372,7 +1372,7 @@ router.get(
         MAX(he.date)::text AS "lastUsedAt"
       FROM household_expenses he
       LEFT JOIN fixed_categories fc ON he.category_id = fc.id
-      WHERE he.date >= NOW() - (${days}::int * INTERVAL '1 day')
+      WHERE NOT he.is_deleted AND he.date >= NOW() - (${days}::int * INTERVAL '1 day')
         AND he.category_id IS NOT NULL
       GROUP BY he.category_id, fc.category_name, fc.color
       ORDER BY uses DESC, MAX(he.date) DESC
@@ -1422,7 +1422,7 @@ router.get(
         COALESCE(SUM(CASE WHEN date >= ${prevStart}::date AND date < ${startDate}::date THEN amount::numeric ELSE 0 END), 0)::text AS prev,
         COUNT(*) FILTER (WHERE date >= ${startDate}::date AND date < ${endDate}::date)::int AS curr_count
       FROM household_expenses
-      WHERE date >= ${prevStart}::date AND date < ${endDate}::date
+      WHERE NOT is_deleted AND date >= ${prevStart}::date AND date < ${endDate}::date
     `)
     const sr = (
       sumRows as unknown as { rows: { curr: string; prev: string; curr_count: number }[] }
@@ -1439,7 +1439,7 @@ router.get(
         COUNT(*)::int AS cnt
       FROM household_expenses he
       LEFT JOIN fixed_categories fc ON he.category_id = fc.id
-      WHERE he.date >= ${startDate}::date AND he.date < ${endDate}::date
+      WHERE NOT he.is_deleted AND he.date >= ${startDate}::date AND he.date < ${endDate}::date
       GROUP BY fc.category_name
       ORDER BY SUM(he.amount::numeric) DESC
     `)
@@ -1451,7 +1451,7 @@ router.get(
     const topRows = await db.execute(sql`
       SELECT amount::text AS amt, description, date::text AS d
       FROM household_expenses
-      WHERE date >= ${startDate}::date AND date < ${endDate}::date
+      WHERE NOT is_deleted AND date >= ${startDate}::date AND date < ${endDate}::date
       ORDER BY amount::numeric DESC
       LIMIT 1
     `)
@@ -1617,7 +1617,7 @@ router.get(
     const spendRows = await db.execute(sql`
       SELECT to_char(date, 'YYYY-MM') AS m, COALESCE(SUM(amount::numeric), 0)::text AS amt
       FROM household_expenses
-      WHERE date >= ${startStr}::date AND date < ${endStr}::date
+      WHERE NOT is_deleted AND date >= ${startStr}::date AND date < ${endStr}::date
       GROUP BY to_char(date, 'YYYY-MM')
     `)
     const spendMap = new Map<string, number>()
@@ -1724,7 +1724,7 @@ router.get(
           he.created_at::text AS created_at
         FROM household_expenses he
         LEFT JOIN fixed_categories fc ON he.category_id = fc.id
-        WHERE he.date >= ${startDate}::date AND he.date < ${endDate}::date
+        WHERE NOT he.is_deleted AND he.date >= ${startDate}::date AND he.date < ${endDate}::date
         ORDER BY he.date DESC, he.id DESC
       `)
       for (const r of (
@@ -1841,7 +1841,7 @@ router.get(
         COUNT(*) FILTER (WHERE date >= ${startDate}::date AND date < ${endDate}::date)::int AS curr_count,
         COALESCE(SUM(CASE WHEN date >= ${prevStart}::date AND date < ${startDate}::date THEN amount::numeric ELSE 0 END), 0)::text AS prev
       FROM household_expenses
-      WHERE date >= ${prevStart}::date AND date < ${endDate}::date
+      WHERE NOT is_deleted AND date >= ${prevStart}::date AND date < ${endDate}::date
     `)
     const sumR = (
       sumRows as unknown as {
@@ -1860,7 +1860,7 @@ router.get(
         COUNT(*)::int AS cnt
       FROM household_expenses he
       LEFT JOIN fixed_categories fc ON he.category_id = fc.id
-      WHERE he.date >= ${startDate}::date AND he.date < ${endDate}::date
+      WHERE NOT he.is_deleted AND he.date >= ${startDate}::date AND he.date < ${endDate}::date
       GROUP BY fc.category_name
       ORDER BY SUM(he.amount::numeric) DESC
     `)
@@ -1882,7 +1882,7 @@ router.get(
         COALESCE(fc.category_name, '(未分類)') AS category_name
       FROM household_expenses he
       LEFT JOIN fixed_categories fc ON he.category_id = fc.id
-      WHERE he.date >= ${startDate}::date AND he.date < ${endDate}::date
+      WHERE NOT he.is_deleted AND he.date >= ${startDate}::date AND he.date < ${endDate}::date
       ORDER BY he.amount::numeric DESC
       LIMIT 10
     `)

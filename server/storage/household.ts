@@ -142,6 +142,9 @@ export async function getHouseholdExpenses(
     conditions.push(eq(householdExpenses.categoryId, filters.categoryId))
   }
 
+  // 軟刪除過濾（2026-05-24 audit P0）
+  conditions.push(eq(householdExpenses.isDeleted, false))
+
   const whereClause =
     conditions.length > 0
       ? conditions.length === 1
@@ -186,8 +189,17 @@ export async function updateHouseholdExpense(
   return expense
 }
 
-export async function deleteHouseholdExpense(id: number): Promise<void> {
-  await db.delete(householdExpenses).where(eq(householdExpenses.id, id))
+export async function deleteHouseholdExpense(id: number, userId?: number): Promise<void> {
+  // 軟刪除（audit 2026-05-24 P0）：標 is_deleted、保留紀錄
+  await db
+    .update(householdExpenses)
+    .set({
+      isDeleted: true,
+      deletedAt: new Date(),
+      deletedByUserId: userId ?? null,
+      updatedAt: new Date(),
+    })
+    .where(eq(householdExpenses.id, id))
 }
 
 // === 家用分類預算 ===

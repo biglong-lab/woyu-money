@@ -1,6 +1,17 @@
-import { pgTable, text, serial, integer, boolean, decimal, timestamp, date, varchar, jsonb } from "drizzle-orm/pg-core";
-import { createInsertSchema } from "drizzle-zod";
-import { z } from "zod";
+import {
+  pgTable,
+  text,
+  serial,
+  integer,
+  boolean,
+  decimal,
+  timestamp,
+  date,
+  varchar,
+  jsonb,
+} from "drizzle-orm/pg-core"
+import { createInsertSchema } from "drizzle-zod"
+import { z } from "zod"
 
 // 家用預算表
 export const householdBudgets = pgTable("household_budgets", {
@@ -13,7 +24,7 @@ export const householdBudgets = pgTable("household_budgets", {
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+})
 
 // 家用支出表
 export const householdExpenses = pgTable("household_expenses", {
@@ -26,25 +37,29 @@ export const householdExpenses = pgTable("household_expenses", {
   description: varchar("description", { length: 255 }),
   receiptImages: jsonb("receipt_images"),
   receiptText: text("receipt_text"),
+  // 軟刪除（2026-05-24 audit P0）：避免誤刪 + 保 audit trail
+  isDeleted: boolean("is_deleted").notNull().default(false),
+  deletedAt: timestamp("deleted_at"),
+  deletedByUserId: integer("deleted_by_user_id"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+})
 
 // 驗證 Schema
 export const insertHouseholdBudgetSchema = createInsertSchema(householdBudgets).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
-});
+})
 
 export const insertHouseholdExpenseSchema = createInsertSchema(householdExpenses).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
-});
+})
 
 // 型別匯出
-export type HouseholdBudget = typeof householdBudgets.$inferSelect;
-export type InsertHouseholdBudget = z.infer<typeof insertHouseholdBudgetSchema>;
-export type HouseholdExpense = typeof householdExpenses.$inferSelect;
-export type InsertHouseholdExpense = z.infer<typeof insertHouseholdExpenseSchema>;
+export type HouseholdBudget = typeof householdBudgets.$inferSelect
+export type InsertHouseholdBudget = z.infer<typeof insertHouseholdBudgetSchema>
+export type HouseholdExpense = typeof householdExpenses.$inferSelect
+export type InsertHouseholdExpense = z.infer<typeof insertHouseholdExpenseSchema>
