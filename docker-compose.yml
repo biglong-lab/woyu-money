@@ -6,6 +6,8 @@ services:
     ports:
       - "5001:5001"
     environment:
+      # 時區固定 Asia/Taipei、避免 new Date() 用 UTC 導致快照日期歪斜
+      - TZ=Asia/Taipei
       # 用 container_name 而非 service name 避免跟 PM network 內的 "db" 衝突
       - DATABASE_URL=postgresql://woyu:woyu123@woyu-money-db:5432/woyu_money
       - SESSION_SECRET=${SESSION_SECRET:-change-me-to-random-string}
@@ -38,6 +40,8 @@ services:
     container_name: woyu-money-db
     restart: unless-stopped
     environment:
+      - TZ=Asia/Taipei
+      - PGTZ=Asia/Taipei
       - POSTGRES_USER=woyu
       - POSTGRES_PASSWORD=woyu123
       - POSTGRES_DB=woyu_money

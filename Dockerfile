@@ -12,6 +12,13 @@ RUN npm run build
 # ====== 階段 2：正式環境 ======
 FROM node:20-alpine
 
+# 時區設定：alpine 預設 UTC、安裝 tzdata 改 Asia/Taipei
+# 避免 new Date() 取 UTC 導致 PM snapshot 日期歪斜（台灣凌晨 0-8 點操作會用前一天日期）
+RUN apk add --no-cache tzdata && \
+    cp /usr/share/zoneinfo/Asia/Taipei /etc/localtime && \
+    echo "Asia/Taipei" > /etc/timezone
+ENV TZ=Asia/Taipei
+
 WORKDIR /app
 
 # 安裝全部依賴（drizzle-kit 遷移需要 devDependencies）
