@@ -544,6 +544,15 @@ export default function HouseholdBudget() {
       {/* 預算超支即時警示 */}
       <BudgetOverrunAlertsCard />
 
+      {/* 月初預算建議（依上月實際） */}
+      <BudgetSuggestionCard
+        selectedMonth={selectedMonth}
+        currentBudget={budgetAmount}
+        onApply={(amt) => {
+          setBudgetMutation.mutate({ monthlyBudget: String(amt) })
+        }}
+      />
+
       {/* 本月預算概況 */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
@@ -853,6 +862,91 @@ function BudgetOverrunAlertsCard() {
             )
           })}
         </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+function BudgetSuggestionCard({
+  selectedMonth,
+  currentBudget,
+  onApply,
+}: {
+  selectedMonth: string
+  currentBudget: number
+  onApply: (amt: number) => void
+}) {
+  // 算上月（避免時區、用字串切）
+  const [y, m] = selectedMonth.split("-").map(Number)
+  const prevDate = new Date(y, m - 2, 1)
+  const prevMonth = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, "0")}`
+
+  const { data: prevStats } = useQuery<{
+    totalSpent: number
+    count: number
+    budgetAmount: number
+  }>({
+    queryKey: [`/api/household/stats?month=${prevMonth}`],
+    staleTime: 10 * 60 * 1000,
+  })
+
+  if (!prevStats || prevStats.totalSpent === 0) return null
+
+  // 建議：上月實際 × 1.05（5% 緩衝、抓未來預估）
+  const suggested = Math.round(prevStats.totalSpent * 1.05)
+  const diff = suggested - currentBudget
+  const isSet = currentBudget > 0
+  const isLowerThanLastMonth = isSet && currentBudget < prevStats.totalSpent
+
+  return (
+    <Card className="border-2 border-indigo-300 bg-gradient-to-br from-indigo-50 to-blue-50">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">📊 月初預算建議</CardTitle>
+        <CardDescription>
+          依上月 {prevMonth} 實際花費 NT$ {Math.round(prevStats.totalSpent).toLocaleString()}（共{" "}
+          {prevStats.count} 筆）
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-3 gap-2 mb-3">
+          <div className="bg-white rounded-lg p-2 text-center">
+            <div className="text-[10px] text-gray-500">上月實際</div>
+            <div className="font-bold text-rose-700">
+              NT$ {Math.round(prevStats.totalSpent).toLocaleString()}
+            </div>
+          </div>
+          <div className="bg-white rounded-lg p-2 text-center border-2 border-indigo-300">
+            <div className="text-[10px] text-gray-500">建議本月（×1.05）</div>
+            <div className="font-bold text-indigo-700">NT$ {suggested.toLocaleString()}</div>
+          </div>
+          <div className="bg-white rounded-lg p-2 text-center">
+            <div className="text-[10px] text-gray-500">目前設定</div>
+            <div className={`font-bold ${isSet ? "text-emerald-700" : "text-gray-400"}`}>
+              {isSet ? `NT$ ${currentBudget.toLocaleString()}` : "未設定"}
+            </div>
+          </div>
+        </div>
+        {isLowerThanLastMonth && (
+          <div className="text-xs text-orange-600 mb-2">
+            ⚠️ 目前預算 NT$ {currentBudget.toLocaleString()} 低於上月實際、容易超支
+          </div>
+        )}
+        {Math.abs(diff) > 100 && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onApply(suggested)}
+            className="w-full gap-2 text-indigo-700 border-indigo-300 hover:bg-indigo-50"
+          >
+            💡 套用建議 NT$ {suggested.toLocaleString()}
+            {diff !== 0 && (
+              <span className="text-xs text-gray-500">
+                （{diff > 0 ? "+" : ""}
+                {diff.toLocaleString()}）
+              </span>
+            )}
+          </Button>
+        )}
       </CardContent>
     </Card>
   )
