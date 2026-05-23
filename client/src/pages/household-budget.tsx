@@ -51,6 +51,7 @@ import {
 } from "@/components/household/expense-templates-card"
 import { ExpenseSearchCard } from "@/components/household/expense-search-card"
 import { IncomeExpenseBalanceCard } from "@/components/household/income-expense-balance-card"
+import { ExportCsvDropdown } from "@/components/household/export-csv-dropdown"
 import { getCategoryDecor } from "@/lib/category-emoji"
 import { useVoiceInput } from "@/hooks/use-voice-input"
 
@@ -1034,6 +1035,8 @@ export default function HouseholdBudget() {
           >
             ⚙️ 分類管理
           </Button>
+
+          <ExportCsvDropdown selectedMonth={selectedMonth} />
         </div>
       </div>
 

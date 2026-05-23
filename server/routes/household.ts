@@ -1575,6 +1575,133 @@ router.get(
 )
 
 /**
+ * GET /api/household/export?type=expenses|incomes|all&month=YYYY-MM
+ * 匯出 CSV（UTF-8 + BOM、Excel 可直接開）
+ *
+ *   - type=expenses（預設）：本月支出
+ *   - type=incomes：本月收入
+ *   - type=all：兩者合併（多 type 欄）
+ *   - month 未傳則本月
+ */
+function csvEscape(v: unknown): string {
+  if (v === null || v === undefined) return ""
+  const s = String(v)
+  // 含逗號 / 雙引號 / 換行 → 包雙引號、雙引號要 escape 成 ""
+  if (/[",\n\r]/.test(s)) {
+    return '"' + s.replace(/"/g, '""') + '"'
+  }
+  return s
+}
+
+router.get(
+  "/api/household/export",
+  asyncHandler(async (req, res) => {
+    const type = ((req.query.type as string) || "expenses").toLowerCase()
+    if (!["expenses", "incomes", "all"].includes(type)) {
+      throw new AppError(400, "type 需為 expenses | incomes | all")
+    }
+    const { year, month } = parseYearMonth(req.query.month as string | undefined)
+    const monthStr = `${year}-${String(month).padStart(2, "0")}`
+    const startDate = `${monthStr}-01`
+    const endY = month === 12 ? year + 1 : year
+    const endM = month === 12 ? 1 : month + 1
+    const endDate = `${endY}-${String(endM).padStart(2, "0")}-01`
+
+    const rows: string[][] = []
+    rows.push(["類型", "日期", "金額", "分類", "備註", "付款方式", "建立時間"])
+
+    if (type === "expenses" || type === "all") {
+      const expenseRows = await db.execute(sql`
+        SELECT
+          he.date::text AS date,
+          he.amount::text AS amount,
+          COALESCE(fc.category_name, '(未分類)') AS category,
+          he.description,
+          he.payment_method,
+          he.created_at::text AS created_at
+        FROM household_expenses he
+        LEFT JOIN fixed_categories fc ON he.category_id = fc.id
+        WHERE he.date >= ${startDate}::date AND he.date < ${endDate}::date
+        ORDER BY he.date DESC, he.id DESC
+      `)
+      for (const r of (
+        expenseRows as unknown as {
+          rows: {
+            date: string
+            amount: string
+            category: string
+            description: string | null
+            payment_method: string | null
+            created_at: string
+          }[]
+        }
+      ).rows) {
+        rows.push([
+          "支出",
+          r.date.slice(0, 10),
+          r.amount,
+          r.category,
+          r.description ?? "",
+          r.payment_method ?? "",
+          r.created_at.slice(0, 19).replace("T", " "),
+        ])
+      }
+    }
+
+    if (type === "incomes" || type === "all") {
+      try {
+        const incomeRows = await db.execute(sql`
+          SELECT
+            date::text AS date,
+            amount::text AS amount,
+            category,
+            description,
+            payment_method,
+            created_at::text AS created_at
+          FROM household_incomes
+          WHERE date >= ${startDate}::date AND date < ${endDate}::date
+          ORDER BY date DESC, id DESC
+        `)
+        for (const r of (
+          incomeRows as unknown as {
+            rows: {
+              date: string
+              amount: string
+              category: string
+              description: string | null
+              payment_method: string
+              created_at: string
+            }[]
+          }
+        ).rows) {
+          rows.push([
+            "收入",
+            r.date.slice(0, 10),
+            r.amount,
+            r.category,
+            r.description ?? "",
+            r.payment_method,
+            r.created_at.slice(0, 19).replace("T", " "),
+          ])
+        }
+      } catch (e) {
+        process.stdout.write(`[export] incomes failed: ${(e as Error).message}\n`)
+      }
+    }
+
+    // 組 CSV：用 \r\n（Excel for Windows 友善）
+    const csv = rows.map((r) => r.map(csvEscape).join(",")).join("\r\n")
+    // UTF-8 BOM
+    const body = "﻿" + csv + "\r\n"
+
+    const filename = `household-${type}-${monthStr}.csv`
+    res.setHeader("Content-Type", "text/csv; charset=utf-8")
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`)
+    res.send(body)
+  })
+)
+
+/**
  * GET /api/household/monthly-report?month=YYYY-MM
  * 回傳 markdown 月報、包含：預算 / 實際 / 分類佔比 / Top 10 大筆 / 上月對比
  * 月底自動結算 + 月初回顧用
