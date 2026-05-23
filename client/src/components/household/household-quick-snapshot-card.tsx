@@ -28,6 +28,9 @@ interface SnapshotResponse {
     timeProgress: number
     isOver: boolean
     isAhead: boolean
+    income?: number
+    incomeCount?: number
+    balance?: number
   }
   past7Days: { date: string; total: number }[]
 }
@@ -101,22 +104,48 @@ export function HouseholdQuickSnapshotCard() {
             <div className="text-lg font-bold text-orange-700">NT$ {ms.spent.toLocaleString()}</div>
             <div className="text-[9px] text-gray-400">{ms.count} 筆</div>
           </div>
-          <div
-            className={cn(
-              "rounded-lg p-2 text-center border",
-              ms.isOver ? "bg-rose-100 border-rose-300" : "bg-emerald-50 border-emerald-300"
-            )}
-          >
-            <div className="text-[10px] text-gray-500">{ms.isOver ? "超支" : "剩餘"}</div>
+          {/* 結餘優先（如果有收入）；無收入則顯示預算剩餘 */}
+          {ms.income !== undefined && ms.income > 0 && ms.balance !== undefined ? (
             <div
-              className={cn("text-lg font-bold", ms.isOver ? "text-rose-700" : "text-emerald-700")}
+              className={cn(
+                "rounded-lg p-2 text-center border",
+                ms.balance >= 0
+                  ? "bg-emerald-100 border-emerald-400"
+                  : "bg-rose-100 border-rose-400"
+              )}
             >
-              NT$ {Math.abs(ms.remaining).toLocaleString()}
+              <div className="text-[10px] text-gray-500">結餘</div>
+              <div
+                className={cn(
+                  "text-lg font-bold",
+                  ms.balance >= 0 ? "text-emerald-800" : "text-rose-800"
+                )}
+              >
+                {ms.balance >= 0 ? "+" : "-"}NT$ {Math.abs(ms.balance).toLocaleString()}
+              </div>
+              <div className="text-[9px] text-gray-500">收入 {ms.income.toLocaleString()}</div>
             </div>
-            {ms.usagePct !== null && (
-              <div className="text-[9px] text-gray-500">{ms.usagePct}% 已用</div>
-            )}
-          </div>
+          ) : (
+            <div
+              className={cn(
+                "rounded-lg p-2 text-center border",
+                ms.isOver ? "bg-rose-100 border-rose-300" : "bg-emerald-50 border-emerald-300"
+              )}
+            >
+              <div className="text-[10px] text-gray-500">{ms.isOver ? "超支" : "剩餘"}</div>
+              <div
+                className={cn(
+                  "text-lg font-bold",
+                  ms.isOver ? "text-rose-700" : "text-emerald-700"
+                )}
+              >
+                NT$ {Math.abs(ms.remaining).toLocaleString()}
+              </div>
+              {ms.usagePct !== null && (
+                <div className="text-[9px] text-gray-500">{ms.usagePct}% 已用</div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* 進度條（如果有預算）*/}

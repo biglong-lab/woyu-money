@@ -50,6 +50,7 @@ import {
   type ExpenseTemplate,
 } from "@/components/household/expense-templates-card"
 import { ExpenseSearchCard } from "@/components/household/expense-search-card"
+import { IncomeExpenseBalanceCard } from "@/components/household/income-expense-balance-card"
 import { getCategoryDecor } from "@/lib/category-emoji"
 import { useVoiceInput } from "@/hooks/use-voice-input"
 
@@ -1035,6 +1036,9 @@ export default function HouseholdBudget() {
           </Button>
         </div>
       </div>
+
+      {/* 收支結餘總覽（收入 + 支出 + 結餘 + 收入分類）*/}
+      <IncomeExpenseBalanceCard selectedMonth={selectedMonth} />
 
       {/* 今天/本週/本月 花費清單（Phase 4） */}
       <PeriodFeedCard />

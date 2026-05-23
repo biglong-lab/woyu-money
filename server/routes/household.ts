@@ -844,6 +844,25 @@ router.get(
     const daysInMonth = new Date(y, m, 0).getDate()
     const timeProgress = Math.round((now.getDate() / daysInMonth) * 100)
 
+    // 本月收入合計（household_incomes）
+    let monthIncome = 0
+    let incomeCount = 0
+    try {
+      const incRows = await db.execute(sql`
+        SELECT
+          COALESCE(SUM(amount::numeric), 0)::text AS total,
+          COUNT(*)::int AS cnt
+        FROM household_incomes
+        WHERE date >= ${monthStart}::date AND date < ${monthEnd}::date
+      `)
+      const r = (incRows as unknown as { rows: { total: string; cnt: number }[] }).rows[0]
+      monthIncome = parseFloat(r?.total ?? "0")
+      incomeCount = r?.cnt ?? 0
+    } catch (e) {
+      process.stdout.write(`[snapshot] incomes failed: ${(e as Error).message}\n`)
+    }
+    const balance = monthIncome - monthSpent
+
     res.json({
       month: monthStr,
       today: { date: todayStr, spent: Math.round(todaySpent), count: todayCount },
@@ -856,6 +875,9 @@ router.get(
         timeProgress,
         isOver: usagePct !== null && usagePct >= 100,
         isAhead: usagePct !== null && usagePct > timeProgress + 15,
+        income: Math.round(monthIncome),
+        incomeCount,
+        balance: Math.round(balance),
       },
       past7Days,
     })
