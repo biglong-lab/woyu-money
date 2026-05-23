@@ -244,14 +244,12 @@ function Router() {
                 <Route component={NotFound} />
               </Switch>
             </main>
-            {/* 浮動快速操作按鈕（僅桌面版，手機版用 Tab Bar 中間按鈕） */}
-            <div className="hidden md:block">
-              <QuickActionFAB
-                onQuickPayment={() => setQuickPaymentOpen(true)}
-                onOpenAi={() => setAiSheetOpen(true)}
-              />
-              <QuickPaymentDialog open={quickPaymentOpen} onOpenChange={setQuickPaymentOpen} />
-            </div>
+            {/* 浮動快速操作按鈕（桌面 + 手機都顯示，手機 bottom-20 避開 TabBar）*/}
+            <QuickActionFAB
+              onQuickPayment={() => setQuickPaymentOpen(true)}
+              onOpenAi={() => setAiSheetOpen(true)}
+            />
+            <QuickPaymentDialog open={quickPaymentOpen} onOpenChange={setQuickPaymentOpen} />
             {/* AI 助手側邊抽屜 */}
             <AiAssistantSheet open={aiSheetOpen} onOpenChange={setAiSheetOpen} />
             {/* 滾動回頂部按鈕（行動版 + 桌面版皆顯示） */}

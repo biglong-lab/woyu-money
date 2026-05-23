@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { useForm } from "react-hook-form"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -124,6 +124,19 @@ export default function HouseholdBudget() {
   const { toast } = useToast()
   const copyAmount = useCopyAmount()
   const [showQuickAdd, setShowQuickAdd] = useState(false)
+
+  // ?quickAdd=1 → 自動開快速記帳（FAB 從其他頁來的 deeplink）
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const params = new URLSearchParams(window.location.search)
+    if (params.get("quickAdd") === "1") {
+      setShowQuickAdd(true)
+      // 清掉 query 避免再次觸發
+      const url = new URL(window.location.href)
+      url.searchParams.delete("quickAdd")
+      window.history.replaceState({}, "", url.toString())
+    }
+  }, [])
   const [showBudgetSetup, setShowBudgetSetup] = useState(false)
   const queryClient = useQueryClient()
 

@@ -8,7 +8,7 @@
 import { useState, useEffect } from "react"
 import { Link } from "wouter"
 import { cn } from "@/lib/utils"
-import { Plus, X, Camera, DollarSign, FileText, Bot } from "lucide-react"
+import { Plus, X, Camera, DollarSign, FileText, Bot, Home } from "lucide-react"
 
 interface QuickActionFABProps {
   onQuickPayment: () => void
@@ -39,6 +39,12 @@ export function QuickActionFAB({ onQuickPayment, onOpenAi }: QuickActionFABProps
         onOpenAi?.()
       },
       color: "bg-purple-600 hover:bg-purple-700",
+    },
+    {
+      label: "🏠 家用記帳",
+      icon: Home,
+      href: "/household-budget?quickAdd=1",
+      color: "bg-amber-500 hover:bg-amber-600",
     },
     {
       label: "掃描單據",
