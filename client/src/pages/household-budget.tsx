@@ -187,6 +187,28 @@ export default function HouseholdBudget() {
     },
   })
 
+  // 智能分類建議：依備註輸入推測分類（debounce 400ms）
+  const watchedDescription = quickAddForm.watch("description") || ""
+  const [debouncedDesc, setDebouncedDesc] = useState("")
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedDesc(watchedDescription.trim()), 400)
+    return () => clearTimeout(t)
+  }, [watchedDescription])
+  const { data: categorySuggestions } = useQuery<{
+    suggestions: Array<{
+      categoryId: number
+      categoryName: string
+      score: number
+      occurrences: number
+    }>
+  }>({
+    queryKey: [
+      `/api/household/suggest-category?description=${encodeURIComponent(debouncedDesc)}&limit=3`,
+    ],
+    enabled: showQuickAdd && debouncedDesc.length >= 2,
+    staleTime: 30 * 1000,
+  })
+
   // 預算設定表單
   const budgetForm = useForm<BudgetFormData>({
     defaultValues: {
@@ -538,9 +560,56 @@ export default function HouseholdBudget() {
                   </Label>
                   <Textarea
                     id="description"
-                    placeholder="簡單備註"
+                    placeholder="例如：早餐、加油"
+                    rows={2}
                     {...quickAddForm.register("description")}
                   />
+                  {/* 智能分類建議 */}
+                  {categorySuggestions &&
+                    categorySuggestions.suggestions.length > 0 &&
+                    (() => {
+                      const currentCatId = quickAddForm.watch("categoryId")
+                      const filtered = categorySuggestions.suggestions.filter(
+                        (s) => String(s.categoryId) !== currentCatId
+                      )
+                      if (filtered.length === 0) return null
+                      return (
+                        <div className="mt-2 p-2 rounded-lg bg-violet-50 border border-violet-200">
+                          <div className="text-[10px] text-violet-700 mb-1.5">
+                            💡 依過去記錄、建議分類：
+                          </div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {filtered.map((s) => {
+                              const decor = getCategoryDecor(s.categoryName)
+                              return (
+                                <button
+                                  key={s.categoryId}
+                                  type="button"
+                                  onClick={() =>
+                                    quickAddForm.setValue("categoryId", String(s.categoryId), {
+                                      shouldValidate: true,
+                                    })
+                                  }
+                                  className={cn(
+                                    "inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs border",
+                                    "bg-white hover:shadow-sm active:scale-95 transition-all"
+                                  )}
+                                  style={{
+                                    borderColor: decor.color,
+                                    color: decor.color,
+                                  }}
+                                  data-testid={`suggest-category-${s.categoryId}`}
+                                >
+                                  <span className="text-sm">{decor.emoji}</span>
+                                  {s.categoryName}
+                                  <span className="text-gray-400">({s.occurrences})</span>
+                                </button>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      )
+                    })()}
                 </div>
                 <div>
                   <Label htmlFor="paymentMethod">

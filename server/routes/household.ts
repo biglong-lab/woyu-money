@@ -726,6 +726,71 @@ router.get(
 )
 
 /**
+ * GET /api/household/suggest-category?description=xxx&limit=3
+ * 依過去 90 天記帳的 description → categoryId 統計、回最可能分類
+ *
+ * 演算法：
+ *  1. 完全相符（LOWER 比較）權重 ×5
+ *  2. 子字串包含（LIKE %xxx%）權重 ×3
+ *  3. 字根命中（單一字 token 命中）權重 ×1
+ *  4. 同筆 expense 只計 1 次（避免某 description 重複扭曲）
+ *  5. 回前 N 個分類、含 categoryName + score
+ */
+router.get(
+  "/api/household/suggest-category",
+  asyncHandler(async (req, res) => {
+    const desc = ((req.query.description as string) || "").trim()
+    const limit = Math.min(Math.max(parseInt((req.query.limit as string) || "3", 10), 1), 10)
+    if (desc.length < 1) {
+      return res.json({ description: desc, suggestions: [] })
+    }
+    const lower = desc.toLowerCase()
+    // SQL LIKE pattern：%input%
+    const likePattern = `%${lower}%`
+
+    const rows = await db.execute(sql`
+      WITH scored AS (
+        SELECT
+          he.category_id,
+          COALESCE(fc.category_name, '(未分類)') AS category_name,
+          SUM(CASE
+            WHEN LOWER(he.description) = ${lower} THEN 5
+            WHEN LOWER(he.description) LIKE ${likePattern} THEN 3
+            WHEN LOWER(${lower}) LIKE '%' || LOWER(he.description) || '%' AND LENGTH(he.description) >= 2 THEN 2
+            ELSE 0
+          END)::int AS score,
+          COUNT(*)::int AS occurrences
+        FROM household_expenses he
+        LEFT JOIN fixed_categories fc ON he.category_id = fc.id
+        WHERE he.date >= NOW() - INTERVAL '90 days'
+          AND he.category_id IS NOT NULL
+          AND he.description IS NOT NULL
+          AND he.description <> ''
+        GROUP BY he.category_id, fc.category_name
+        HAVING SUM(CASE
+            WHEN LOWER(he.description) = ${lower} THEN 5
+            WHEN LOWER(he.description) LIKE ${likePattern} THEN 3
+            WHEN LOWER(${lower}) LIKE '%' || LOWER(he.description) || '%' AND LENGTH(he.description) >= 2 THEN 2
+            ELSE 0
+          END) > 0
+      )
+      SELECT
+        category_id AS "categoryId",
+        category_name AS "categoryName",
+        score,
+        occurrences
+      FROM scored
+      ORDER BY score DESC, occurrences DESC
+      LIMIT ${limit}
+    `)
+    res.json({
+      description: desc,
+      suggestions: (rows as unknown as { rows: unknown[] }).rows,
+    })
+  })
+)
+
+/**
  * GET /api/household/top-categories?limit=6&days=30
  * 取過去 N 天最常用的分類（依筆數排序）
  * 用於 quick add 介面置頂 N 個常用分類
