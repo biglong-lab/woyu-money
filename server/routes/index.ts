@@ -50,6 +50,7 @@ import dashboardRoutes from "./dashboard"
 import costStructureRoutes from "./cost-structure"
 import familyKidsRoutes from "./family-kids"
 import familyMembersRoutes from "./family-members"
+import familySavingsGoalsRoutes from "./family-savings-goals"
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // 設定認證系統
@@ -149,6 +150,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use(costStructureRoutes)
   app.use(familyKidsRoutes)
   app.use(familyMembersRoutes)
+  app.use(familySavingsGoalsRoutes)
 
   const httpServer = createServer(app)
   return httpServer
