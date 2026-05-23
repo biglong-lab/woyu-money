@@ -34,6 +34,7 @@ import { BackToTop } from "@/components/back-to-top"
 import { ReceiptUploadButton } from "@/components/receipt-upload-button"
 import { AmountKeypad } from "@/components/amount-keypad"
 import { useIsMobile } from "@/hooks/use-mobile"
+import { PeriodFeedCard } from "@/components/household/period-feed-card"
 
 // API 回應型別定義（對齊 server /api/household/budget 和 /api/household/stats）
 interface MonthlyBudgetResponse {
@@ -700,6 +701,9 @@ export default function HouseholdBudget() {
           </Button>
         </div>
       </div>
+
+      {/* 今天/本週/本月 花費清單（Phase 4） */}
+      <PeriodFeedCard />
 
       {/* 預算超支即時警示 */}
       <BudgetOverrunAlertsCard />

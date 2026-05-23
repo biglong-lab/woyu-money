@@ -633,6 +633,99 @@ router.get(
 )
 
 /**
+ * DELETE /api/household/expenses/:id  (alias for /api/household-expenses/:id)
+ * 給前端 /household-budget 頁直接刪除
+ */
+router.delete(
+  "/api/household/expenses/:id",
+  asyncHandler(async (req, res) => {
+    const id = parseInt(req.params.id, 10)
+    if (isNaN(id)) throw new AppError(400, "無效的 ID")
+    await storage.deleteHouseholdExpense(id)
+    res.status(204).send()
+  })
+)
+
+/**
+ * GET /api/household/period-summary?period=today|week|month&date=YYYY-MM-DD
+ * 取指定期間的「花了什麼」即時清單
+ *  - today：當日（依使用者本地時區、Asia/Taipei）
+ *  - week：本週（週一至週日）
+ *  - month：當月
+ * 回傳 { period, total, count, expenses: [...] }
+ */
+router.get(
+  "/api/household/period-summary",
+  asyncHandler(async (req, res) => {
+    const period = (req.query.period as string) || "today"
+    if (!["today", "week", "month"].includes(period)) {
+      throw new AppError(400, "period 需為 today | week | month")
+    }
+    // 用使用者傳的 date 當基準（沒傳則用伺服器當下）
+    const baseDateStr = (req.query.date as string) || ""
+    const base = /^\d{4}-\d{2}-\d{2}$/.test(baseDateStr) ? new Date(baseDateStr) : new Date()
+
+    let startDate: string
+    let endDate: string
+    if (period === "today") {
+      const y = base.getFullYear()
+      const m = String(base.getMonth() + 1).padStart(2, "0")
+      const d = String(base.getDate()).padStart(2, "0")
+      startDate = `${y}-${m}-${d}`
+      // endDate 是下一天
+      const tomorrow = new Date(base)
+      tomorrow.setDate(tomorrow.getDate() + 1)
+      endDate = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, "0")}-${String(tomorrow.getDate()).padStart(2, "0")}`
+    } else if (period === "week") {
+      // 週一作為一週起點
+      const dow = base.getDay() === 0 ? 7 : base.getDay() // 1=Mon, 7=Sun
+      const start = new Date(base)
+      start.setDate(start.getDate() - (dow - 1))
+      const end = new Date(start)
+      end.setDate(end.getDate() + 7)
+      startDate = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}-${String(start.getDate()).padStart(2, "0")}`
+      endDate = `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, "0")}-${String(end.getDate()).padStart(2, "0")}`
+    } else {
+      // month
+      const y = base.getFullYear()
+      const m = base.getMonth() + 1
+      startDate = `${y}-${String(m).padStart(2, "0")}-01`
+      const ny = m === 12 ? y + 1 : y
+      const nm = m === 12 ? 1 : m + 1
+      endDate = `${ny}-${String(nm).padStart(2, "0")}-01`
+    }
+
+    const rows = await db.execute(sql`
+      SELECT
+        he.id,
+        he.amount::text AS amount,
+        he.description,
+        he.date::text AS date,
+        he.payment_method AS "paymentMethod",
+        he.receipt_images AS "receiptImages",
+        he.category_id AS "categoryId",
+        COALESCE(fc.category_name, '(未分類)') AS "categoryName",
+        COALESCE(fc.color, '#9CA3AF') AS color
+      FROM household_expenses he
+      LEFT JOIN fixed_categories fc ON he.category_id = fc.id
+      WHERE he.date >= ${startDate}::date AND he.date < ${endDate}::date
+      ORDER BY he.date DESC, he.id DESC
+      LIMIT 200
+    `)
+    const list = (rows as unknown as { rows: { amount: string }[] }).rows
+    const total = list.reduce((s, r) => s + parseFloat(r.amount), 0)
+    res.json({
+      period,
+      startDate,
+      endDate,
+      total: Math.round(total),
+      count: list.length,
+      expenses: list,
+    })
+  })
+)
+
+/**
  * GET /api/household/top-categories?limit=6&days=30
  * 取過去 N 天最常用的分類（依筆數排序）
  * 用於 quick add 介面置頂 N 個常用分類
