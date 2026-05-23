@@ -202,6 +202,14 @@
   - 規則 3 (missing)：過去 3 月有 ≥ 3 筆但本月空白的固定分類（僅月過 50%+ 提示）
   - 新增 `AnomaliesCard`、3 種 severity + 3 種 type icon
   - 階段 3 報表深度 + AI 助手全完成、進階段 4 家庭多人協作（commit `d3c5211`）
+- `2026-05-23` **階段 5.1** Cron 觀測 UI（技術債清理啟動）：
+  - 新增 `/admin/cron-health` ProtectedRoute 頁面
+  - 用既有 `GET /api/admin/cron-tick-logs`（階段 1.4 已建）顯示：
+    - 整體統計（總 / OK / FAIL / 最近時間）
+    - 過去 24h 各任務通過率（含 avg duration、last status badge、進度條配色）
+    - 最近 50 筆 tick log（時間倒序、OK 綠 FAIL 紅）
+  - auto-refresh 30 秒 + 手動「立即刷新」
+  - 純前端聚合、無新 backend、不動 schema（commit `f9e614f`）
 - `2026-05-23` **階段 4.4** 家庭共同存錢目標：
   - 新增 2 張表：`family_savings_goals`（目標）+ `family_savings_contributions`（每筆 contribution 可追溯）
   - 後端 5 endpoints：列表 / 建立 / contribute（達標自動 achieved + insert contribution）/ archive / 明細
