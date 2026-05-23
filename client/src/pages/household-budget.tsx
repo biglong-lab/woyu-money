@@ -553,6 +553,9 @@ export default function HouseholdBudget() {
         }}
       />
 
+      {/* 本月 vs 上月同期 + 6 月 sparkline */}
+      <MonthlyComparisonCard selectedMonth={selectedMonth} currentSpent={totalSpent} />
+
       {/* 本月預算概況 */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
@@ -947,6 +950,147 @@ function BudgetSuggestionCard({
             )}
           </Button>
         )}
+      </CardContent>
+    </Card>
+  )
+}
+
+function MonthlyComparisonCard({
+  selectedMonth,
+  currentSpent,
+}: {
+  selectedMonth: string
+  currentSpent: number
+}) {
+  // 算過去 5 個月（不含本月）
+  const [y, m] = selectedMonth.split("-").map(Number)
+  const pastMonths: string[] = []
+  for (let i = 1; i <= 5; i++) {
+    const d = new Date(y, m - 1 - i, 1)
+    pastMonths.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`)
+  }
+
+  // 一次拉 5 個月 stats
+  const queries = pastMonths.map((mo) => ({
+    queryKey: [`/api/household/stats?month=${mo}`],
+    staleTime: 10 * 60 * 1000,
+  }))
+
+  const { data: prevStats } = useQuery<{ totalSpent: number }>({
+    queryKey: queries[0].queryKey,
+    staleTime: queries[0].staleTime,
+  })
+  const { data: m2 } = useQuery<{ totalSpent: number }>({
+    queryKey: queries[1].queryKey,
+    staleTime: queries[1].staleTime,
+  })
+  const { data: m3 } = useQuery<{ totalSpent: number }>({
+    queryKey: queries[2].queryKey,
+    staleTime: queries[2].staleTime,
+  })
+  const { data: m4 } = useQuery<{ totalSpent: number }>({
+    queryKey: queries[3].queryKey,
+    staleTime: queries[3].staleTime,
+  })
+  const { data: m5 } = useQuery<{ totalSpent: number }>({
+    queryKey: queries[4].queryKey,
+    staleTime: queries[4].staleTime,
+  })
+
+  const series = [
+    m5?.totalSpent ?? 0,
+    m4?.totalSpent ?? 0,
+    m3?.totalSpent ?? 0,
+    m2?.totalSpent ?? 0,
+    prevStats?.totalSpent ?? 0,
+    currentSpent,
+  ]
+  if (series.every((v) => v === 0)) return null
+
+  // 同期比較：今天是本月第 N 天、上月同 N 天累計
+  const today = new Date()
+  const isCurrentMonth = today.getFullYear() === y && today.getMonth() + 1 === m
+  const dayOfMonth = isCurrentMonth ? today.getDate() : 0
+  // 簡化：直接用上月實際全月 / 30 * dayOfMonth 估「同期」
+  const prevTotal = prevStats?.totalSpent ?? 0
+  const prevSamePeriod =
+    isCurrentMonth && dayOfMonth > 0 ? Math.round((prevTotal / 30) * dayOfMonth) : prevTotal
+  const diff = currentSpent - prevSamePeriod
+  const diffPct = prevSamePeriod > 0 ? Math.round((diff / prevSamePeriod) * 100) : 0
+
+  // sparkline max
+  const max = Math.max(...series, 1)
+  const labels = [...pastMonths.slice().reverse(), selectedMonth]
+
+  const isUp = diff > 0
+  const trendEmoji = Math.abs(diffPct) < 5 ? "≈" : isUp ? "📈" : "📉"
+  const trendColor =
+    Math.abs(diffPct) < 5 ? "text-gray-600" : isUp ? "text-rose-600" : "text-emerald-600"
+
+  return (
+    <Card className="border-2 border-cyan-300 bg-gradient-to-br from-cyan-50 to-sky-50">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">📊 本月 vs 上月同期</CardTitle>
+        <CardDescription>
+          {isCurrentMonth
+            ? `本月第 ${dayOfMonth} 天、跟上月同期比較`
+            : `${selectedMonth} 全月 vs 上月 (${pastMonths[0]})`}
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-3 gap-2 mb-3">
+          <div className="bg-white rounded-lg p-2 text-center">
+            <div className="text-[10px] text-gray-500">本月已花</div>
+            <div className="font-bold text-cyan-700">
+              NT$ {Math.round(currentSpent).toLocaleString()}
+            </div>
+          </div>
+          <div className="bg-white rounded-lg p-2 text-center">
+            <div className="text-[10px] text-gray-500">上月同期</div>
+            <div className="font-bold text-gray-700">
+              NT$ {Math.round(prevSamePeriod).toLocaleString()}
+            </div>
+          </div>
+          <div className="bg-white rounded-lg p-2 text-center">
+            <div className="text-[10px] text-gray-500">差異</div>
+            <div className={`font-bold ${trendColor}`}>
+              {trendEmoji} {isUp ? "+" : ""}
+              {diffPct}%
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg p-2">
+          <div className="text-[10px] text-gray-500 mb-1">過去 6 個月走勢</div>
+          <div className="flex items-end gap-1 h-12">
+            {series.map((v, i) => {
+              const h = (v / max) * 100
+              const isCurrent = i === series.length - 1
+              return (
+                <div key={labels[i]} className="flex-1 flex flex-col items-center justify-end">
+                  <div
+                    className={`w-full rounded-t transition-all ${
+                      v > 0
+                        ? isCurrent
+                          ? "bg-gradient-to-t from-cyan-400 to-cyan-600"
+                          : "bg-gray-300"
+                        : "bg-gray-100"
+                    }`}
+                    style={{ height: `${Math.max(2, h)}%` }}
+                    title={`${labels[i]}: NT$ ${Math.round(v).toLocaleString()}`}
+                  />
+                </div>
+              )
+            })}
+          </div>
+          <div className="flex justify-between text-[8px] text-gray-400 mt-1">
+            {labels.map((l) => (
+              <span key={l} className="flex-1 text-center">
+                {l.slice(5)}
+              </span>
+            ))}
+          </div>
+        </div>
       </CardContent>
     </Card>
   )

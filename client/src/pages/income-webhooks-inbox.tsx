@@ -681,7 +681,29 @@ export default function IncomeWebhooksInboxPage() {
       })
     },
     onError: (err: Error) => {
-      toast({ title: "一鍵確認失敗", description: err.message, variant: "destructive" })
+      // 未設 defaultProjectId 是常見原因、給友善導航
+      const noDefault =
+        err.message.includes("未設預設專案") || err.message.includes("defaultProjectId")
+      if (noDefault) {
+        toast({
+          title: "需要先設預設專案",
+          description: "前往 /income/sources 編輯 pm-bridge 來源、選一個預設專案後再回來",
+          variant: "destructive",
+          duration: 8000,
+          action: (
+            <button
+              onClick={() => {
+                window.location.href = "/income/sources"
+              }}
+              className="px-3 py-1 bg-white text-red-600 rounded text-xs font-medium hover:bg-red-50 border border-red-200"
+            >
+              去設定 →
+            </button>
+          ),
+        })
+      } else {
+        toast({ title: "一鍵確認失敗", description: err.message, variant: "destructive" })
+      }
     },
   })
 
@@ -736,25 +758,46 @@ export default function IncomeWebhooksInboxPage() {
             <Building2 className="h-4 w-4" />從 PM 同步
           </Button>
 
-          {statusFilter === "pending" && pendingWebhooks.length > 0 && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                if (
-                  window.confirm(
-                    `將用「pm-bridge」source 預設專案一鍵 confirm 全部 PM-bridge pending、繼續嗎？\n\n（需先在 /income/sources 設好 defaultProjectId）`
-                  )
-                ) {
-                  autoConfirmMutation.mutate({ sourceKey: "pm-bridge" })
-                }
-              }}
-              disabled={autoConfirmMutation.isPending}
-              className="gap-2 text-emerald-700 border-emerald-300 hover:bg-emerald-50"
-            >
-              <CheckCircle2 className="h-4 w-4" />⚡ 一鍵確認 PM 全部
-            </Button>
-          )}
+          {statusFilter === "pending" &&
+            pendingWebhooks.length > 0 &&
+            (() => {
+              const pmSource = sources.find((s) => s.sourceKey === "pm-bridge")
+              const ready = !!pmSource?.defaultProjectId
+              if (!ready) {
+                return (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      window.location.href = "/income/sources"
+                    }}
+                    className="gap-2 text-orange-700 border-orange-300 hover:bg-orange-50"
+                    title="pm-bridge 來源尚未設 defaultProjectId，按此前往設定"
+                  >
+                    ⚙️ 先設 PM 預設專案
+                  </Button>
+                )
+              }
+              return (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    if (
+                      window.confirm(
+                        `將用「pm-bridge」source 預設專案一鍵 confirm 全部 PM-bridge pending、繼續嗎？`
+                      )
+                    ) {
+                      autoConfirmMutation.mutate({ sourceKey: "pm-bridge" })
+                    }
+                  }}
+                  disabled={autoConfirmMutation.isPending}
+                  className="gap-2 text-emerald-700 border-emerald-300 hover:bg-emerald-50"
+                >
+                  <CheckCircle2 className="h-4 w-4" />⚡ 一鍵確認 PM 全部
+                </Button>
+              )
+            })()}
 
           {selectedIds.size > 0 && statusFilter === "pending" && (
             <Button onClick={() => setShowBatchConfirm(true)} className="gap-2">

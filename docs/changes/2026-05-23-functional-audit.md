@@ -174,4 +174,9 @@
 - `2026-05-23` **階段 2.2** quick-add dialog「拍照存證」placeholder 換真的 `ReceiptUploadButton`、提交時 receiptImages array 帶到 `/api/household/expenses`（後端已支援 `receipt_images` jsonb）（commit `802866c`）
 - `2026-05-23` **階段 2.3** 拍照 → AI 自動填表：新增 `POST /api/household/recognize-receipt`（從 /uploads/ URL 讀檔 + recognizeDocument 跑 Gemini 辨識）+ quick-add UI「✨ AI 自動填金額/品項/日期」按鈕、自動 setValue 金額/日期/備註/分類（模糊匹配 householdCategories）（commit `868b0e4`）
 - `2026-05-23` **階段 2.4** 月初預算建議 widget：`BudgetSuggestionCard` 顯示上月實際花費 vs 本月建議（×1.05 緩衝）+ 目前設定 3 column 對照、超支時橘色警示、一鍵套用建議到 setBudgetMutation（commit `d76bbae`）
-- `2026-05-23` **階段 2.5** 超支瀏覽器通知：`BudgetOverrunNotifier` 注入 App layout、每 5 分鐘輪詢 `/api/budget/overrun-alerts`、用 localStorage 比對 severity 升級才觸發 Notification API（無需 VAPID / web-push、零部署風險）
+- `2026-05-23` **階段 2.5** 超支瀏覽器通知：`BudgetOverrunNotifier` 注入 App layout、每 5 分鐘輪詢 `/api/budget/overrun-alerts`、用 localStorage 比對 severity 升級才觸發 Notification API（無需 VAPID / web-push、零部署風險）（commit `7da0924`）
+- `2026-05-23` **階段 2.6** 本月 vs 上月同期 widget：`MonthlyComparisonCard` 抓過去 5 月 + 本月、3 column 對照（本月已花 / 上月同期 / 差異 %）+ 6 月 mini bar sparkline + 趨勢 emoji（📈 上升 / 📉 下降 / ≈ 持平 < 5%）（commit `366d622`）
+- `2026-05-23` **inbox 一鍵失敗友善修復**：使用者按「⚡ 一鍵確認 PM 全部」遇 400「未設預設專案」、UX 改善：
+  - 按鈕智能偵測 pm-bridge source 是否設 defaultProjectId、未設改顯「⚙️ 先設 PM 預設專案」並直接跳 /income/sources
+  - 已設則正常顯「⚡ 一鍵確認 PM 全部」
+  - 失敗 toast 改帶「去設定 →」按鈕跳轉
