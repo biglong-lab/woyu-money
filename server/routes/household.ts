@@ -137,7 +137,7 @@ router.get(
     const rows = await db.execute(sql`
       SELECT id, budget_amount::text AS "budgetAmount", year, month, notes
       FROM household_budgets
-      WHERE year = ${year} AND month = ${month} AND category_id = ${TOTAL_BUDGET_CATEGORY_ID}
+      WHERE year = ${year} AND month = ${month} AND is_total_budget = true
       LIMIT 1
     `)
     const row = (rows as unknown as { rows: { id: number; budgetAmount: string }[] }).rows[0]
@@ -168,7 +168,7 @@ router.post(
     // 取舊預算（給 change log）
     const existRows = await db.execute(sql`
       SELECT id, budget_amount::text AS "budgetAmount" FROM household_budgets
-      WHERE year = ${year} AND month = ${month} AND category_id = ${TOTAL_BUDGET_CATEGORY_ID}
+      WHERE year = ${year} AND month = ${month} AND is_total_budget = true
       LIMIT 1
     `)
     const existing = (existRows as unknown as { rows: { id: number; budgetAmount: string }[] })
@@ -188,8 +188,8 @@ router.post(
       result = (updateRes as unknown as { rows: { id: number; budgetAmount: string }[] }).rows[0]
     } else {
       const insertRes = await db.execute(sql`
-        INSERT INTO household_budgets (category_id, year, month, budget_amount, notes, is_active, created_at, updated_at)
-        VALUES (${TOTAL_BUDGET_CATEGORY_ID}, ${year}, ${month}, ${amt}, ${notes ?? null}, true, NOW(), NOW())
+        INSERT INTO household_budgets (category_id, is_total_budget, year, month, budget_amount, notes, is_active, created_at, updated_at)
+        VALUES (${TOTAL_BUDGET_CATEGORY_ID}, true, ${year}, ${month}, ${amt}, ${notes ?? null}, true, NOW(), NOW())
         RETURNING id, budget_amount::text AS "budgetAmount"
       `)
       result = (insertRes as unknown as { rows: { id: number; budgetAmount: string }[] }).rows[0]
@@ -350,7 +350,7 @@ router.get(
     // 總預算
     const budgetRows = await db.execute(sql`
       SELECT budget_amount::text AS amt FROM household_budgets
-      WHERE year = ${year} AND month = ${month} AND category_id = ${TOTAL_BUDGET_CATEGORY_ID}
+      WHERE year = ${year} AND month = ${month} AND is_total_budget = true
       LIMIT 1
     `)
     const budgetAmount = parseFloat(
@@ -911,7 +911,7 @@ router.get(
     // 本月預算
     const budgetRows = await db.execute(sql`
       SELECT budget_amount::text AS amt FROM household_budgets
-      WHERE year = ${y} AND month = ${m} AND category_id = ${TOTAL_BUDGET_CATEGORY_ID}
+      WHERE year = ${y} AND month = ${m} AND is_total_budget = true
       LIMIT 1
     `)
     const monthBudget = parseFloat(
@@ -1408,7 +1408,7 @@ router.get(
     // 預算
     const budgetRows = await db.execute(sql`
       SELECT budget_amount::text AS amt FROM household_budgets
-      WHERE year = ${year} AND month = ${month} AND category_id = ${TOTAL_BUDGET_CATEGORY_ID}
+      WHERE year = ${year} AND month = ${month} AND is_total_budget = true
       LIMIT 1
     `)
     const budgetAmount = parseFloat(
@@ -1629,7 +1629,7 @@ router.get(
     const budgetRows = await db.execute(sql`
       SELECT year, month, budget_amount::text AS amt
       FROM household_budgets
-      WHERE category_id = ${TOTAL_BUDGET_CATEGORY_ID}
+      WHERE is_total_budget = true
         AND (year * 100 + month) >= ${months[0].year * 100 + months[0].month}
         AND (year * 100 + month) <= ${lastYear * 100 + lastMonth}
     `)
@@ -1827,7 +1827,7 @@ router.get(
     // 總預算
     const budgetRows = await db.execute(sql`
       SELECT budget_amount::text AS amt FROM household_budgets
-      WHERE year = ${year} AND month = ${month} AND category_id = ${TOTAL_BUDGET_CATEGORY_ID}
+      WHERE year = ${year} AND month = ${month} AND is_total_budget = true
       LIMIT 1
     `)
     const budgetAmount = parseFloat(

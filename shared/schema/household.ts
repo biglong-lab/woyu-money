@@ -17,6 +17,9 @@ import { z } from "zod"
 export const householdBudgets = pgTable("household_budgets", {
   id: serial("id").primaryKey(),
   categoryId: integer("category_id").notNull(),
+  // 2026-05-24 audit P3：取代 categoryId=0 sentinel
+  // 舊資料 cat_id=0 仍保留（backward compat）、查詢一律走 is_total_budget=true
+  isTotalBudget: boolean("is_total_budget").notNull().default(false),
   year: integer("year").notNull(),
   month: integer("month").notNull(),
   budgetAmount: decimal("budget_amount", { precision: 10, scale: 2 }).notNull(),
