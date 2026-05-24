@@ -28,6 +28,7 @@ import { db } from "../db"
 import { paymentProjects } from "@shared/schema"
 import { asyncHandler, AppError } from "../middleware/error-handler"
 import { requireAuth } from "../auth"
+import { getCompanyToProjectMap } from "../storage/pm-company-mapping"
 
 const router = Router()
 
@@ -101,16 +102,8 @@ router.get(
       revenueMap.set(Number(r.project_id), Number(r.total))
     }
 
-    // PM company_id → project_id 對應（hardcoded、跟 pms-calibration 一致）
-    // 未來改成 project_company_mapping 表
-    const PM_COMPANY_TO_PROJECT: Record<number, number> = {
-      1: 3, // 浯島文旅
-      2: 4, // 浯島輕旅
-      3: 9, // 小六路厝
-      4: 10, // 總兵招待所
-      5: 20, // 魁星背包棧
-      6: 26, // 大號文創
-    }
+    // PM company_id → project_id 對應（DB 表 pm_company_mapping、5 分鐘 cache）
+    const PM_COMPANY_TO_PROJECT = await getCompanyToProjectMap()
     const webhookRows = await db.execute<{
       company_id: number | null
       total: string
@@ -130,7 +123,7 @@ router.get(
     for (const r of webhookRows.rows as { company_id: number | null; total: string }[]) {
       const cid = r.company_id
       if (cid === null) continue
-      const projectId = PM_COMPANY_TO_PROJECT[cid]
+      const projectId = PM_COMPANY_TO_PROJECT.get(cid)
       if (!projectId) continue
       revenueMap.set(projectId, (revenueMap.get(projectId) ?? 0) + Number(r.total))
     }

@@ -93,21 +93,14 @@ async function getTrainingPairs(companyId: number | null): Promise<RawPair[]> {
         ${companyId !== null ? sql`AND company_id = ${companyId}` : sql``}
     ),
     actual AS (
-      -- project_id → PMS company_id 映射（不用 item_name LIKE，會漏抓）
+      -- project_id → PMS company_id 映射（JOIN pm_company_mapping、取代舊 CASE hardcoded）
       SELECT
-        CASE project_id
-          WHEN 3  THEN 1  -- 浯島文旅
-          WHEN 4  THEN 2  -- 浯島輕旅
-          WHEN 9  THEN 3  -- 小六路厝
-          WHEN 10 THEN 4  -- 總兵招待所
-          WHEN 20 THEN 5  -- 魁星背包棧
-          WHEN 26 THEN 6  -- 大號文創
-        END AS company_id,
-        TO_CHAR(start_date, 'YYYY-MM') AS target_month,
-        SUM(total_amount::numeric) AS actual
-      FROM payment_items
-      WHERE item_type = 'income' AND NOT is_deleted AND source = 'webhook'
-        AND project_id IN (3, 4, 9, 10, 20, 26)
+        m.company_id,
+        TO_CHAR(pi.start_date, 'YYYY-MM') AS target_month,
+        SUM(pi.total_amount::numeric) AS actual
+      FROM payment_items pi
+      JOIN pm_company_mapping m ON m.project_id = pi.project_id AND m.is_active = TRUE
+      WHERE pi.item_type = 'income' AND NOT pi.is_deleted AND pi.source = 'webhook'
       GROUP BY 1, 2
     )
     SELECT p.snapshot_date::text, p.company_id, p.target_month,
