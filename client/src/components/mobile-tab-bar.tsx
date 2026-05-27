@@ -508,7 +508,8 @@ export function MobileTabBar() {
   // household 場景優先（包含 default fallback、家用記帳是預設）
   const isHousehold = pageContext === "household" || pageContext === "default"
   const isFamily = pageContext === "family"
-  const isPayment = pageContext === "payment"
+  // inbox（單據收件箱）也走 payment 入口、共用「項目 / + / 單據」三件套
+  const isPayment = pageContext === "payment" || pageContext === "inbox"
   const isProperty = pageContext === "property"
   const isFinance = pageContext === "finance"
 
