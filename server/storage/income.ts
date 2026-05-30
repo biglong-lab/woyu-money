@@ -551,7 +551,7 @@ export async function reprocessWebhook(webhookId: number): Promise<boolean> {
 // 內部：建立 paymentItem + paymentRecord
 // ─────────────────────────────────────────────
 
-async function _createPaymentFromWebhook(
+export async function _createPaymentFromWebhook(
   webhook: IncomeWebhook,
   input: Pick<ConfirmWebhookInput, "projectId" | "categoryId" | "itemName">
 ): Promise<{ paymentItemId: number; paymentRecordId: number }> {

@@ -14,6 +14,8 @@ import { Pool } from "pg"
 import { db } from "../db"
 import { incomeSources, incomeWebhooks } from "@shared/schema"
 import { eq, and, isNull } from "drizzle-orm"
+import { _createPaymentFromWebhook } from "./income"
+import { getCompanyToProjectMap } from "./pm-company-mapping"
 
 // ─────────────────────────────────────────────
 // PM 資料庫連線（唯讀用途）
@@ -227,25 +229,45 @@ export async function syncPmRevenues(
       // 使用者反映：PM 是每日 21:00 結帳後的固定金額、進來多少就是多少
       // 所有報表用同一個 source（income_webhooks confirmed）保持數字一致
       const nowTs = new Date()
-      await db.insert(incomeWebhooks).values({
-        sourceId,
-        externalTransactionId: externalTxId,
-        rawPayload,
-        parsedAmount: rev.amount,
-        parsedCurrency: "TWD",
-        parsedAmountTwd: rev.amount,
-        parsedDescription: description,
-        parsedPaidAt: new Date(dateStr),
-        parsedOrderId: rev.order_number ?? undefined,
-        parsedPayerName: companyName ?? source,
-        signatureValid: true,
-        status: "confirmed",
-        reviewedAt: nowTs,
-        reviewNote: "PM 自動同步、無需人工確認",
-        processedAt: nowTs,
-        requestIp: "internal",
-        requestHeaders: { "x-bridge": "pm-db-sync" },
-      })
+      const [insertedWebhook] = await db
+        .insert(incomeWebhooks)
+        .values({
+          sourceId,
+          externalTransactionId: externalTxId,
+          rawPayload,
+          parsedAmount: rev.amount,
+          parsedCurrency: "TWD",
+          parsedAmountTwd: rev.amount,
+          parsedDescription: description,
+          parsedPaidAt: new Date(dateStr),
+          parsedOrderId: rev.order_number ?? undefined,
+          parsedPayerName: companyName ?? source,
+          signatureValid: true,
+          status: "confirmed",
+          reviewedAt: nowTs,
+          reviewNote: "PM 自動同步、無需人工確認",
+          processedAt: nowTs,
+          requestIp: "internal",
+          requestHeaders: { "x-bridge": "pm-db-sync" },
+        })
+        .returning()
+
+      // 2026-05-30 fix：同步建 payment_items + payment_records
+      // 避免 dashboard 收入只算 payment_items、漏掉 webhook 表（差距高達 100 萬/月）
+      if (rev.company_id) {
+        const mapping = await getCompanyToProjectMap()
+        const projectId = mapping.get(rev.company_id)
+        if (projectId) {
+          try {
+            await _createPaymentFromWebhook(insertedWebhook, {
+              projectId,
+              itemName: description || `PM 收入 ${dateStr}`,
+            })
+          } catch (e) {
+            console.error(`[pm-bridge] revenue#${rev.id} 建 payment_item 失敗:`, e)
+          }
+        }
+      }
 
       synced++
     } catch (err) {
