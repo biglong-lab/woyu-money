@@ -375,8 +375,16 @@ export default function FinancialDashboardPage() {
     const d = new Date()
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
   })()
+  // 以 currentMonth 為中心、最近 6 月（含本月）+ 未來 3 月 = 9 個月窗
+  const chartWindow = (() => {
+    const d = new Date()
+    const from = new Date(d.getFullYear(), d.getMonth() - 5, 1)
+    const to = new Date(d.getFullYear(), d.getMonth() + 3, 1)
+    const ym = (x: Date) => `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}`
+    return { from: ym(from), to: ym(to) }
+  })()
   const chartData = ytd.months
-    .slice(-9) // 最多顯示 9 個月
+    .filter((m) => m.month >= chartWindow.from && m.month <= chartWindow.to)
     .map((m) => ({ ...m, isForecast: m.month > currentMonthClient }))
 
   return (
