@@ -17,6 +17,12 @@ router.get(
     const now = new Date()
     const yearStart = `${now.getFullYear()}-01-01`
     const today = now.toISOString().slice(0, 10)
+    // 圖表「最近 6 月」需要往前涵蓋 currentMonth - 5（含去年 12 月）
+    // dataStart = min(yearStart, currentMonth - 5 months) 確保 chart 6 月窗完整
+    const sixMonthsBack = new Date(now.getFullYear(), now.getMonth() - 5, 1)
+      .toISOString()
+      .slice(0, 10)
+    const dataStart = sixMonthsBack < yearStart ? sixMonthsBack : yearStart
     // 月度上限抓到「本月後 6 個月」止、避免把太遠未來合約全列進來，又能涵蓋
     // template_scheduled 占位 + 分期付款（如 12 期租金）的未來幾個月預定
     const lookaheadEnd = new Date(now.getFullYear(), now.getMonth() + 7, 0)
@@ -44,7 +50,7 @@ router.get(
                SUM(CASE WHEN start_date >  ${today}::date THEN total_amount::numeric ELSE 0 END)::bigint AS planned
         FROM payment_items
         WHERE item_type = 'income' AND NOT is_deleted
-          AND start_date >= ${yearStart}::date AND start_date <= ${lookaheadEnd}::date
+          AND start_date >= ${dataStart}::date AND start_date <= ${lookaheadEnd}::date
         GROUP BY 1
       ),
       household_income AS (
@@ -53,7 +59,7 @@ router.get(
                SUM(CASE WHEN date <= ${today}::date THEN amount::numeric ELSE 0 END)::bigint AS actual,
                SUM(CASE WHEN date >  ${today}::date THEN amount::numeric ELSE 0 END)::bigint AS planned
         FROM household_incomes
-        WHERE date >= ${yearStart}::date AND date <= ${lookaheadEnd}::date
+        WHERE date >= ${dataStart}::date AND date <= ${lookaheadEnd}::date
         GROUP BY 1
       ),
       income_split AS (
@@ -77,7 +83,7 @@ router.get(
         FROM payment_items pi
         LEFT JOIN payment_projects pp ON pi.project_id = pp.id
         WHERE pi.item_type IN ('project', 'home') AND NOT pi.is_deleted
-          AND pi.start_date >= ${yearStart}::date AND pi.start_date <= ${lookaheadEnd}::date
+          AND pi.start_date >= ${dataStart}::date AND pi.start_date <= ${lookaheadEnd}::date
           AND (pp.project_name IS NULL OR pp.project_name != '人力成本')
           AND pi.item_name NOT LIKE '%薪資%'
           AND pi.item_name NOT LIKE '%薪水%'
@@ -103,7 +109,7 @@ router.get(
       -- 加入 expense.planned 對齊 /cost-overview（看到完整成本、不依賴是否手動產出占位）
       template_missing AS (
         WITH RECURSIVE month_series AS (
-          SELECT ${yearStart}::date AS m
+          SELECT ${dataStart}::date AS m
           UNION ALL
           SELECT (m + INTERVAL '1 month')::date FROM month_series WHERE m < ${lookaheadEnd}::date
         )
@@ -276,7 +282,7 @@ router.get(
         LEFT JOIN fixed_categories fc ON pi.fixed_category_id = fc.id
         LEFT JOIN payment_projects pp ON pi.project_id = pp.id
         WHERE pi.item_type IN ('project', 'home') AND NOT pi.is_deleted
-          AND pi.start_date >= ${yearStart}::date AND pi.start_date <= ${lookaheadEnd}::date
+          AND pi.start_date >= ${dataStart}::date AND pi.start_date <= ${lookaheadEnd}::date
           AND (pp.project_name IS NULL OR pp.project_name != '人力成本')
           AND pi.item_name NOT LIKE '%薪資%'
           AND pi.item_name NOT LIKE '%薪水%'
@@ -309,13 +315,13 @@ router.get(
         FROM payment_items pi
         LEFT JOIN payment_projects pp ON pi.project_id = pp.id
         WHERE pi.item_type = 'income' AND NOT pi.is_deleted
-          AND pi.start_date >= ${yearStart}::date AND pi.start_date <= ${lookaheadEnd}::date
+          AND pi.start_date >= ${dataStart}::date AND pi.start_date <= ${lookaheadEnd}::date
         GROUP BY 1, 2
       ),
       template_missing_by_cat AS (
         -- 未產出模板 → 全部歸入「週期模板（未產出）」分類、全 planned
         WITH RECURSIVE month_series AS (
-          SELECT ${yearStart}::date AS m
+          SELECT ${dataStart}::date AS m
           UNION ALL
           SELECT (m + INTERVAL '1 month')::date FROM month_series WHERE m < ${lookaheadEnd}::date
         )
@@ -428,10 +434,12 @@ router.get(
       }
     }
 
-    // YTD totals 只算 actual + 只算到本月（不含未到日 / 未來月的 planned）
+    // YTD totals 只算 actual + 今年 1 月起 ~ 本月（不含未到日 / 未來月的 planned）
+    // months 陣列可能含去年 12 月（chart 用），加 yearStartMonth filter 排除
+    const yearStartMonth = yearStart.slice(0, 7)
     const totals = months.reduce(
       (acc, m) => {
-        if (m.month > currentMonth) return acc
+        if (m.month < yearStartMonth || m.month > currentMonth) return acc
         return {
           income: acc.income + m.incomeActual,
           expense: acc.expense + m.expenseActual,
