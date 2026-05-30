@@ -2,12 +2,33 @@
 
 ## 專案狀態：開發中
 
-**最後更新**: 2026-04-25
-**最新提交**: `a7bb6db` — 已推送至 GitHub
+**最後更新**: 2026-05-31
+**最新提交**: `b4ef76d` — 已推送至 GitHub
 
 ---
 
-## 🎯 當前階段：財務決策助理改造（Loop 推進中）
+## 🎯 當前階段：P0/P1 系統強化（audit 2026-05-30）
+
+### 已完成
+- ✅ **Phase A** — 個資外洩停損（git filter-repo + force push）、docker-compose 密碼注入、完整 pg_dump 備份腳本
+- ✅ **Phase B2** — payment_records 軟刪除（migration 0016）
+- ✅ **Phase B1 子集** — server 6 處 toISOString → localDateTPE 跨日 bug 修
+- ✅ **Phase C1** — `scripts/migrate.sh` 自動化 migration tracking（取代人工 scp + psql）
+- ✅ **Phase C2** — CI 加 ESLint 步驟（baseline 314 warnings）
+- ✅ **Phase C3** — 文件同步（docs/README 補索引、根目錄 README、archive 過時 BACKUP_README）
+
+### 待處理
+- ⏸️ family-kids.ts 16 處 timing bug（task #339、需配 SQL DATE() AT TIME ZONE）
+- ⏸️ payment_records SELECT filter 補 20 處（task #338）
+- ⏸️ Phase D — family-kids.ts 16K 行單檔拆 6 模組
+- ⏸️ Phase E — ESLint 314 warnings 分批清、安全 Headers 補齊
+
+### 歷史推進
+詳：[docs/changes/](docs/changes/)
+
+---
+
+## 🎯 上個階段：財務決策助理改造（已完成）
 
 **核心目標**：把系統從「讓人焦慮的記帳工具」改造為「主動幫我省力的財務決策助理」。
 

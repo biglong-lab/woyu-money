@@ -45,6 +45,9 @@ jobs:
       - name: TypeScript 型別檢查
         run: npx tsc --noEmit
 
+      - name: ESLint（baseline 314 warnings、新增即擋）
+        run: npx eslint client/src server shared --max-warnings 314
+
       - name: 初始化資料庫
         run: npx drizzle-kit push
 

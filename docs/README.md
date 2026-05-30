@@ -95,7 +95,16 @@ docs/
 - [Endpoint 使用率報告](runbooks/family-kids-endpoint-usage.md) — 207 個 endpoint（5.3）
 - [Doc 索引狀態](runbooks/doc-index-status.md) — 本檔的自我檢查報告（5.4）
 
-### Domains
+### Domains（業務領域 source of truth、2026-05-24 新增骨架）
+- [Domains README](domains/README.md) — 領域索引
+- [付款](domains/payment.md)
+- [家用](domains/household.md)（含 is_total_budget 概念）
+- [親子](domains/kids.md)（family-kids 9500 行單檔提醒）
+- [Webhook](domains/webhook.md)（PM/PMS bridge + integration_events）
+- [租金](domains/rental.md)
+- [預算](domains/budget.md)（attribution / 攤提）
+- [預測](domains/forecast.md)（PMS 校準）
+- [ERD Overview](domains/erd-overview.md) — 跨領域 FK
 - [Category 合併](category-merge.md)
 - [Income Webhook API](income-webhook-api.md)
 
@@ -107,6 +116,12 @@ docs/
 - [2026-05-18 Forecasting Engine](changes/2026-05-18-forecasting-engine.md)
 - [2026-05-19 UX Detail Optimization Loop](changes/2026-05-19-ux-detail-optimization-loop.md)
 - [2026-05-23 Functional Audit + 5 階段優化](changes/2026-05-23-functional-audit.md) — 完整 5 階段優化路線執行紀錄
-- [2026-05-23 家用記帳超級好用化](changes/2026-05-23-household-budget-overhaul.md) — 13 個強化迭代（tab bar / 大鍵盤 / 智能分類 / 語音 / 範本 / 搜尋 / 手勢 / 首頁快照 / 收入 / 結餘 / CSV / streak / 每日提醒）
-- [2026-05-24 數據完備性與計算精準度盤點](changes/2026-05-24-data-accuracy-audit.md) — 全面 audit、15+ 風險點分 P0/P1/P2、含修復路徑建議
-- [2026-05-24 系統架構全面盤點 + 整合設計對照表](changes/2026-05-24-system-architecture-audit.md) — 63 頁面 / 571 endpoints / 70+ 表 完整盤點、10 個重疊問題、整合路線圖
+- [2026-05-23 家用記帳超級好用化](changes/2026-05-23-household-budget-overhaul.md) — 13 個強化迭代
+- [2026-05-24 數據完備性與計算精準度盤點](changes/2026-05-24-data-accuracy-audit.md) — 全面 audit、15+ 風險點
+- [2026-05-24 系統架構全面盤點 + 整合對照表](changes/2026-05-24-system-architecture-audit.md) — 63 頁面 / 571 endpoints
+- [2026-05-24 household_budgets is_total_budget 欄位](changes/2026-05-24-household-budget-is-total-flag.md) — 取代 catId=0 sentinel
+- [2026-05-24 pm_company_mapping 表](changes/2026-05-24-pm-company-mapping-table.md) — 取代 2 處 hardcoded
+- [2026-05-30 PM webhook payment_items sync 修](changes/2026-05-30-pm-webhook-payment-items-sync.md) — dashboard 收入漏 $632K backfill
+- [2026-05-31 Phase A：個資外洩 + 密碼注入 + 完整備份](changes/2026-05-31-secrets-and-backup-hardening.md) — git filter-repo + docker-compose 強制注入
+- [2026-05-31 房客個資外洩通知草稿](changes/2026-05-31-tenant-notice-draft.md) — 個資法 §12 通知書
+- [2026-05-31 Phase B：台北日期 helper + payment_records 軟刪](changes/2026-05-31-phase-b-date-helper-soft-delete.md)
