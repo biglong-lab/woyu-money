@@ -3,6 +3,7 @@
  */
 import { db } from "../db"
 import { eq, sql, and } from "drizzle-orm"
+import { localDateTPE } from "@shared/date-utils"
 import {
   recurringExpenseTemplates,
   paymentItems,
@@ -242,7 +243,7 @@ export async function linkItemToTemplate(params: {
   if (!item) throw new Error("付款項目不存在")
   if (item.isDeleted) throw new Error("付款項目已刪除")
 
-  const stamp = new Date().toISOString().slice(0, 10)
+  const stamp = localDateTPE()
   const linkNote = `📎 已連結模板 #${templateId}（${tpl.templateName}、${stamp}）`
 
   const newNotes = item.notes

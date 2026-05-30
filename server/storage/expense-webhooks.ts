@@ -18,6 +18,7 @@ import {
 } from "@shared/schema"
 import { and, eq, sql } from "drizzle-orm"
 import { verifyHmacSignature, verifyBearerToken, verifyIpAllowlist } from "./income"
+import { localDateTPE } from "@shared/date-utils"
 
 // ─────────────────────────────────────────────
 // JSONPath 解析（複製版，未來抽 shared util）
@@ -175,7 +176,7 @@ export async function confirmExpenseWebhook(
   const itemName =
     input.itemName || webhook.parsedVendor || webhook.parsedDescription || `帳單 #${webhook.id}`
 
-  const today = new Date().toISOString().split("T")[0]
+  const today = localDateTPE()
   const startDate = webhook.parsedPaidAt
     ? webhook.parsedPaidAt.toISOString().split("T")[0]
     : webhook.parsedDueAt

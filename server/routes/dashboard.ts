@@ -8,6 +8,7 @@ import { asyncHandler } from "../middleware/error-handler"
 import { db } from "../db"
 import { sql } from "drizzle-orm"
 import { getSeasonalForecast } from "../storage/forecast-snapshots"
+import { localDateTPE } from "@shared/date-utils"
 
 const router = Router()
 
@@ -16,7 +17,7 @@ router.get(
   asyncHandler(async (_req, res) => {
     const now = new Date()
     const yearStart = `${now.getFullYear()}-01-01`
-    const today = now.toISOString().slice(0, 10)
+    const today = localDateTPE()
     // 圖表「最近 6 月」需要往前涵蓋 currentMonth - 5（含去年 12 月）
     // dataStart = min(yearStart, currentMonth - 5 months) 確保 chart 6 月窗完整
     const sixMonthsBack = new Date(now.getFullYear(), now.getMonth() - 5, 1)

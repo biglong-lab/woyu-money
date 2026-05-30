@@ -20,7 +20,7 @@ import { Router } from "express"
 import { asyncHandler, AppError } from "../middleware/error-handler"
 import { db } from "../db"
 import { sql } from "drizzle-orm"
-import { localMonthTPE } from "@shared/date-utils"
+import { localMonthTPE, localDateTPE } from "@shared/date-utils"
 import { generateItemsForMonth } from "../storage/recurring-expense-templates"
 
 const router = Router()
@@ -107,7 +107,7 @@ router.get(
     const endY = month === 12 ? year + 1 : year
     const endM = month === 12 ? 1 : month + 1
     const nextMonth = `${endY}-${String(endM).padStart(2, "0")}-01`
-    const today = new Date().toISOString().slice(0, 10)
+    const today = localDateTPE()
     const currentMonth = today.slice(0, 7)
     const isPast = monthStr < currentMonth
     const isCurrent = monthStr === currentMonth
