@@ -21,6 +21,14 @@ e2e/.auth-state.json
 # 本地上傳檔案
 uploads/
 
+# 🔴 資料庫備份（含個資、絕不可進版控）
+database_backup/database_export.json
+database_backup/*.json
+database_backup/*.sql.gz
+database_backup/dumps/
+*.dump
+*.sql.backup
+
 # macOS
 .DS_Store
 *.DS_Store

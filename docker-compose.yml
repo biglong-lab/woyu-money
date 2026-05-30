@@ -9,8 +9,9 @@ services:
       # 時區固定 Asia/Taipei、避免 new Date() 用 UTC 導致快照日期歪斜
       - TZ=Asia/Taipei
       # 用 container_name 而非 service name 避免跟 PM network 內的 "db" 衝突
-      - DATABASE_URL=postgresql://woyu:woyu123@woyu-money-db:5432/woyu_money
-      - SESSION_SECRET=${SESSION_SECRET:-change-me-to-random-string}
+      # 2026-05-31 audit P0：密碼從環境變數注入、不接受弱預設值
+      - DATABASE_URL=postgresql://woyu:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD 未設定}@woyu-money-db:5432/woyu_money
+      - SESSION_SECRET=${SESSION_SECRET:?SESSION_SECRET 未設定（至少 32 字元隨機字串）}
       - NODE_ENV=production
       - PORT=5001
       # AI 辨識（Gemini）— 從 .env 注入；未設定則 AI 辨識會回「Gemini API key 未設定」
@@ -43,7 +44,7 @@ services:
       - TZ=Asia/Taipei
       - PGTZ=Asia/Taipei
       - POSTGRES_USER=woyu
-      - POSTGRES_PASSWORD=woyu123
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD 未設定}
       - POSTGRES_DB=woyu_money
     volumes:
       - pgdata:/var/lib/postgresql/data
