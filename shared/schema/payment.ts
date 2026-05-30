@@ -100,6 +100,10 @@ export const paymentRecords = pgTable(
     receiptText: text("receipt_text"),
     isPartialPayment: boolean("is_partial_payment").default(false),
     notes: text("notes"),
+    // 2026-05-31 audit P0：軟刪除（保財務 audit trail）
+    isDeleted: boolean("is_deleted").notNull().default(false),
+    deletedAt: timestamp("deleted_at"),
+    deletedByUserId: integer("deleted_by_user_id"),
     createdAt: timestamp("created_at").defaultNow(),
     updatedAt: timestamp("updated_at").defaultNow(),
   },

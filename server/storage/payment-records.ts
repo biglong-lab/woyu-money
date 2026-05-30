@@ -145,6 +145,9 @@ export async function getPaymentRecordsByItemId(itemId: number): Promise<Payment
       receiptImageUrl: row.receiptImageUrl || null,
       receiptText: null,
       isPartialPayment: null,
+      isDeleted: false,
+      deletedAt: null,
+      deletedByUserId: null,
       createdAt: row.createdAt ? new Date(row.createdAt) : null,
       updatedAt: row.updatedAt ? new Date(row.updatedAt) : null,
     }
@@ -275,6 +278,9 @@ export async function createPaymentRecord(recordData: InsertPaymentRecord): Prom
     receiptImageUrl: row.receiptImageUrl || null,
     receiptText: null,
     isPartialPayment: null,
+    isDeleted: false,
+    deletedAt: null,
+    deletedByUserId: null,
     createdAt: row.createdAt ? new Date(row.createdAt) : null,
     updatedAt: row.updatedAt ? new Date(row.updatedAt) : null,
   }
@@ -292,8 +298,17 @@ export async function updatePaymentRecord(
   return record
 }
 
-export async function deletePaymentRecord(id: number): Promise<void> {
-  await db.delete(paymentRecords).where(eq(paymentRecords.id, id))
+export async function deletePaymentRecord(id: number, deletedByUserId?: number): Promise<void> {
+  // 2026-05-31 audit P0：改軟刪除、保財務 audit trail
+  await db
+    .update(paymentRecords)
+    .set({
+      isDeleted: true,
+      deletedAt: new Date(),
+      deletedByUserId: deletedByUserId ?? null,
+      updatedAt: new Date(),
+    })
+    .where(eq(paymentRecords.id, id))
 }
 
 // === 付款排程 ===
