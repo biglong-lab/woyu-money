@@ -124,7 +124,11 @@ router.get(
     }
     const pool = new Pool({ connectionString: connStr, max: 1 })
     try {
-      const result = await pool.query("SELECT id, name FROM companies ORDER BY id")
+      // 排除不納入 Money 的公司（大號文創 6 / 大哉文旅 7）
+      const result = await pool.query(
+        "SELECT id, name FROM companies WHERE id <> ALL($1::int[]) ORDER BY id",
+        [[...EXCLUDED_PM_COMPANY_IDS]]
+      )
       res.json(result.rows)
     } finally {
       await pool.end()
