@@ -232,7 +232,7 @@ export default function PaymentPlannerPage() {
             排程分配規劃台
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            依類別分配應付款 + 營運成本 + 生活所需，三大塊組出每月需賺到的收入
+            依類別分配應付款（本月及之前的帳）+ 營運成本 + 生活所需，三大塊組出每月需賺到的收入
           </p>
         </div>
         <Link href="/financial-cockpit">
@@ -288,7 +288,7 @@ export default function PaymentPlannerPage() {
                       colSpan={columns.length + 1}
                       className="p-1.5 px-2 font-medium text-xs text-indigo-700 sticky left-0 z-10"
                     >
-                      ① 應付款項（依類別）
+                      ① 應付款項（依類別 · 僅本月及之前的帳，未來到期歸營運費用）
                     </td>
                   </tr>
                   {payableCategories.length === 0 && (

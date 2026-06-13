@@ -58,8 +58,11 @@ router.get(
     ])
     const overrideMap = new Map(overrides.map((o) => [o.paymentItemId, o.category]))
 
+    // 只處理本月及之前的帳（逾期/本月/未定到期）；未來到期的歸營運費用、不在此重複處理
+    const cur = currentMonth()
     const items = report.all
       .filter((r) => r.unpaidAmount > 0)
+      .filter((r) => !r.dueDate || r.dueDate.slice(0, 7) <= cur)
       .map((r) => ({
         id: r.id,
         itemName: r.itemName,
