@@ -9,12 +9,16 @@
  *
  * Phase 1：聚合 + 健康分數 + 導航收斂。欠款分期規劃器、AI 顧問為後續 Phase。
  */
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import { Link } from "wouter"
 import { useQuery } from "@tanstack/react-query"
 import { useDocumentTitle } from "@/hooks/use-document-title"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
+import { PayableManager } from "@/components/cockpit/payable-manager"
+import { ArrearsPlanner } from "@/components/cockpit/arrears-planner"
+import { AiAdvisor, type AdvisorSnapshot } from "@/components/cockpit/ai-advisor"
 import {
   Activity,
   TrendingUp,
@@ -189,6 +193,7 @@ const TOOLS = [
 // ─────────────────────────────────────────────
 export default function FinancialCockpitPage() {
   useDocumentTitle("財務健康駕駛艙")
+  const [tab, setTab] = useState("overview")
 
   const { data: ytd } = useQuery<YtdData>({ queryKey: ["/api/dashboard/ytd"] })
   const { data: priority } = useQuery<PriorityReport>({
@@ -229,6 +234,30 @@ export default function FinancialCockpitPage() {
     [priority]
   )
 
+  // AI 顧問快照（帶給後端組 prompt）
+  const advisorSnapshot = useMemo<AdvisorSnapshot>(
+    () => ({
+      healthScore: health.score,
+      healthLabel: health.label,
+      monthIncome,
+      monthExpense,
+      monthProfit,
+      totalUnpaid: priority?.totalUnpaid,
+      counts: priority?.counts,
+      topPayables: (priority?.all ?? []).slice(0, 20).map((i) => ({
+        itemName: i.itemName,
+        unpaidAmount: i.unpaidAmount,
+        categoryLabel: i.categoryLabel,
+        urgency: i.urgency,
+        daysOverdue: i.daysOverdue,
+        daysUntilDue: i.daysUntilDue,
+        dailyLateFee: i.dailyLateFee,
+      })),
+      gaps: forecast?.gapAnalysis,
+    }),
+    [health, monthIncome, monthExpense, monthProfit, priority, forecast]
+  )
+
   return (
     <div className="container mx-auto py-4 sm:py-6 space-y-4 sm:space-y-6">
       {/* 標題 + 健康分數 */}
@@ -259,167 +288,209 @@ export default function FinancialCockpitPage() {
         </CardContent>
       </Card>
 
-      {/* 現況卡 */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatCard title="本月收入" value={fmt(monthIncome)} tone="text-green-600" />
-        <StatCard title="本月成本" value={fmt(monthExpense)} tone="text-red-500" />
-        <StatCard
-          title="本月淨利"
-          value={monthProfit === null ? "—" : fmt(monthProfit)}
-          tone={monthProfit !== null && monthProfit < 0 ? "text-red-600" : "text-indigo-600"}
-        />
-        <StatCard
-          title="待付總額"
-          value={fmt(priority?.totalUnpaid ?? 0)}
-          tone="text-orange-600"
-          sub={`${priority?.counts.critical ?? 0} 筆須立刻付`}
-        />
-      </div>
+      {/* 一頁式工作台：總覽 / 應付款整理 / 欠款規劃 全在頁內切換、不跳頁 */}
+      <Tabs value={tab} onValueChange={setTab} className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="overview">總覽</TabsTrigger>
+          <TabsTrigger value="payables">
+            應付款整理
+            {priority && priority.counts.critical + priority.counts.high > 0
+              ? `（${priority.counts.critical + priority.counts.high}）`
+              : ""}
+          </TabsTrigger>
+          <TabsTrigger value="arrears">欠款規劃</TabsTrigger>
+          <TabsTrigger value="ai">🤖 AI 顧問</TabsTrigger>
+        </TabsList>
 
-      {/* 現金缺口警示 */}
-      {worstGap && (
-        <Card className="border-orange-300 bg-orange-50">
-          <CardContent className="pt-4 flex items-start gap-3">
-            <AlertTriangle className="h-5 w-5 text-orange-600 mt-0.5 shrink-0" />
-            <div className="text-sm">
-              <span className="font-semibold text-orange-800">
-                {worstGap.year}/{String(worstGap.month).padStart(2, "0")} 預估現金缺口{" "}
-                {fmt(worstGap.gap ?? 0)}
-              </span>
-              <span className="text-orange-700">
-                （估收 {fmt(worstGap.estimatedIncome)}、估支 {fmt(worstGap.estimatedExpense)}）—
-                建議提前部署現金或排程分期。
-              </span>
-              <Link href="/cashflow-decision-center">
-                <span className="ml-1 underline text-orange-900 cursor-pointer">看明細 →</span>
-              </Link>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* 該付什麼 */}
-      <Card>
-        <CardHeader className="pb-2 flex flex-row items-center justify-between">
-          <CardTitle className="text-base">該付什麼（依優先級排序）</CardTitle>
-          <Link href="/cash-allocation">
-            <span className="text-sm text-indigo-600 hover:underline cursor-pointer inline-flex items-center gap-1">
-              現金分配助理 <ArrowRight className="h-3 w-3" />
-            </span>
-          </Link>
-        </CardHeader>
-        <CardContent>
-          {topPayables.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-4 text-center">
-              目前沒有急迫的應付款 🎉
-            </p>
-          ) : (
-            <div className="space-y-2">
-              {topPayables.map((item) => (
-                <div
-                  key={item.id}
-                  className="flex items-center justify-between gap-3 border rounded-lg px-3 py-2"
-                >
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span
-                        className={`px-1.5 py-0.5 rounded text-xs ${URGENCY_BADGE[item.urgency].cls}`}
-                      >
-                        {URGENCY_BADGE[item.urgency].label}
-                      </span>
-                      <span className="font-medium truncate">{item.itemName}</span>
-                      <Badge variant="outline" className="text-xs">
-                        {item.categoryLabel}
-                      </Badge>
-                    </div>
-                    <div className="text-xs text-muted-foreground mt-0.5">
-                      {item.daysOverdue > 0
-                        ? `已逾期 ${item.daysOverdue} 天`
-                        : `${item.daysUntilDue} 天後到期`}
-                      {item.dailyLateFee > 0 && ` · 每天 +${fmt(item.dailyLateFee)} 滯納金`}
-                      {item.projectName && ` · ${item.projectName}`}
-                    </div>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <div className="font-bold">{fmt(item.unpaidAmount)}</div>
-                    {item.lateFeeEstimate > 0 && (
-                      <div className="text-xs text-red-500">滯納 +{fmt(item.lateFeeEstimate)}</div>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* 未來現金流 mini */}
-      {forecast && forecast.gapAnalysis.length > 0 && (
-        <Card>
-          <CardHeader className="pb-2 flex flex-row items-center justify-between">
-            <CardTitle className="text-base">未來現金流</CardTitle>
-            <Link href="/cashflow-decision-center">
-              <span className="text-sm text-indigo-600 hover:underline cursor-pointer inline-flex items-center gap-1">
-                決策中心 <ArrowRight className="h-3 w-3" />
-              </span>
-            </Link>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-2">
-              {forecast.gapAnalysis.slice(0, 6).map((g) => {
-                const hasGap = (g.gap ?? 0) > 0
-                return (
-                  <div
-                    key={`${g.year}-${g.month}`}
-                    className={`border rounded-lg px-3 py-2 text-sm ${hasGap ? "border-orange-300 bg-orange-50" : ""}`}
-                  >
-                    <div className="font-medium">
-                      {g.year}/{String(g.month).padStart(2, "0")}
-                    </div>
-                    <div
-                      className={
-                        hasGap ? "text-orange-700 font-semibold" : "text-green-600 font-semibold"
-                      }
-                    >
-                      {g.net >= 0 ? "+" : ""}
-                      {fmt(g.net)}
-                    </div>
-                    {hasGap && (
-                      <div className="text-xs text-orange-600">缺口 {fmt(g.gap ?? 0)}</div>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* 深度工具入口 */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">規劃與分析工具</CardTitle>
-        </CardHeader>
-        <CardContent>
+        <TabsContent value="overview" className="space-y-4 mt-0">
+          {/* 現況卡 */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {TOOLS.map((t) => (
-              <Link key={t.href} href={t.href}>
-                <div className="border rounded-lg p-3 hover:border-indigo-400 hover:bg-indigo-50/40 transition cursor-pointer h-full">
-                  <t.icon className="h-5 w-5 text-indigo-600 mb-1" />
-                  <div className="font-medium text-sm">{t.title}</div>
-                  <div className="text-xs text-muted-foreground mt-0.5">{t.desc}</div>
-                </div>
-              </Link>
-            ))}
-            {/* 後續 Phase 預留 */}
-            <div className="border border-dashed rounded-lg p-3 opacity-60 h-full">
-              <Bot className="h-5 w-5 text-muted-foreground mb-1" />
-              <div className="font-medium text-sm">欠款分期規劃器 + AI 顧問</div>
-              <div className="text-xs text-muted-foreground mt-0.5">Phase 2/3 規劃中</div>
-            </div>
+            <StatCard title="本月收入" value={fmt(monthIncome)} tone="text-green-600" />
+            <StatCard title="本月成本" value={fmt(monthExpense)} tone="text-red-500" />
+            <StatCard
+              title="本月淨利"
+              value={monthProfit === null ? "—" : fmt(monthProfit)}
+              tone={monthProfit !== null && monthProfit < 0 ? "text-red-600" : "text-indigo-600"}
+            />
+            <StatCard
+              title="待付總額"
+              value={fmt(priority?.totalUnpaid ?? 0)}
+              tone="text-orange-600"
+              sub={`${priority?.counts.critical ?? 0} 筆須立刻付`}
+            />
           </div>
-        </CardContent>
-      </Card>
+
+          {/* 現金缺口警示 */}
+          {worstGap && (
+            <Card className="border-orange-300 bg-orange-50">
+              <CardContent className="pt-4 flex items-start gap-3">
+                <AlertTriangle className="h-5 w-5 text-orange-600 mt-0.5 shrink-0" />
+                <div className="text-sm">
+                  <span className="font-semibold text-orange-800">
+                    {worstGap.year}/{String(worstGap.month).padStart(2, "0")} 預估現金缺口{" "}
+                    {fmt(worstGap.gap ?? 0)}
+                  </span>
+                  <span className="text-orange-700">
+                    （估收 {fmt(worstGap.estimatedIncome)}、估支 {fmt(worstGap.estimatedExpense)}）—
+                    建議提前部署現金或排程分期。
+                  </span>
+                  <Link href="/cashflow-decision-center">
+                    <span className="ml-1 underline text-orange-900 cursor-pointer">看明細 →</span>
+                  </Link>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* 該付什麼 */}
+          <Card>
+            <CardHeader className="pb-2 flex flex-row items-center justify-between">
+              <CardTitle className="text-base">該付什麼（依優先級排序）</CardTitle>
+              <button
+                type="button"
+                onClick={() => setTab("payables")}
+                className="text-sm text-indigo-600 hover:underline cursor-pointer inline-flex items-center gap-1"
+              >
+                整理應付款 <ArrowRight className="h-3 w-3" />
+              </button>
+            </CardHeader>
+            <CardContent>
+              {topPayables.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-4 text-center">
+                  目前沒有急迫的應付款 🎉
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {topPayables.map((item) => (
+                    <div
+                      key={item.id}
+                      className="flex items-center justify-between gap-3 border rounded-lg px-3 py-2"
+                    >
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span
+                            className={`px-1.5 py-0.5 rounded text-xs ${URGENCY_BADGE[item.urgency].cls}`}
+                          >
+                            {URGENCY_BADGE[item.urgency].label}
+                          </span>
+                          <span className="font-medium truncate">{item.itemName}</span>
+                          <Badge variant="outline" className="text-xs">
+                            {item.categoryLabel}
+                          </Badge>
+                        </div>
+                        <div className="text-xs text-muted-foreground mt-0.5">
+                          {item.daysOverdue > 0
+                            ? `已逾期 ${item.daysOverdue} 天`
+                            : `${item.daysUntilDue} 天後到期`}
+                          {item.dailyLateFee > 0 && ` · 每天 +${fmt(item.dailyLateFee)} 滯納金`}
+                          {item.projectName && ` · ${item.projectName}`}
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <div className="font-bold">{fmt(item.unpaidAmount)}</div>
+                        {item.lateFeeEstimate > 0 && (
+                          <div className="text-xs text-red-500">
+                            滯納 +{fmt(item.lateFeeEstimate)}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* 未來現金流 mini */}
+          {forecast && forecast.gapAnalysis.length > 0 && (
+            <Card>
+              <CardHeader className="pb-2 flex flex-row items-center justify-between">
+                <CardTitle className="text-base">未來現金流</CardTitle>
+                <Link href="/cashflow-decision-center">
+                  <span className="text-sm text-indigo-600 hover:underline cursor-pointer inline-flex items-center gap-1">
+                    決策中心 <ArrowRight className="h-3 w-3" />
+                  </span>
+                </Link>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-wrap gap-2">
+                  {forecast.gapAnalysis.slice(0, 6).map((g) => {
+                    const hasGap = (g.gap ?? 0) > 0
+                    return (
+                      <div
+                        key={`${g.year}-${g.month}`}
+                        className={`border rounded-lg px-3 py-2 text-sm ${hasGap ? "border-orange-300 bg-orange-50" : ""}`}
+                      >
+                        <div className="font-medium">
+                          {g.year}/{String(g.month).padStart(2, "0")}
+                        </div>
+                        <div
+                          className={
+                            hasGap
+                              ? "text-orange-700 font-semibold"
+                              : "text-green-600 font-semibold"
+                          }
+                        >
+                          {g.net >= 0 ? "+" : ""}
+                          {fmt(g.net)}
+                        </div>
+                        {hasGap && (
+                          <div className="text-xs text-orange-600">缺口 {fmt(g.gap ?? 0)}</div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* 深度工具入口 */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">規劃與分析工具</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {TOOLS.map((t) => (
+                  <Link key={t.href} href={t.href}>
+                    <div className="border rounded-lg p-3 hover:border-indigo-400 hover:bg-indigo-50/40 transition cursor-pointer h-full">
+                      <t.icon className="h-5 w-5 text-indigo-600 mb-1" />
+                      <div className="font-medium text-sm">{t.title}</div>
+                      <div className="text-xs text-muted-foreground mt-0.5">{t.desc}</div>
+                    </div>
+                  </Link>
+                ))}
+                {/* AI 財務顧問：切到頁內 AI 分頁 */}
+                <button
+                  type="button"
+                  onClick={() => setTab("ai")}
+                  className="text-left border rounded-lg p-3 hover:border-purple-400 hover:bg-purple-50/40 transition cursor-pointer h-full"
+                >
+                  <Bot className="h-5 w-5 text-purple-600 mb-1" />
+                  <div className="font-medium text-sm">AI 財務顧問</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">一鍵產出財務優化方案</div>
+                </button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* 應付款整理：頁內就地標記已付、篩選、搜尋 */}
+        <TabsContent value="payables" className="mt-0">
+          <PayableManager />
+        </TabsContent>
+
+        {/* 欠款分期規劃器：頁內輸入→分期→建立 */}
+        <TabsContent value="arrears" className="mt-0">
+          <ArrearsPlanner />
+        </TabsContent>
+
+        {/* AI 財務顧問：讀快照產出優化方案 */}
+        <TabsContent value="ai" className="mt-0">
+          <AiAdvisor snapshot={advisorSnapshot} />
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }
