@@ -8,6 +8,7 @@
 import { Router } from "express"
 import { asyncHandler, AppError } from "../middleware/error-handler"
 import { syncPmRevenues, previewPmRevenues, ensurePmBridgeSource } from "../storage/pm-bridge"
+import { EXCLUDED_PM_COMPANY_IDS } from "@shared/pm-excluded-companies"
 
 const router = Router()
 
