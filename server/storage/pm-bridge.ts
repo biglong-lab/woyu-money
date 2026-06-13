@@ -16,6 +16,7 @@ import { incomeSources, incomeWebhooks } from "@shared/schema"
 import { eq, and, isNull } from "drizzle-orm"
 import { _createPaymentFromWebhook } from "./income"
 import { getCompanyToProjectMap } from "./pm-company-mapping"
+import { EXCLUDED_PM_COMPANY_IDS, isExcludedPmCompany } from "@shared/pm-excluded-companies"
 
 // ─────────────────────────────────────────────
 // PM 資料庫連線（唯讀用途）
