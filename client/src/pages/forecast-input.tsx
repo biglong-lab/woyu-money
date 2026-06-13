@@ -21,13 +21,13 @@ import { Badge } from "@/components/ui/badge"
 import { Calendar, Save, TrendingUp, Info, CheckCircle2, RotateCcw } from "lucide-react"
 import { useDocumentTitle } from "@/hooks/use-document-title"
 
+// 大號文創 (6) / 大哉文旅 (7) 不納入 Money、見 shared/pm-excluded-companies.ts
 const COMPANIES = [
   { id: 1, name: "浯島文旅" },
   { id: 2, name: "浯島輕旅" },
   { id: 3, name: "小六路厝" },
   { id: 4, name: "總兵招待所" },
   { id: 5, name: "魁星背包棧" },
-  { id: 6, name: "大號文創" },
 ]
 
 interface ForecastSnapshot {
