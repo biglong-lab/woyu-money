@@ -172,6 +172,12 @@ export const toolboxNavItems: NavItem[] = [
     icon: BarChart3,
     description: "預估 vs 實際 / 各館組損益一頁看完",
   },
+  {
+    title: "信用卡請款紀錄",
+    href: "/card-claims",
+    icon: CreditCard,
+    description: "記錄刷卡請款金額、銀行、標籤、館別、狀態 + 月度統計",
+  },
 ]
 
 // 保留 decisionNavItems export 對舊呼叫者相容（合併 core + toolbox）
@@ -500,6 +506,11 @@ export const breadcrumbConfig: Record<string, BreadcrumbItem[]> = {
     { title: "週期性支出模板" },
   ],
   "/revenue-forecast": [{ title: "首頁", href: "/" }, { title: "財務助理" }, { title: "收入預測" }],
+  "/card-claims": [
+    { title: "首頁", href: "/" },
+    { title: "財務助理" },
+    { title: "信用卡請款紀錄" },
+  ],
   "/scenario-simulator": [
     { title: "首頁", href: "/" },
     { title: "財務助理" },

@@ -73,6 +73,7 @@ import IntegrationsCenter from "@/pages/integrations-center"
 import AdminCronHealthPage from "@/pages/admin-cron-health"
 import RecurringExpensesPage from "@/pages/recurring-expenses"
 import RevenueForecastPage from "@/pages/revenue-forecast"
+import CardClaimsPage from "@/pages/card-claims"
 import ScenarioSimulatorPage from "@/pages/scenario-simulator"
 import LateFeeSettingsPage from "@/pages/late-fee-settings"
 import FinancialDashboardPage from "@/pages/financial-dashboard"
@@ -195,6 +196,7 @@ function Router() {
                 <ProtectedRoute path="/admin/cron-health" component={AdminCronHealthPage} />
                 <ProtectedRoute path="/recurring-expenses" component={RecurringExpensesPage} />
                 <ProtectedRoute path="/revenue-forecast" component={RevenueForecastPage} />
+                <ProtectedRoute path="/card-claims" component={CardClaimsPage} />
                 <ProtectedRoute path="/scenario-simulator" component={ScenarioSimulatorPage} />
                 <ProtectedRoute path="/late-fee-settings" component={LateFeeSettingsPage} />
                 <ProtectedRoute path="/financial-dashboard" component={FinancialDashboardPage} />
