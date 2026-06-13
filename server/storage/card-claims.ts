@@ -122,6 +122,7 @@ export async function listClaims(filters: CardClaimFilters = {}): Promise<CardCl
       tagId: cardClaims.tagId,
       propertyId: cardClaims.propertyId,
       status: cardClaims.status,
+      receiptImageUrl: cardClaims.receiptImageUrl,
       notes: cardClaims.notes,
       createdAt: cardClaims.createdAt,
       updatedAt: cardClaims.updatedAt,

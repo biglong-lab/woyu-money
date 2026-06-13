@@ -5,7 +5,7 @@
  * 功能：記錄每次刷卡請款的結算金額、刷卡時間、銀行、請款標籤、館別、狀態、備註
  *      + 區間查詢（本月/上月/下月/本季/今年/自訂）+ 月度統計
  */
-import { useState } from "react"
+import { useState, useRef } from "react"
 import { useQuery, useMutation } from "@tanstack/react-query"
 import { queryClient, apiRequest } from "@/lib/queryClient"
 import { useToast } from "@/hooks/use-toast"
@@ -39,7 +39,7 @@ import {
   TableHead,
   TableCell,
 } from "@/components/ui/table"
-import { CreditCard, Plus, Pencil, Trash2, Settings, Tag, Building2 } from "lucide-react"
+import { CreditCard, Plus, Pencil, Trash2, Settings, Tag, Building2, Upload, X } from "lucide-react"
 
 // ─────────────────────────────────────────────
 // 型別
@@ -57,6 +57,7 @@ interface Claim {
   tagId: number | null
   propertyId: number | null
   status: string
+  receiptImageUrl: string | null
   notes: string | null
   tagName: string | null
   propertyName: string | null
@@ -292,6 +293,7 @@ export default function CardClaimsPage() {
                     <TableHead>標籤</TableHead>
                     <TableHead>館別</TableHead>
                     <TableHead>狀態</TableHead>
+                    <TableHead>收據</TableHead>
                     <TableHead>備註</TableHead>
                     <TableHead className="text-right">操作</TableHead>
                   </TableRow>
@@ -314,6 +316,19 @@ export default function CardClaimsPage() {
                           <span className={`px-2 py-0.5 rounded text-xs ${sm.color}`}>
                             {sm.label}
                           </span>
+                        </TableCell>
+                        <TableCell>
+                          {c.receiptImageUrl ? (
+                            <a href={c.receiptImageUrl} target="_blank" rel="noreferrer">
+                              <img
+                                src={c.receiptImageUrl}
+                                alt="收據"
+                                className="h-10 w-10 rounded object-cover border hover:opacity-80"
+                              />
+                            </a>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
                         </TableCell>
                         <TableCell className="max-w-[200px] truncate text-muted-foreground text-sm">
                           {c.notes || "—"}
@@ -390,6 +405,32 @@ function ClaimForm({
   )
   const [status, setStatus] = useState(claim?.status ?? "pending")
   const [notes, setNotes] = useState(claim?.notes ?? "")
+  const [receiptImageUrl, setReceiptImageUrl] = useState<string | null>(
+    claim?.receiptImageUrl ?? null
+  )
+  const [uploading, setUploading] = useState(false)
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  async function handleUpload(file: File) {
+    setUploading(true)
+    try {
+      const fd = new FormData()
+      fd.append("file", file)
+      const res = await fetch("/api/upload", { method: "POST", body: fd, credentials: "include" })
+      if (!res.ok) throw new Error((await res.text()) || "上傳失敗")
+      const data = (await res.json()) as { url: string }
+      setReceiptImageUrl(data.url)
+      toast({ title: "圖片已上傳" })
+    } catch (e) {
+      toast({
+        title: "圖片上傳失敗",
+        description: e instanceof Error ? e.message : String(e),
+        variant: "destructive",
+      })
+    } finally {
+      setUploading(false)
+    }
+  }
 
   const save = useMutation({
     mutationFn: () => {
@@ -400,6 +441,7 @@ function ClaimForm({
         tagId: tagId === "none" ? null : Number(tagId),
         propertyId: propertyId === "none" ? null : Number(propertyId),
         status,
+        receiptImageUrl,
         notes: notes || null,
       }
       return claim
@@ -500,6 +542,55 @@ function ClaimForm({
                 ))}
               </SelectContent>
             </Select>
+          </div>
+          <div>
+            <Label>收據圖片</Label>
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/jpeg,image/png,image/gif,application/pdf"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0]
+                if (f) handleUpload(f)
+                e.target.value = ""
+              }}
+            />
+            {receiptImageUrl ? (
+              <div className="flex items-center gap-2 mt-1">
+                <a href={receiptImageUrl} target="_blank" rel="noreferrer">
+                  <img
+                    src={receiptImageUrl}
+                    alt="收據"
+                    className="h-16 w-16 rounded object-cover border"
+                  />
+                </a>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setReceiptImageUrl(null)}
+                >
+                  <X className="h-4 w-4 mr-1" /> 移除
+                </Button>
+              </div>
+            ) : (
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full mt-1"
+                disabled={uploading}
+                onClick={() => fileRef.current?.click()}
+              >
+                {uploading ? (
+                  "上傳中…"
+                ) : (
+                  <>
+                    <Upload className="h-4 w-4 mr-1" /> 上傳收據圖片
+                  </>
+                )}
+              </Button>
+            )}
           </div>
           <div>
             <Label>備註</Label>

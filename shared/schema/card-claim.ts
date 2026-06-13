@@ -57,6 +57,8 @@ export const cardClaims = pgTable(
     propertyId: integer("property_id").references(() => cardClaimProperties.id),
     // 狀態
     status: varchar("status", { length: 20 }).default("pending").notNull(),
+    // 收據/請款截圖（本地 /uploads/receipts/... 路徑）
+    receiptImageUrl: varchar("receipt_image_url", { length: 500 }),
     // 備註
     notes: text("notes"),
     createdAt: timestamp("created_at").defaultNow(),
@@ -98,6 +100,7 @@ export const insertCardClaimSchema = createInsertSchema(cardClaims)
     tagId: z.number().int().positive().optional().nullable(),
     propertyId: z.number().int().positive().optional().nullable(),
     status: z.enum(CARD_CLAIM_STATUSES).default("pending"),
+    receiptImageUrl: z.string().max(500).optional().nullable(),
     notes: z.string().max(1000).optional().nullable(),
   })
 
