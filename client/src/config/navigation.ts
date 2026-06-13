@@ -106,9 +106,18 @@ export const familyNavItem: NavItem = {
 // 註：/forecast-input 已下架，PMS 系統已自動同步「不定期填入」資料
 // 路由保留可訪問供舊連結，但不顯示在導航
 
-// 核心決策（3 個主入口、最常用）
-// 扁平化建議（audit 2026-05-24 P1）：14 項 → 3 主 + 工具箱可摺疊
+// 財務健康駕駛艙（全站唯一財務主入口 — 一頁看完現況/該付什麼/未來現金流）
+export const cockpitNavItem: NavItem = {
+  title: "財務健康駕駛艙",
+  href: "/financial-cockpit",
+  icon: Activity,
+  description: "現況 + 應付款排序 + 現金缺口，一頁看完並導向深度工具",
+}
+
+// 核心決策（駕駛艙為首要入口）
+// 扁平化建議（audit 2026-05-24 P1）：14 項 → 駕駛艙領頭 + 工具箱可摺疊
 export const coreDecisionNavItems: NavItem[] = [
+  cockpitNavItem, // 🚀 主入口：一頁看完 + 導向
   dashboardNavItem, // 全局：YTD + 3 月預估
   costOverviewNavItem, // 細節：四大成本
   {
@@ -511,6 +520,7 @@ export const breadcrumbConfig: Record<string, BreadcrumbItem[]> = {
     { title: "財務助理" },
     { title: "信用卡請款紀錄" },
   ],
+  "/financial-cockpit": [{ title: "首頁", href: "/" }, { title: "財務健康駕駛艙" }],
   "/scenario-simulator": [
     { title: "首頁", href: "/" },
     { title: "財務助理" },
