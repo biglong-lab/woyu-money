@@ -111,12 +111,14 @@ async function fetchPmRevenues(
 ): Promise<{ revenues: PmRevenue[]; companies: Map<number, string> }> {
   const pool = createPmPool()
   try {
-    // 取得館舍名稱對照
+    // 取得館舍名稱對照（排除不納入 Money 的公司）
     const companyResult = await pool.query<PmCompany>("SELECT id, name FROM companies ORDER BY id")
     const companies = new Map<number, string>()
-    companyResult.rows.forEach((c) => companies.set(c.id, c.name))
+    companyResult.rows
+      .filter((c) => !isExcludedPmCompany(c.id))
+      .forEach((c) => companies.set(c.id, c.name))
 
-    // 查詢 revenues（僅唯讀 SELECT）
+    // 查詢 revenues（僅唯讀 SELECT；排除不納入 Money 的公司）
     let query = `
       SELECT
         id,
@@ -132,8 +134,13 @@ async function fetchPmRevenues(
       WHERE deleted_at IS NULL
         AND date::date >= $1::date
         AND date::date <= $2::date
+        AND (company_id IS NULL OR company_id <> ALL($3::int[]))
     `
-    const params: (string | number)[] = [startDate, endDate]
+    const params: (string | number | number[])[] = [
+      startDate,
+      endDate,
+      [...EXCLUDED_PM_COMPANY_IDS],
+    ]
 
     if (companyId) {
       query += ` AND company_id = $${params.length + 1}`
