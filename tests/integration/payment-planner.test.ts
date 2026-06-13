@@ -49,6 +49,10 @@ describe.skipIf(skipIfNoDb)("Payment Planner allocations API", () => {
 
   afterAll(async () => {
     await db.execute(sql`DELETE FROM payment_plan_allocations WHERE payment_item_id = ${itemId}`)
+    await db.execute(
+      sql`DELETE FROM payment_plan_item_categories WHERE payment_item_id = ${itemId}`
+    )
+    await db.execute(sql`DELETE FROM payment_plan_category_budgets WHERE category = '__test_cat'`)
     await db.execute(sql`DELETE FROM payment_items WHERE id = ${itemId}`)
   })
 
@@ -80,5 +84,42 @@ describe.skipIf(skipIfNoDb)("Payment Planner allocations API", () => {
   it("刪除分配", async () => {
     const res = await request(app).delete(`/api/payment-planner/allocations/${allocId}`)
     expect(res.status).toBe(200)
+  })
+
+  it("重新分類", async () => {
+    const res = await request(app)
+      .put("/api/payment-planner/item-category")
+      .send({ paymentItemId: itemId, category: "__test_cat" })
+    expect(res.status).toBe(200)
+    expect(res.body.category).toBe("__test_cat")
+  })
+
+  it("設定分類月度預算 upsert", async () => {
+    const r1 = await request(app)
+      .put("/api/payment-planner/category-budget")
+      .send({ category: "__test_cat", plannedMonth: "2099-05", amount: "8000" })
+    expect(r1.status).toBe(200)
+    // upsert 覆寫
+    const r2 = await request(app)
+      .put("/api/payment-planner/category-budget")
+      .send({ category: "__test_cat", plannedMonth: "2099-05", amount: "9000" })
+    expect(r2.status).toBe(200)
+    const rows = await db.execute(
+      sql`SELECT amount FROM payment_plan_category_budgets WHERE category = '__test_cat' AND planned_month = '2099-05'`
+    )
+    expect(Number((rows as unknown as { rows: Array<{ amount: string }> }).rows[0].amount)).toBe(
+      9000
+    )
+  })
+
+  it("分攤平均攤到勾選月份", async () => {
+    const res = await request(app)
+      .post("/api/payment-planner/distribute")
+      .send({ category: "__test_cat", amount: 30000, months: ["2099-06", "2099-07", "2099-08"] })
+    expect(res.status).toBe(200)
+    const rows = await db.execute(
+      sql`SELECT count(*)::int AS c FROM payment_plan_category_budgets WHERE category = '__test_cat' AND planned_month IN ('2099-06','2099-07','2099-08')`
+    )
+    expect((rows as unknown as { rows: Array<{ c: number }> }).rows[0].c).toBe(3)
   })
 })

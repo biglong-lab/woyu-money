@@ -1,10 +1,14 @@
 /**
- * 一頁式排程分配規劃台（/payment-planner）
+ * 一頁式排程分配規劃台（/payment-planner）— 分類 + 三大塊模型
  *
- * 一頁顯示所有應付款 + 欠款，直接分類、安排時間（哪月付多少、可攤多月），
- * 自動加總每月需付金額，對照營運收入預測，跑出未來每月/每季/每年所需金額與缺口。
+ * 「每月需要的收入金額」= 三大塊組合：
+ *   ① 應付款項（依類別：租金/勞健保/其他…，可自己重新分類）
+ *   ② 營運所需成本
+ *   ③ 生活所需
+ * 每一類勾選月份平均攤 → 算出每月攤提 → 加總 = 每月需賺到的收入，對照營運收入預測看缺口。
  *
- * 獨立規劃層（payment_plan_allocations），不動原始 dueDate，純沙盤、可逆。
+ * 獨立規劃層（payment_plan_category_budgets / payment_plan_item_categories），
+ * 不動原始 dueDate、純沙盤、可逆。
  */
 import { useMemo, useState } from "react"
 import { Link } from "wouter"
@@ -15,38 +19,29 @@ import { useDocumentTitle } from "@/hooks/use-document-title"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
-import {
-  Select,
-  SelectTrigger,
-  SelectContent,
-  SelectItem,
-  SelectValue,
-} from "@/components/ui/select"
-import { CalendarRange, Wand2, Search, ArrowLeft, AlertTriangle } from "lucide-react"
+import { DistributeDialog } from "@/components/planner/distribute-dialog"
+import { CalendarRange, ArrowLeft, ChevronRight, ChevronDown, Wand2 } from "lucide-react"
 
 // ─────────────────────────────────────────────
 // 型別
 // ─────────────────────────────────────────────
-type Urgency = "critical" | "high" | "medium" | "low"
 interface PlanItem {
   id: number
   itemName: string
+  category: string
   categoryLabel: string
-  urgency: Urgency
   unpaidAmount: number
   dueDate: string | null
   projectName: string | null
 }
-interface Allocation {
-  id: number
-  paymentItemId: number
+interface CategoryBudget {
+  category: string
   plannedMonth: string
-  plannedAmount: number
+  amount: number
 }
 interface PlannerData {
   items: PlanItem[]
-  allocations: Allocation[]
+  categoryBudgets: CategoryBudget[]
   totalUnpaid: number
 }
 interface ForecastMonth {
@@ -59,30 +54,10 @@ interface ForecastResponse {
 }
 
 const fmt = (n: number) => `$${Math.round(n).toLocaleString()}`
+const OPERATING = "營運成本"
+const LIVING = "生活所需"
+const SPECIAL_BLOCKS = [OPERATING, LIVING]
 
-// 以到期時間為主軸的分類（預期款項）
-type TimeBucket = "overdue" | "thisMonth" | "future"
-function bucketOf(dueDate: string | null, curYm: string): TimeBucket {
-  if (!dueDate) return "future" // 未定到期 → 視為預期
-  const dueYm = dueDate.slice(0, 7)
-  if (dueYm < curYm) return "overdue"
-  if (dueYm === curYm) return "thisMonth"
-  return "future"
-}
-const BUCKET_META: Record<TimeBucket, { label: string; cls: string }> = {
-  overdue: { label: "逾期未付", cls: "bg-red-100 text-red-800" },
-  thisMonth: { label: "本月到期", cls: "bg-orange-100 text-orange-800" },
-  future: { label: "預期未到", cls: "bg-blue-100 text-blue-700" },
-}
-
-const URGENCY_DOT: Record<Urgency, string> = {
-  critical: "🔴",
-  high: "🟠",
-  medium: "🟡",
-  low: "⚪",
-}
-
-// 月份工具
 function ymOf(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
 }
@@ -100,9 +75,8 @@ interface ColGroup {
   months: string[]
 }
 function buildColumns(months: string[], mode: AggMode): ColGroup[] {
-  if (mode === "month") {
+  if (mode === "month")
     return months.map((m) => ({ key: m, label: m.replace("-", "/"), months: [m] }))
-  }
   if (mode === "quarter") {
     const groups: ColGroup[] = []
     for (let i = 0; i < months.length; i += 3) {
@@ -112,28 +86,21 @@ function buildColumns(months: string[], mode: AggMode): ColGroup[] {
     }
     return groups
   }
-  // year
   const byYear = new Map<string, string[]>()
-  for (const m of months) {
-    const y = m.slice(0, 4)
-    byYear.set(y, [...(byYear.get(y) ?? []), m])
-  }
+  for (const m of months) byYear.set(m.slice(0, 4), [...(byYear.get(m.slice(0, 4)) ?? []), m])
   return Array.from(byYear.entries()).map(([y, ms]) => ({ key: y, label: `${y} 年`, months: ms }))
 }
 
-// ─────────────────────────────────────────────
-// 主頁面
-// ─────────────────────────────────────────────
 const MONTHS_AHEAD = 12
 
+// ─────────────────────────────────────────────
 export default function PaymentPlannerPage() {
   useDocumentTitle("排程分配規劃台")
   const { toast } = useToast()
 
   const [mode, setMode] = useState<AggMode>("month")
-  const [catFilter, setCatFilter] = useState<string>("all")
-  const [timeFilter, setTimeFilter] = useState<string>("all")
-  const [search, setSearch] = useState("")
+  const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  const [distributeFor, setDistributeFor] = useState<string | null>(null)
 
   const { data, isLoading } = useQuery<PlannerData>({ queryKey: ["/api/payment-planner"] })
   const { data: forecast } = useQuery<ForecastResponse>({
@@ -143,141 +110,121 @@ export default function PaymentPlannerPage() {
   const months = useMemo(() => buildMonths(MONTHS_AHEAD), [])
   const columns = useMemo(() => buildColumns(months, mode), [months, mode])
 
-  // 收入：month "YYYY-MM" → estimated
   const revenueByMonth = useMemo(() => {
     const map = new Map<string, number>()
-    forecast?.forecast.months.forEach((m) => {
+    forecast?.forecast.months.forEach((m) =>
       map.set(`${m.year}-${String(m.month).padStart(2, "0")}`, m.estimated)
-    })
+    )
     return map
   }, [forecast])
 
-  // 分配查找：itemId → month → {id, amount}
-  const allocLookup = useMemo(() => {
-    const map = new Map<number, Map<string, Allocation>>()
-    data?.allocations.forEach((a) => {
-      if (!map.has(a.paymentItemId)) map.set(a.paymentItemId, new Map())
-      map.get(a.paymentItemId)!.set(a.plannedMonth, a)
+  // 預算查找：category → month → amount
+  const budgetLookup = useMemo(() => {
+    const map = new Map<string, Map<string, number>>()
+    data?.categoryBudgets.forEach((b) => {
+      if (!map.has(b.category)) map.set(b.category, new Map())
+      map.get(b.category)!.set(b.plannedMonth, b.amount)
     })
     return map
   }, [data])
 
-  // 分類選項
-  const categories = useMemo(() => {
-    const set = new Set<string>()
-    data?.items.forEach((i) => set.add(i.categoryLabel))
+  // 應付款依類別分組
+  const itemsByCategory = useMemo(() => {
+    const map = new Map<string, PlanItem[]>()
+    data?.items.forEach((i) => {
+      if (!map.has(i.category)) map.set(i.category, [])
+      map.get(i.category)!.push(i)
+    })
+    return map
+  }, [data])
+
+  const payableCategories = useMemo(
+    () => Array.from(itemsByCategory.keys()).sort(),
+    [itemsByCategory]
+  )
+  // 重新分類可選的類別（既有 + 常用）
+  const categoryOptions = useMemo(() => {
+    const set = new Set<string>(payableCategories)
+    ;["租金", "勞健保", "貸款", "稅務", "水電", "其他"].forEach((c) => set.add(c))
     return Array.from(set).sort()
-  }, [data])
+  }, [payableCategories])
 
-  const curYm = months[0]
-
-  // 篩選後項目（以到期時間為主軸：依到期日排序，逾期/最早在前）
-  const items = useMemo(() => {
-    let list = data?.items ?? []
-    if (catFilter !== "all") list = list.filter((i) => i.categoryLabel === catFilter)
-    if (timeFilter !== "all") list = list.filter((i) => bucketOf(i.dueDate, curYm) === timeFilter)
-    if (search.trim()) {
-      const s = search.trim().toLowerCase()
-      list = list.filter(
-        (i) =>
-          i.itemName.toLowerCase().includes(s) ||
-          i.categoryLabel.toLowerCase().includes(s) ||
-          (i.projectName ?? "").toLowerCase().includes(s)
-      )
-    }
-    // 依到期日排序（無到期日排最後）
-    return [...list].sort((a, b) => {
-      const da = a.dueDate ?? "9999-99-99"
-      const db = b.dueDate ?? "9999-99-99"
-      return da.localeCompare(db)
-    })
-  }, [data, catFilter, timeFilter, search, curYm])
-
-  // 列數上限保護（底部彙總用全部 allocations、不受此影響）
-  const MAX_ROWS = 200
-  const visibleItems = items.slice(0, MAX_ROWS)
-  const truncated = items.length > MAX_ROWS
-
-  // 每月需付（全部項目，不受篩選影響底部彙總 → 用全部 allocations）
-  const neededByMonth = useMemo(() => {
-    const map = new Map<string, number>()
-    data?.allocations.forEach((a) => {
-      map.set(a.plannedMonth, (map.get(a.plannedMonth) ?? 0) + a.plannedAmount)
-    })
-    return map
-  }, [data])
-
-  // 某項目某月的分配額
-  function cellAmount(itemId: number, monthsInCol: string[]): number {
-    const itemMap = allocLookup.get(itemId)
-    if (!itemMap) return 0
-    return monthsInCol.reduce((sum, m) => sum + (itemMap.get(m)?.plannedAmount ?? 0), 0)
+  function catUnpaid(cat: string): number {
+    return (itemsByCategory.get(cat) ?? []).reduce((s, i) => s + i.unpaidAmount, 0)
   }
-  // 某項目未分配餘額
-  function unallocated(item: PlanItem): number {
-    const itemMap = allocLookup.get(item.id)
-    const allocated = itemMap
-      ? Array.from(itemMap.values()).reduce((s, a) => s + a.plannedAmount, 0)
-      : 0
-    return Math.round((item.unpaidAmount - allocated) * 100) / 100
+  function cellBudget(cat: string, monthsInCol: string[]): number {
+    const m = budgetLookup.get(cat)
+    if (!m) return 0
+    return monthsInCol.reduce((s, mo) => s + (m.get(mo) ?? 0), 0)
+  }
+  // 某月所有類別（含三大塊）預算總和 = 該月所需收入
+  function monthNeeded(monthsInCol: string[]): number {
+    let total = 0
+    budgetLookup.forEach((mMap) => monthsInCol.forEach((mo) => (total += mMap.get(mo) ?? 0)))
+    return total
+  }
+  function colRevenue(monthsInCol: string[]): number {
+    return monthsInCol.reduce((s, m) => s + (revenueByMonth.get(m) ?? 0), 0)
   }
 
-  // 編輯一格（僅月模式）
-  const cellMut = useMutation({
-    mutationFn: async (p: { item: PlanItem; month: string; amount: number }) => {
-      const existing = allocLookup.get(p.item.id)?.get(p.month)
-      if (p.amount <= 0) {
-        if (existing) await apiRequest("DELETE", `/api/payment-planner/allocations/${existing.id}`)
-        return
-      }
-      if (existing) {
-        await apiRequest("PUT", `/api/payment-planner/allocations/${existing.id}`, {
-          plannedAmount: p.amount.toFixed(2),
-        })
-      } else {
-        await apiRequest("POST", "/api/payment-planner/allocations", {
-          paymentItemId: p.item.id,
-          plannedMonth: p.month,
-          plannedAmount: p.amount.toFixed(2),
-        })
-      }
-    },
+  // 未分配（應付款類別）：該類未付 − 已排預算總額
+  function catUnallocated(cat: string): number {
+    const budgeted = Array.from(budgetLookup.get(cat)?.values() ?? []).reduce((s, v) => s + v, 0)
+    return Math.round((catUnpaid(cat) - budgeted) * 100) / 100
+  }
+
+  const budgetMut = useMutation({
+    mutationFn: (p: { category: string; month: string; amount: number }) =>
+      apiRequest("PUT", "/api/payment-planner/category-budget", {
+        category: p.category,
+        plannedMonth: p.month,
+        amount: p.amount.toFixed(2),
+      }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/payment-planner"] }),
     onError: (e: Error) =>
       toast({ title: "更新失敗", description: e.message, variant: "destructive" }),
   })
 
-  const autoMut = useMutation<{ created: number }, Error, "by_due" | "even">({
-    mutationFn: (strategy) =>
-      apiRequest("POST", "/api/payment-planner/auto-distribute", {
-        monthsAhead: MONTHS_AHEAD,
-        strategy,
-      }),
-    onSuccess: (res) => {
+  const distributeMut = useMutation({
+    mutationFn: (p: { category: string; amount: number; months: string[] }) =>
+      apiRequest("POST", "/api/payment-planner/distribute", p),
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/payment-planner"] })
-      toast({ title: "已自動分配", description: `建立 ${res.created} 筆規劃` })
+      toast({ title: "已分攤" })
+      setDistributeFor(null)
     },
     onError: (e: Error) =>
-      toast({ title: "自動分配失敗", description: e.message, variant: "destructive" }),
+      toast({ title: "分攤失敗", description: e.message, variant: "destructive" }),
   })
 
-  const totalUnallocated = useMemo(
-    () => (data?.items ?? []).reduce((s, i) => s + Math.max(0, unallocated(i)), 0),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [data, allocLookup]
-  )
+  const reclassifyMut = useMutation({
+    mutationFn: (p: { paymentItemId: number; category: string }) =>
+      apiRequest("PUT", "/api/payment-planner/item-category", p),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/payment-planner"] })
+      toast({ title: "已重新分類" })
+    },
+    onError: (e: Error) =>
+      toast({ title: "分類失敗", description: e.message, variant: "destructive" }),
+  })
 
-  // 底部彙總（依欄分組）
-  function colNeeded(col: ColGroup): number {
-    return col.months.reduce((s, m) => s + (neededByMonth.get(m) ?? 0), 0)
+  function toggleExpand(cat: string) {
+    setExpanded((prev) => {
+      const next = new Set(prev)
+      if (next.has(cat)) next.delete(cat)
+      else next.add(cat)
+      return next
+    })
   }
-  function colRevenue(col: ColGroup): number {
-    return col.months.reduce((s, m) => s + (revenueByMonth.get(m) ?? 0), 0)
-  }
+
+  const distributeDefault = distributeFor
+    ? SPECIAL_BLOCKS.includes(distributeFor)
+      ? 0
+      : Math.max(0, catUnallocated(distributeFor))
+    : 0
 
   return (
     <div className="container mx-auto py-4 sm:py-6 space-y-4">
-      {/* 標題列 */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
@@ -285,7 +232,7 @@ export default function PaymentPlannerPage() {
             排程分配規劃台
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            一頁安排所有應付款的付款月份，推估未來每月/每季/每年所需金額（不影響原始到期日）
+            依類別分配應付款 + 營運成本 + 生活所需，三大塊組出每月需賺到的收入
           </p>
         </div>
         <Link href="/financial-cockpit">
@@ -295,228 +242,167 @@ export default function PaymentPlannerPage() {
         </Link>
       </div>
 
-      {/* 工具列 */}
+      {/* 粒度切換 */}
       <Card>
         <CardContent className="pt-4 flex flex-wrap items-center gap-2">
-          {/* 彙總粒度 */}
-          <div className="flex gap-1">
-            {(["month", "quarter", "year"] as AggMode[]).map((m) => (
-              <Button
-                key={m}
-                size="sm"
-                variant={mode === m ? "default" : "outline"}
-                onClick={() => setMode(m)}
-              >
-                {m === "month" ? "月" : m === "quarter" ? "季" : "年"}
-              </Button>
-            ))}
-          </div>
-          {/* 自動分配 */}
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => autoMut.mutate("by_due")}
-            disabled={autoMut.isPending}
-          >
-            <Wand2 className="h-4 w-4 mr-1" /> 自動分配（依到期月）
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => autoMut.mutate("even")}
-            disabled={autoMut.isPending}
-          >
-            <Wand2 className="h-4 w-4 mr-1" /> 平均攤 12 月
-          </Button>
-          {/* 篩選 */}
-          <Select value={catFilter} onValueChange={setCatFilter}>
-            <SelectTrigger className="w-36 h-9">
-              <SelectValue placeholder="分類" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">全部分類</SelectItem>
-              {categories.map((c) => (
-                <SelectItem key={c} value={c}>
-                  {c}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={timeFilter} onValueChange={setTimeFilter}>
-            <SelectTrigger className="w-36 h-9">
-              <SelectValue placeholder="到期時間" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">全部款項</SelectItem>
-              <SelectItem value="overdue">逾期未付</SelectItem>
-              <SelectItem value="thisMonth">本月到期</SelectItem>
-              <SelectItem value="future">預期未到</SelectItem>
-            </SelectContent>
-          </Select>
-          <div className="relative">
-            <Search className="h-4 w-4 absolute left-2 top-2.5 text-muted-foreground" />
-            <Input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="搜尋"
-              className="pl-8 w-40 h-9"
-            />
-          </div>
+          <span className="text-sm text-muted-foreground">彙總粒度：</span>
+          {(["month", "quarter", "year"] as AggMode[]).map((m) => (
+            <Button
+              key={m}
+              size="sm"
+              variant={mode === m ? "default" : "outline"}
+              onClick={() => setMode(m)}
+            >
+              {m === "month" ? "月" : m === "quarter" ? "季" : "年"}
+            </Button>
+          ))}
+          <span className="text-xs text-muted-foreground ml-2">
+            （「月」模式可直接點格輸入或用各類「分攤」勾月份平均攤）
+          </span>
         </CardContent>
       </Card>
 
-      {/* 未分配警示 */}
-      {totalUnallocated > 0 && (
-        <div className="flex items-center gap-2 text-sm bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-amber-800">
-          <AlertTriangle className="h-4 w-4 shrink-0" />
-          尚有 <span className="font-bold">{fmt(totalUnallocated)}</span>{" "}
-          應付款未排入任何月份。可用「自動分配」一鍵排入，或在矩陣手動填入。
-        </div>
-      )}
-
-      {/* 矩陣 */}
       <Card>
         <CardContent className="pt-4">
           {isLoading ? (
             <p className="text-center py-8 text-muted-foreground">載入中…</p>
-          ) : items.length === 0 ? (
-            <p className="text-center py-8 text-muted-foreground">沒有符合條件的應付款</p>
           ) : (
             <div className="overflow-x-auto">
-              {truncated && (
-                <p className="text-xs text-amber-600 mb-2">
-                  ⚠️ 應付款項過多，僅顯示前 {MAX_ROWS} 筆（共 {items.length}
-                  筆）。請用上方篩選縮小範圍；底部每月彙總仍為全部金額。
-                </p>
-              )}
               <table className="w-full text-sm border-collapse">
                 <thead>
                   <tr className="border-b">
-                    <th className="sticky left-0 bg-background text-left p-2 min-w-[200px] z-10">
-                      應付款項
+                    <th className="sticky left-0 bg-background text-left p-2 min-w-[220px] z-10">
+                      類別 / 區塊
                     </th>
-                    <th className="text-left p-2 min-w-[110px]">到期</th>
-                    <th className="text-right p-2 min-w-[90px]">未付</th>
-                    <th className="text-right p-2 min-w-[80px] text-amber-600">未分配</th>
                     {columns.map((c) => (
-                      <th key={c.key} className="text-right p-2 min-w-[90px] whitespace-nowrap">
+                      <th key={c.key} className="text-right p-2 min-w-[88px] whitespace-nowrap">
                         {c.label}
                       </th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {visibleItems.map((item) => {
-                    const un = unallocated(item)
+                  {/* ① 應付款項（依類別） */}
+                  <tr className="bg-indigo-50/40">
+                    <td
+                      colSpan={columns.length + 1}
+                      className="p-1.5 px-2 font-medium text-xs text-indigo-700 sticky left-0 z-10"
+                    >
+                      ① 應付款項（依類別）
+                    </td>
+                  </tr>
+                  {payableCategories.length === 0 && (
+                    <tr>
+                      <td
+                        colSpan={columns.length + 1}
+                        className="p-3 text-center text-muted-foreground"
+                      >
+                        目前沒有應付款
+                      </td>
+                    </tr>
+                  )}
+                  {payableCategories.map((cat) => {
+                    const isOpen = expanded.has(cat)
+                    const un = catUnallocated(cat)
                     return (
-                      <tr key={item.id} className="border-b hover:bg-muted/30">
-                        <td className="sticky left-0 bg-background p-2 z-10">
-                          <div className="flex items-center gap-1">
-                            <span>{URGENCY_DOT[item.urgency]}</span>
-                            <span
-                              className="font-medium truncate max-w-[160px]"
-                              title={item.itemName}
-                            >
-                              {item.itemName}
-                            </span>
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            <Badge variant="outline" className="text-[10px] mr-1">
-                              {item.categoryLabel}
-                            </Badge>
-                            {item.projectName}
-                          </div>
-                        </td>
-                        <td className="p-2 whitespace-nowrap">
-                          {(() => {
-                            const b = bucketOf(item.dueDate, curYm)
-                            return (
-                              <div className="flex flex-col gap-0.5">
-                                <span
-                                  className={`px-1.5 py-0.5 rounded text-[10px] w-fit ${BUCKET_META[b].cls}`}
-                                >
-                                  {BUCKET_META[b].label}
-                                </span>
-                                <span className="text-xs text-muted-foreground">
-                                  {item.dueDate ?? "未定"}
-                                </span>
-                              </div>
-                            )
-                          })()}
-                        </td>
-                        <td className="text-right p-2 whitespace-nowrap">
-                          {fmt(item.unpaidAmount)}
-                        </td>
-                        <td
-                          className={`text-right p-2 whitespace-nowrap ${un > 0 ? "text-amber-600 font-medium" : "text-muted-foreground"}`}
-                        >
-                          {un === 0 ? "✓" : fmt(un)}
-                        </td>
-                        {columns.map((c) => {
-                          const val = cellAmount(item.id, c.months)
-                          if (mode === "month") {
-                            return (
-                              <td key={c.key} className="p-1">
-                                <CellInput
-                                  value={val}
-                                  onCommit={(amount) =>
-                                    cellMut.mutate({ item, month: c.months[0], amount })
-                                  }
-                                />
-                              </td>
-                            )
-                          }
-                          return (
-                            <td key={c.key} className="text-right p-2 whitespace-nowrap">
-                              {val > 0 ? (
-                                fmt(val)
-                              ) : (
-                                <span className="text-muted-foreground">—</span>
-                              )}
-                            </td>
-                          )
-                        })}
-                      </tr>
+                      <CategoryRows
+                        key={cat}
+                        category={cat}
+                        isOpen={isOpen}
+                        unpaid={catUnpaid(cat)}
+                        unallocated={un}
+                        items={itemsByCategory.get(cat) ?? []}
+                        columns={columns}
+                        editable={mode === "month"}
+                        categoryOptions={categoryOptions}
+                        cellBudget={cellBudget}
+                        onToggle={() => toggleExpand(cat)}
+                        onDistribute={() => setDistributeFor(cat)}
+                        onEdit={(month, amount) =>
+                          budgetMut.mutate({ category: cat, month, amount })
+                        }
+                        onReclassify={(id, category) =>
+                          reclassifyMut.mutate({ paymentItemId: id, category })
+                        }
+                      />
                     )
                   })}
+
+                  {/* ②③ 營運成本 / 生活所需 */}
+                  <tr className="bg-emerald-50/40">
+                    <td
+                      colSpan={columns.length + 1}
+                      className="p-1.5 px-2 font-medium text-xs text-emerald-700 sticky left-0 z-10"
+                    >
+                      ②③ 營運成本 + 生活所需
+                    </td>
+                  </tr>
+                  {SPECIAL_BLOCKS.map((blk) => (
+                    <tr key={blk} className="border-b hover:bg-muted/30">
+                      <td className="sticky left-0 bg-background p-2 z-10">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-medium">{blk}</span>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-6 text-xs"
+                            onClick={() => setDistributeFor(blk)}
+                          >
+                            <Wand2 className="h-3 w-3 mr-1" />
+                            分攤
+                          </Button>
+                        </div>
+                      </td>
+                      {columns.map((c) => {
+                        const val = cellBudget(blk, c.months)
+                        return (
+                          <td key={c.key} className={mode === "month" ? "p-1" : "text-right p-2"}>
+                            {mode === "month" ? (
+                              <BudgetCell
+                                value={val}
+                                onCommit={(amount) =>
+                                  budgetMut.mutate({ category: blk, month: c.months[0], amount })
+                                }
+                              />
+                            ) : val > 0 ? (
+                              fmt(val)
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
+                          </td>
+                        )
+                      })}
+                    </tr>
+                  ))}
                 </tbody>
                 <tfoot className="font-medium">
-                  <tr className="border-t-2 bg-muted/20">
-                    <td className="sticky left-0 bg-muted/20 p-2 z-10">每月需付總額</td>
-                    <td></td>
-                    <td></td>
-                    <td></td>
+                  <tr className="border-t-2 bg-muted/30">
+                    <td className="sticky left-0 bg-muted/30 p-2 z-10">每月所需收入（三塊合計）</td>
                     {columns.map((c) => (
                       <td key={c.key} className="text-right p-2 whitespace-nowrap">
-                        {fmt(colNeeded(c))}
+                        {fmt(monthNeeded(c.months))}
                       </td>
                     ))}
                   </tr>
                   <tr className="bg-green-50/50">
                     <td className="sticky left-0 bg-green-50/50 p-2 z-10">預估營運收入</td>
-                    <td></td>
-                    <td></td>
-                    <td></td>
                     {columns.map((c) => (
                       <td key={c.key} className="text-right p-2 whitespace-nowrap text-green-700">
-                        {fmt(colRevenue(c))}
+                        {fmt(colRevenue(c.months))}
                       </td>
                     ))}
                   </tr>
                   <tr>
-                    <td className="sticky left-0 bg-background p-2 z-10">淨現金流</td>
-                    <td></td>
-                    <td></td>
-                    <td></td>
+                    <td className="sticky left-0 bg-background p-2 z-10">差額（收入 − 所需）</td>
                     {columns.map((c) => {
-                      const net = colRevenue(c) - colNeeded(c)
+                      const diff = colRevenue(c.months) - monthNeeded(c.months)
                       return (
                         <td
                           key={c.key}
-                          className={`text-right p-2 whitespace-nowrap ${net < 0 ? "text-red-600 font-bold" : "text-green-700"}`}
+                          className={`text-right p-2 whitespace-nowrap ${diff < 0 ? "text-red-600 font-bold" : "text-green-700"}`}
                         >
-                          {net >= 0 ? "+" : ""}
-                          {fmt(net)}
+                          {diff >= 0 ? "+" : ""}
+                          {fmt(diff)}
                         </td>
                       )
                     })}
@@ -529,20 +415,150 @@ export default function PaymentPlannerPage() {
       </Card>
 
       <p className="text-xs text-muted-foreground">
-        💡 「月」模式可直接點格輸入該月要付的金額（一筆可分散到多月）；「季 / 年」模式顯示彙總。
-        此規劃為獨立沙盤，不會更動原始到期日或滯納金計算。
+        💡 點類別前箭頭可展開該類項目並重新分類；「分攤」勾選月份把該類金額平均攤入。 紅字差額 =
+        該月預估收入不足以支應三大塊所需。純規劃，不影響實際到期日。
       </p>
+
+      {distributeFor && (
+        <DistributeDialog
+          category={distributeFor}
+          defaultAmount={distributeDefault}
+          months={months}
+          isPending={distributeMut.isPending}
+          onClose={() => setDistributeFor(null)}
+          onConfirm={(amount, selectedMonths) =>
+            distributeMut.mutate({ category: distributeFor, amount, months: selectedMonths })
+          }
+        />
+      )}
     </div>
   )
 }
 
 // ─────────────────────────────────────────────
-// 可編輯儲存格
+// 類別列（含展開項目 + 重新分類）
 // ─────────────────────────────────────────────
-function CellInput({ value, onCommit }: { value: number; onCommit: (amount: number) => void }) {
+function CategoryRows({
+  category,
+  isOpen,
+  unpaid,
+  unallocated,
+  items,
+  columns,
+  editable,
+  categoryOptions,
+  cellBudget,
+  onToggle,
+  onDistribute,
+  onEdit,
+  onReclassify,
+}: {
+  category: string
+  isOpen: boolean
+  unpaid: number
+  unallocated: number
+  items: PlanItem[]
+  columns: ColGroup[]
+  editable: boolean
+  categoryOptions: string[]
+  cellBudget: (cat: string, months: string[]) => number
+  onToggle: () => void
+  onDistribute: () => void
+  onEdit: (month: string, amount: number) => void
+  onReclassify: (id: number, category: string) => void
+}) {
+  return (
+    <>
+      <tr className="border-b hover:bg-muted/30">
+        <td className="sticky left-0 bg-background p-2 z-10">
+          <div className="flex items-center justify-between gap-2">
+            <button
+              type="button"
+              onClick={onToggle}
+              className="flex items-center gap-1 font-medium"
+            >
+              {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              {category}
+              <span className="text-xs text-muted-foreground">（{items.length}）</span>
+            </button>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">
+                未付 {fmt(unpaid)}
+                {unallocated > 0 && (
+                  <span className="text-amber-600">·待排 {fmt(unallocated)}</span>
+                )}
+              </span>
+              <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={onDistribute}>
+                <Wand2 className="h-3 w-3 mr-1" />
+                分攤
+              </Button>
+            </div>
+          </div>
+        </td>
+        {columns.map((c) => {
+          const val = cellBudget(category, c.months)
+          return (
+            <td key={c.key} className={editable ? "p-1" : "text-right p-2"}>
+              {editable ? (
+                <BudgetCell value={val} onCommit={(amount) => onEdit(c.months[0], amount)} />
+              ) : val > 0 ? (
+                fmt(val)
+              ) : (
+                <span className="text-muted-foreground">—</span>
+              )}
+            </td>
+          )
+        })}
+      </tr>
+      {isOpen &&
+        items.map((it) => (
+          <tr key={it.id} className="border-b bg-muted/10 text-xs">
+            <td className="sticky left-0 bg-muted/10 p-2 pl-8 z-10">
+              <div className="flex items-center justify-between gap-2">
+                <span className="truncate max-w-[120px]" title={it.itemName}>
+                  {it.itemName}
+                </span>
+                <div className="flex items-center gap-1">
+                  <span className="text-muted-foreground">{fmt(it.unpaidAmount)}</span>
+                  <input
+                    list="planner-cat-options"
+                    defaultValue={it.category}
+                    onBlur={(e) => {
+                      const v = e.target.value.trim()
+                      if (v && v !== it.category) onReclassify(it.id, v)
+                    }}
+                    className="h-6 w-20 text-xs border rounded px-1"
+                    title="重新分類"
+                  />
+                </div>
+              </div>
+            </td>
+            {columns.map((c) => (
+              <td key={c.key} className="text-right p-2 text-muted-foreground">
+                {it.dueDate
+                  ? it.dueDate.slice(0, 7) === c.months[0] && c.months.length === 1
+                    ? "到期"
+                    : ""
+                  : ""}
+              </td>
+            ))}
+          </tr>
+        ))}
+      <datalist id="planner-cat-options">
+        {categoryOptions.map((c) => (
+          <option key={c} value={c} />
+        ))}
+      </datalist>
+    </>
+  )
+}
+
+// ─────────────────────────────────────────────
+// 可編輯預算格
+// ─────────────────────────────────────────────
+function BudgetCell({ value, onCommit }: { value: number; onCommit: (amount: number) => void }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState("")
-
   if (!editing) {
     return (
       <button

@@ -48,14 +48,16 @@ interface ForecastMonth {
 interface ForecastResponse {
   forecast: { months: ForecastMonth[] }
 }
-interface Allocation {
-  paymentItemId: number
+interface CategoryBudget {
+  category: string
   plannedMonth: string
-  plannedAmount: number
+  amount: number
 }
 interface PlannerData {
-  allocations: Allocation[]
+  categoryBudgets: CategoryBudget[]
 }
+// 排程規劃台的營運/生活兩塊（沙盤另有營運成本輸入，避免重複計）
+const PLANNER_NON_DEBT = ["營運成本", "生活所需"]
 interface Template {
   id: number
   estimatedAmount: string
@@ -146,9 +148,9 @@ export default function ScenarioPlannerPage() {
 
   const repayByMonth = useMemo(() => {
     const map = new Map<string, number>()
-    planner?.allocations.forEach((a) =>
-      map.set(a.plannedMonth, (map.get(a.plannedMonth) ?? 0) + a.plannedAmount)
-    )
+    planner?.categoryBudgets
+      .filter((b) => !PLANNER_NON_DEBT.includes(b.category))
+      .forEach((b) => map.set(b.plannedMonth, (map.get(b.plannedMonth) ?? 0) + b.amount))
     return map
   }, [planner])
 

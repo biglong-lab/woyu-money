@@ -12,7 +12,11 @@
 import { Router } from "express"
 import { z } from "zod"
 import { asyncHandler, AppError } from "../middleware/error-handler"
-import { insertPaymentPlanAllocationSchema } from "@shared/schema"
+import {
+  insertPaymentPlanAllocationSchema,
+  insertItemCategorySchema,
+  insertCategoryBudgetSchema,
+} from "@shared/schema"
 import * as planStore from "../storage/payment-plan"
 import { getPriorityReport } from "../services/payment-priority.service"
 
@@ -47,29 +51,78 @@ function clampMonth(target: string, min: string, max: string): string {
 router.get(
   "/api/payment-planner",
   asyncHandler(async (_req, res) => {
-    const report = await getPriorityReport({ includeLow: true })
+    const [report, overrides, budgets] = await Promise.all([
+      getPriorityReport({ includeLow: true }),
+      planStore.getItemCategories(),
+      planStore.getCategoryBudgets(),
+    ])
+    const overrideMap = new Map(overrides.map((o) => [o.paymentItemId, o.category]))
+
     const items = report.all
       .filter((r) => r.unpaidAmount > 0)
       .map((r) => ({
         id: r.id,
         itemName: r.itemName,
         categoryLabel: r.categoryLabel,
+        // 自訂分類優先、否則用引擎判定
+        category: overrideMap.get(r.id) ?? r.categoryLabel,
         urgency: r.urgency,
         unpaidAmount: r.unpaidAmount,
         dueDate: r.dueDate,
         projectName: r.projectName,
       }))
-    const itemIdSet = new Set(items.map((i) => i.id))
-    const allocations = (await planStore.getAllocations())
-      .filter((a) => itemIdSet.has(a.paymentItemId))
-      .map((a) => ({
-        id: a.id,
-        paymentItemId: a.paymentItemId,
-        plannedMonth: a.plannedMonth,
-        plannedAmount: Number(a.plannedAmount),
-        note: a.note,
-      }))
-    res.json({ items, allocations, totalUnpaid: report.totalUnpaid })
+
+    const categoryBudgets = budgets.map((b) => ({
+      category: b.category,
+      plannedMonth: b.plannedMonth,
+      amount: Number(b.amount),
+    }))
+
+    res.json({ items, categoryBudgets, totalUnpaid: report.totalUnpaid })
+  })
+)
+
+// ─────────────────────────────────────────────
+// 分類覆寫
+// ─────────────────────────────────────────────
+router.put(
+  "/api/payment-planner/item-category",
+  asyncHandler(async (req, res) => {
+    const parsed = insertItemCategorySchema.safeParse(req.body)
+    if (!parsed.success) throw new AppError(400, "資料驗證失敗")
+    res.json(await planStore.setItemCategory(parsed.data.paymentItemId, parsed.data.category))
+  })
+)
+
+// ─────────────────────────────────────────────
+// 分類月度預算
+// ─────────────────────────────────────────────
+router.put(
+  "/api/payment-planner/category-budget",
+  asyncHandler(async (req, res) => {
+    const parsed = insertCategoryBudgetSchema.safeParse(req.body)
+    if (!parsed.success) throw new AppError(400, "資料驗證失敗")
+    await planStore.setCategoryBudget(
+      parsed.data.category,
+      parsed.data.plannedMonth,
+      parsed.data.amount
+    )
+    res.json({ success: true })
+  })
+)
+
+const distributeSchema = z.object({
+  category: z.string().trim().min(1),
+  amount: z.number().nonnegative(),
+  months: z.array(z.string().regex(/^\d{4}-\d{2}$/)).min(1),
+})
+router.post(
+  "/api/payment-planner/distribute",
+  asyncHandler(async (req, res) => {
+    const parsed = distributeSchema.safeParse(req.body)
+    if (!parsed.success) throw new AppError(400, "參數錯誤")
+    await planStore.distributeCategory(parsed.data.category, parsed.data.amount, parsed.data.months)
+    res.json({ success: true })
   })
 )
 
