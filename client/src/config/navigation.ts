@@ -82,6 +82,13 @@ export const scenarioNavItem: NavItem = {
   description: "調整行銷/訂價/固定支出，即時看下月收支影響",
 }
 
+export const scenarioPlannerNavItem: NavItem = {
+  title: "沙盤推演 2.0 · 現金模擬",
+  href: "/scenario-planner",
+  icon: Sparkles,
+  description: "收入↑/成本↓/還款三軸推未來 12 月現金走勢",
+}
+
 export const dashboardNavItem: NavItem = {
   title: "綜合儀表板",
   href: "/financial-dashboard",
@@ -124,6 +131,7 @@ export const coreDecisionNavItems: NavItem[] = [
     icon: Calendar,
     description: "一頁安排所有應付款付款月份，推估每月/季/年所需金額",
   },
+  scenarioPlannerNavItem, // 沙盤推演 2.0：未來現金模擬
   dashboardNavItem, // 全局：YTD + 3 月預估
   costOverviewNavItem, // 細節：四大成本
   {
@@ -531,6 +539,11 @@ export const breadcrumbConfig: Record<string, BreadcrumbItem[]> = {
     { title: "首頁", href: "/" },
     { title: "財務健康駕駛艙", href: "/financial-cockpit" },
     { title: "排程分配規劃台" },
+  ],
+  "/scenario-planner": [
+    { title: "首頁", href: "/" },
+    { title: "財務健康駕駛艙", href: "/financial-cockpit" },
+    { title: "沙盤推演 2.0" },
   ],
   "/scenario-simulator": [
     { title: "首頁", href: "/" },

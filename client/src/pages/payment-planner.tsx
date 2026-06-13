@@ -59,6 +59,22 @@ interface ForecastResponse {
 }
 
 const fmt = (n: number) => `$${Math.round(n).toLocaleString()}`
+
+// 以到期時間為主軸的分類（預期款項）
+type TimeBucket = "overdue" | "thisMonth" | "future"
+function bucketOf(dueDate: string | null, curYm: string): TimeBucket {
+  if (!dueDate) return "future" // 未定到期 → 視為預期
+  const dueYm = dueDate.slice(0, 7)
+  if (dueYm < curYm) return "overdue"
+  if (dueYm === curYm) return "thisMonth"
+  return "future"
+}
+const BUCKET_META: Record<TimeBucket, { label: string; cls: string }> = {
+  overdue: { label: "逾期未付", cls: "bg-red-100 text-red-800" },
+  thisMonth: { label: "本月到期", cls: "bg-orange-100 text-orange-800" },
+  future: { label: "預期未到", cls: "bg-blue-100 text-blue-700" },
+}
+
 const URGENCY_DOT: Record<Urgency, string> = {
   critical: "🔴",
   high: "🟠",
@@ -116,7 +132,7 @@ export default function PaymentPlannerPage() {
 
   const [mode, setMode] = useState<AggMode>("month")
   const [catFilter, setCatFilter] = useState<string>("all")
-  const [urgencyFilter, setUrgencyFilter] = useState<string>("all")
+  const [timeFilter, setTimeFilter] = useState<string>("all")
   const [search, setSearch] = useState("")
 
   const { data, isLoading } = useQuery<PlannerData>({ queryKey: ["/api/payment-planner"] })
@@ -153,11 +169,13 @@ export default function PaymentPlannerPage() {
     return Array.from(set).sort()
   }, [data])
 
-  // 篩選後項目
+  const curYm = months[0]
+
+  // 篩選後項目（以到期時間為主軸：依到期日排序，逾期/最早在前）
   const items = useMemo(() => {
     let list = data?.items ?? []
     if (catFilter !== "all") list = list.filter((i) => i.categoryLabel === catFilter)
-    if (urgencyFilter !== "all") list = list.filter((i) => i.urgency === urgencyFilter)
+    if (timeFilter !== "all") list = list.filter((i) => bucketOf(i.dueDate, curYm) === timeFilter)
     if (search.trim()) {
       const s = search.trim().toLowerCase()
       list = list.filter(
@@ -167,8 +185,13 @@ export default function PaymentPlannerPage() {
           (i.projectName ?? "").toLowerCase().includes(s)
       )
     }
-    return list
-  }, [data, catFilter, urgencyFilter, search])
+    // 依到期日排序（無到期日排最後）
+    return [...list].sort((a, b) => {
+      const da = a.dueDate ?? "9999-99-99"
+      const db = b.dueDate ?? "9999-99-99"
+      return da.localeCompare(db)
+    })
+  }, [data, catFilter, timeFilter, search, curYm])
 
   // 列數上限保護（底部彙總用全部 allocations、不受此影響）
   const MAX_ROWS = 200
@@ -319,16 +342,15 @@ export default function PaymentPlannerPage() {
               ))}
             </SelectContent>
           </Select>
-          <Select value={urgencyFilter} onValueChange={setUrgencyFilter}>
-            <SelectTrigger className="w-32 h-9">
-              <SelectValue placeholder="急迫度" />
+          <Select value={timeFilter} onValueChange={setTimeFilter}>
+            <SelectTrigger className="w-36 h-9">
+              <SelectValue placeholder="到期時間" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">全部急迫度</SelectItem>
-              <SelectItem value="critical">🔴 立刻付</SelectItem>
-              <SelectItem value="high">🟠 本週付</SelectItem>
-              <SelectItem value="medium">🟡 可延後</SelectItem>
-              <SelectItem value="low">⚪ 可推後</SelectItem>
+              <SelectItem value="all">全部款項</SelectItem>
+              <SelectItem value="overdue">逾期未付</SelectItem>
+              <SelectItem value="thisMonth">本月到期</SelectItem>
+              <SelectItem value="future">預期未到</SelectItem>
             </SelectContent>
           </Select>
           <div className="relative">
@@ -373,6 +395,7 @@ export default function PaymentPlannerPage() {
                     <th className="sticky left-0 bg-background text-left p-2 min-w-[200px] z-10">
                       應付款項
                     </th>
+                    <th className="text-left p-2 min-w-[110px]">到期</th>
                     <th className="text-right p-2 min-w-[90px]">未付</th>
                     <th className="text-right p-2 min-w-[80px] text-amber-600">未分配</th>
                     {columns.map((c) => (
@@ -403,6 +426,23 @@ export default function PaymentPlannerPage() {
                             </Badge>
                             {item.projectName}
                           </div>
+                        </td>
+                        <td className="p-2 whitespace-nowrap">
+                          {(() => {
+                            const b = bucketOf(item.dueDate, curYm)
+                            return (
+                              <div className="flex flex-col gap-0.5">
+                                <span
+                                  className={`px-1.5 py-0.5 rounded text-[10px] w-fit ${BUCKET_META[b].cls}`}
+                                >
+                                  {BUCKET_META[b].label}
+                                </span>
+                                <span className="text-xs text-muted-foreground">
+                                  {item.dueDate ?? "未定"}
+                                </span>
+                              </div>
+                            )
+                          })()}
                         </td>
                         <td className="text-right p-2 whitespace-nowrap">
                           {fmt(item.unpaidAmount)}
@@ -445,6 +485,7 @@ export default function PaymentPlannerPage() {
                     <td className="sticky left-0 bg-muted/20 p-2 z-10">每月需付總額</td>
                     <td></td>
                     <td></td>
+                    <td></td>
                     {columns.map((c) => (
                       <td key={c.key} className="text-right p-2 whitespace-nowrap">
                         {fmt(colNeeded(c))}
@@ -455,6 +496,7 @@ export default function PaymentPlannerPage() {
                     <td className="sticky left-0 bg-green-50/50 p-2 z-10">預估營運收入</td>
                     <td></td>
                     <td></td>
+                    <td></td>
                     {columns.map((c) => (
                       <td key={c.key} className="text-right p-2 whitespace-nowrap text-green-700">
                         {fmt(colRevenue(c))}
@@ -463,6 +505,7 @@ export default function PaymentPlannerPage() {
                   </tr>
                   <tr>
                     <td className="sticky left-0 bg-background p-2 z-10">淨現金流</td>
+                    <td></td>
                     <td></td>
                     <td></td>
                     {columns.map((c) => {

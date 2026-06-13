@@ -166,10 +166,16 @@ const TOOLS = [
     desc: "輸入可用現金→建議先付哪幾筆",
   },
   {
+    href: "/scenario-planner",
+    icon: Sparkles,
+    title: "沙盤推演 2.0",
+    desc: "收入↑/成本↓/還款三軸推未來現金走勢",
+  },
+  {
     href: "/scenario-simulator",
     icon: Sparkles,
-    title: "沙盤推演",
-    desc: "調行銷/訂價/成本看下月收支",
+    title: "沙盤推演（單月）",
+    desc: "調行銷/訂價看下月收支",
   },
   {
     href: "/cashflow-decision-center",
