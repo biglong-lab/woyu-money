@@ -118,6 +118,12 @@ export const cockpitNavItem: NavItem = {
 // 扁平化建議（audit 2026-05-24 P1）：14 項 → 駕駛艙領頭 + 工具箱可摺疊
 export const coreDecisionNavItems: NavItem[] = [
   cockpitNavItem, // 🚀 主入口：一頁看完 + 導向
+  {
+    title: "排程分配規劃台",
+    href: "/payment-planner",
+    icon: Calendar,
+    description: "一頁安排所有應付款付款月份，推估每月/季/年所需金額",
+  },
   dashboardNavItem, // 全局：YTD + 3 月預估
   costOverviewNavItem, // 細節：四大成本
   {
@@ -521,6 +527,11 @@ export const breadcrumbConfig: Record<string, BreadcrumbItem[]> = {
     { title: "信用卡請款紀錄" },
   ],
   "/financial-cockpit": [{ title: "首頁", href: "/" }, { title: "財務健康駕駛艙" }],
+  "/payment-planner": [
+    { title: "首頁", href: "/" },
+    { title: "財務健康駕駛艙", href: "/financial-cockpit" },
+    { title: "排程分配規劃台" },
+  ],
   "/scenario-simulator": [
     { title: "首頁", href: "/" },
     { title: "財務助理" },

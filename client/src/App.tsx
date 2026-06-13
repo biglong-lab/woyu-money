@@ -75,6 +75,7 @@ import RecurringExpensesPage from "@/pages/recurring-expenses"
 import RevenueForecastPage from "@/pages/revenue-forecast"
 import CardClaimsPage from "@/pages/card-claims"
 import FinancialCockpitPage from "@/pages/financial-cockpit"
+import PaymentPlannerPage from "@/pages/payment-planner"
 import ScenarioSimulatorPage from "@/pages/scenario-simulator"
 import LateFeeSettingsPage from "@/pages/late-fee-settings"
 import FinancialDashboardPage from "@/pages/financial-dashboard"
@@ -199,6 +200,7 @@ function Router() {
                 <ProtectedRoute path="/revenue-forecast" component={RevenueForecastPage} />
                 <ProtectedRoute path="/card-claims" component={CardClaimsPage} />
                 <ProtectedRoute path="/financial-cockpit" component={FinancialCockpitPage} />
+                <ProtectedRoute path="/payment-planner" component={PaymentPlannerPage} />
                 <ProtectedRoute path="/scenario-simulator" component={ScenarioSimulatorPage} />
                 <ProtectedRoute path="/late-fee-settings" component={LateFeeSettingsPage} />
                 <ProtectedRoute path="/financial-dashboard" component={FinancialDashboardPage} />

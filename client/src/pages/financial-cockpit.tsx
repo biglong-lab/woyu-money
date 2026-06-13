@@ -154,6 +154,12 @@ const URGENCY_BADGE: Record<UrgencyLevel, { label: string; cls: string }> = {
 // ─────────────────────────────────────────────
 const TOOLS = [
   {
+    href: "/payment-planner",
+    icon: Layers,
+    title: "排程分配規劃台",
+    desc: "一頁排所有應付款付款月份，推估每月/季/年",
+  },
+  {
     href: "/cash-allocation",
     icon: Wallet,
     title: "現金分配助理",
