@@ -8,6 +8,7 @@
 import { db } from "../db"
 import { sql, and, eq, gte } from "drizzle-orm"
 import { revenueForecastSnapshots, type RevenueForecastSnapshot } from "@shared/schema"
+import { EXCLUDED_PM_COMPANY_IDS } from "@shared/pm-excluded-companies"
 import pg from "pg"
 
 const PM_DATABASE_URL = process.env.PM_DATABASE_URL
@@ -129,8 +130,9 @@ export async function captureFromPM(): Promise<CaptureResult> {
          WHERE deleted_at IS NULL
            AND TO_CHAR(date, 'YYYY-MM') = $1
            AND date <= $2::date
+           AND (company_id IS NULL OR company_id <> ALL($3::int[]))
          GROUP BY company_id`,
-        [targetMonth, todayStr]
+        [targetMonth, todayStr, [...EXCLUDED_PM_COMPANY_IDS]]
       )
 
       const daysAhead = Math.ceil(
@@ -207,7 +209,9 @@ export async function backfillFromPMHistory(): Promise<CaptureResult> {
     }>(
       `SELECT date, company_id, COALESCE(total_revenue, 0)::text AS total_revenue
        FROM daily_revenue_snapshots
-       ORDER BY date, company_id`
+       WHERE company_id IS NULL OR company_id <> ALL($1::int[])
+       ORDER BY date, company_id`,
+      [[...EXCLUDED_PM_COMPANY_IDS]]
     )
 
     if (result.rows.length === 0) {
@@ -228,7 +232,9 @@ export async function backfillFromPMHistory(): Promise<CaptureResult> {
                 ORDER BY date
               )::text AS accumulated
        FROM daily_revenue_snapshots
-       ORDER BY date, company_id`
+       WHERE company_id IS NULL OR company_id <> ALL($1::int[])
+       ORDER BY date, company_id`,
+      [[...EXCLUDED_PM_COMPANY_IDS]]
     )
 
     let inserted = 0
@@ -273,11 +279,13 @@ export async function backfillFromPMHistory(): Promise<CaptureResult> {
                  ORDER BY date
                ) AS cum
         FROM daily_revenue_snapshots
+        WHERE company_id IS NULL OR company_id <> ALL($1::int[])
       )
       SELECT date::text, tm AS target_month, SUM(cum)::text AS total
       FROM cumu
       GROUP BY date, tm
-      ORDER BY date`
+      ORDER BY date`,
+      [[...EXCLUDED_PM_COMPANY_IDS]]
     )
 
     for (const row of aggregated.rows) {
