@@ -103,13 +103,13 @@ const CONFIDENCE_LABEL: Record<SeasonalForecast["confidence"], { label: string; 
   insufficient: { label: "資料不足（< 2 樣本，僅線性推估）", color: "bg-red-100 text-red-800" },
 }
 
+// 大號文創 (6) / 大哉文旅 (7) 不納入 Money、見 shared/pm-excluded-companies.ts
 const PM_COMPANIES = [
   { id: 1, name: "浯島文旅" },
   { id: 2, name: "浯島輕旅" },
   { id: 3, name: "小六路厝" },
   { id: 4, name: "總兵招待所" },
   { id: 5, name: "魁星背包棧" },
-  { id: 6, name: "大號文創" },
 ]
 
 function monthOptions(count: number): string[] {
