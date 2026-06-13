@@ -56,8 +56,8 @@ interface CategoryBudget {
 interface PlannerData {
   categoryBudgets: CategoryBudget[]
 }
-// 排程規劃台的營運/生活兩塊（沙盤另有營運成本輸入，避免重複計）
-const PLANNER_NON_DEBT = ["營運成本", "生活所需"]
+// 排程規劃台非還款的類別：營運/生活兩塊（沙盤另有營運成本輸入）+ 收入覆寫
+const PLANNER_NON_DEBT = ["營運成本", "生活所需", "預估營運收入"]
 interface Template {
   id: number
   estimatedAmount: string

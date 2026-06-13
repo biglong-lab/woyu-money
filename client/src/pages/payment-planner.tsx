@@ -57,6 +57,9 @@ const fmt = (n: number) => `$${Math.round(n).toLocaleString()}`
 const OPERATING = "營運成本"
 const LIVING = "生活所需"
 const SPECIAL_BLOCKS = [OPERATING, LIVING]
+// 保留類別：預估營運收入覆寫（收入、非需付；不計入每月所需）
+const REVENUE_KEY = "預估營運收入"
+const NON_NEED_KEYS = [REVENUE_KEY]
 
 function ymOf(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
@@ -157,14 +160,22 @@ export default function PaymentPlannerPage() {
     if (!m) return 0
     return monthsInCol.reduce((s, mo) => s + (m.get(mo) ?? 0), 0)
   }
-  // 某月所有類別（含三大塊）預算總和 = 該月所需收入
+  // 某月所有類別（含三大塊、排除收入覆寫）預算總和 = 該月所需收入
   function monthNeeded(monthsInCol: string[]): number {
     let total = 0
-    budgetLookup.forEach((mMap) => monthsInCol.forEach((mo) => (total += mMap.get(mo) ?? 0)))
+    budgetLookup.forEach((mMap, cat) => {
+      if (NON_NEED_KEYS.includes(cat)) return
+      monthsInCol.forEach((mo) => (total += mMap.get(mo) ?? 0))
+    })
     return total
   }
+  // 預估營運收入：有覆寫用覆寫、否則用現金流預測
+  function effRevenue(month: string): number {
+    const ov = budgetLookup.get(REVENUE_KEY)?.get(month)
+    return ov !== undefined ? ov : (revenueByMonth.get(month) ?? 0)
+  }
   function colRevenue(monthsInCol: string[]): number {
-    return monthsInCol.reduce((s, m) => s + (revenueByMonth.get(m) ?? 0), 0)
+    return monthsInCol.reduce((s, m) => s + effRevenue(m), 0)
   }
 
   // 未分配（應付款類別）：該類未付 − 已排預算總額
@@ -385,12 +396,34 @@ export default function PaymentPlannerPage() {
                     ))}
                   </tr>
                   <tr className="bg-green-50/50">
-                    <td className="sticky left-0 bg-green-50/50 p-2 z-10">預估營運收入</td>
-                    {columns.map((c) => (
-                      <td key={c.key} className="text-right p-2 whitespace-nowrap text-green-700">
-                        {fmt(colRevenue(c.months))}
-                      </td>
-                    ))}
+                    <td className="sticky left-0 bg-green-50/50 p-2 z-10">
+                      預估營運收入
+                      <span className="text-xs text-muted-foreground"> · 可輸入覆寫</span>
+                    </td>
+                    {columns.map((c) => {
+                      const val = colRevenue(c.months)
+                      return (
+                        <td
+                          key={c.key}
+                          className={mode === "month" ? "p-1" : "text-right p-2 text-green-700"}
+                        >
+                          {mode === "month" ? (
+                            <BudgetCell
+                              value={val}
+                              onCommit={(amount) =>
+                                budgetMut.mutate({
+                                  category: REVENUE_KEY,
+                                  month: c.months[0],
+                                  amount,
+                                })
+                              }
+                            />
+                          ) : (
+                            fmt(val)
+                          )}
+                        </td>
+                      )
+                    })}
                   </tr>
                   <tr>
                     <td className="sticky left-0 bg-background p-2 z-10">差額（收入 − 所需）</td>
