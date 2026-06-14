@@ -36,6 +36,18 @@
   },
   "shortcuts": [
     {
+      "name": "財務健康駕駛艙",
+      "short_name": "駕駛艙",
+      "description": "現況 + 應付款排序 + 現金缺口一頁看完",
+      "url": "/financial-cockpit"
+    },
+    {
+      "name": "排程分配規劃台",
+      "short_name": "規劃台",
+      "description": "依類別分配應付款、推估每月所需",
+      "url": "/payment-planner"
+    },
+    {
       "name": "現金分配",
       "short_name": "分配",
       "description": "輸入可動用金額，建議先付哪幾筆",
