@@ -26,6 +26,7 @@ import { CreditCard, Plus, Pencil, Trash2, Settings, Banknote } from "lucide-rea
 import { ClaimForm } from "@/components/card-claims/claim-form"
 import { OptionsDialog } from "@/components/card-claims/options-dialog"
 import { SettleDialog } from "@/components/card-claims/settle-dialog"
+import { ImageLightbox } from "@/components/card-claims/image-lightbox"
 import {
   statusMeta,
   fmt,
@@ -88,6 +89,7 @@ export default function CardClaimsPage() {
   const [formOpen, setFormOpen] = useState(false)
   const [optionsOpen, setOptionsOpen] = useState(false)
   const [settleFor, setSettleFor] = useState<Claim | null>(null)
+  const [lightbox, setLightbox] = useState<string | null>(null)
 
   function applyPreset(p: RangePreset) {
     setPreset(p)
@@ -274,6 +276,7 @@ export default function CardClaimsPage() {
                       <TableHead>標籤</TableHead>
                       <TableHead>館別</TableHead>
                       <TableHead>狀態</TableHead>
+                      <TableHead>收據</TableHead>
                       <TableHead className="text-right">操作</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -308,6 +311,18 @@ export default function CardClaimsPage() {
                             <span className={`px-2 py-0.5 rounded text-xs ${sm.color}`}>
                               {sm.label}
                             </span>
+                          </TableCell>
+                          <TableCell>
+                            {c.receiptImageUrl ? (
+                              <img
+                                src={c.receiptImageUrl}
+                                alt="收據"
+                                onClick={() => setLightbox(c.receiptImageUrl)}
+                                className="h-10 w-10 rounded object-cover border cursor-pointer hover:opacity-80"
+                              />
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
                           </TableCell>
                           <TableCell className="text-right whitespace-nowrap">
                             <Button
@@ -381,23 +396,35 @@ export default function CardClaimsPage() {
                           </span>
                         ))}
                       </div>
-                      <div className="mt-2 flex items-center justify-end gap-1">
-                        <Button size="sm" variant="outline" onClick={() => setSettleFor(c)}>
-                          <Banknote className="h-4 w-4 mr-1 text-green-600" />
-                          到帳
-                        </Button>
-                        <Button size="sm" variant="outline" onClick={() => openEdit(c)}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            if (confirm("確定刪除此筆紀錄？")) deleteMut.mutate(c.id)
-                          }}
-                        >
-                          <Trash2 className="h-4 w-4 text-red-500" />
-                        </Button>
+                      <div className="mt-2 flex items-center justify-between gap-1">
+                        {c.receiptImageUrl ? (
+                          <img
+                            src={c.receiptImageUrl}
+                            alt="收據"
+                            onClick={() => setLightbox(c.receiptImageUrl)}
+                            className="h-12 w-12 rounded object-cover border cursor-pointer"
+                          />
+                        ) : (
+                          <span className="text-xs text-muted-foreground">無收據</span>
+                        )}
+                        <div className="flex items-center gap-1">
+                          <Button size="sm" variant="outline" onClick={() => setSettleFor(c)}>
+                            <Banknote className="h-4 w-4 mr-1 text-green-600" />
+                            到帳
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => openEdit(c)}>
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              if (confirm("確定刪除此筆紀錄？")) deleteMut.mutate(c.id)
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4 text-red-500" />
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   )
@@ -425,6 +452,7 @@ export default function CardClaimsPage() {
           onClose={() => setSettleFor(null)}
         />
       )}
+      {lightbox && <ImageLightbox src={lightbox} onClose={() => setLightbox(null)} />}
     </div>
   )
 }

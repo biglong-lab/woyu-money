@@ -25,6 +25,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 import { Upload, X } from "lucide-react"
+import { ImageLightbox } from "./image-lightbox"
 import {
   STATUS_OPTIONS,
   fmt,
@@ -63,6 +64,7 @@ export function ClaimForm({
     claim?.receiptImageUrl ?? null
   )
   const [uploading, setUploading] = useState(false)
+  const [lightbox, setLightbox] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const feeRate = feeRateOf(bank === "none" ? null : bank, banks)
@@ -265,13 +267,12 @@ export function ClaimForm({
             />
             {receiptImageUrl ? (
               <div className="flex items-center gap-2 mt-1">
-                <a href={receiptImageUrl} target="_blank" rel="noreferrer">
-                  <img
-                    src={receiptImageUrl}
-                    alt="收據"
-                    className="h-16 w-16 rounded object-cover border"
-                  />
-                </a>
+                <img
+                  src={receiptImageUrl}
+                  alt="收據"
+                  onClick={() => setLightbox(true)}
+                  className="h-16 w-16 rounded object-cover border cursor-pointer"
+                />
                 <Button
                   type="button"
                   size="sm"
@@ -313,6 +314,9 @@ export function ClaimForm({
           </Button>
         </DialogFooter>
       </DialogContent>
+      {lightbox && receiptImageUrl && (
+        <ImageLightbox src={receiptImageUrl} onClose={() => setLightbox(false)} />
+      )}
     </Dialog>
   )
 }
