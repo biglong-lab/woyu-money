@@ -16,6 +16,7 @@ import {
   insertCardClaimSchema,
   insertCardClaimTagSchema,
   insertCardClaimPropertySchema,
+  insertCardClaimBankSchema,
 } from "@shared/schema"
 import * as store from "../storage/card-claims"
 import { ZodError } from "zod"
@@ -127,6 +128,51 @@ router.delete(
   "/api/card-claims/properties/:id",
   asyncHandler(async (req, res) => {
     await store.deleteProperty(parseId(req.params.id))
+    res.json({ success: true })
+  })
+)
+
+// ─────────────────────────────────────────────
+// 刷卡銀行管理
+// ─────────────────────────────────────────────
+
+router.get(
+  "/api/card-claims/banks",
+  asyncHandler(async (req, res) => {
+    res.json(await store.getBanks(req.query.all === "true"))
+  })
+)
+
+router.post(
+  "/api/card-claims/banks",
+  asyncHandler(async (req, res) => {
+    try {
+      const data = insertCardClaimBankSchema.parse(req.body)
+      res.json(await store.createBank(data))
+    } catch (e) {
+      handleZod(e)
+    }
+  })
+)
+
+router.patch(
+  "/api/card-claims/banks/:id",
+  asyncHandler(async (req, res) => {
+    try {
+      const data = insertCardClaimBankSchema.partial().parse(req.body)
+      const row = await store.updateBank(parseId(req.params.id), data)
+      if (!row) throw new AppError(404, "找不到該銀行")
+      res.json(row)
+    } catch (e) {
+      handleZod(e)
+    }
+  })
+)
+
+router.delete(
+  "/api/card-claims/banks/:id",
+  asyncHandler(async (req, res) => {
+    await store.deleteBank(parseId(req.params.id))
     res.json({ success: true })
   })
 )

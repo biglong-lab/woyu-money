@@ -36,6 +36,15 @@ export const cardClaimProperties = pgTable("card_claim_properties", {
   createdAt: timestamp("created_at").defaultNow(),
 })
 
+// 刷卡銀行（可自訂、依需求新增，如 中國信託 / 聯合信用卡）
+export const cardClaimBanks = pgTable("card_claim_banks", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 50 }).notNull().unique(),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+})
+
 // 狀態：pending 待請款 / claimed 已請款 / settled 已入帳 / cancelled 已取消
 export const CARD_CLAIM_STATUSES = ["pending", "claimed", "settled", "cancelled"] as const
 export type CardClaimStatus = (typeof CARD_CLAIM_STATUSES)[number]
@@ -72,9 +81,33 @@ export const cardClaims = pgTable(
   })
 )
 
+// 館別多選關聯（一筆請款可對應多個館別）
+export const cardClaimPropertyLinks = pgTable(
+  "card_claim_property_links",
+  {
+    id: serial("id").primaryKey(),
+    claimId: integer("claim_id")
+      .notNull()
+      .references(() => cardClaims.id, { onDelete: "cascade" }),
+    propertyId: integer("property_id")
+      .notNull()
+      .references(() => cardClaimProperties.id),
+    createdAt: timestamp("created_at").defaultNow(),
+  },
+  (table) => ({
+    claimIdx: index("card_claim_prop_link_claim_idx").on(table.claimId),
+  })
+)
+
 // ─────────────────────────────────────────────
 // 驗證 Schema
 // ─────────────────────────────────────────────
+
+export const insertCardClaimBankSchema = createInsertSchema(cardClaimBanks)
+  .omit({ id: true, createdAt: true })
+  .extend({
+    name: z.string().trim().min(1, "銀行名稱不可空白").max(50),
+  })
 
 export const insertCardClaimTagSchema = createInsertSchema(cardClaimTags)
   .omit({ id: true, createdAt: true })
@@ -102,6 +135,8 @@ export const insertCardClaimSchema = createInsertSchema(cardClaims)
     status: z.enum(CARD_CLAIM_STATUSES).default("pending"),
     receiptImageUrl: z.string().max(500).optional().nullable(),
     notes: z.string().max(1000).optional().nullable(),
+    // 館別多選（選填）；相容舊單選 propertyId
+    propertyIds: z.array(z.number().int().positive()).optional(),
   })
 
 // ─────────────────────────────────────────────
@@ -114,3 +149,6 @@ export type CardClaimProperty = typeof cardClaimProperties.$inferSelect
 export type InsertCardClaimProperty = z.infer<typeof insertCardClaimPropertySchema>
 export type CardClaim = typeof cardClaims.$inferSelect
 export type InsertCardClaim = z.infer<typeof insertCardClaimSchema>
+export type CardClaimBank = typeof cardClaimBanks.$inferSelect
+export type InsertCardClaimBank = z.infer<typeof insertCardClaimBankSchema>
+export type CardClaimPropertyLink = typeof cardClaimPropertyLinks.$inferSelect

@@ -61,6 +61,8 @@ interface Claim {
   notes: string | null
   tagName: string | null
   propertyName: string | null
+  propertyIds: number[]
+  propertyNames: string[]
 }
 interface Summary {
   totalAmount: number
@@ -126,8 +128,8 @@ export default function CardClaimsPage() {
   useDocumentTitle("信用卡請款紀錄")
   const { toast } = useToast()
 
-  const [preset, setPreset] = useState<RangePreset>("thisMonth")
-  const initial = presetRange("thisMonth")
+  const [preset, setPreset] = useState<RangePreset>("thisYear")
+  const initial = presetRange("thisYear")
   const [start, setStart] = useState(initial.start)
   const [end, setEnd] = useState(initial.end)
 
@@ -156,6 +158,7 @@ export default function CardClaimsPage() {
   const { data: properties = [] } = useQuery<Option[]>({
     queryKey: ["/api/card-claims/properties"],
   })
+  const { data: banks = [] } = useQuery<Option[]>({ queryKey: ["/api/card-claims/banks"] })
 
   const deleteMut = useMutation({
     mutationFn: (id: number) => apiRequest("DELETE", `/api/card-claims/${id}`),
@@ -191,7 +194,7 @@ export default function CardClaimsPage() {
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => setOptionsOpen(true)}>
-            <Settings className="h-4 w-4 mr-1" /> 標籤/館別
+            <Settings className="h-4 w-4 mr-1" /> 標籤/館別/銀行
           </Button>
           <Button onClick={openNew}>
             <Plus className="h-4 w-4 mr-1" /> 新增紀錄
@@ -283,76 +286,145 @@ export default function CardClaimsPage() {
           ) : claims.length === 0 ? (
             <p className="text-center py-8 text-muted-foreground">此區間尚無紀錄</p>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>刷卡日期</TableHead>
-                    <TableHead className="text-right">結算金額</TableHead>
-                    <TableHead>銀行</TableHead>
-                    <TableHead>標籤</TableHead>
-                    <TableHead>館別</TableHead>
-                    <TableHead>狀態</TableHead>
-                    <TableHead>收據</TableHead>
-                    <TableHead>備註</TableHead>
-                    <TableHead className="text-right">操作</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {claims.map((c) => {
-                    const sm = statusMeta(c.status)
-                    return (
-                      <TableRow key={c.id}>
-                        <TableCell className="whitespace-nowrap">{c.swipeDate}</TableCell>
-                        <TableCell className="text-right font-medium">
-                          {fmt(Number(c.amount))}
-                        </TableCell>
-                        <TableCell>{c.bank || "—"}</TableCell>
-                        <TableCell>
-                          {c.tagName ? <Badge variant="outline">{c.tagName}</Badge> : "—"}
-                        </TableCell>
-                        <TableCell>{c.propertyName || "—"}</TableCell>
-                        <TableCell>
-                          <span className={`px-2 py-0.5 rounded text-xs ${sm.color}`}>
-                            {sm.label}
+            <>
+              {/* 桌面：表格 */}
+              <div className="hidden md:block overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>刷卡日期</TableHead>
+                      <TableHead className="text-right">結算金額</TableHead>
+                      <TableHead>銀行</TableHead>
+                      <TableHead>標籤</TableHead>
+                      <TableHead>館別</TableHead>
+                      <TableHead>狀態</TableHead>
+                      <TableHead>收據</TableHead>
+                      <TableHead>備註</TableHead>
+                      <TableHead className="text-right">操作</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {claims.map((c) => {
+                      const sm = statusMeta(c.status)
+                      return (
+                        <TableRow key={c.id}>
+                          <TableCell className="whitespace-nowrap">{c.swipeDate}</TableCell>
+                          <TableCell className="text-right font-medium">
+                            {fmt(Number(c.amount))}
+                          </TableCell>
+                          <TableCell>{c.bank || "—"}</TableCell>
+                          <TableCell>
+                            {c.tagName ? <Badge variant="outline">{c.tagName}</Badge> : "—"}
+                          </TableCell>
+                          <TableCell>
+                            {c.propertyNames.length > 0 ? c.propertyNames.join("、") : "—"}
+                          </TableCell>
+                          <TableCell>
+                            <span className={`px-2 py-0.5 rounded text-xs ${sm.color}`}>
+                              {sm.label}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            {c.receiptImageUrl ? (
+                              <a href={c.receiptImageUrl} target="_blank" rel="noreferrer">
+                                <img
+                                  src={c.receiptImageUrl}
+                                  alt="收據"
+                                  className="h-10 w-10 rounded object-cover border hover:opacity-80"
+                                />
+                              </a>
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="max-w-[200px] truncate text-muted-foreground text-sm">
+                            {c.notes || "—"}
+                          </TableCell>
+                          <TableCell className="text-right whitespace-nowrap">
+                            <Button size="icon" variant="ghost" onClick={() => openEdit(c)}>
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => {
+                                if (confirm("確定刪除此筆紀錄？")) deleteMut.mutate(c.id)
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4 text-red-500" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* 手機：卡片 */}
+              <div className="md:hidden space-y-3">
+                {claims.map((c) => {
+                  const sm = statusMeta(c.status)
+                  return (
+                    <div key={c.id} className="border rounded-lg p-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="font-bold text-lg">{fmt(Number(c.amount))}</div>
+                          <div className="text-xs text-muted-foreground">{c.swipeDate}</div>
+                        </div>
+                        <span className={`px-2 py-0.5 rounded text-xs shrink-0 ${sm.color}`}>
+                          {sm.label}
+                        </span>
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-1.5 text-xs">
+                        {c.bank && (
+                          <span className="bg-muted px-1.5 py-0.5 rounded">🏦 {c.bank}</span>
+                        )}
+                        {c.tagName && (
+                          <span className="bg-muted px-1.5 py-0.5 rounded">🏷️ {c.tagName}</span>
+                        )}
+                        {c.propertyNames.map((p) => (
+                          <span key={p} className="bg-muted px-1.5 py-0.5 rounded">
+                            🏨 {p}
                           </span>
-                        </TableCell>
-                        <TableCell>
-                          {c.receiptImageUrl ? (
-                            <a href={c.receiptImageUrl} target="_blank" rel="noreferrer">
-                              <img
-                                src={c.receiptImageUrl}
-                                alt="收據"
-                                className="h-10 w-10 rounded object-cover border hover:opacity-80"
-                              />
-                            </a>
-                          ) : (
-                            <span className="text-muted-foreground">—</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="max-w-[200px] truncate text-muted-foreground text-sm">
-                          {c.notes || "—"}
-                        </TableCell>
-                        <TableCell className="text-right whitespace-nowrap">
-                          <Button size="icon" variant="ghost" onClick={() => openEdit(c)}>
-                            <Pencil className="h-4 w-4" />
+                        ))}
+                      </div>
+                      {c.notes && (
+                        <div className="mt-1 text-xs text-muted-foreground">{c.notes}</div>
+                      )}
+                      <div className="mt-2 flex items-center justify-between">
+                        {c.receiptImageUrl ? (
+                          <a href={c.receiptImageUrl} target="_blank" rel="noreferrer">
+                            <img
+                              src={c.receiptImageUrl}
+                              alt="收據"
+                              className="h-12 w-12 rounded object-cover border"
+                            />
+                          </a>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">無收據</span>
+                        )}
+                        <div className="flex gap-1">
+                          <Button size="sm" variant="outline" onClick={() => openEdit(c)}>
+                            <Pencil className="h-4 w-4 mr-1" />
+                            編輯
                           </Button>
                           <Button
-                            size="icon"
-                            variant="ghost"
+                            size="sm"
+                            variant="outline"
                             onClick={() => {
                               if (confirm("確定刪除此筆紀錄？")) deleteMut.mutate(c.id)
                             }}
                           >
                             <Trash2 className="h-4 w-4 text-red-500" />
                           </Button>
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })}
-                </TableBody>
-              </Table>
-            </div>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </>
           )}
         </CardContent>
       </Card>
@@ -362,6 +434,7 @@ export default function CardClaimsPage() {
           claim={editing}
           tags={tags}
           properties={properties}
+          banks={banks}
           onClose={() => setFormOpen(false)}
         />
       )}
@@ -388,21 +461,21 @@ function ClaimForm({
   claim,
   tags,
   properties,
+  banks,
   onClose,
 }: {
   claim: Claim | null
   tags: Option[]
   properties: Option[]
+  banks: Option[]
   onClose: () => void
 }) {
   const { toast } = useToast()
   const [amount, setAmount] = useState(claim?.amount ?? "")
   const [swipeDate, setSwipeDate] = useState(claim?.swipeDate ?? ymd(new Date()))
-  const [bank, setBank] = useState(claim?.bank ?? "")
+  const [bank, setBank] = useState(claim?.bank ?? "none")
   const [tagId, setTagId] = useState<string>(claim?.tagId ? String(claim.tagId) : "none")
-  const [propertyId, setPropertyId] = useState<string>(
-    claim?.propertyId ? String(claim.propertyId) : "none"
-  )
+  const [propertyIds, setPropertyIds] = useState<number[]>(claim?.propertyIds ?? [])
   const [status, setStatus] = useState(claim?.status ?? "pending")
   const [notes, setNotes] = useState(claim?.notes ?? "")
   const [receiptImageUrl, setReceiptImageUrl] = useState<string | null>(
@@ -437,9 +510,9 @@ function ClaimForm({
       const body = {
         amount,
         swipeDate,
-        bank: bank || null,
+        bank: bank === "none" ? null : bank,
         tagId: tagId === "none" ? null : Number(tagId),
-        propertyId: propertyId === "none" ? null : Number(propertyId),
+        propertyIds,
         status,
         receiptImageUrl,
         notes: notes || null,
@@ -469,12 +542,12 @@ function ClaimForm({
 
   return (
     <Dialog open onOpenChange={onClose}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>{claim ? "編輯請款紀錄" : "新增請款紀錄"}</DialogTitle>
           <DialogDescription>填寫刷卡請款資訊</DialogDescription>
         </DialogHeader>
-        <div className="space-y-3">
+        <div className="space-y-3 overflow-y-auto flex-1 pr-1">
           <div>
             <Label>結算金額 *</Label>
             <Input
@@ -490,11 +563,19 @@ function ClaimForm({
           </div>
           <div>
             <Label>刷卡銀行</Label>
-            <Input
-              value={bank}
-              onChange={(e) => setBank(e.target.value)}
-              placeholder="如：玉山、國泰…"
-            />
+            <Select value={bank} onValueChange={setBank}>
+              <SelectTrigger>
+                <SelectValue placeholder="選擇銀行" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">（不指定）</SelectItem>
+                {banks.map((b) => (
+                  <SelectItem key={b.id} value={b.name}>
+                    {b.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div>
             <Label>請款標籤</Label>
@@ -513,20 +594,29 @@ function ClaimForm({
             </Select>
           </div>
           <div>
-            <Label>館別</Label>
-            <Select value={propertyId} onValueChange={setPropertyId}>
-              <SelectTrigger>
-                <SelectValue placeholder="選擇館別" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">（不指定）</SelectItem>
-                {properties.map((p) => (
-                  <SelectItem key={p.id} value={String(p.id)}>
+            <Label>館別（可多選）</Label>
+            <div className="grid grid-cols-2 gap-1.5 mt-1">
+              {properties.map((p) => {
+                const checked = propertyIds.includes(p.id)
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() =>
+                      setPropertyIds((prev) =>
+                        checked ? prev.filter((id) => id !== p.id) : [...prev, p.id]
+                      )
+                    }
+                    className={`text-sm px-2 py-1.5 rounded border text-left ${
+                      checked ? "bg-indigo-600 text-white border-indigo-600" : "hover:bg-muted"
+                    }`}
+                  >
+                    {checked ? "✓ " : ""}
                     {p.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+                  </button>
+                )
+              })}
+            </div>
           </div>
           <div>
             <Label>狀態</Label>
@@ -616,12 +706,12 @@ function ClaimForm({
 function OptionsDialog({ onClose }: { onClose: () => void }) {
   return (
     <Dialog open onOpenChange={onClose}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>標籤 / 館別管理</DialogTitle>
-          <DialogDescription>可依需求新增請款標籤與館別</DialogDescription>
+          <DialogTitle>標籤 / 館別 / 銀行管理</DialogTitle>
+          <DialogDescription>可依需求新增請款標籤、館別與刷卡銀行</DialogDescription>
         </DialogHeader>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <OptionList
             title="請款標籤"
             icon={<Tag className="h-4 w-4" />}
@@ -631,6 +721,11 @@ function OptionsDialog({ onClose }: { onClose: () => void }) {
             title="館別"
             icon={<Building2 className="h-4 w-4" />}
             endpoint="/api/card-claims/properties"
+          />
+          <OptionList
+            title="刷卡銀行"
+            icon={<CreditCard className="h-4 w-4" />}
+            endpoint="/api/card-claims/banks"
           />
         </div>
         <DialogFooter>

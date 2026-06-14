@@ -7,14 +7,18 @@ import {
   cardClaims,
   cardClaimTags,
   cardClaimProperties,
+  cardClaimBanks,
+  cardClaimPropertyLinks,
   type CardClaim,
   type InsertCardClaim,
   type CardClaimTag,
   type InsertCardClaimTag,
   type CardClaimProperty,
   type InsertCardClaimProperty,
+  type CardClaimBank,
+  type InsertCardClaimBank,
 } from "@shared/schema"
-import { eq, and, gte, lte, asc, desc, sql } from "drizzle-orm"
+import { eq, and, gte, lte, asc, desc, sql, inArray } from "drizzle-orm"
 
 // ─────────────────────────────────────────────
 // 請款標籤
@@ -85,6 +89,52 @@ export async function deleteProperty(id: number): Promise<void> {
 }
 
 // ─────────────────────────────────────────────
+// 刷卡銀行
+// ─────────────────────────────────────────────
+
+export async function getBanks(includeInactive = false): Promise<CardClaimBank[]> {
+  const where = includeInactive ? undefined : eq(cardClaimBanks.isActive, true)
+  return db
+    .select()
+    .from(cardClaimBanks)
+    .where(where)
+    .orderBy(asc(cardClaimBanks.sortOrder), asc(cardClaimBanks.id))
+}
+
+export async function createBank(data: InsertCardClaimBank): Promise<CardClaimBank> {
+  const [row] = await db.insert(cardClaimBanks).values(data).returning()
+  return row
+}
+
+export async function updateBank(
+  id: number,
+  data: Partial<InsertCardClaimBank>
+): Promise<CardClaimBank | undefined> {
+  const [row] = await db
+    .update(cardClaimBanks)
+    .set(data)
+    .where(eq(cardClaimBanks.id, id))
+    .returning()
+  return row
+}
+
+export async function deleteBank(id: number): Promise<void> {
+  await db.update(cardClaimBanks).set({ isActive: false }).where(eq(cardClaimBanks.id, id))
+}
+
+// ─────────────────────────────────────────────
+// 館別多選關聯
+// ─────────────────────────────────────────────
+
+async function setPropertyLinks(claimId: number, propertyIds: number[]): Promise<void> {
+  await db.delete(cardClaimPropertyLinks).where(eq(cardClaimPropertyLinks.claimId, claimId))
+  if (propertyIds.length === 0) return
+  await db
+    .insert(cardClaimPropertyLinks)
+    .values(propertyIds.map((propertyId) => ({ claimId, propertyId })))
+}
+
+// ─────────────────────────────────────────────
 // 請款紀錄
 // ─────────────────────────────────────────────
 
@@ -99,7 +149,9 @@ export interface CardClaimFilters {
 /** 帶標籤/館別名稱的請款紀錄 */
 export interface CardClaimWithRefs extends CardClaim {
   tagName: string | null
-  propertyName: string | null
+  propertyName: string | null // 相容：單一/第一個館別名
+  propertyIds: number[] // 多選館別 id
+  propertyNames: string[] // 多選館別名
 }
 
 function buildConditions(filters: CardClaimFilters) {
@@ -134,23 +186,69 @@ export async function listClaims(filters: CardClaimFilters = {}): Promise<CardCl
     .leftJoin(cardClaimProperties, eq(cardClaims.propertyId, cardClaimProperties.id))
     .where(buildConditions(filters))
     .orderBy(desc(cardClaims.swipeDate), desc(cardClaims.id))
-  return rows
+
+  // 取多選館別關聯
+  const claimIds = rows.map((r) => r.id)
+  const links =
+    claimIds.length > 0
+      ? await db
+          .select({
+            claimId: cardClaimPropertyLinks.claimId,
+            propertyId: cardClaimPropertyLinks.propertyId,
+            name: cardClaimProperties.name,
+          })
+          .from(cardClaimPropertyLinks)
+          .leftJoin(
+            cardClaimProperties,
+            eq(cardClaimPropertyLinks.propertyId, cardClaimProperties.id)
+          )
+          .where(inArray(cardClaimPropertyLinks.claimId, claimIds))
+      : []
+  const byClaim = new Map<number, { ids: number[]; names: string[] }>()
+  for (const l of links) {
+    if (!byClaim.has(l.claimId)) byClaim.set(l.claimId, { ids: [], names: [] })
+    const e = byClaim.get(l.claimId)!
+    e.ids.push(l.propertyId)
+    if (l.name) e.names.push(l.name)
+  }
+
+  return rows.map((r) => {
+    const linked = byClaim.get(r.id)
+    const names = linked?.names ?? (r.propertyName ? [r.propertyName] : [])
+    const ids = linked?.ids ?? (r.propertyId ? [r.propertyId] : [])
+    return {
+      ...r,
+      propertyIds: ids,
+      propertyNames: names,
+      propertyName: names[0] ?? r.propertyName ?? null,
+    }
+  })
 }
 
-export async function createClaim(data: InsertCardClaim): Promise<CardClaim> {
-  const [row] = await db.insert(cardClaims).values(data).returning()
+export async function createClaim(
+  data: InsertCardClaim & { propertyIds?: number[] }
+): Promise<CardClaim> {
+  const { propertyIds, ...claimData } = data
+  // 相容：若給多選、第一個寫進舊單選欄位
+  const propertyId = propertyIds && propertyIds.length > 0 ? propertyIds[0] : claimData.propertyId
+  const [row] = await db
+    .insert(cardClaims)
+    .values({ ...claimData, propertyId })
+    .returning()
+  if (propertyIds) await setPropertyLinks(row.id, propertyIds)
+  else if (propertyId) await setPropertyLinks(row.id, [propertyId])
   return row
 }
 
 export async function updateClaim(
   id: number,
-  data: Partial<InsertCardClaim>
+  data: Partial<InsertCardClaim> & { propertyIds?: number[] }
 ): Promise<CardClaim | undefined> {
-  const [row] = await db
-    .update(cardClaims)
-    .set({ ...data, updatedAt: new Date() })
-    .where(eq(cardClaims.id, id))
-    .returning()
+  const { propertyIds, ...claimData } = data
+  const patch: Record<string, unknown> = { ...claimData, updatedAt: new Date() }
+  if (propertyIds) patch.propertyId = propertyIds.length > 0 ? propertyIds[0] : null
+  const [row] = await db.update(cardClaims).set(patch).where(eq(cardClaims.id, id)).returning()
+  if (row && propertyIds) await setPropertyLinks(id, propertyIds)
   return row
 }
 
