@@ -40,6 +40,8 @@ export const cardClaimProperties = pgTable("card_claim_properties", {
 export const cardClaimBanks = pgTable("card_claim_banks", {
   id: serial("id").primaryKey(),
   name: varchar("name", { length: 50 }).notNull().unique(),
+  // 手續費率（%）— 用來推估可能到帳金額
+  feeRate: decimal("fee_rate", { precision: 5, scale: 2 }).default("0").notNull(),
   sortOrder: integer("sort_order").default(0).notNull(),
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow(),
@@ -66,6 +68,10 @@ export const cardClaims = pgTable(
     propertyId: integer("property_id").references(() => cardClaimProperties.id),
     // 狀態
     status: varchar("status", { length: 20 }).default("pending").notNull(),
+    // 實際到帳金額（閉環：對比預估到帳）
+    settledAmount: decimal("settled_amount", { precision: 12, scale: 2 }),
+    // 到帳日期
+    settledDate: date("settled_date"),
     // 收據/請款截圖（本地 /uploads/receipts/... 路徑）
     receiptImageUrl: varchar("receipt_image_url", { length: 500 }),
     // 備註
@@ -107,6 +113,14 @@ export const insertCardClaimBankSchema = createInsertSchema(cardClaimBanks)
   .omit({ id: true, createdAt: true })
   .extend({
     name: z.string().trim().min(1, "銀行名稱不可空白").max(50),
+    feeRate: z
+      .union([z.string(), z.number()])
+      .transform((v) => v.toString())
+      .refine(
+        (v) => !isNaN(parseFloat(v)) && parseFloat(v) >= 0 && parseFloat(v) <= 100,
+        "手續費率需為 0-100"
+      )
+      .optional(),
   })
 
 export const insertCardClaimTagSchema = createInsertSchema(cardClaimTags)
@@ -133,6 +147,17 @@ export const insertCardClaimSchema = createInsertSchema(cardClaims)
     tagId: z.number().int().positive().optional().nullable(),
     propertyId: z.number().int().positive().optional().nullable(),
     status: z.enum(CARD_CLAIM_STATUSES).default("pending"),
+    settledAmount: z
+      .union([z.string(), z.number()])
+      .transform((v) => v.toString())
+      .refine((v) => !isNaN(parseFloat(v)) && parseFloat(v) >= 0, "到帳金額需為非負數字")
+      .optional()
+      .nullable(),
+    settledDate: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, "到帳日期格式需為 YYYY-MM-DD")
+      .optional()
+      .nullable(),
     receiptImageUrl: z.string().max(500).optional().nullable(),
     notes: z.string().max(1000).optional().nullable(),
     // 館別多選（選填）；相容舊單選 propertyId

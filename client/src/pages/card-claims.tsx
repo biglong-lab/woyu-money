@@ -1,11 +1,10 @@
 /**
  * 信用卡請款紀錄（/card-claims）
  *
- * 獨立模組、暫不與其他財務數據對應。
- * 功能：記錄每次刷卡請款的結算金額、刷卡時間、銀行、請款標籤、館別、狀態、備註
- *      + 區間查詢（本月/上月/下月/本季/今年/自訂）+ 月度統計
+ * 獨立模組。請款 → (扣銀行手續費) → 預估到帳 → 記錄實際到帳 → 比對，形成閉環。
+ * 區間查詢（本月/上月/下月/本季/今年/自訂）+ 月度統計 + 到帳彙總。
  */
-import { useState, useRef } from "react"
+import { useMemo, useState } from "react"
 import { useQuery, useMutation } from "@tanstack/react-query"
 import { queryClient, apiRequest } from "@/lib/queryClient"
 import { useToast } from "@/hooks/use-toast"
@@ -13,24 +12,8 @@ import { useDocumentTitle } from "@/hooks/use-document-title"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Label } from "@/components/ui/label"
-import {
-  Select,
-  SelectTrigger,
-  SelectContent,
-  SelectItem,
-  SelectValue,
-} from "@/components/ui/select"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog"
 import {
   Table,
   TableHeader,
@@ -39,57 +22,29 @@ import {
   TableHead,
   TableCell,
 } from "@/components/ui/table"
-import { CreditCard, Plus, Pencil, Trash2, Settings, Tag, Building2, Upload, X } from "lucide-react"
+import { CreditCard, Plus, Pencil, Trash2, Settings, Banknote } from "lucide-react"
+import { ClaimForm } from "@/components/card-claims/claim-form"
+import { OptionsDialog } from "@/components/card-claims/options-dialog"
+import { SettleDialog } from "@/components/card-claims/settle-dialog"
+import {
+  statusMeta,
+  fmt,
+  ymd,
+  feeRateOf,
+  expectedSettlement,
+  type Option,
+  type BankOption,
+  type Claim,
+} from "@/components/card-claims/shared"
 
-// ─────────────────────────────────────────────
-// 型別
-// ─────────────────────────────────────────────
-interface Option {
-  id: number
-  name: string
-  isActive: boolean
-}
-interface Claim {
-  id: number
-  amount: string
-  swipeDate: string
-  bank: string | null
-  tagId: number | null
-  propertyId: number | null
-  status: string
-  receiptImageUrl: string | null
-  notes: string | null
-  tagName: string | null
-  propertyName: string | null
-  propertyIds: number[]
-  propertyNames: string[]
-}
 interface Summary {
   totalAmount: number
   totalCount: number
   byStatus: Array<{ status: string; count: number; amount: number }>
   byMonth: Array<{ month: string; count: number; amount: number }>
-  byTag: Array<{ tagName: string | null; count: number; amount: number }>
-  byProperty: Array<{ propertyName: string | null; count: number; amount: number }>
 }
 
-const STATUS_OPTIONS = [
-  { value: "pending", label: "待請款", color: "bg-amber-100 text-amber-800" },
-  { value: "claimed", label: "已請款", color: "bg-blue-100 text-blue-800" },
-  { value: "settled", label: "已入帳", color: "bg-green-100 text-green-800" },
-  { value: "cancelled", label: "已取消", color: "bg-gray-100 text-gray-600" },
-]
-const statusMeta = (s: string) => STATUS_OPTIONS.find((o) => o.value === s) ?? STATUS_OPTIONS[0]
-
-const fmt = (n: number) => `$${Math.round(n).toLocaleString()}`
-
-// ─────────────────────────────────────────────
-// 區間預設
-// ─────────────────────────────────────────────
 type RangePreset = "thisMonth" | "lastMonth" | "nextMonth" | "thisQuarter" | "thisYear" | "custom"
-function ymd(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
-}
 function presetRange(preset: RangePreset): { start: string; end: string } {
   const now = new Date()
   const y = now.getFullYear()
@@ -111,7 +66,6 @@ function presetRange(preset: RangePreset): { start: string; end: string } {
       return { start: ymd(new Date(y, m, 1)), end: ymd(new Date(y, m + 1, 0)) }
   }
 }
-
 const PRESET_LABELS: Array<{ value: RangePreset; label: string }> = [
   { value: "thisMonth", label: "本月" },
   { value: "lastMonth", label: "上月" },
@@ -121,9 +75,6 @@ const PRESET_LABELS: Array<{ value: RangePreset; label: string }> = [
   { value: "custom", label: "自訂" },
 ]
 
-// ─────────────────────────────────────────────
-// 主頁面
-// ─────────────────────────────────────────────
 export default function CardClaimsPage() {
   useDocumentTitle("信用卡請款紀錄")
   const { toast } = useToast()
@@ -136,6 +87,7 @@ export default function CardClaimsPage() {
   const [editing, setEditing] = useState<Claim | null>(null)
   const [formOpen, setFormOpen] = useState(false)
   const [optionsOpen, setOptionsOpen] = useState(false)
+  const [settleFor, setSettleFor] = useState<Claim | null>(null)
 
   function applyPreset(p: RangePreset) {
     setPreset(p)
@@ -147,18 +99,15 @@ export default function CardClaimsPage() {
   }
 
   const qs = `startDate=${start}&endDate=${end}`
-
   const { data: claims = [], isLoading } = useQuery<Claim[]>({
     queryKey: [`/api/card-claims?${qs}`],
   })
-  const { data: summary } = useQuery<Summary>({
-    queryKey: [`/api/card-claims/summary?${qs}`],
-  })
+  const { data: summary } = useQuery<Summary>({ queryKey: [`/api/card-claims/summary?${qs}`] })
   const { data: tags = [] } = useQuery<Option[]>({ queryKey: ["/api/card-claims/tags"] })
   const { data: properties = [] } = useQuery<Option[]>({
     queryKey: ["/api/card-claims/properties"],
   })
-  const { data: banks = [] } = useQuery<Option[]>({ queryKey: ["/api/card-claims/banks"] })
+  const { data: banks = [] } = useQuery<BankOption[]>({ queryKey: ["/api/card-claims/banks"] })
 
   const deleteMut = useMutation({
     mutationFn: (id: number) => apiRequest("DELETE", `/api/card-claims/${id}`),
@@ -169,6 +118,25 @@ export default function CardClaimsPage() {
       toast({ title: "已刪除紀錄" })
     },
   })
+
+  // 每筆預估到帳
+  const expectedOf = (c: Claim) => expectedSettlement(Number(c.amount), feeRateOf(c.bank, banks))
+
+  // 到帳彙總
+  const settleSummary = useMemo(() => {
+    let expected = 0
+    let settled = 0
+    let settledCount = 0
+    for (const c of claims) {
+      expected += expectedOf(c)
+      if (c.settledAmount != null) {
+        settled += Number(c.settledAmount)
+        settledCount++
+      }
+    }
+    return { expected, settled, settledCount, pendingCount: claims.length - settledCount }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [claims, banks])
 
   function openNew() {
     setEditing(null)
@@ -189,7 +157,7 @@ export default function CardClaimsPage() {
             信用卡請款紀錄
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            記錄每次刷卡請款的結算金額、銀行、標籤、館別與狀態（獨立模組）
+            請款 → 扣手續費 → 預估到帳 → 記錄實際到帳，閉環比對
           </p>
         </div>
         <div className="flex gap-2">
@@ -247,16 +215,22 @@ export default function CardClaimsPage() {
       </Card>
 
       {/* 統計摘要 */}
-      {summary && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <SummaryCard title="區間總額" value={fmt(summary.totalAmount)} />
-          <SummaryCard title="筆數" value={String(summary.totalCount)} />
-          {STATUS_OPTIONS.slice(0, 2).map((s) => {
-            const row = summary.byStatus.find((b) => b.status === s.value)
-            return <SummaryCard key={s.value} title={s.label} value={fmt(row?.amount ?? 0)} />
-          })}
-        </div>
-      )}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <StatCard title="請款總額" value={fmt(summary?.totalAmount ?? 0)} />
+        <StatCard title="預估到帳" value={fmt(settleSummary.expected)} tone="text-indigo-600" />
+        <StatCard
+          title="實際到帳"
+          value={fmt(settleSummary.settled)}
+          tone="text-green-600"
+          sub={`${settleSummary.settledCount} 筆已到帳`}
+        />
+        <StatCard
+          title="待到帳"
+          value={String(settleSummary.pendingCount)}
+          tone="text-amber-600"
+          sub="筆"
+        />
+      </div>
 
       {/* 月度統計 */}
       {summary && summary.byMonth.length > 0 && (
@@ -278,7 +252,7 @@ export default function CardClaimsPage() {
         </Card>
       )}
 
-      {/* 紀錄表格 */}
+      {/* 紀錄 */}
       <Card>
         <CardContent className="pt-4">
           {isLoading ? (
@@ -295,17 +269,18 @@ export default function CardClaimsPage() {
                       <TableHead>刷卡日期</TableHead>
                       <TableHead className="text-right">結算金額</TableHead>
                       <TableHead>銀行</TableHead>
+                      <TableHead className="text-right">預估到帳</TableHead>
+                      <TableHead className="text-right">實際到帳</TableHead>
                       <TableHead>標籤</TableHead>
                       <TableHead>館別</TableHead>
                       <TableHead>狀態</TableHead>
-                      <TableHead>收據</TableHead>
-                      <TableHead>備註</TableHead>
                       <TableHead className="text-right">操作</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {claims.map((c) => {
                       const sm = statusMeta(c.status)
+                      const exp = expectedOf(c)
                       return (
                         <TableRow key={c.id}>
                           <TableCell className="whitespace-nowrap">{c.swipeDate}</TableCell>
@@ -313,6 +288,16 @@ export default function CardClaimsPage() {
                             {fmt(Number(c.amount))}
                           </TableCell>
                           <TableCell>{c.bank || "—"}</TableCell>
+                          <TableCell className="text-right text-indigo-600">{fmt(exp)}</TableCell>
+                          <TableCell className="text-right">
+                            {c.settledAmount != null ? (
+                              <span className="text-green-700 font-medium">
+                                {fmt(Number(c.settledAmount))}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground">未到帳</span>
+                            )}
+                          </TableCell>
                           <TableCell>
                             {c.tagName ? <Badge variant="outline">{c.tagName}</Badge> : "—"}
                           </TableCell>
@@ -324,23 +309,15 @@ export default function CardClaimsPage() {
                               {sm.label}
                             </span>
                           </TableCell>
-                          <TableCell>
-                            {c.receiptImageUrl ? (
-                              <a href={c.receiptImageUrl} target="_blank" rel="noreferrer">
-                                <img
-                                  src={c.receiptImageUrl}
-                                  alt="收據"
-                                  className="h-10 w-10 rounded object-cover border hover:opacity-80"
-                                />
-                              </a>
-                            ) : (
-                              <span className="text-muted-foreground">—</span>
-                            )}
-                          </TableCell>
-                          <TableCell className="max-w-[200px] truncate text-muted-foreground text-sm">
-                            {c.notes || "—"}
-                          </TableCell>
                           <TableCell className="text-right whitespace-nowrap">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              title="記錄到帳"
+                              onClick={() => setSettleFor(c)}
+                            >
+                              <Banknote className="h-4 w-4 text-green-600" />
+                            </Button>
                             <Button size="icon" variant="ghost" onClick={() => openEdit(c)}>
                               <Pencil className="h-4 w-4" />
                             </Button>
@@ -365,6 +342,7 @@ export default function CardClaimsPage() {
               <div className="md:hidden space-y-3">
                 {claims.map((c) => {
                   const sm = statusMeta(c.status)
+                  const exp = expectedOf(c)
                   return (
                     <div key={c.id} className="border rounded-lg p-3">
                       <div className="flex items-start justify-between gap-2">
@@ -375,6 +353,20 @@ export default function CardClaimsPage() {
                         <span className={`px-2 py-0.5 rounded text-xs shrink-0 ${sm.color}`}>
                           {sm.label}
                         </span>
+                      </div>
+                      <div className="mt-2 grid grid-cols-2 gap-1 text-sm">
+                        <div className="text-muted-foreground">預估到帳</div>
+                        <div className="text-right text-indigo-600">{fmt(exp)}</div>
+                        <div className="text-muted-foreground">實際到帳</div>
+                        <div className="text-right">
+                          {c.settledAmount != null ? (
+                            <span className="text-green-700 font-medium">
+                              {fmt(Number(c.settledAmount))}
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground">未到帳</span>
+                          )}
+                        </div>
                       </div>
                       <div className="mt-2 flex flex-wrap gap-1.5 text-xs">
                         {c.bank && (
@@ -389,36 +381,23 @@ export default function CardClaimsPage() {
                           </span>
                         ))}
                       </div>
-                      {c.notes && (
-                        <div className="mt-1 text-xs text-muted-foreground">{c.notes}</div>
-                      )}
-                      <div className="mt-2 flex items-center justify-between">
-                        {c.receiptImageUrl ? (
-                          <a href={c.receiptImageUrl} target="_blank" rel="noreferrer">
-                            <img
-                              src={c.receiptImageUrl}
-                              alt="收據"
-                              className="h-12 w-12 rounded object-cover border"
-                            />
-                          </a>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">無收據</span>
-                        )}
-                        <div className="flex gap-1">
-                          <Button size="sm" variant="outline" onClick={() => openEdit(c)}>
-                            <Pencil className="h-4 w-4 mr-1" />
-                            編輯
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              if (confirm("確定刪除此筆紀錄？")) deleteMut.mutate(c.id)
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4 text-red-500" />
-                          </Button>
-                        </div>
+                      <div className="mt-2 flex items-center justify-end gap-1">
+                        <Button size="sm" variant="outline" onClick={() => setSettleFor(c)}>
+                          <Banknote className="h-4 w-4 mr-1 text-green-600" />
+                          到帳
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => openEdit(c)}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            if (confirm("確定刪除此筆紀錄？")) deleteMut.mutate(c.id)
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4 text-red-500" />
+                        </Button>
                       </div>
                     </div>
                   )
@@ -439,374 +418,35 @@ export default function CardClaimsPage() {
         />
       )}
       {optionsOpen && <OptionsDialog onClose={() => setOptionsOpen(false)} />}
+      {settleFor && (
+        <SettleDialog
+          claim={settleFor}
+          expected={expectedOf(settleFor)}
+          onClose={() => setSettleFor(null)}
+        />
+      )}
     </div>
   )
 }
 
-function SummaryCard({ title, value }: { title: string; value: string }) {
+function StatCard({
+  title,
+  value,
+  tone,
+  sub,
+}: {
+  title: string
+  value: string
+  tone?: string
+  sub?: string
+}) {
   return (
     <Card>
       <CardContent className="pt-4">
         <div className="text-xs text-muted-foreground">{title}</div>
-        <div className="text-xl font-bold mt-1">{value}</div>
+        <div className={`text-xl font-bold mt-1 ${tone ?? ""}`}>{value}</div>
+        {sub && <div className="text-xs text-muted-foreground mt-0.5">{sub}</div>}
       </CardContent>
     </Card>
-  )
-}
-
-// ─────────────────────────────────────────────
-// 新增 / 編輯表單
-// ─────────────────────────────────────────────
-function ClaimForm({
-  claim,
-  tags,
-  properties,
-  banks,
-  onClose,
-}: {
-  claim: Claim | null
-  tags: Option[]
-  properties: Option[]
-  banks: Option[]
-  onClose: () => void
-}) {
-  const { toast } = useToast()
-  const [amount, setAmount] = useState(claim?.amount ?? "")
-  const [swipeDate, setSwipeDate] = useState(claim?.swipeDate ?? ymd(new Date()))
-  const [bank, setBank] = useState(claim?.bank ?? "none")
-  const [tagId, setTagId] = useState<string>(claim?.tagId ? String(claim.tagId) : "none")
-  const [propertyIds, setPropertyIds] = useState<number[]>(claim?.propertyIds ?? [])
-  const [status, setStatus] = useState(claim?.status ?? "pending")
-  const [notes, setNotes] = useState(claim?.notes ?? "")
-  const [receiptImageUrl, setReceiptImageUrl] = useState<string | null>(
-    claim?.receiptImageUrl ?? null
-  )
-  const [uploading, setUploading] = useState(false)
-  const fileRef = useRef<HTMLInputElement>(null)
-
-  async function handleUpload(file: File) {
-    setUploading(true)
-    try {
-      const fd = new FormData()
-      fd.append("file", file)
-      const res = await fetch("/api/upload", { method: "POST", body: fd, credentials: "include" })
-      if (!res.ok) throw new Error((await res.text()) || "上傳失敗")
-      const data = (await res.json()) as { url: string }
-      setReceiptImageUrl(data.url)
-      toast({ title: "圖片已上傳" })
-    } catch (e) {
-      toast({
-        title: "圖片上傳失敗",
-        description: e instanceof Error ? e.message : String(e),
-        variant: "destructive",
-      })
-    } finally {
-      setUploading(false)
-    }
-  }
-
-  const save = useMutation({
-    mutationFn: () => {
-      const body = {
-        amount,
-        swipeDate,
-        bank: bank === "none" ? null : bank,
-        tagId: tagId === "none" ? null : Number(tagId),
-        propertyIds,
-        status,
-        receiptImageUrl,
-        notes: notes || null,
-      }
-      return claim
-        ? apiRequest("PATCH", `/api/card-claims/${claim.id}`, body)
-        : apiRequest("POST", "/api/card-claims", body)
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        predicate: (q) => String(q.queryKey[0]).startsWith("/api/card-claims"),
-      })
-      toast({ title: claim ? "已更新紀錄" : "已新增紀錄" })
-      onClose()
-    },
-    onError: (e: Error) =>
-      toast({ title: "儲存失敗", description: e.message, variant: "destructive" }),
-  })
-
-  function submit() {
-    if (!amount || isNaN(Number(amount))) {
-      toast({ title: "請輸入有效金額", variant: "destructive" })
-      return
-    }
-    save.mutate()
-  }
-
-  return (
-    <Dialog open onOpenChange={onClose}>
-      <DialogContent className="max-w-md max-h-[90vh] flex flex-col">
-        <DialogHeader>
-          <DialogTitle>{claim ? "編輯請款紀錄" : "新增請款紀錄"}</DialogTitle>
-          <DialogDescription>填寫刷卡請款資訊</DialogDescription>
-        </DialogHeader>
-        <div className="space-y-3 overflow-y-auto flex-1 pr-1">
-          <div>
-            <Label>結算金額 *</Label>
-            <Input
-              type="number"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              placeholder="0"
-            />
-          </div>
-          <div>
-            <Label>刷卡時間 *</Label>
-            <Input type="date" value={swipeDate} onChange={(e) => setSwipeDate(e.target.value)} />
-          </div>
-          <div>
-            <Label>刷卡銀行</Label>
-            <Select value={bank} onValueChange={setBank}>
-              <SelectTrigger>
-                <SelectValue placeholder="選擇銀行" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">（不指定）</SelectItem>
-                {banks.map((b) => (
-                  <SelectItem key={b.id} value={b.name}>
-                    {b.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label>請款標籤</Label>
-            <Select value={tagId} onValueChange={setTagId}>
-              <SelectTrigger>
-                <SelectValue placeholder="選擇標籤" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">（不指定）</SelectItem>
-                {tags.map((t) => (
-                  <SelectItem key={t.id} value={String(t.id)}>
-                    {t.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label>館別（可多選）</Label>
-            <div className="grid grid-cols-2 gap-1.5 mt-1">
-              {properties.map((p) => {
-                const checked = propertyIds.includes(p.id)
-                return (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() =>
-                      setPropertyIds((prev) =>
-                        checked ? prev.filter((id) => id !== p.id) : [...prev, p.id]
-                      )
-                    }
-                    className={`text-sm px-2 py-1.5 rounded border text-left ${
-                      checked ? "bg-indigo-600 text-white border-indigo-600" : "hover:bg-muted"
-                    }`}
-                  >
-                    {checked ? "✓ " : ""}
-                    {p.name}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-          <div>
-            <Label>狀態</Label>
-            <Select value={status} onValueChange={setStatus}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {STATUS_OPTIONS.map((s) => (
-                  <SelectItem key={s.value} value={s.value}>
-                    {s.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label>收據圖片</Label>
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/jpeg,image/png,image/gif,application/pdf"
-              className="hidden"
-              onChange={(e) => {
-                const f = e.target.files?.[0]
-                if (f) handleUpload(f)
-                e.target.value = ""
-              }}
-            />
-            {receiptImageUrl ? (
-              <div className="flex items-center gap-2 mt-1">
-                <a href={receiptImageUrl} target="_blank" rel="noreferrer">
-                  <img
-                    src={receiptImageUrl}
-                    alt="收據"
-                    className="h-16 w-16 rounded object-cover border"
-                  />
-                </a>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setReceiptImageUrl(null)}
-                >
-                  <X className="h-4 w-4 mr-1" /> 移除
-                </Button>
-              </div>
-            ) : (
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full mt-1"
-                disabled={uploading}
-                onClick={() => fileRef.current?.click()}
-              >
-                {uploading ? (
-                  "上傳中…"
-                ) : (
-                  <>
-                    <Upload className="h-4 w-4 mr-1" /> 上傳收據圖片
-                  </>
-                )}
-              </Button>
-            )}
-          </div>
-          <div>
-            <Label>備註</Label>
-            <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
-            取消
-          </Button>
-          <Button onClick={submit} disabled={save.isPending}>
-            {save.isPending ? "儲存中…" : "儲存"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
-// ─────────────────────────────────────────────
-// 標籤 / 館別管理
-// ─────────────────────────────────────────────
-function OptionsDialog({ onClose }: { onClose: () => void }) {
-  return (
-    <Dialog open onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>標籤 / 館別 / 銀行管理</DialogTitle>
-          <DialogDescription>可依需求新增請款標籤、館別與刷卡銀行</DialogDescription>
-        </DialogHeader>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <OptionList
-            title="請款標籤"
-            icon={<Tag className="h-4 w-4" />}
-            endpoint="/api/card-claims/tags"
-          />
-          <OptionList
-            title="館別"
-            icon={<Building2 className="h-4 w-4" />}
-            endpoint="/api/card-claims/properties"
-          />
-          <OptionList
-            title="刷卡銀行"
-            icon={<CreditCard className="h-4 w-4" />}
-            endpoint="/api/card-claims/banks"
-          />
-        </div>
-        <DialogFooter>
-          <Button onClick={onClose}>關閉</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
-function OptionList({
-  title,
-  icon,
-  endpoint,
-}: {
-  title: string
-  icon: React.ReactNode
-  endpoint: string
-}) {
-  const { toast } = useToast()
-  const [name, setName] = useState("")
-  const { data: items = [] } = useQuery<Option[]>({ queryKey: [endpoint] })
-
-  const refresh = () => queryClient.invalidateQueries({ queryKey: [endpoint] })
-
-  const addMut = useMutation({
-    mutationFn: () => apiRequest("POST", endpoint, { name }),
-    onSuccess: () => {
-      setName("")
-      refresh()
-      toast({ title: "已新增" })
-    },
-    onError: (e: Error) =>
-      toast({ title: "新增失敗", description: e.message, variant: "destructive" }),
-  })
-  const delMut = useMutation({
-    mutationFn: (id: number) => apiRequest("DELETE", `${endpoint}/${id}`),
-    onSuccess: () => {
-      refresh()
-      toast({ title: "已移除" })
-    },
-  })
-
-  return (
-    <div className="border rounded-lg p-3">
-      <div className="flex items-center gap-2 font-medium mb-2">
-        {icon}
-        {title}
-      </div>
-      <div className="flex gap-1 mb-2">
-        <Input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="新增…"
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && name.trim()) addMut.mutate()
-          }}
-        />
-        <Button
-          size="sm"
-          onClick={() => name.trim() && addMut.mutate()}
-          disabled={addMut.isPending}
-        >
-          <Plus className="h-4 w-4" />
-        </Button>
-      </div>
-      <div className="space-y-1 max-h-48 overflow-y-auto">
-        {items.map((it) => (
-          <div key={it.id} className="flex items-center justify-between text-sm py-1">
-            <span>{it.name}</span>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-6 w-6"
-              onClick={() => delMut.mutate(it.id)}
-            >
-              <Trash2 className="h-3 w-3 text-red-400" />
-            </Button>
-          </div>
-        ))}
-      </div>
-    </div>
   )
 }

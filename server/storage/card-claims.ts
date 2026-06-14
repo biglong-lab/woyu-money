@@ -174,6 +174,8 @@ export async function listClaims(filters: CardClaimFilters = {}): Promise<CardCl
       tagId: cardClaims.tagId,
       propertyId: cardClaims.propertyId,
       status: cardClaims.status,
+      settledAmount: cardClaims.settledAmount,
+      settledDate: cardClaims.settledDate,
       receiptImageUrl: cardClaims.receiptImageUrl,
       notes: cardClaims.notes,
       createdAt: cardClaims.createdAt,
