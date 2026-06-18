@@ -99,6 +99,9 @@ export default function MonthlyPaymentManagement() {
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false)
   const [sortBy, setSortBy] = useState<string>("startDate")
   const [sortOrder, setSortOrder] = useState<string>("asc")
+  // 時間焦點：預設只看到本月為止的期數，未來期數勾選才顯示
+  const [includeFuture, setIncludeFuture] = useState(false)
+  const todayStr = new Date().toISOString().split("T")[0]
 
   // 批量選擇
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
