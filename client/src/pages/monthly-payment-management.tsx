@@ -173,7 +173,10 @@ export default function MonthlyPaymentManagement() {
           }
         }
 
-        return matchesSearch && matchesProject && matchesStatus && matchesCategory
+        // 時間焦點：預設隱藏未來期數（startDate > 今天）
+        const matchesFocus = includeFuture || !item.startDate || item.startDate <= todayStr
+
+        return matchesSearch && matchesProject && matchesStatus && matchesCategory && matchesFocus
       })
       .sort((a, b) => {
         let comparison: number
