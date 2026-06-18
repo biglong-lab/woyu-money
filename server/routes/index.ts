@@ -55,6 +55,7 @@ import cardClaimRoutes from "./card-claims"
 import financialAdviceRoutes from "./financial-advice"
 import paymentPlannerRoutes from "./payment-planner"
 import alertsRoutes from "./alerts"
+import scenarioPresetRoutes from "./scenario-presets"
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // 設定認證系統
