@@ -602,6 +602,21 @@ export default function MonthlyPaymentManagement() {
         onResetFilters={resetFilters}
       />
 
+      {/* 時間焦點切換：預設只看到本月為止，未來期數勾選才顯示 */}
+      <div className="mb-2">
+        <Button
+          type="button"
+          size="sm"
+          variant={includeFuture ? "default" : "outline"}
+          onClick={() => setIncludeFuture((v) => !v)}
+        >
+          {includeFuture ? "✓ 含未來期數" : "聚焦到本月為止"}
+        </Button>
+        {!includeFuture && (
+          <span className="ml-2 text-xs text-muted-foreground">已隱藏未來月份期數</span>
+        )}
+      </div>
+
       {/* 篩選結果統計 */}
       <FilterStatsBar
         filteredCount={filteredAndSortedItems.length}
