@@ -179,9 +179,32 @@ export default function ScenarioPlannerPage() {
 
   function save() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(levers))
+    toast({ title: "已暫存本機情境" })
   }
   function setLever<K extends keyof Levers>(k: K, v: Levers[K]) {
     setLevers((l) => ({ ...l, [k]: v }))
+  }
+
+  // 後端情境（跨裝置）
+  const { data: presets = [] } = useQuery<
+    Array<{ id: number; name: string; levers: Levers }>
+  >({ queryKey: ["/api/scenario-presets"] })
+  const savePreset = useMutation({
+    mutationFn: (name: string) =>
+      apiRequest("POST", "/api/scenario-presets", { name, levers }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/scenario-presets"] })
+      toast({ title: "已儲存情境（跨裝置）" })
+    },
+    onError: (e: Error) => toast({ title: "儲存失敗", description: e.message, variant: "destructive" }),
+  })
+  const delPreset = useMutation({
+    mutationFn: (id: number) => apiRequest("DELETE", `/api/scenario-presets/${id}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/scenario-presets"] }),
+  })
+  function saveNamedPreset() {
+    const name = window.prompt("情境名稱（同名會覆寫）")
+    if (name && name.trim()) savePreset.mutate(name.trim())
   }
 
   return (
