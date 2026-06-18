@@ -12,8 +12,29 @@ import OpenAI from "openai"
 import { z } from "zod"
 import { asyncHandler, AppError } from "../middleware/error-handler"
 import { getAiSettings } from "../storage/ai-settings"
+import { db } from "../db"
+import { financialAdviceLog } from "@shared/schema"
+import { desc } from "drizzle-orm"
 
 const router = Router()
+
+// 歷史：最近 10 筆建議
+router.get(
+  "/api/ai/financial-advice/history",
+  asyncHandler(async (_req, res) => {
+    const rows = await db
+      .select({
+        id: financialAdviceLog.id,
+        advice: financialAdviceLog.advice,
+        model: financialAdviceLog.model,
+        createdAt: financialAdviceLog.createdAt,
+      })
+      .from(financialAdviceLog)
+      .orderBy(desc(financialAdviceLog.createdAt))
+      .limit(10)
+    res.json(rows)
+  })
+)
 
 const payableSchema = z.object({
   itemName: z.string(),
