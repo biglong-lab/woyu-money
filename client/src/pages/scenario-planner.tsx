@@ -227,6 +227,28 @@ export default function ScenarioPlannerPage() {
         </Link>
       </div>
 
+      {/* 已存情境（跨裝置）*/}
+      {presets.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs text-muted-foreground">已存情境：</span>
+          {presets.map((p) => (
+            <span key={p.id} className="inline-flex items-center gap-1 border rounded-full pl-3 pr-1 py-0.5 text-sm">
+              <button type="button" className="hover:text-indigo-600" onClick={() => setLevers(p.levers)}>
+                {p.name}
+              </button>
+              <button
+                type="button"
+                className="text-muted-foreground hover:text-red-500 px-1"
+                onClick={() => delPreset.mutate(p.id)}
+                aria-label="刪除"
+              >
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+
       {/* 三軸控制 */}
       <Card>
         <CardHeader className="pb-2">
