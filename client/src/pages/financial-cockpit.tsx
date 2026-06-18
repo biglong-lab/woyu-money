@@ -237,6 +237,17 @@ export default function FinancialCockpitPage() {
   const monthExpense = thisMonth?.expense ?? 0
   const monthProfit = thisMonth ? monthIncome - monthExpense : null
 
+  // 同期比較：上月收入 → 本月 vs 上月 %
+  const incomeMoM = useMemo(() => {
+    if (!ytd) return null
+    const ym = currentYm()
+    const idx = ytd.months.findIndex((m) => m.month === ym)
+    if (idx <= 0) return null
+    const prev = ytd.months[idx - 1]?.income ?? 0
+    if (prev <= 0) return null
+    return Math.round(((monthIncome - prev) / prev) * 100)
+  }, [ytd, monthIncome])
+
   const health = useMemo(
     () => computeHealth(priority, forecast, monthProfit),
     [priority, forecast, monthProfit]
