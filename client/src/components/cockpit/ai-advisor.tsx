@@ -128,6 +128,34 @@ export function AiAdvisor({ snapshot }: { snapshot: AdvisorSnapshot }) {
           )}
         </CardContent>
       </Card>
+
+      {/* 歷史建議 */}
+      {history.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <button
+              type="button"
+              onClick={() => setShowHistory((v) => !v)}
+              className="text-sm font-medium text-left w-full flex items-center justify-between"
+            >
+              <span>歷史建議（{history.length}）</span>
+              <span className="text-xs text-muted-foreground">{showHistory ? "收合" : "展開"}</span>
+            </button>
+          </CardHeader>
+          {showHistory && (
+            <CardContent className="space-y-2">
+              {history.map((h) => (
+                <details key={h.id} className="border rounded-lg p-2">
+                  <summary className="text-xs text-muted-foreground cursor-pointer">
+                    {new Date(h.createdAt).toLocaleString("zh-TW")} · {h.model ?? ""}
+                  </summary>
+                  <div className="mt-2 text-sm whitespace-pre-wrap leading-relaxed">{h.advice}</div>
+                </details>
+              ))}
+            </CardContent>
+          )}
+        </Card>
+      )}
     </div>
   )
 }
