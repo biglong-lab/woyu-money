@@ -347,9 +347,14 @@ export default function ScenarioPlannerPage() {
       <Card>
         <CardHeader className="pb-2 flex flex-row items-center justify-between">
           <CardTitle className="text-base">逐月明細</CardTitle>
-          <Button size="sm" variant="outline" onClick={save}>
-            <Save className="h-4 w-4 mr-1" /> 儲存情境
-          </Button>
+          <div className="flex gap-1">
+            <Button size="sm" variant="outline" onClick={save}>
+              <Save className="h-4 w-4 mr-1" /> 暫存本機
+            </Button>
+            <Button size="sm" onClick={saveNamedPreset} disabled={savePreset.isPending}>
+              <Save className="h-4 w-4 mr-1" /> 另存情境
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
