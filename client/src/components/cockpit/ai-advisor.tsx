@@ -5,8 +5,8 @@
  * 成本控管 / 收入提升 / 應付款分配。結果就地顯示，可重新產生、複製。
  */
 import { useState } from "react"
-import { useMutation } from "@tanstack/react-query"
-import { apiRequest } from "@/lib/queryClient"
+import { useMutation, useQuery } from "@tanstack/react-query"
+import { apiRequest, queryClient } from "@/lib/queryClient"
 import { useToast } from "@/hooks/use-toast"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
