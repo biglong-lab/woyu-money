@@ -210,6 +210,8 @@ export default function MonthlyPaymentManagement() {
     sortBy,
     sortOrder,
     projects,
+    includeFuture,
+    todayStr,
   ])
 
   const totalMonthlyCount = paymentItems.filter((item) => item.paymentType === "monthly").length
