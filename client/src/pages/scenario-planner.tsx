@@ -91,6 +91,7 @@ const MONTHS_AHEAD = 12
 
 export default function ScenarioPlannerPage() {
   useDocumentTitle("沙盤推演 2.0")
+  const { toast } = useToast()
 
   const { data: forecast } = useQuery<ForecastResponse>({
     queryKey: ["/api/cashflow/forecast?monthsAhead=12"],
