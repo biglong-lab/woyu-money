@@ -372,7 +372,16 @@ export default function FinancialCockpitPage() {
         <TabsContent value="overview" className="space-y-4 mt-0">
           {/* 現況卡 */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <StatCard title="本月收入" value={fmt(monthIncome)} tone="text-green-600" />
+            <StatCard
+              title="本月收入"
+              value={fmt(monthIncome)}
+              tone="text-green-600"
+              sub={
+                incomeMoM === null
+                  ? undefined
+                  : `較上月 ${incomeMoM >= 0 ? "▲" : "▼"} ${Math.abs(incomeMoM)}%`
+              }
+            />
             <StatCard title="本月成本" value={fmt(monthExpense)} tone="text-red-500" />
             <StatCard
               title="本月淨利"
