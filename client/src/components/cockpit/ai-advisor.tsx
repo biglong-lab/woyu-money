@@ -49,9 +49,17 @@ export function AiAdvisor({ snapshot }: { snapshot: AdvisorSnapshot }) {
   const { toast } = useToast()
   const [result, setResult] = useState<AdviceResponse | null>(null)
 
+  const [showHistory, setShowHistory] = useState(false)
+  const { data: history = [] } = useQuery<
+    Array<{ id: number; advice: string; model: string | null; createdAt: string }>
+  >({ queryKey: ["/api/ai/financial-advice/history"] })
+
   const gen = useMutation<AdviceResponse>({
     mutationFn: () => apiRequest("POST", "/api/ai/financial-advice", { snapshot }),
-    onSuccess: (data) => setResult(data),
+    onSuccess: (data) => {
+      setResult(data)
+      queryClient.invalidateQueries({ queryKey: ["/api/ai/financial-advice/history"] })
+    },
     onError: (e: Error) =>
       toast({ title: "產生建議失敗", description: e.message, variant: "destructive" }),
   })
