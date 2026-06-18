@@ -78,6 +78,15 @@ interface ForecastResponse {
   gapAnalysis: GapItem[]
   hasShortage: boolean
 }
+interface TodayAlert {
+  type: string
+  severity: "critical" | "warn" | "info"
+  title: string
+  detail: string
+  count?: number
+  amount?: number
+  link: string
+}
 
 const fmt = (n: number) => `$${Math.round(n).toLocaleString()}`
 const currentYm = () => new Date().toISOString().slice(0, 7)
@@ -214,6 +223,10 @@ export default function FinancialCockpitPage() {
   const { data: forecast } = useQuery<ForecastResponse>({
     queryKey: ["/api/cashflow/forecast?monthsAhead=6"],
   })
+  const { data: alertsData } = useQuery<{ alerts: TodayAlert[] }>({
+    queryKey: ["/api/alerts/today"],
+  })
+  const alerts = alertsData?.alerts ?? []
 
   const thisMonth = useMemo(() => {
     const ym = currentYm()
@@ -299,6 +312,37 @@ export default function FinancialCockpitPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* 今日提醒（主動聚合：勞健保 / 請款未到帳 / 排程到期）*/}
+      {alerts.length > 0 && (
+        <div className="space-y-2">
+          {alerts.map((a, i) => {
+            const cls =
+              a.severity === "critical"
+                ? "border-red-300 bg-red-50 text-red-800"
+                : a.severity === "warn"
+                  ? "border-orange-300 bg-orange-50 text-orange-800"
+                  : "border-blue-200 bg-blue-50 text-blue-800"
+            return (
+              <Link key={i} href={a.link}>
+                <div
+                  className={`flex items-start gap-2 border rounded-lg px-3 py-2 text-sm cursor-pointer ${cls}`}
+                >
+                  <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                  <div className="flex-1">
+                    <span className="font-semibold">{a.title}</span>
+                    <span className="ml-1">{a.detail}</span>
+                    {a.amount ? (
+                      <span className="ml-1 font-medium">（{fmt(a.amount)}）</span>
+                    ) : null}
+                  </div>
+                  <ArrowRight className="h-4 w-4 mt-0.5 shrink-0" />
+                </div>
+              </Link>
+            )
+          })}
+        </div>
+      )}
 
       {/* 一頁式工作台：總覽 / 應付款整理 / 欠款規劃 全在頁內切換、不跳頁 */}
       <Tabs value={tab} onValueChange={setTab} className="space-y-4">

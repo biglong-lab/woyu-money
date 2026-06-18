@@ -87,9 +87,12 @@ export default function GeneralPaymentManagement() {
   const [endDate, setEndDate] = useState<string>("")
   const [priorityFilter, setPriorityFilter] = useState<string>("all")
   const [showPaidItems, setShowPaidItems] = useState(true)
+  // 時間焦點：預設只看逾期+到今天，未來項目勾選才顯示
+  const [includeFuture, setIncludeFuture] = useState(false)
   const [sortBy, setSortBy] = useState<string>("dueDate")
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc")
   const [isPriorityFilterOpen, setIsPriorityFilterOpen] = useState(false)
+  const todayStr = new Date().toISOString().split("T")[0]
 
   // 操作狀態
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
@@ -223,7 +226,6 @@ export default function GeneralPaymentManagement() {
 
   const statusCounts = useMemo(() => {
     const today = new Date()
-    const todayStr = today.toISOString().split("T")[0]
     return {
       pending: generalItems.filter((item) => item.status === "pending").length,
       paid: generalItems.filter((item) => item.status === "paid").length,
@@ -239,7 +241,7 @@ export default function GeneralPaymentManagement() {
       dueUnpaid: generalItems.filter((item) => item.status !== "paid" && item.startDate <= todayStr)
         .length,
     }
-  }, [generalItems])
+  }, [generalItems, todayStr])
 
   const filteredItems = useMemo(() => {
     return generalItems
@@ -263,6 +265,9 @@ export default function GeneralPaymentManagement() {
         const matchesPaymentType =
           selectedPaymentType === "all" || item.paymentType === selectedPaymentType
         const showItem = showPaidItems || item.status !== "paid"
+
+        // 時間焦點：預設隱藏未來項目（以 startDate 為準）
+        const matchesFocus = includeFuture || !item.startDate || item.startDate <= todayStr
 
         let matchesDate = true
         const itemDate = new Date(item.startDate)
@@ -308,7 +313,6 @@ export default function GeneralPaymentManagement() {
               break
             }
             case "up-to-today": {
-              const todayStr = today.toISOString().split("T")[0]
               matchesDate = item.startDate <= todayStr
               break
             }
@@ -334,7 +338,8 @@ export default function GeneralPaymentManagement() {
           matchesPaymentType &&
           showItem &&
           matchesDate &&
-          matchesPriority
+          matchesPriority &&
+          matchesFocus
         )
       })
       .sort((a, b) => {
@@ -379,6 +384,8 @@ export default function GeneralPaymentManagement() {
     priorityFilter,
     sortBy,
     sortOrder,
+    includeFuture,
+    todayStr,
   ])
 
   // =========== 統計計算 ===========
@@ -780,6 +787,23 @@ export default function GeneralPaymentManagement() {
           <p className="text-sm sm:text-base text-gray-600 mt-2 leading-relaxed">
             管理所有一次性付款項目，簡單快速的付款處理流程
           </p>
+
+          {/* 時間焦點切換：預設只看逾期+到今天，未來項目勾選才顯示 */}
+          <div className="mt-3">
+            <Button
+              type="button"
+              size="sm"
+              variant={includeFuture ? "default" : "outline"}
+              onClick={() => setIncludeFuture((v) => !v)}
+            >
+              {includeFuture ? "✓ 含未來項目" : "聚焦逾期/到今天"}
+            </Button>
+            {!includeFuture && (
+              <span className="ml-2 text-xs text-muted-foreground">
+                已隱藏未來日期項目（點上方按鈕可顯示）
+              </span>
+            )}
+          </div>
 
           {/* 篩選狀態提示 */}
           {(selectedYear !== null ||

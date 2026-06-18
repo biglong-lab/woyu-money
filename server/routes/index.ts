@@ -54,6 +54,7 @@ import familySavingsGoalsRoutes from "./family-savings-goals"
 import cardClaimRoutes from "./card-claims"
 import financialAdviceRoutes from "./financial-advice"
 import paymentPlannerRoutes from "./payment-planner"
+import alertsRoutes from "./alerts"
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // 設定認證系統
@@ -157,6 +158,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use(cardClaimRoutes)
   app.use(financialAdviceRoutes)
   app.use(paymentPlannerRoutes)
+  app.use(alertsRoutes)
 
   const httpServer = createServer(app)
   return httpServer
