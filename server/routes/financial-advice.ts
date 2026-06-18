@@ -177,6 +177,14 @@ router.post(
           lastError = new Error("AI 回傳空內容")
           continue
         }
+        // 存歷史（失敗不影響回應）
+        try {
+          await db
+            .insert(financialAdviceLog)
+            .values({ advice, model, snapshot: parsed.data })
+        } catch {
+          /* ignore */
+        }
         return res.json({ advice, model, generatedAt: new Date().toISOString() })
       } catch (err: unknown) {
         const apiErr = err as { status?: number; error?: { code?: number } }
