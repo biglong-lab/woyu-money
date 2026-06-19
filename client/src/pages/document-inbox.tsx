@@ -100,18 +100,6 @@ export default function DocumentInboxPage() {
   }
 
   // 上傳
-  const uploadMutation = useMutation({
-    mutationFn: async (formData: FormData) => {
-      return apiRequest("POST", "/api/document-inbox/upload", formData)
-    },
-    onSuccess: () => {
-      invalidateDocumentInboxQueries()
-    },
-    onError: (error: Error) => {
-      toast({ title: "上傳失敗", description: error.message, variant: "destructive" })
-    },
-  })
-
   const handleUpload = useCallback(
     async (files: FileList, notes: string) => {
       if (files.length > 20) {
@@ -123,30 +111,50 @@ export default function DocumentInboxPage() {
         return
       }
       setIsUploading(true)
-      const formData = new FormData()
-      for (const file of Array.from(files)) {
-        formData.append("file", file)
-      }
-      formData.append("documentType", selectedType)
-      if (notes) {
-        formData.append("notes", notes)
+      const fileArr = Array.from(files)
+
+      // 每張獨立上傳（小請求、可並行、單張失敗不影響其他）
+      // 解決：多張合併成單一大 multipart 請求在生產代理層偶發失敗（伺服器已處理但前端顯示錯誤）
+      const buildForm = (file: File) => {
+        const fd = new FormData()
+        fd.append("file", file)
+        fd.append("documentType", selectedType)
+        if (notes) fd.append("notes", notes)
+        return fd
       }
 
-      try {
-        await uploadMutation.mutateAsync(formData)
+      const settled = await Promise.allSettled(
+        fileArr.map((file) => apiRequest("POST", "/api/document-inbox/upload", buildForm(file)))
+      )
+      const ok = settled.filter((s) => s.status === "fulfilled").length
+      const fail = fileArr.length - ok
+
+      invalidateDocumentInboxQueries()
+
+      if (fail === 0) {
         toast({
           title: "上傳成功",
           description:
-            files.length > 1
-              ? `已上傳 ${files.length} 張圖片，正在進行 AI 辨識...`
-              : "正在進行 AI 辨識...",
+            fileArr.length > 1 ? `已上傳 ${ok} 張圖片，正在進行 AI 辨識...` : "正在進行 AI 辨識...",
         })
-      } catch {
-        // mutation onError 已處理
+      } else if (ok > 0) {
+        toast({
+          title: `部分上傳成功（${ok}/${fileArr.length}）`,
+          description: `${ok} 張成功辨識中、${fail} 張失敗，可重試失敗的`,
+        })
+      } else {
+        const firstErr = settled.find((s) => s.status === "rejected") as
+          | PromiseRejectedResult
+          | undefined
+        toast({
+          title: "上傳失敗",
+          description: firstErr?.reason?.message ?? "請稍後再試",
+          variant: "destructive",
+        })
       }
       setIsUploading(false)
     },
-    [selectedType, uploadMutation, toast]
+    [selectedType, toast]
   )
 
   // Share Target：處理從外部分享進來的圖片（PWA 安裝後可用）
