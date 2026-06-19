@@ -152,7 +152,7 @@ export default function GeneralPaymentManagement() {
     isLoading,
     refetch: refetchItems,
   } = useQuery<PaymentItem[] | PaymentItemsResponse>({
-    queryKey: ["/api/payment/items?limit=500&itemType=general"],
+    queryKey: ["/api/payment/items?limit=500&itemType=general&includeFuture=true"],
     staleTime: 30000,
     refetchOnWindowFocus: false,
   })

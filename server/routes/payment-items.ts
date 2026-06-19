@@ -18,6 +18,7 @@ router.get(
       page = "1",
       limit = "50",
       includeAll = "false",
+      includeFuture = "false", // 時間焦點：預設排除未來項目
       itemType = "all", // 新增itemType篩選參數
     } = req.query
 
@@ -33,6 +34,12 @@ router.get(
     if (itemType === "general") {
       // 一般付款管理：排除租約相關項目，只顯示home和project類型
       filters.excludeRental = true
+    }
+
+    // 時間焦點：預設排除未來項目（start_date > 今天）；
+    // includeFuture=true（管理/排程頁）或 includeAll（匯出）時保留全部
+    if (includeFuture !== "true" && !shouldIncludeAll) {
+      filters.excludeFuture = true
     }
 
     if (shouldIncludeAll) {

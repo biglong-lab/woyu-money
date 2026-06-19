@@ -95,7 +95,7 @@ export default function PaymentProjectStatsOptimized() {
 
   // 資料查詢
   const { data: paymentItems = [] } = useQuery<PaymentItem[]>({
-    queryKey: [`/api/payment/items?includeDeleted=false`],
+    queryKey: [`/api/payment/items?includeDeleted=false&includeFuture=true`],
   })
 
   const { data: projects = [] } = useQuery<PaymentProject[]>({

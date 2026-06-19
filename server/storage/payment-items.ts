@@ -45,6 +45,8 @@ interface PaymentItemFilters {
   projectId?: number | string
   categoryId?: number | string
   excludeRental?: boolean
+  // 時間焦點：排除未來項目（start_date > 今天）
+  excludeFuture?: boolean
 }
 
 export async function getPaymentItems(
@@ -74,6 +76,10 @@ export async function getPaymentItems(
       (pp.project_type IS NULL OR pp.project_type != 'rental' OR
        pi.payment_type = 'single')
     )`)
+  }
+
+  if (filters?.excludeFuture) {
+    conditions.push(sql`pi.start_date <= CURRENT_DATE`)
   }
 
   const whereClause = sql`WHERE ${sql.join(conditions, sql` AND `)}`
@@ -137,6 +143,10 @@ export async function getPaymentItemsCount(filters?: PaymentItemFilters): Promis
       (pp.project_type IS NULL OR pp.project_type != 'rental' OR
        pi.payment_type = 'single')
     )`)
+  }
+
+  if (filters?.excludeFuture) {
+    conditions.push(sql`pi.start_date <= CURRENT_DATE`)
   }
 
   const whereClause = sql`WHERE ${sql.join(conditions, sql` AND `)}`
