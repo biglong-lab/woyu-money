@@ -127,10 +127,11 @@ export default function DocumentInboxArchiveDialog({
           i.vendor?.toLowerCase().includes(searchLower)
       )
     } else {
-      // 未搜尋時：只顯示逾期+到今天，未來項目隱藏（依到期日）
+      // 未搜尋時：只顯示逾期+到今天，未來項目隱藏（以 startDate 為主、否則 dueDate）
       const today = new Date().toISOString().split("T")[0]
       items = items.filter((i) => {
-        const d = i.dueDate ? String(i.dueDate).slice(0, 10) : null
+        const raw = i.startDate || i.dueDate
+        const d = raw ? String(raw).slice(0, 10) : null
         return !d || d <= today
       })
     }
