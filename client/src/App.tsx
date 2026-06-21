@@ -68,6 +68,7 @@ import ExpenseWebhooksInbox from "@/pages/expense-webhooks-inbox"
 import CashAllocation from "@/pages/cash-allocation"
 import LaborInsuranceWatch from "@/pages/labor-insurance-watch"
 import RentalMatrix from "@/pages/rental-matrix"
+import FixedExpenseMatrix from "@/pages/fixed-expense-matrix"
 import CashflowDecisionCenter from "@/pages/cashflow-decision-center"
 import ReceiptMatchHelper from "@/pages/receipt-match-helper"
 import IntegrationsCenter from "@/pages/integrations-center"
@@ -188,6 +189,7 @@ function Router() {
 
                 {/* Rental Matrix — 租金月度矩陣 */}
                 <ProtectedRoute path="/rental-matrix" component={RentalMatrix} />
+                <ProtectedRoute path="/fixed-expense-matrix" component={FixedExpenseMatrix} />
 
                 {/* Cashflow Decision Center — 現金流決策中心 */}
                 <ProtectedRoute

@@ -560,6 +560,24 @@ function AddExpenseSourceDialog({ onClose }: { onClose: () => void }) {
           <CardDescription>外部系統將以此 sourceKey 推送支出資料</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
+          {/* 一鍵樣板：專案系統請款（像 PM bridge：只接收彙整，核銷留在來源系統）*/}
+          <button
+            type="button"
+            className="w-full rounded border border-amber-300 bg-amber-50 px-3 py-2 text-left text-amber-800 hover:bg-amber-100"
+            onClick={() =>
+              setForm((f) => ({
+                ...f,
+                sourceName: f.sourceName || "專案系統請款",
+                sourceKey: f.sourceKey || "project_claims",
+                sourceType: "pm_expense",
+                webhookMode: "as_pending",
+                autoConfirm: false,
+              }))
+            }
+            data-testid="preset-project-claims"
+          >
+            ⚡ 套用「專案系統請款」樣板 — 接收待付彙整，核銷留在來源系統
+          </button>
           <Field label="名稱">
             <input
               className="w-full border rounded px-3 py-1.5"

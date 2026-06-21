@@ -41,6 +41,7 @@ import {
   mainNavItems,
   coreDecisionNavItems,
   toolboxNavItems,
+  advancedNavItems,
   managementNavItems,
   viewNavItems,
   systemNavItems,
@@ -70,6 +71,13 @@ const categoryConfigs: CategoryConfig[] = [
     titleClass: "text-amber-700",
     hoverClass: "hover:bg-amber-50",
     items: toolboxNavItems,
+  },
+  {
+    id: "decision-advanced",
+    title: "🔬 進階工具",
+    titleClass: "text-amber-700",
+    hoverClass: "hover:bg-amber-50",
+    items: advancedNavItems,
   },
   {
     id: "management",

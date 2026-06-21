@@ -12,6 +12,7 @@ import {
   systemNavItems,
   coreDecisionNavItems,
   toolboxNavItems,
+  advancedNavItems,
 } from "@/config/navigation"
 import { useQuery } from "@tanstack/react-query"
 import { useState, useRef, useEffect } from "react"
@@ -588,6 +589,7 @@ export function MobileTabBar() {
         sections={[
           { label: "💡 核心決策", color: "amber", items: coreDecisionNavItems },
           { label: "🧰 工具箱", color: "amber", items: toolboxNavItems },
+          { label: "🔬 進階工具", color: "amber", items: advancedNavItems },
           { label: "📊 查看 & 報表", color: "green", items: viewNavItems },
           { label: "⚙️ 系統管理", color: "orange", items: systemNavItems },
         ]}

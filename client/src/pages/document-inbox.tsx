@@ -15,6 +15,7 @@ import DocumentInboxUploadSection from "@/components/document-inbox-upload-secti
 import DocumentInboxDocumentList from "@/components/document-inbox-document-list"
 import DocumentInboxPreviewDialog from "@/components/document-inbox-preview-dialog"
 import DocumentInboxArchiveDialog from "@/components/document-inbox-archive-dialog"
+import ExpenseLedgerPanel from "@/components/expense-ledger-panel"
 
 // 歸檔資料型別定義
 interface ArchiveToPaymentItemData {
@@ -47,6 +48,7 @@ export default function DocumentInboxPage() {
   useDocumentTitle("單據收件箱")
   const { toast } = useToast()
 
+  const [mainView, setMainView] = useState<"inbox" | "ledger">("inbox")
   const [selectedType, setSelectedType] = useState<"bill" | "payment" | "invoice">("bill")
   const [filterType, setFilterType] = useState<string>("all")
   const [filterStatus, setFilterStatus] = useState<string>("all")
@@ -299,11 +301,11 @@ export default function DocumentInboxPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold" data-testid="page-title">
-            單據收件箱
+            記帳窗口
           </h1>
-          <p className="text-gray-500">快速拍照或上傳單據，AI 自動辨識分類</p>
+          <p className="text-gray-500">先記錄、後分帳：拍單據或快速記一筆，之後再整理分類</p>
         </div>
-        {stats && stats.totalPending > 0 && (
+        {mainView === "inbox" && stats && stats.totalPending > 0 && (
           <Badge variant="outline" className="text-lg px-4 py-2 bg-amber-50 border-amber-300">
             <Clock className="h-4 w-4 mr-2" />
             {stats.totalPending} 項待整理
@@ -311,113 +313,133 @@ export default function DocumentInboxPage() {
         )}
       </div>
 
-      {/* 上傳區塊 */}
-      <DocumentInboxUploadSection
-        selectedType={selectedType}
-        onSelectedTypeChange={setSelectedType}
-        onUpload={handleUpload}
-        isUploading={isUploading}
-      />
-
-      {/* 統計卡片 */}
-      {stats && (
-        <div className="grid grid-cols-3 gap-4">
-          {DOCUMENT_TYPES.map((type) => {
-            const stat = stats[type.value as keyof InboxStats]
-            if (typeof stat !== "object") return null
-            const Icon = type.icon
-            return (
-              <Card
-                key={type.value}
-                className={`cursor-pointer hover:shadow-md transition-shadow ${filterType === type.value ? "ring-2 ring-primary" : ""}`}
-                onClick={() => setFilterType(filterType === type.value ? "all" : type.value)}
-                data-testid={`stat-card-${type.value}`}
-              >
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className={`p-2 rounded-lg ${type.color}`}>
-                        <Icon className="h-5 w-5" />
-                      </div>
-                      <span className="font-medium">{type.label}</span>
-                    </div>
-                    <span className="text-2xl font-bold">{stat.total}</span>
-                  </div>
-                  <div className="mt-2 flex gap-2 text-xs text-gray-500">
-                    {stat.processing > 0 && <span>辨識中 {stat.processing}</span>}
-                    {stat.recognized > 0 && <span>待整理 {stat.recognized}</span>}
-                    {stat.failed > 0 && <span className="text-red-500">失敗 {stat.failed}</span>}
-                  </div>
-                </CardContent>
-              </Card>
-            )
-          })}
-        </div>
-      )}
-
-      {/* 篩選 Tabs */}
-      <Tabs value={filterStatus} onValueChange={setFilterStatus}>
+      {/* 主視圖切換：單據收件箱 / 開銷流水帳 */}
+      <Tabs value={mainView} onValueChange={(v) => setMainView(v as "inbox" | "ledger")}>
         <TabsList>
-          <TabsTrigger value="all" data-testid="filter-all">
-            全部
+          <TabsTrigger value="inbox" data-testid="view-inbox">
+            📷 單據收件箱
           </TabsTrigger>
-          <TabsTrigger value="processing" data-testid="filter-processing">
-            辨識中
-          </TabsTrigger>
-          <TabsTrigger value="recognized" data-testid="filter-recognized">
-            待整理
-          </TabsTrigger>
-          <TabsTrigger value="failed" data-testid="filter-failed">
-            失敗
+          <TabsTrigger value="ledger" data-testid="view-ledger">
+            ⚡ 開銷流水帳
           </TabsTrigger>
         </TabsList>
       </Tabs>
 
-      {/* 文件列表 */}
-      <DocumentInboxDocumentList
-        documents={documents}
-        isLoading={isLoading}
-        onSelectDocument={(doc) => {
-          setSelectedDoc(doc)
-          setShowPreviewDialog(true)
-        }}
-        onReRecognize={(id) => reRecognizeMutation.mutate(id)}
-      />
+      {mainView === "ledger" ? (
+        <ExpenseLedgerPanel />
+      ) : (
+        <>
+          {/* 上傳區塊 */}
+          <DocumentInboxUploadSection
+            selectedType={selectedType}
+            onSelectedTypeChange={setSelectedType}
+            onUpload={handleUpload}
+            isUploading={isUploading}
+          />
 
-      {/* 預覽 Dialog */}
-      <DocumentInboxPreviewDialog
-        open={showPreviewDialog}
-        onOpenChange={setShowPreviewDialog}
-        document={selectedDoc}
-        onDelete={(id) => deleteMutation.mutate(id)}
-        onReRecognize={(id) => reRecognizeMutation.mutate(id)}
-        reRecognizePending={reRecognizeMutation.isPending}
-        onArchive={() => {
-          setShowPreviewDialog(false)
-          setShowArchiveDialog(true)
-        }}
-        onUpdateNotes={(id, notes) => updateNotesMutation.mutate({ id, notes })}
-        updateNotesPending={updateNotesMutation.isPending}
-      />
+          {/* 統計卡片 */}
+          {stats && (
+            <div className="grid grid-cols-3 gap-4">
+              {DOCUMENT_TYPES.map((type) => {
+                const stat = stats[type.value as keyof InboxStats]
+                if (typeof stat !== "object") return null
+                const Icon = type.icon
+                return (
+                  <Card
+                    key={type.value}
+                    className={`cursor-pointer hover:shadow-md transition-shadow ${filterType === type.value ? "ring-2 ring-primary" : ""}`}
+                    onClick={() => setFilterType(filterType === type.value ? "all" : type.value)}
+                    data-testid={`stat-card-${type.value}`}
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className={`p-2 rounded-lg ${type.color}`}>
+                            <Icon className="h-5 w-5" />
+                          </div>
+                          <span className="font-medium">{type.label}</span>
+                        </div>
+                        <span className="text-2xl font-bold">{stat.total}</span>
+                      </div>
+                      <div className="mt-2 flex gap-2 text-xs text-gray-500">
+                        {stat.processing > 0 && <span>辨識中 {stat.processing}</span>}
+                        {stat.recognized > 0 && <span>待整理 {stat.recognized}</span>}
+                        {stat.failed > 0 && (
+                          <span className="text-red-500">失敗 {stat.failed}</span>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )
+              })}
+            </div>
+          )}
 
-      {/* 歸檔 Dialog */}
-      <DocumentInboxArchiveDialog
-        open={showArchiveDialog}
-        onOpenChange={setShowArchiveDialog}
-        document={selectedDoc}
-        projects={projects}
-        paymentItems={paymentItems}
-        onArchive={(type, data) => {
-          if (selectedDoc) {
-            archiveMutation.mutate({
-              id: selectedDoc.id,
-              type,
-              data: data as unknown as ArchiveData,
-            })
-          }
-        }}
-        isPending={archiveMutation.isPending}
-      />
+          {/* 篩選 Tabs */}
+          <Tabs value={filterStatus} onValueChange={setFilterStatus}>
+            <TabsList>
+              <TabsTrigger value="all" data-testid="filter-all">
+                全部
+              </TabsTrigger>
+              <TabsTrigger value="processing" data-testid="filter-processing">
+                辨識中
+              </TabsTrigger>
+              <TabsTrigger value="recognized" data-testid="filter-recognized">
+                待整理
+              </TabsTrigger>
+              <TabsTrigger value="failed" data-testid="filter-failed">
+                失敗
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+
+          {/* 文件列表 */}
+          <DocumentInboxDocumentList
+            documents={documents}
+            isLoading={isLoading}
+            onSelectDocument={(doc) => {
+              setSelectedDoc(doc)
+              setShowPreviewDialog(true)
+            }}
+            onReRecognize={(id) => reRecognizeMutation.mutate(id)}
+          />
+
+          {/* 預覽 Dialog */}
+          <DocumentInboxPreviewDialog
+            open={showPreviewDialog}
+            onOpenChange={setShowPreviewDialog}
+            document={selectedDoc}
+            onDelete={(id) => deleteMutation.mutate(id)}
+            onReRecognize={(id) => reRecognizeMutation.mutate(id)}
+            reRecognizePending={reRecognizeMutation.isPending}
+            onArchive={() => {
+              setShowPreviewDialog(false)
+              setShowArchiveDialog(true)
+            }}
+            onUpdateNotes={(id, notes) => updateNotesMutation.mutate({ id, notes })}
+            updateNotesPending={updateNotesMutation.isPending}
+          />
+
+          {/* 歸檔 Dialog */}
+          <DocumentInboxArchiveDialog
+            open={showArchiveDialog}
+            onOpenChange={setShowArchiveDialog}
+            document={selectedDoc}
+            projects={projects}
+            paymentItems={paymentItems}
+            onArchive={(type, data) => {
+              if (selectedDoc) {
+                archiveMutation.mutate({
+                  id: selectedDoc.id,
+                  type,
+                  data: data as unknown as ArchiveData,
+                })
+              }
+            }}
+            isPending={archiveMutation.isPending}
+          />
+        </>
+      )}
     </div>
   )
 }

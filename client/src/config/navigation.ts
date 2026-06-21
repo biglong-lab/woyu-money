@@ -20,6 +20,7 @@ import {
   Target,
   Clipboard,
   Calendar,
+  CalendarRange,
   Receipt,
   FileText,
   Layers,
@@ -60,10 +61,11 @@ export const mainNavItems: NavItem[] = [
     icon: Home,
   },
   {
-    title: "單據收件箱",
+    title: "記帳窗口",
     href: "/document-inbox",
     icon: Inbox,
-    badge: "AI",
+    badge: "記帳",
+    description: "單據收件箱 + 開銷流水帳：先記錄、後分帳的統一窗口",
   },
 ]
 
@@ -142,11 +144,10 @@ export const coreDecisionNavItems: NavItem[] = [
   },
 ]
 
-// 工具箱（10 項、可摺疊、依使用頻率排序）
+// 工具箱（常用、可摺疊、依使用頻率排序）
 export const toolboxNavItems: NavItem[] = [
   familyNavItem,
   forecastNavItem,
-  scenarioNavItem,
   {
     title: "館別損益報表",
     href: "/property-pl",
@@ -159,6 +160,35 @@ export const toolboxNavItems: NavItem[] = [
     icon: Wallet,
     description: "輸入可動用金額、系統建議先付哪幾筆",
   },
+  {
+    title: "租金月度矩陣",
+    href: "/rental-matrix",
+    icon: Calendar,
+    description: "合約×12月狀態圖 + 一鍵本月已付",
+  },
+  {
+    title: "固定開銷矩陣",
+    href: "/fixed-expense-matrix",
+    icon: CalendarRange,
+    description: "週期性支出 預算 vs 實際×12月、超支結餘一眼看",
+  },
+  {
+    title: "收據對應助手",
+    href: "/receipt-match-helper",
+    icon: Receipt,
+    description: "拍收據自動匹配既有項目、不重複建立",
+  },
+  {
+    title: "信用卡請款紀錄",
+    href: "/card-claims",
+    icon: CreditCard,
+    description: "記錄刷卡請款金額、銀行、標籤、館別、狀態 + 月度統計",
+  },
+]
+
+// 進階工具（較少用的分析/模擬，預設收合，不刪頁只下放）
+export const advancedNavItems: NavItem[] = [
+  scenarioNavItem,
   {
     title: "月度預估自動產生",
     href: "/budget-estimates",
@@ -178,33 +208,19 @@ export const toolboxNavItems: NavItem[] = [
     description: "年度損失儀表 + 三層提醒",
   },
   {
-    title: "租金月度矩陣",
-    href: "/rental-matrix",
-    icon: Calendar,
-    description: "合約×12月狀態圖 + 一鍵本月已付",
-  },
-  {
-    title: "收據對應助手",
-    href: "/receipt-match-helper",
-    icon: Receipt,
-    description: "拍收據自動匹配既有項目、不重複建立",
-  },
-  {
     title: "財務總覽 v2",
     href: "/financial-overview-v2",
     icon: BarChart3,
     description: "預估 vs 實際 / 各館組損益一頁看完",
   },
-  {
-    title: "信用卡請款紀錄",
-    href: "/card-claims",
-    icon: CreditCard,
-    description: "記錄刷卡請款金額、銀行、標籤、館別、狀態 + 月度統計",
-  },
 ]
 
-// 保留 decisionNavItems export 對舊呼叫者相容（合併 core + toolbox）
-export const decisionNavItems: NavItem[] = [...coreDecisionNavItems, ...toolboxNavItems]
+// 保留 decisionNavItems export 對舊呼叫者相容（合併 core + toolbox + advanced）
+export const decisionNavItems: NavItem[] = [
+  ...coreDecisionNavItems,
+  ...toolboxNavItems,
+  ...advancedNavItems,
+]
 
 // 付款方式管理分類
 export const managementNavItems: NavItem[] = [
@@ -593,6 +609,11 @@ export const breadcrumbConfig: Record<string, BreadcrumbItem[]> = {
     { title: "首頁", href: "/" },
     { title: "財務助理" },
     { title: "租金月度矩陣" },
+  ],
+  "/fixed-expense-matrix": [
+    { title: "首頁", href: "/" },
+    { title: "財務助理" },
+    { title: "固定開銷矩陣" },
   ],
   "/cashflow-decision-center": [
     { title: "首頁", href: "/" },

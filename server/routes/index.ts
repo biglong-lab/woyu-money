@@ -55,6 +55,8 @@ import cardClaimRoutes from "./card-claims"
 import financialAdviceRoutes from "./financial-advice"
 import paymentPlannerRoutes from "./payment-planner"
 import alertsRoutes from "./alerts"
+import expenseLedgerRoutes from "./expense-ledger"
+import fixedExpenseMatrixRoutes from "./fixed-expense-matrix"
 import scenarioPresetRoutes from "./scenario-presets"
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -160,6 +162,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use(financialAdviceRoutes)
   app.use(paymentPlannerRoutes)
   app.use(alertsRoutes)
+  app.use(expenseLedgerRoutes)
+  app.use(fixedExpenseMatrixRoutes)
   app.use(scenarioPresetRoutes)
 
   const httpServer = createServer(app)
