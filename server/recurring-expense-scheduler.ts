@@ -47,6 +47,46 @@ class RecurringExpenseScheduler {
     await this.checkDailySnapshot()
     await this.checkPmsSync()
     await this.checkPmRevenueSync()
+    await this.checkDailyAlertPush()
+  }
+
+  /** 每日早晨推播今日財務提醒（同日不重複；台北 8 點後第一次 tick 發送）*/
+  private async checkDailyAlertPush() {
+    try {
+      const tpe = new Date(Date.now() + 8 * 60 * 60 * 1000)
+      const today = tpe.toISOString().slice(0, 10)
+      const hour = tpe.getUTCHours() // tpe 已加 8 小時、getUTCHours = 台北時
+      if (hour < 8) return
+      if (this.lastAlertPushDate === today) return
+
+      const alerts = await getTodayAlerts()
+      // 標記今日已處理（即使無提醒也標記、避免整天重算）
+      this.lastAlertPushDate = today
+      if (alerts.length === 0) {
+        recordTick("daily-alert-push", true, `${today}: 無提醒`)
+        return
+      }
+
+      const critical = alerts.filter((a) => a.severity === "critical").length
+      const title = critical > 0 ? "🔴 今日有急迫財務提醒" : "📋 今日財務提醒"
+      const body = alerts
+        .slice(0, 3)
+        .map((a) => `・${a.title}：${a.detail}`)
+        .join("\n")
+
+      const result = await broadcastPush({
+        title,
+        body,
+        url: "/financial-cockpit",
+        tag: "daily-alerts",
+      })
+      const msg = `${today}: ${alerts.length} 則提醒、推播 ${result.sent} 成功/${result.failed} 失敗`
+      log(`daily alert push ${msg}`)
+      recordTick("daily-alert-push", true, msg)
+    } catch (err) {
+      console.error("[RecurringExpenseScheduler] daily alert push 失敗:", err)
+      recordTick("daily-alert-push", false, String(err))
+    }
   }
 
   /** 每日從 PM revenues 拉細項到 income_webhooks（autoConfirm=false、需人工確認）*/
