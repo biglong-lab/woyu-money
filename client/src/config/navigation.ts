@@ -21,6 +21,7 @@ import {
   Clipboard,
   Calendar,
   CalendarRange,
+  Shield,
   Receipt,
   FileText,
   Layers,
@@ -171,6 +172,12 @@ export const toolboxNavItems: NavItem[] = [
     href: "/fixed-expense-matrix",
     icon: CalendarRange,
     description: "週期性支出 預算 vs 實際×12月、超支結餘一眼看",
+  },
+  {
+    title: "勞健保矩陣",
+    href: "/labor-insurance-matrix",
+    icon: Shield,
+    description: "勞保/健保/勞退 雇主負擔×12月、整月一鍵標已繳",
   },
   {
     title: "收據對應助手",
@@ -614,6 +621,11 @@ export const breadcrumbConfig: Record<string, BreadcrumbItem[]> = {
     { title: "首頁", href: "/" },
     { title: "財務助理" },
     { title: "固定開銷矩陣" },
+  ],
+  "/labor-insurance-matrix": [
+    { title: "首頁", href: "/" },
+    { title: "財務助理" },
+    { title: "勞健保矩陣" },
   ],
   "/cashflow-decision-center": [
     { title: "首頁", href: "/" },
