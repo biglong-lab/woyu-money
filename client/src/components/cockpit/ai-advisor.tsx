@@ -140,6 +140,21 @@ export function AiAdvisor({ snapshot }: { snapshot: AdvisorSnapshot }) {
               <div className="rounded-lg border bg-muted/30 p-4 text-sm whitespace-pre-wrap leading-relaxed">
                 {result.advice}
               </div>
+              {/* 行動捷徑：一鍵到處理頁執行建議 */}
+              <div>
+                <div className="text-xs text-muted-foreground mb-1">前往執行：</div>
+                <div className="flex flex-wrap gap-2">
+                  {ADVICE_ACTIONS.map((a) => (
+                    <Link key={a.href} href={a.href}>
+                      <span className="inline-flex items-center gap-1 text-sm border rounded-full px-3 py-1 hover:border-indigo-400 hover:bg-indigo-50/40 cursor-pointer">
+                        <a.icon className="h-3.5 w-3.5 text-indigo-600" />
+                        {a.label}
+                        <ArrowRight className="h-3 w-3 text-muted-foreground" />
+                      </span>
+                    </Link>
+                  ))}
+                </div>
+              </div>
               <p className="text-xs text-muted-foreground">
                 ⚠️ AI 建議僅供參考，請依實際情況判斷後執行。
               </p>
