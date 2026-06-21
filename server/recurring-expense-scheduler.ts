@@ -12,6 +12,8 @@ import { captureFromPM } from "./storage/forecast-snapshots"
 import { syncFromPMS } from "./storage/pms-forecast-sync"
 import { syncPmRevenues } from "./storage/pm-bridge"
 import { recordTick } from "./storage/tick-log"
+import { getTodayAlerts } from "./services/alerts.service"
+import { broadcastPush } from "./storage/push-subscriptions"
 import { log } from "./vite"
 
 class RecurringExpenseScheduler {
@@ -19,6 +21,7 @@ class RecurringExpenseScheduler {
   private isRunning = false
   private lastGeneratedMonth: string | null = null
   private lastSnapshotDate: string | null = null
+  private lastAlertPushDate: string | null = null
 
   start() {
     if (this.isRunning) return
