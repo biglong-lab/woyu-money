@@ -8,9 +8,28 @@ import { useState } from "react"
 import { useMutation, useQuery } from "@tanstack/react-query"
 import { apiRequest, queryClient } from "@/lib/queryClient"
 import { useToast } from "@/hooks/use-toast"
+import { Link } from "wouter"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Bot, Sparkles, Copy, RefreshCw } from "lucide-react"
+import {
+  Bot,
+  Sparkles,
+  Copy,
+  RefreshCw,
+  Wallet,
+  CalendarRange,
+  ShieldCheck,
+  CreditCard,
+  ArrowRight,
+} from "lucide-react"
+
+// 行動捷徑：把建議導向實際處理頁
+const ADVICE_ACTIONS = [
+  { href: "/cash-allocation", icon: Wallet, label: "現金分配" },
+  { href: "/payment-planner", icon: CalendarRange, label: "排程規劃" },
+  { href: "/labor-insurance-watch", icon: ShieldCheck, label: "勞健保" },
+  { href: "/card-claims", icon: CreditCard, label: "請款到帳" },
+]
 
 export interface AdvisorSnapshot {
   healthScore?: number
