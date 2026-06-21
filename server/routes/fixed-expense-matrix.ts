@@ -10,6 +10,9 @@
 import { Router } from "express"
 import { z } from "zod"
 import { asyncHandler, errors } from "../middleware/error-handler"
+import { receiptUpload } from "./upload-config"
+import { recordTemplateMonthPayment } from "../storage/recurring-expense-templates"
+import { localDateTPE } from "@shared/date-utils"
 import {
   buildFixedExpenseMatrix,
   type FixedExpenseTemplateInfo,
@@ -103,6 +106,46 @@ router.get(
     }))
 
     res.json(buildFixedExpenseMatrix(year, templates, payments))
+  })
+)
+
+// POST /api/fixed-expense-matrix/pay — 點格子記一筆付款（含選填收據上傳）
+// multipart：欄位 templateId/year/month/amount/paymentDate?/paymentMethod?/note? + 檔案 receiptFile?
+const paySchema = z.object({
+  templateId: z.coerce.number().int().positive(),
+  year: z.coerce.number().int().min(2000).max(2100),
+  month: z.coerce.number().int().min(1).max(12),
+  amount: z.coerce.number().positive(),
+  paymentDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
+  paymentMethod: z.string().max(50).optional(),
+  note: z.string().max(1000).optional(),
+})
+
+router.post(
+  "/api/fixed-expense-matrix/pay",
+  receiptUpload.single("receiptFile"),
+  asyncHandler(async (req, res) => {
+    const parsed = paySchema.safeParse(req.body)
+    if (!parsed.success) {
+      throw errors.badRequest("參數錯誤：" + parsed.error.errors.map((e) => e.message).join("、"))
+    }
+    const { templateId, year, month, amount, paymentDate, paymentMethod, note } = parsed.data
+    const receiptImageUrl = req.file ? `/uploads/receipts/${req.file.filename}` : null
+
+    const result = await recordTemplateMonthPayment({
+      templateId,
+      year,
+      month,
+      actualAmount: amount,
+      paymentDate: paymentDate || localDateTPE(),
+      paymentMethod: paymentMethod || null,
+      note: note || null,
+      receiptImageUrl,
+    })
+    res.json({ success: true, ...result, receiptImageUrl })
   })
 )
 

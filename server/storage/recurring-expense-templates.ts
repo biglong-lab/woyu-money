@@ -2,7 +2,7 @@
  * 週期性支出模板 CRUD + 產出邏輯
  */
 import { db } from "../db"
-import { eq, sql, and } from "drizzle-orm"
+import { eq, sql } from "drizzle-orm"
 import { localDateTPE } from "@shared/date-utils"
 import {
   recurringExpenseTemplates,
@@ -364,5 +364,94 @@ export async function replaceScheduledWithActual(params: {
       .returning({ id: paymentRecords.id })
 
     return { itemId, recordId: record.id, estimatedAmount, diff }
+  })
+}
+
+/**
+ * 矩陣「點格子記一筆付款」：對指定模板 × 年月，find-or-create 當月 payment_item，
+ * 再以 replaceScheduledWithActual 記錄實際付款（含收據）。
+ *
+ * 自己做 find-or-create（不走 generateItemsForMonth）以避免 lastGeneratedMonth
+ * 已設但項目被刪時被誤 skip。
+ */
+export async function recordTemplateMonthPayment(params: {
+  templateId: number
+  year: number
+  month: number // 1-12
+  actualAmount: number
+  paymentDate: string // YYYY-MM-DD
+  paymentMethod?: string | null
+  note?: string | null
+  receiptImageUrl?: string | null
+}): Promise<{ itemId: number; recordId: number; estimatedAmount: number; diff: number }> {
+  const { templateId, year, month } = params
+  if (month < 1 || month > 12) throw new Error("月份需為 1-12")
+  const targetMonth = `${year}-${String(month).padStart(2, "0")}`
+
+  // 1. find 當月該模板的 payment_item
+  const found = await db.execute(sql`
+    SELECT id FROM payment_items
+    WHERE NOT is_deleted
+      AND recurring_template_id = ${templateId}
+      AND DATE_TRUNC('month', start_date)::date = (${targetMonth} || '-01')::date
+    ORDER BY id LIMIT 1
+  `)
+  let itemId = (found as unknown as { rows: Array<{ id: number }> }).rows[0]?.id
+
+  // 2. 沒有 → 依模板建一筆當月占位
+  if (!itemId) {
+    const [tpl] = await db
+      .select()
+      .from(recurringExpenseTemplates)
+      .where(eq(recurringExpenseTemplates.id, templateId))
+    if (!tpl) throw new Error("模板不存在")
+
+    let projectName: string | null = null
+    if (tpl.projectId) {
+      const [proj] = await db
+        .select({ name: paymentProjects.projectName })
+        .from(paymentProjects)
+        .where(eq(paymentProjects.id, tpl.projectId))
+      projectName = proj?.name ?? null
+    }
+    const itemName = projectName
+      ? `${tpl.templateName} ${targetMonth} - ${projectName}`
+      : `${tpl.templateName} ${targetMonth}`
+    const day = Math.min(28, Math.max(1, tpl.dayOfMonth))
+    const startDate = `${targetMonth}-${String(day).padStart(2, "0")}`
+
+    const [item] = await db
+      .insert(paymentItems)
+      .values({
+        itemName,
+        totalAmount: tpl.estimatedAmount,
+        itemType: "project",
+        paymentType: "single",
+        projectId: tpl.projectId,
+        categoryId: tpl.categoryId,
+        fixedCategoryId: tpl.fixedCategoryId,
+        startDate,
+        status: "unpaid",
+        paidAmount: "0",
+        source: "template_scheduled",
+        recurringTemplateId: tpl.id,
+        tags: tpl.tags ?? `週期估算,模板#${tpl.id}`,
+        notes: `🧮 估算占位（由固定開銷矩陣付款介面建立、template id=${tpl.id}）`,
+        priority: 3,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .returning({ id: paymentItems.id })
+    itemId = item.id
+  }
+
+  // 3. 記錄實際付款（含收據）
+  return replaceScheduledWithActual({
+    itemId,
+    actualAmount: params.actualAmount,
+    paymentDate: params.paymentDate,
+    paymentMethod: params.paymentMethod,
+    notes: params.note,
+    receiptImageUrl: params.receiptImageUrl,
   })
 }

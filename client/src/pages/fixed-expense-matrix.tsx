@@ -3,9 +3,19 @@
  * 縱軸週期性支出模板 × 橫軸 12 月，預算（成本預估）vs 實際（已付單據）一眼看出超支/結餘
  */
 import { useState } from "react"
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useMutation } from "@tanstack/react-query"
 import { CalendarRange, TrendingUp, TrendingDown } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog"
 import {
   Select,
   SelectContent,
@@ -13,9 +23,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { apiRequest, queryClient } from "@/lib/queryClient"
 import { formatNT } from "@/lib/utils"
+import { useToast } from "@/hooks/use-toast"
 import { useDocumentTitle } from "@/hooks/use-document-title"
 import { BackToTop } from "@/components/back-to-top"
+
+const PAYMENT_METHODS = ["現金", "信用卡", "轉帳", "其他"]
 
 interface TemplateInfo {
   id: number
@@ -74,11 +88,34 @@ function cellsFor(cells: MatrixCell[], templateId: number): MatrixCell[] {
   return cells.filter((c) => c.templateId === templateId).sort((a, b) => a.month - b.month)
 }
 
+interface PayTarget {
+  templateId: number
+  templateName: string
+  month: number
+  budget: number
+  actual: number
+}
+
 export default function FixedExpenseMatrixPage() {
   useDocumentTitle("固定開銷矩陣")
+  const { toast } = useToast()
   const now = new Date()
   const [year, setYear] = useState(now.getFullYear())
   const [categoryId, setCategoryId] = useState<string>("all")
+
+  // 付款對話框狀態
+  const [payTarget, setPayTarget] = useState<PayTarget | null>(null)
+  const [payAmount, setPayAmount] = useState("")
+  const [payDate, setPayDate] = useState("")
+  const [payMethod, setPayMethod] = useState("")
+  const [payFile, setPayFile] = useState<File | null>(null)
+
+  // 新增固定開銷項目對話框
+  const [addOpen, setAddOpen] = useState(false)
+  const [addName, setAddName] = useState("")
+  const [addAmount, setAddAmount] = useState("")
+  const [addCategory, setAddCategory] = useState<string>("none")
+  const [addMonths, setAddMonths] = useState("*")
 
   const url =
     categoryId === "all"
@@ -89,6 +126,79 @@ export default function FixedExpenseMatrixPage() {
   const { data: categories = [] } = useQuery<DebtCategory[]>({ queryKey: ["/api/categories"] })
 
   const years = [now.getFullYear() - 1, now.getFullYear(), now.getFullYear() + 1]
+
+  const invalidateMatrix = () => {
+    queryClient.invalidateQueries({
+      predicate: (q) =>
+        typeof q.queryKey[0] === "string" &&
+        (q.queryKey[0] as string).startsWith("/api/fixed-expense-matrix"),
+    })
+  }
+
+  function openPay(t: TemplateInfo, c: MatrixCell) {
+    setPayTarget({
+      templateId: t.id,
+      templateName: t.templateName,
+      month: c.month,
+      budget: c.budget,
+      actual: c.actual,
+    })
+    // 預設金額：剩餘預算（預算−已實際），否則預算
+    const remaining = Math.max(0, c.budget - c.actual)
+    setPayAmount(String(remaining > 0 ? remaining : c.budget || ""))
+    // 預設付款日：該月 15 號（當月則用今天）
+    const mm = String(c.month).padStart(2, "0")
+    const today = now.toISOString().slice(0, 10)
+    setPayDate(
+      c.month === now.getMonth() + 1 && year === now.getFullYear() ? today : `${year}-${mm}-15`
+    )
+    setPayMethod("")
+    setPayFile(null)
+  }
+
+  const payMutation = useMutation({
+    mutationFn: async () => {
+      if (!payTarget) throw new Error("無付款目標")
+      const fd = new FormData()
+      fd.append("templateId", String(payTarget.templateId))
+      fd.append("year", String(year))
+      fd.append("month", String(payTarget.month))
+      fd.append("amount", payAmount)
+      if (payDate) fd.append("paymentDate", payDate)
+      if (payMethod) fd.append("paymentMethod", payMethod)
+      if (payFile) fd.append("receiptFile", payFile)
+      return apiRequest("POST", "/api/fixed-expense-matrix/pay", fd)
+    },
+    onSuccess: () => {
+      invalidateMatrix()
+      toast({ title: "✅ 已記一筆付款", description: `$${Number(payAmount).toLocaleString()}` })
+      setPayTarget(null)
+    },
+    onError: (e: Error) =>
+      toast({ title: "付款失敗", description: e.message, variant: "destructive" }),
+  })
+
+  const addMutation = useMutation({
+    mutationFn: async () =>
+      apiRequest("POST", "/api/recurring-expense-templates", {
+        templateName: addName,
+        estimatedAmount: addAmount,
+        activeMonths: addMonths.trim() || "*",
+        categoryId: addCategory === "none" ? undefined : Number(addCategory),
+        isActive: true,
+      }),
+    onSuccess: () => {
+      invalidateMatrix()
+      toast({ title: "✅ 已新增固定開銷項目", description: addName })
+      setAddOpen(false)
+      setAddName("")
+      setAddAmount("")
+      setAddCategory("none")
+      setAddMonths("*")
+    },
+    onError: (e: Error) =>
+      toast({ title: "新增失敗", description: e.message, variant: "destructive" }),
+  })
 
   return (
     <div className="container mx-auto py-6 space-y-6">
@@ -126,6 +236,13 @@ export default function FixedExpenseMatrixPage() {
               ))}
             </SelectContent>
           </Select>
+          <Button
+            onClick={() => setAddOpen(true)}
+            className="bg-amber-600 hover:bg-amber-700"
+            data-testid="add-template"
+          >
+            ＋ 新增固定開銷
+          </Button>
         </div>
       </div>
 
@@ -206,8 +323,15 @@ export default function FixedExpenseMatrixPage() {
           {isLoading ? (
             <div className="text-center text-gray-400 py-8">載入中…</div>
           ) : !data || data.templates.length === 0 ? (
-            <div className="text-center text-gray-400 py-8">
-              尚無週期性支出模板。請先到「週期性支出」設定固定開銷與預算金額。
+            <div className="text-center text-gray-400 py-8 space-y-3">
+              <div>尚無固定開銷項目。點右上「＋ 新增固定開銷」建立第一筆（如勞健保、店租）。</div>
+              <Button
+                onClick={() => setAddOpen(true)}
+                className="bg-amber-600 hover:bg-amber-700"
+                data-testid="add-template-empty"
+              >
+                ＋ 新增固定開銷
+              </Button>
             </div>
           ) : (
             <table className="w-full text-sm border-collapse">
@@ -238,9 +362,10 @@ export default function FixedExpenseMatrixPage() {
                       {cells.map((c) => (
                         <td key={c.month} className="p-1 text-center">
                           <div
-                            className={`border rounded py-1 px-0.5 ${cellClass(c)}`}
-                            title={`${MONTH_LABELS[c.month - 1]}\n預算 ${formatNT(c.budget)}\n實際 ${formatNT(c.actual)}\n差異 ${c.diff > 0 ? "+" : ""}${formatNT(c.diff)}`}
+                            className={`border rounded py-1 px-0.5 cursor-pointer hover:opacity-80 hover:ring-1 hover:ring-blue-400 active:scale-95 transition-all ${cellClass(c)}`}
+                            title={`${MONTH_LABELS[c.month - 1]}\n預算 ${formatNT(c.budget)}\n實際 ${formatNT(c.actual)}\n差異 ${c.diff > 0 ? "+" : ""}${formatNT(c.diff)}\n👆 點此記一筆付款`}
                             data-testid={`cell-${t.id}-${c.month}`}
+                            onClick={() => openPay(t, c)}
                           >
                             <div className="font-semibold text-[11px] leading-tight">
                               {c.actual > 0 ? formatNT(c.actual) : c.budget > 0 ? "—" : ""}
@@ -278,6 +403,157 @@ export default function FixedExpenseMatrixPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* 記一筆付款 Dialog */}
+      <Dialog open={!!payTarget} onOpenChange={(o) => !o && setPayTarget(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>記一筆付款</DialogTitle>
+            <DialogDescription>
+              {payTarget &&
+                `${payTarget.templateName}・${year} 年 ${payTarget.month} 月（預算 ${formatNT(payTarget.budget)}${payTarget.actual > 0 ? `、已實際 ${formatNT(payTarget.actual)}` : ""}）`}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div>
+              <label className="text-sm text-gray-600 mb-1 block">金額 *</label>
+              <Input
+                type="number"
+                inputMode="decimal"
+                value={payAmount}
+                onChange={(e) => setPayAmount(e.target.value)}
+                className="text-lg font-bold"
+                data-testid="pay-amount"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-sm text-gray-600 mb-1 block">付款日</label>
+                <Input
+                  type="date"
+                  value={payDate}
+                  onChange={(e) => setPayDate(e.target.value)}
+                  data-testid="pay-date"
+                />
+              </div>
+              <div>
+                <label className="text-sm text-gray-600 mb-1 block">付款方式</label>
+                <Select value={payMethod} onValueChange={setPayMethod}>
+                  <SelectTrigger data-testid="pay-method">
+                    <SelectValue placeholder="選填" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PAYMENT_METHODS.map((m) => (
+                      <SelectItem key={m} value={m}>
+                        {m}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div>
+              <label className="text-sm text-gray-600 mb-1 block">收據圖片（選填）</label>
+              <Input
+                type="file"
+                accept="image/*"
+                onChange={(e) => setPayFile(e.target.files?.[0] ?? null)}
+                data-testid="pay-receipt"
+              />
+              {payFile && <div className="text-xs text-gray-400 mt-1">已選：{payFile.name}</div>}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPayTarget(null)}>
+              取消
+            </Button>
+            <Button
+              onClick={() => payMutation.mutate()}
+              disabled={!payAmount || Number(payAmount) <= 0 || payMutation.isPending}
+              className="bg-amber-600 hover:bg-amber-700"
+              data-testid="pay-submit"
+            >
+              {payMutation.isPending ? "記錄中…" : "記一筆付款"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 新增固定開銷項目 Dialog */}
+      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>新增固定開銷項目</DialogTitle>
+            <DialogDescription>
+              設定每月預算（成本預估），之後在矩陣點格子記實際付款
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div>
+              <label className="text-sm text-gray-600 mb-1 block">項目名稱 *</label>
+              <Input
+                value={addName}
+                onChange={(e) => setAddName(e.target.value)}
+                placeholder="例：勞健保、店租、網路費"
+                data-testid="add-name"
+              />
+            </div>
+            <div>
+              <label className="text-sm text-gray-600 mb-1 block">每月預算金額 *</label>
+              <Input
+                type="number"
+                inputMode="decimal"
+                value={addAmount}
+                onChange={(e) => setAddAmount(e.target.value)}
+                className="text-lg font-bold"
+                data-testid="add-amount"
+              />
+            </div>
+            <div>
+              <label className="text-sm text-gray-600 mb-1 block">類別（選填）</label>
+              <Select value={addCategory} onValueChange={setAddCategory}>
+                <SelectTrigger data-testid="add-category">
+                  <SelectValue placeholder="未分類" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">未分類</SelectItem>
+                  {categories.map((c) => (
+                    <SelectItem key={c.id} value={String(c.id)}>
+                      {c.categoryName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-sm text-gray-600 mb-1 block">適用月份</label>
+              <Input
+                value={addMonths}
+                onChange={(e) => setAddMonths(e.target.value)}
+                placeholder="每月填 *、指定月份填 1,6,12"
+                data-testid="add-months"
+              />
+              <div className="text-xs text-gray-400 mt-1">
+                每月留「*」；只有特定月份（如年繳）填如「6」或「1,7」
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddOpen(false)}>
+              取消
+            </Button>
+            <Button
+              onClick={() => addMutation.mutate()}
+              disabled={!addName || !addAmount || Number(addAmount) <= 0 || addMutation.isPending}
+              className="bg-amber-600 hover:bg-amber-700"
+              data-testid="add-submit"
+            >
+              {addMutation.isPending ? "新增中…" : "新增"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <BackToTop />
     </div>
   )
