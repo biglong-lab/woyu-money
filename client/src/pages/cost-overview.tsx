@@ -32,10 +32,12 @@ import {
   ChevronUp,
   ExternalLink,
   Gift,
+  Zap,
 } from "lucide-react"
 import { useDocumentTitle } from "@/hooks/use-document-title"
 import { BackToTop } from "@/components/back-to-top"
 import { formatStatus, isCompletedStatus } from "@/lib/status-labels"
+import CostStructureAnnualView from "@/components/cost-structure-annual-view"
 
 interface RentalItem {
   contractId: number
@@ -95,6 +97,15 @@ interface AllowanceItem {
   notes: string | null
 }
 
+interface LedgerItem {
+  id: number
+  amount: number
+  entryDate: string
+  note: string | null
+  status: string
+  categoryName: string | null
+}
+
 interface Alert {
   level: "info" | "warning" | "error"
   type: string
@@ -131,6 +142,15 @@ interface CostStructureData {
     count: number
     items: AllowanceItem[]
   }
+  ledger: {
+    total: number
+    actual: number
+    planned: number
+    count: number
+    unclassifiedTotal: number
+    unclassifiedCount: number
+    items: LedgerItem[]
+  }
   grandTotal: number
   grandActual: number
   grandPlanned: number
@@ -161,7 +181,11 @@ const SOURCE_LABEL: Record<string, string> = {
 }
 
 export default function CostOverviewPage() {
-  useDocumentTitle("成本結構總覽")
+  useDocumentTitle("成本結構中樞")
+
+  // 主視圖：年度為主（可切月度）
+  const [view, setView] = useState<"annual" | "monthly">("annual")
+  const [selectedYear, setSelectedYear] = useState(() => new Date().getFullYear())
 
   const [selectedMonth, setSelectedMonth] = useState(() => {
     const now = new Date()
@@ -174,6 +198,7 @@ export default function CostOverviewPage() {
     template: false,
     manual: false,
     allowance: false,
+    ledger: false,
   })
 
   const { data, isLoading } = useQuery<CostStructureData>({
@@ -209,14 +234,33 @@ export default function CostOverviewPage() {
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <FileText className="h-6 w-6 text-indigo-600" />
-            成本結構總覽
+            成本結構中樞
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            一頁看完租金 / 人事 / 週期模板 / 一般單項四大成本來源
+            租金 / 人事(含勞健保) / 固定開銷 / 流水雜支 / 其他單項 — 全年成本結構與占比一頁看完
           </p>
         </div>
         <div className="flex gap-2 items-center flex-wrap">
-          {data && data.template.notGeneratedCount > 0 && (
+          {/* 年度 / 月度切換 */}
+          <div className="inline-flex rounded-md border overflow-hidden">
+            <button
+              type="button"
+              className={`px-3 py-1.5 text-sm ${view === "annual" ? "bg-indigo-600 text-white" : "bg-white text-gray-600"}`}
+              onClick={() => setView("annual")}
+              data-testid="view-annual"
+            >
+              年度
+            </button>
+            <button
+              type="button"
+              className={`px-3 py-1.5 text-sm ${view === "monthly" ? "bg-indigo-600 text-white" : "bg-white text-gray-600"}`}
+              onClick={() => setView("monthly")}
+              data-testid="view-monthly"
+            >
+              月度
+            </button>
+          </div>
+          {view === "monthly" && data && data.template.notGeneratedCount > 0 && (
             <Button
               onClick={() => generateMissingMutation.mutate()}
               disabled={generateMissingMutation.isPending}
@@ -229,267 +273,416 @@ export default function CostOverviewPage() {
                 : `一鍵產出 ${data.template.notGeneratedCount} 個占位`}
             </Button>
           )}
-          <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-            <SelectTrigger className="w-44">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {monthOptions().map((m) => (
-                <SelectItem key={m.value} value={m.value}>
-                  {m.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {view === "annual" ? (
+            <Select value={String(selectedYear)} onValueChange={(v) => setSelectedYear(Number(v))}>
+              <SelectTrigger className="w-32" data-testid="year-select">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {[selectedYear - 1, selectedYear, selectedYear + 1]
+                  .filter((y, i, a) => a.indexOf(y) === i)
+                  .map((y) => (
+                    <SelectItem key={y} value={String(y)}>
+                      {y} 年
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+              <SelectTrigger className="w-44">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {monthOptions().map((m) => (
+                  <SelectItem key={m.value} value={m.value}>
+                    {m.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
         </div>
       </div>
 
-      {/* 警示區 */}
-      {data && data.alerts.length > 0 && (
-        <div className="space-y-2">
-          {data.alerts.map((a, i) => (
-            <div
-              key={i}
-              className={`rounded-md px-3 py-2 text-sm flex items-center gap-2 ${
-                a.level === "error"
-                  ? "bg-red-50 border border-red-200 text-red-800"
-                  : a.level === "warning"
-                    ? "bg-amber-50 border border-amber-200 text-amber-800"
-                    : "bg-blue-50 border border-blue-200 text-blue-800"
-              }`}
-            >
-              {a.level === "error" ? (
-                <AlertCircle className="h-4 w-4 shrink-0" />
-              ) : a.level === "warning" ? (
-                <AlertTriangle className="h-4 w-4 shrink-0" />
-              ) : (
-                <Info className="h-4 w-4 shrink-0" />
-              )}
-              <span>{a.message}</span>
-            </div>
-          ))}
-        </div>
-      )}
+      {view === "annual" && <CostStructureAnnualView year={selectedYear} />}
 
-      {/* 總計卡 */}
-      {data && (
-        <Card className="border-indigo-200 bg-indigo-50">
-          <CardContent className="py-3 px-4">
-            <div className="flex flex-wrap gap-6">
-              <div>
-                <div className="text-xs text-indigo-700">總成本</div>
-                <div className="text-2xl font-bold text-indigo-900">
-                  {formatMoney(data.grandTotal)}
-                </div>
-              </div>
-              <div>
-                <div className="text-xs text-green-700">已發生（actual）</div>
-                <div className="text-xl font-semibold text-green-800">
-                  {formatMoney(data.grandActual)}
-                </div>
-              </div>
-              <div>
-                <div className="text-xs text-amber-700">預定（planned）</div>
-                <div className="text-xl font-semibold text-amber-700">
-                  {formatMoney(data.grandPlanned)}
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* 4 大區塊卡 */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-        <CostCard
-          icon={Home}
-          color="rose"
-          title="租金"
-          total={data?.rental.total ?? 0}
-          actual={data?.rental.actual ?? 0}
-          planned={data?.rental.planned ?? 0}
-          count={data?.rental.count ?? 0}
-          subtitle="rental_contracts"
-          isLoading={isLoading}
-          onClick={() => toggle("rental")}
-          expanded={expanded.rental}
-        />
-        <CostCard
-          icon={Users}
-          color="purple"
-          title="人事"
-          total={data?.hr.total ?? 0}
-          actual={data?.hr.actual ?? 0}
-          planned={data?.hr.planned ?? 0}
-          count={data?.hr.count ?? 0}
-          subtitle={
-            data && data.hr.unpaidCount > 0 ? `${data.hr.unpaidCount} 人未發放` : "monthly_hr_costs"
-          }
-          isLoading={isLoading}
-          onClick={() => toggle("hr")}
-          expanded={expanded.hr}
-        />
-        <CostCard
-          icon={Repeat}
-          color="blue"
-          title="週期模板"
-          total={data?.template.total ?? 0}
-          actual={data?.template.actual ?? 0}
-          planned={data?.template.planned ?? 0}
-          count={data?.template.count ?? 0}
-          subtitle={
-            data && data.template.notGeneratedCount > 0
-              ? `${data.template.notGeneratedCount} 個未產出`
-              : "recurring_expense_templates"
-          }
-          isLoading={isLoading}
-          onClick={() => toggle("template")}
-          expanded={expanded.template}
-        />
-        <CostCard
-          icon={FileText}
-          color="gray"
-          title="一般單項"
-          total={data?.manual.total ?? 0}
-          actual={data?.manual.actual ?? 0}
-          planned={data?.manual.planned ?? 0}
-          count={data?.manual.count ?? 0}
-          subtitle="payment_items"
-          isLoading={isLoading}
-          onClick={() => toggle("manual")}
-          expanded={expanded.manual}
-        />
-        <CostCard
-          icon={Gift}
-          color="pink"
-          title="家庭零用金"
-          total={data?.allowance.total ?? 0}
-          actual={data?.allowance.actual ?? 0}
-          planned={data?.allowance.planned ?? 0}
-          count={data?.allowance.count ?? 0}
-          subtitle="kids,allowance"
-          isLoading={isLoading}
-          onClick={() => toggle("allowance")}
-          expanded={expanded.allowance}
-        />
-      </div>
-
-      {/* 明細展開區 */}
-      {data && expanded.rental && (
-        <SectionTable
-          title="🏠 租金明細"
-          link="/rental-matrix"
-          linkLabel="到租金矩陣編輯"
-          empty={data.rental.items.length === 0 ? "本月無有效租約" : null}
-        >
-          {data.rental.items.map((r) => (
-            <tr key={r.contractId} className="border-b last:border-0 hover:bg-gray-50">
-              <td className="px-3 py-2 text-sm">{r.contractName}</td>
-              <td className="px-3 py-2 text-xs text-gray-500">
-                {r.tenantName ?? "—"}
-                {r.projectName ? ` · ${r.projectName}` : ""}
-              </td>
-              <td className="px-3 py-2 text-xs">每月 {r.paymentDay} 日</td>
-              <td className="px-3 py-2 text-sm font-mono">{formatMoney(r.amount)}</td>
-              <td className="px-3 py-2 text-xs">
-                {r.paymentItemId === null ? (
-                  <Badge variant="outline" className="bg-amber-50 text-amber-700">
-                    未產出
-                  </Badge>
-                ) : (
-                  <Badge
-                    className={
-                      isCompletedStatus(r.paymentItemStatus)
-                        ? "bg-green-100 text-green-800"
-                        : "bg-amber-100 text-amber-800"
-                    }
-                  >
-                    {formatStatus(r.paymentItemStatus)}
-                  </Badge>
-                )}
-              </td>
-            </tr>
-          ))}
-        </SectionTable>
-      )}
-
-      {data && expanded.hr && (
-        <SectionTable
-          title="👥 人事明細"
-          link="/hr-cost-management"
-          linkLabel="到人事管理"
-          empty={data.hr.items.length === 0 ? `${selectedMonth} 還沒結算人事成本` : null}
-        >
-          {data.hr.items.map((h) => (
-            <tr key={h.employeeId} className="border-b last:border-0 hover:bg-gray-50">
-              <td className="px-3 py-2 text-sm">{h.employeeName ?? `員工 #${h.employeeId}`}</td>
-              <td className="px-3 py-2 text-xs text-gray-500">{h.position ?? "—"}</td>
-              <td className="px-3 py-2 text-sm font-mono">{formatMoney(h.totalCost)}</td>
-              <td className="px-3 py-2 text-xs">
-                <Badge
-                  className={
-                    h.isPaid ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"
-                  }
-                >
-                  {h.isPaid ? "已發放" : "未發放"}
-                </Badge>
-              </td>
-            </tr>
-          ))}
-        </SectionTable>
-      )}
-
-      {data && expanded.template && (
+      {view === "monthly" && (
         <>
-          <SectionTable
-            title={`📋 已產出占位（${data.template.count}）`}
-            link="/recurring-expenses"
-            linkLabel="到週期模板管理"
-            empty={data.template.generatedItems.length === 0 ? "尚無產出占位" : null}
-          >
-            {data.template.generatedItems.map((g) => (
-              <tr key={g.itemId} className="border-b last:border-0 hover:bg-gray-50">
-                <td className="px-3 py-2 text-sm">
-                  {g.itemName}
-                  {g.templateName && (
-                    <span className="ml-1.5 text-[10px] text-blue-600 bg-blue-50 rounded px-1 py-0.5">
-                      模板 #{g.templateId}
-                    </span>
+          {/* ===== 月度明細（原視圖）===== */}
+
+          {/* 警示區 */}
+          {data && data.alerts.length > 0 && (
+            <div className="space-y-2">
+              {data.alerts.map((a, i) => (
+                <div
+                  key={i}
+                  className={`rounded-md px-3 py-2 text-sm flex items-center gap-2 ${
+                    a.level === "error"
+                      ? "bg-red-50 border border-red-200 text-red-800"
+                      : a.level === "warning"
+                        ? "bg-amber-50 border border-amber-200 text-amber-800"
+                        : "bg-blue-50 border border-blue-200 text-blue-800"
+                  }`}
+                >
+                  {a.level === "error" ? (
+                    <AlertCircle className="h-4 w-4 shrink-0" />
+                  ) : a.level === "warning" ? (
+                    <AlertTriangle className="h-4 w-4 shrink-0" />
+                  ) : (
+                    <Info className="h-4 w-4 shrink-0" />
                   )}
-                </td>
-                <td className="px-3 py-2 text-xs text-gray-500">{g.startDate}</td>
-                <td className="px-3 py-2 text-sm font-mono">{formatMoney(g.estimatedAmount)}</td>
-                <td className="px-3 py-2 text-xs">
-                  <Badge
-                    className={
-                      isCompletedStatus(g.status)
-                        ? "bg-green-100 text-green-800"
-                        : "bg-amber-100 text-amber-800"
-                    }
-                  >
-                    {formatStatus(g.status)}
-                  </Badge>
-                </td>
-              </tr>
-            ))}
-          </SectionTable>
-          {data.template.notGenerated.length > 0 && (
+                  <span>{a.message}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* 總計卡 */}
+          {data && (
+            <Card className="border-indigo-200 bg-indigo-50">
+              <CardContent className="py-3 px-4">
+                <div className="flex flex-wrap gap-6">
+                  <div>
+                    <div className="text-xs text-indigo-700">總成本</div>
+                    <div className="text-2xl font-bold text-indigo-900">
+                      {formatMoney(data.grandTotal)}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-green-700">已發生（actual）</div>
+                    <div className="text-xl font-semibold text-green-800">
+                      {formatMoney(data.grandActual)}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-amber-700">預定（planned）</div>
+                    <div className="text-xl font-semibold text-amber-700">
+                      {formatMoney(data.grandPlanned)}
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* 4 大區塊卡 */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            <CostCard
+              icon={Home}
+              color="rose"
+              title="租金"
+              total={data?.rental.total ?? 0}
+              actual={data?.rental.actual ?? 0}
+              planned={data?.rental.planned ?? 0}
+              count={data?.rental.count ?? 0}
+              subtitle="rental_contracts"
+              isLoading={isLoading}
+              onClick={() => toggle("rental")}
+              expanded={expanded.rental}
+            />
+            <CostCard
+              icon={Users}
+              color="purple"
+              title="人事"
+              total={data?.hr.total ?? 0}
+              actual={data?.hr.actual ?? 0}
+              planned={data?.hr.planned ?? 0}
+              count={data?.hr.count ?? 0}
+              subtitle={
+                data && data.hr.unpaidCount > 0
+                  ? `${data.hr.unpaidCount} 人未發放`
+                  : "monthly_hr_costs"
+              }
+              isLoading={isLoading}
+              onClick={() => toggle("hr")}
+              expanded={expanded.hr}
+            />
+            <CostCard
+              icon={Repeat}
+              color="blue"
+              title="週期模板"
+              total={data?.template.total ?? 0}
+              actual={data?.template.actual ?? 0}
+              planned={data?.template.planned ?? 0}
+              count={data?.template.count ?? 0}
+              subtitle={
+                data && data.template.notGeneratedCount > 0
+                  ? `${data.template.notGeneratedCount} 個未產出`
+                  : "recurring_expense_templates"
+              }
+              isLoading={isLoading}
+              onClick={() => toggle("template")}
+              expanded={expanded.template}
+            />
+            <CostCard
+              icon={FileText}
+              color="gray"
+              title="一般單項"
+              total={data?.manual.total ?? 0}
+              actual={data?.manual.actual ?? 0}
+              planned={data?.manual.planned ?? 0}
+              count={data?.manual.count ?? 0}
+              subtitle="payment_items"
+              isLoading={isLoading}
+              onClick={() => toggle("manual")}
+              expanded={expanded.manual}
+            />
+            <CostCard
+              icon={Gift}
+              color="pink"
+              title="家庭零用金"
+              total={data?.allowance.total ?? 0}
+              actual={data?.allowance.actual ?? 0}
+              planned={data?.allowance.planned ?? 0}
+              count={data?.allowance.count ?? 0}
+              subtitle="kids,allowance"
+              isLoading={isLoading}
+              onClick={() => toggle("allowance")}
+              expanded={expanded.allowance}
+            />
+            <CostCard
+              icon={Zap}
+              color="green"
+              title="流水雜支"
+              total={data?.ledger.total ?? 0}
+              actual={data?.ledger.actual ?? 0}
+              planned={data?.ledger.planned ?? 0}
+              count={data?.ledger.count ?? 0}
+              subtitle="expense_ledger"
+              isLoading={isLoading}
+              onClick={() => toggle("ledger")}
+              expanded={expanded.ledger}
+            />
+          </div>
+
+          {/* 明細展開區 */}
+          {data && expanded.rental && (
             <SectionTable
-              title={`⚠️ 未產出占位（${data.template.notGenerated.length}）`}
-              link="/recurring-expenses"
-              linkLabel="到週期模板管理產出"
-              empty={null}
+              title="🏠 租金明細"
+              link="/rental-matrix"
+              linkLabel="到租金矩陣編輯"
+              empty={data.rental.items.length === 0 ? "本月無有效租約" : null}
             >
-              {data.template.notGenerated.map((t) => (
-                <tr key={t.templateId} className="border-b last:border-0 hover:bg-amber-50">
-                  <td className="px-3 py-2 text-sm">{t.templateName}</td>
-                  <td className="px-3 py-2 text-xs text-gray-500">每月 {t.dayOfMonth} 日預計</td>
-                  <td className="px-3 py-2 text-sm font-mono text-amber-700">
-                    {formatMoney(t.estimatedAmount)}
+              {data.rental.items.map((r) => (
+                <tr key={r.contractId} className="border-b last:border-0 hover:bg-gray-50">
+                  <td className="px-3 py-2 text-sm">{r.contractName}</td>
+                  <td className="px-3 py-2 text-xs text-gray-500">
+                    {r.tenantName ?? "—"}
+                    {r.projectName ? ` · ${r.projectName}` : ""}
+                  </td>
+                  <td className="px-3 py-2 text-xs">每月 {r.paymentDay} 日</td>
+                  <td className="px-3 py-2 text-sm font-mono">{formatMoney(r.amount)}</td>
+                  <td className="px-3 py-2 text-xs">
+                    {r.paymentItemId === null ? (
+                      <Badge variant="outline" className="bg-amber-50 text-amber-700">
+                        未產出
+                      </Badge>
+                    ) : (
+                      <Badge
+                        className={
+                          isCompletedStatus(r.paymentItemStatus)
+                            ? "bg-green-100 text-green-800"
+                            : "bg-amber-100 text-amber-800"
+                        }
+                      >
+                        {formatStatus(r.paymentItemStatus)}
+                      </Badge>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </SectionTable>
+          )}
+
+          {data && expanded.hr && (
+            <SectionTable
+              title="👥 人事明細"
+              link="/hr-cost-management"
+              linkLabel="到人事管理"
+              empty={data.hr.items.length === 0 ? `${selectedMonth} 還沒結算人事成本` : null}
+            >
+              {data.hr.items.map((h) => (
+                <tr key={h.employeeId} className="border-b last:border-0 hover:bg-gray-50">
+                  <td className="px-3 py-2 text-sm">{h.employeeName ?? `員工 #${h.employeeId}`}</td>
+                  <td className="px-3 py-2 text-xs text-gray-500">{h.position ?? "—"}</td>
+                  <td className="px-3 py-2 text-sm font-mono">{formatMoney(h.totalCost)}</td>
+                  <td className="px-3 py-2 text-xs">
+                    <Badge
+                      className={
+                        h.isPaid ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"
+                      }
+                    >
+                      {h.isPaid ? "已發放" : "未發放"}
+                    </Badge>
+                  </td>
+                </tr>
+              ))}
+            </SectionTable>
+          )}
+
+          {data && expanded.template && (
+            <>
+              <SectionTable
+                title={`📋 已產出占位（${data.template.count}）`}
+                link="/recurring-expenses"
+                linkLabel="到週期模板管理"
+                empty={data.template.generatedItems.length === 0 ? "尚無產出占位" : null}
+              >
+                {data.template.generatedItems.map((g) => (
+                  <tr key={g.itemId} className="border-b last:border-0 hover:bg-gray-50">
+                    <td className="px-3 py-2 text-sm">
+                      {g.itemName}
+                      {g.templateName && (
+                        <span className="ml-1.5 text-[10px] text-blue-600 bg-blue-50 rounded px-1 py-0.5">
+                          模板 #{g.templateId}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 text-xs text-gray-500">{g.startDate}</td>
+                    <td className="px-3 py-2 text-sm font-mono">
+                      {formatMoney(g.estimatedAmount)}
+                    </td>
+                    <td className="px-3 py-2 text-xs">
+                      <Badge
+                        className={
+                          isCompletedStatus(g.status)
+                            ? "bg-green-100 text-green-800"
+                            : "bg-amber-100 text-amber-800"
+                        }
+                      >
+                        {formatStatus(g.status)}
+                      </Badge>
+                    </td>
+                  </tr>
+                ))}
+              </SectionTable>
+              {data.template.notGenerated.length > 0 && (
+                <SectionTable
+                  title={`⚠️ 未產出占位（${data.template.notGenerated.length}）`}
+                  link="/recurring-expenses"
+                  linkLabel="到週期模板管理產出"
+                  empty={null}
+                >
+                  {data.template.notGenerated.map((t) => (
+                    <tr key={t.templateId} className="border-b last:border-0 hover:bg-amber-50">
+                      <td className="px-3 py-2 text-sm">{t.templateName}</td>
+                      <td className="px-3 py-2 text-xs text-gray-500">
+                        每月 {t.dayOfMonth} 日預計
+                      </td>
+                      <td className="px-3 py-2 text-sm font-mono text-amber-700">
+                        {formatMoney(t.estimatedAmount)}
+                      </td>
+                      <td className="px-3 py-2 text-xs">
+                        <Badge variant="outline" className="bg-amber-50 text-amber-700">
+                          待產出
+                        </Badge>
+                      </td>
+                    </tr>
+                  ))}
+                </SectionTable>
+              )}
+            </>
+          )}
+
+          {data && expanded.manual && (
+            <SectionTable
+              title={`📝 一般單項（${data.manual.count}）`}
+              link="/payment-project"
+              linkLabel="到付款管理"
+              empty={data.manual.items.length === 0 ? "本月無一般單項" : null}
+            >
+              {data.manual.items.slice(0, 50).map((m) => (
+                <tr key={m.id} className="border-b last:border-0 hover:bg-gray-50">
+                  <td className="px-3 py-2 text-sm">
+                    {m.itemName}
+                    <span className="ml-1.5 text-[10px] text-gray-500 bg-gray-100 rounded px-1 py-0.5">
+                      {SOURCE_LABEL[m.source] ?? m.source}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2 text-xs text-gray-500">
+                    {m.categoryName ?? "未分類"}
+                    {m.projectName ? ` · ${m.projectName}` : ""}
+                  </td>
+                  <td className="px-3 py-2 text-sm font-mono">{formatMoney(m.amount)}</td>
+                  <td className="px-3 py-2 text-xs">
+                    <Badge
+                      className={
+                        isCompletedStatus(m.status)
+                          ? "bg-green-100 text-green-800"
+                          : "bg-amber-100 text-amber-800"
+                      }
+                    >
+                      {formatStatus(m.status)}
+                    </Badge>
+                  </td>
+                </tr>
+              ))}
+              {data.manual.items.length > 50 && (
+                <tr>
+                  <td colSpan={4} className="px-3 py-2 text-xs text-gray-400 text-center italic">
+                    只顯示前 50 筆、其餘 {data.manual.items.length - 50} 筆請至付款管理查看
+                  </td>
+                </tr>
+              )}
+            </SectionTable>
+          )}
+
+          {data && expanded.allowance && (
+            <SectionTable
+              title={`🎁 家庭零用金（${data.allowance.count}）`}
+              link="/family"
+              linkLabel="到家庭記帳"
+              empty={data.allowance.items.length === 0 ? "本月無零用金支出" : null}
+            >
+              {data.allowance.items.map((a) => (
+                <tr key={a.id} className="border-b last:border-0 hover:bg-pink-50">
+                  <td className="px-3 py-2 text-sm">{a.itemName}</td>
+                  <td className="px-3 py-2 text-xs text-gray-500">{a.startDate}</td>
+                  <td className="px-3 py-2 text-sm font-mono text-pink-700">
+                    {formatMoney(a.amount)}
                   </td>
                   <td className="px-3 py-2 text-xs">
-                    <Badge variant="outline" className="bg-amber-50 text-amber-700">
-                      待產出
+                    <Badge
+                      className={
+                        isCompletedStatus(a.status)
+                          ? "bg-green-100 text-green-800"
+                          : "bg-amber-100 text-amber-800"
+                      }
+                    >
+                      {formatStatus(a.status)}
+                    </Badge>
+                  </td>
+                </tr>
+              ))}
+            </SectionTable>
+          )}
+
+          {data && expanded.ledger && (
+            <SectionTable
+              title={`⚡ 流水雜支（${data.ledger.count}）`}
+              link="/document-inbox"
+              linkLabel="到記帳窗口"
+              empty={data.ledger.items.length === 0 ? "本月無流水帳" : null}
+            >
+              {data.ledger.items.map((l) => (
+                <tr key={l.id} className="border-b last:border-0 hover:bg-emerald-50">
+                  <td className="px-3 py-2 text-sm">
+                    {l.note || l.categoryName || "（未填備註）"}
+                  </td>
+                  <td className="px-3 py-2 text-xs text-gray-500">{l.entryDate}</td>
+                  <td className="px-3 py-2 text-sm font-mono text-emerald-700">
+                    {formatMoney(l.amount)}
+                  </td>
+                  <td className="px-3 py-2 text-xs">
+                    <Badge
+                      className={
+                        l.status === "unclassified"
+                          ? "bg-amber-100 text-amber-800"
+                          : "bg-green-100 text-green-800"
+                      }
+                    >
+                      {l.status === "unclassified" ? "待分帳" : (l.categoryName ?? "已分帳")}
                     </Badge>
                   </td>
                 </tr>
@@ -497,77 +690,6 @@ export default function CostOverviewPage() {
             </SectionTable>
           )}
         </>
-      )}
-
-      {data && expanded.manual && (
-        <SectionTable
-          title={`📝 一般單項（${data.manual.count}）`}
-          link="/payment-project"
-          linkLabel="到付款管理"
-          empty={data.manual.items.length === 0 ? "本月無一般單項" : null}
-        >
-          {data.manual.items.slice(0, 50).map((m) => (
-            <tr key={m.id} className="border-b last:border-0 hover:bg-gray-50">
-              <td className="px-3 py-2 text-sm">
-                {m.itemName}
-                <span className="ml-1.5 text-[10px] text-gray-500 bg-gray-100 rounded px-1 py-0.5">
-                  {SOURCE_LABEL[m.source] ?? m.source}
-                </span>
-              </td>
-              <td className="px-3 py-2 text-xs text-gray-500">
-                {m.categoryName ?? "未分類"}
-                {m.projectName ? ` · ${m.projectName}` : ""}
-              </td>
-              <td className="px-3 py-2 text-sm font-mono">{formatMoney(m.amount)}</td>
-              <td className="px-3 py-2 text-xs">
-                <Badge
-                  className={
-                    isCompletedStatus(m.status)
-                      ? "bg-green-100 text-green-800"
-                      : "bg-amber-100 text-amber-800"
-                  }
-                >
-                  {formatStatus(m.status)}
-                </Badge>
-              </td>
-            </tr>
-          ))}
-          {data.manual.items.length > 50 && (
-            <tr>
-              <td colSpan={4} className="px-3 py-2 text-xs text-gray-400 text-center italic">
-                只顯示前 50 筆、其餘 {data.manual.items.length - 50} 筆請至付款管理查看
-              </td>
-            </tr>
-          )}
-        </SectionTable>
-      )}
-
-      {data && expanded.allowance && (
-        <SectionTable
-          title={`🎁 家庭零用金（${data.allowance.count}）`}
-          link="/family"
-          linkLabel="到家庭記帳"
-          empty={data.allowance.items.length === 0 ? "本月無零用金支出" : null}
-        >
-          {data.allowance.items.map((a) => (
-            <tr key={a.id} className="border-b last:border-0 hover:bg-pink-50">
-              <td className="px-3 py-2 text-sm">{a.itemName}</td>
-              <td className="px-3 py-2 text-xs text-gray-500">{a.startDate}</td>
-              <td className="px-3 py-2 text-sm font-mono text-pink-700">{formatMoney(a.amount)}</td>
-              <td className="px-3 py-2 text-xs">
-                <Badge
-                  className={
-                    isCompletedStatus(a.status)
-                      ? "bg-green-100 text-green-800"
-                      : "bg-amber-100 text-amber-800"
-                  }
-                >
-                  {formatStatus(a.status)}
-                </Badge>
-              </td>
-            </tr>
-          ))}
-        </SectionTable>
       )}
 
       <BackToTop />
@@ -589,7 +711,7 @@ function CostCard({
   expanded,
 }: {
   icon: React.ComponentType<{ className?: string }>
-  color: "rose" | "purple" | "blue" | "gray" | "pink"
+  color: "rose" | "purple" | "blue" | "gray" | "pink" | "green"
   title: string
   total: number
   actual: number
@@ -606,6 +728,7 @@ function CostCard({
     blue: { border: "border-blue-200", bg: "bg-blue-50", text: "text-blue-700" },
     gray: { border: "border-gray-200", bg: "bg-gray-50", text: "text-gray-700" },
     pink: { border: "border-pink-200", bg: "bg-pink-50", text: "text-pink-700" },
+    green: { border: "border-emerald-200", bg: "bg-emerald-50", text: "text-emerald-700" },
   }
   const c = colorMap[color]
   return (

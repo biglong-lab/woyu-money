@@ -17,11 +17,16 @@
  *    + 排除 item_name LIKE '%租金%' 等 rental 字樣（rental_contracts 才是 source of truth）
  */
 import { Router } from "express"
-import { asyncHandler, AppError } from "../middleware/error-handler"
+import { asyncHandler } from "../middleware/error-handler"
 import { db } from "../db"
 import { sql } from "drizzle-orm"
 import { localMonthTPE, localDateTPE } from "@shared/date-utils"
 import { generateItemsForMonth } from "../storage/recurring-expense-templates"
+import {
+  buildAnnualCostStructure,
+  type BucketMonthInput,
+  type BucketKey,
+} from "@shared/cost-structure-annual"
 
 const router = Router()
 
@@ -97,6 +102,15 @@ interface AllowanceItem {
   status: string
   startDate: string
   notes: string | null
+}
+
+interface LedgerItem {
+  id: number
+  amount: number
+  entryDate: string
+  note: string | null
+  status: string // unclassified | classified | archived
+  categoryName: string | null
 }
 
 router.get(
@@ -499,10 +513,56 @@ router.get(
     const manualPlanned = manualTotal - manualActual
 
     // ============================================================
+    // 4.6 開銷流水帳（expense_ledger）— 獨立第 6 桶（每筆即已花費）
+    // 不與 payment_items 雙算（獨立表）；total 即 actual、無 planned
+    // ============================================================
+    const ledgerRows = await db.execute(sql`
+      SELECT el.id, el.amount::numeric AS amount, el.entry_date AS "entryDate",
+             el.note, el.status, dc.category_name AS "categoryName"
+      FROM expense_ledger el
+      LEFT JOIN debt_categories dc ON dc.id = el.category_id
+      WHERE el.entry_date >= ${monthStart}::date
+        AND el.entry_date < ${nextMonth}::date
+      ORDER BY el.entry_date DESC, el.id DESC
+    `)
+    const ledgerItems: LedgerItem[] = (
+      ledgerRows as unknown as {
+        rows: {
+          id: number
+          amount: string
+          entryDate: string
+          note: string | null
+          status: string
+          categoryName: string | null
+        }[]
+      }
+    ).rows.map((r) => ({
+      id: r.id,
+      amount: parseFloat(r.amount),
+      entryDate: r.entryDate,
+      note: r.note,
+      status: r.status,
+      categoryName: r.categoryName,
+    }))
+    const ledgerTotal = ledgerItems.reduce((s, i) => s + i.amount, 0)
+    const ledgerUnclassifiedTotal = ledgerItems
+      .filter((i) => i.status === "unclassified")
+      .reduce((s, i) => s + i.amount, 0)
+    const ledgerUnclassifiedCount = ledgerItems.filter((i) => i.status === "unclassified").length
+    if (ledgerUnclassifiedCount > 0) {
+      alerts.push({
+        level: "info",
+        type: "ledger_unclassified",
+        message: `流水帳 ${ledgerUnclassifiedCount} 筆未分帳（$${ledgerUnclassifiedTotal.toLocaleString()}）待整理`,
+      })
+    }
+
+    // ============================================================
     // 5. 總計 + 回傳
     // ============================================================
-    const grandTotal = rentalTotal + hrTotal + tplTotal + manualTotal + allowanceTotal
-    const grandActual = rentalActual + hrPaid + tplActual + manualActual + allowanceActual
+    const grandTotal = rentalTotal + hrTotal + tplTotal + manualTotal + allowanceTotal + ledgerTotal
+    const grandActual =
+      rentalActual + hrPaid + tplActual + manualActual + allowanceActual + ledgerTotal
     const grandPlanned = grandTotal - grandActual
 
     res.json({
@@ -547,11 +607,121 @@ router.get(
         count: allowanceItems.length,
         items: allowanceItems,
       },
+      ledger: {
+        total: ledgerTotal,
+        actual: ledgerTotal, // 流水帳每筆即已花費
+        planned: 0,
+        count: ledgerItems.length,
+        unclassifiedTotal: ledgerUnclassifiedTotal,
+        unclassifiedCount: ledgerUnclassifiedCount,
+        items: ledgerItems,
+      },
       grandTotal,
       grandActual,
       grandPlanned,
       alerts,
     })
+  })
+)
+
+/**
+ * GET /api/dashboard/cost-structure/annual?year=YYYY
+ * 五桶（租金/人事含勞健保/固定開銷/流水雜支/其他單項）× 12 月，預算 vs 實際。
+ * 結構總覽用：各桶以 SQL 依月份加總，排除邏輯確保桶間不雙算。
+ */
+interface MonthAggRow {
+  month: number
+  budget: string | number
+  actual: string | number
+}
+
+router.get(
+  "/api/dashboard/cost-structure/annual",
+  asyncHandler(async (req, res) => {
+    const yearRaw = Number(req.query.year)
+    const year =
+      Number.isInteger(yearRaw) && yearRaw >= 2000 && yearRaw <= 2100
+        ? yearRaw
+        : new Date().getFullYear()
+
+    const rowsOf = (r: unknown): MonthAggRow[] => (r as unknown as { rows: MonthAggRow[] }).rows
+
+    // 人事（含勞健保）：monthly_hr_costs
+    const hrRes = await db.execute(sql`
+      SELECT month,
+             COALESCE(SUM(total_cost::numeric), 0) AS budget,
+             COALESCE(SUM(total_cost::numeric) FILTER (WHERE is_paid), 0) AS actual
+      FROM monthly_hr_costs WHERE year = ${year} GROUP BY month
+    `)
+    // 固定開銷（週期模板產出的 payment_items）
+    const fixedRes = await db.execute(sql`
+      SELECT EXTRACT(MONTH FROM start_date)::int AS month,
+             COALESCE(SUM(total_amount::numeric), 0) AS budget,
+             COALESCE(SUM(COALESCE(paid_amount, 0)::numeric), 0) AS actual
+      FROM payment_items
+      WHERE NOT is_deleted AND recurring_template_id IS NOT NULL
+        AND EXTRACT(YEAR FROM start_date) = ${year}
+      GROUP BY month
+    `)
+    // 流水雜支（expense_ledger，每筆即已花費）
+    const ledgerRes = await db.execute(sql`
+      SELECT EXTRACT(MONTH FROM entry_date)::int AS month,
+             0 AS budget,
+             COALESCE(SUM(amount::numeric), 0) AS actual
+      FROM expense_ledger
+      WHERE EXTRACT(YEAR FROM entry_date) = ${year}
+      GROUP BY month
+    `)
+    // 租金（payment_items 租金分類或名稱含租）
+    const rentalRes = await db.execute(sql`
+      SELECT EXTRACT(MONTH FROM start_date)::int AS month,
+             COALESCE(SUM(total_amount::numeric), 0) AS budget,
+             COALESCE(SUM(COALESCE(paid_amount, 0)::numeric), 0) AS actual
+      FROM payment_items
+      WHERE NOT is_deleted AND recurring_template_id IS NULL
+        AND EXTRACT(YEAR FROM start_date) = ${year}
+        AND (category_id IN (2, 28) OR item_name LIKE '%租%')
+      GROUP BY month
+    `)
+    // 其他單項（排除模板/HR/租金/零用金，避免雙算）
+    const manualRes = await db.execute(sql`
+      SELECT EXTRACT(MONTH FROM start_date)::int AS month,
+             COALESCE(SUM(total_amount::numeric), 0) AS budget,
+             COALESCE(SUM(COALESCE(paid_amount, 0)::numeric), 0) AS actual
+      FROM payment_items pi
+      WHERE NOT pi.is_deleted AND pi.recurring_template_id IS NULL
+        AND pi.item_type IN ('project', 'home')
+        AND EXTRACT(YEAR FROM pi.start_date) = ${year}
+        AND pi.source NOT IN ('template_scheduled', 'hr', 'auto_backfill')
+        AND (pi.category_id IS NULL OR pi.category_id NOT IN (2, 28))
+        AND pi.item_name NOT LIKE '%租%'
+        AND pi.item_name NOT LIKE '%薪%'
+        AND pi.item_name NOT LIKE '%勞保%'
+        AND pi.item_name NOT LIKE '%勞退%'
+        AND pi.item_name NOT LIKE '%健保%'
+        AND (pi.tags IS NULL OR pi.tags NOT LIKE '%kids%')
+        AND (pi.notes IS NULL OR pi.notes NOT LIKE '%自動補建%')
+      GROUP BY month
+    `)
+
+    const inputs: BucketMonthInput[] = []
+    const push = (bucket: BucketKey, r: unknown) => {
+      for (const row of rowsOf(r)) {
+        inputs.push({
+          bucket,
+          month: Number(row.month),
+          budget: Number(row.budget),
+          actual: Number(row.actual),
+        })
+      }
+    }
+    push("rental", rentalRes)
+    push("hr", hrRes)
+    push("fixed", fixedRes)
+    push("ledger", ledgerRes)
+    push("manual", manualRes)
+
+    res.json(buildAnnualCostStructure(year, inputs))
   })
 )
 

@@ -100,10 +100,10 @@ export const dashboardNavItem: NavItem = {
 }
 
 export const costOverviewNavItem: NavItem = {
-  title: "成本結構總覽",
+  title: "成本結構中樞",
   href: "/cost-overview",
   icon: Layers,
-  description: "租金 / 人事 / 週期模板 / 一般單項 四大成本一頁看完",
+  description: "租金/人事/固定開銷/流水雜支/其他 全年成本結構+占比，下鑽三大矩陣",
 }
 
 export const familyNavItem: NavItem = {
