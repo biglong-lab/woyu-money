@@ -40,6 +40,11 @@ export const paymentItems = pgTable(
     installmentAmount: decimal("installment_amount", { precision: 10, scale: 2 }),
     startDate: date("start_date").notNull(),
     endDate: date("end_date"),
+    // 帳單時間掌握（避免遲繳）：帳單來的時間 / 法定付款時間
+    billIssuedDate: date("bill_issued_date"),
+    legalDueDate: date("legal_due_date"),
+    // 強執分流：被強制執行的應付款連到強執案，從一般應付款排除
+    enforcementCaseId: integer("enforcement_case_id"),
     paidAmount: decimal("paid_amount", { precision: 10, scale: 2 }).default("0.00"),
     status: varchar("status", { length: 20 }).default("pending"),
     priority: integer("priority").default(1),

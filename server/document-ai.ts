@@ -153,6 +153,88 @@ export async function recognizeDocument(
   }
 }
 
+// ── 強制執行公文辨識 ──
+export interface EnforcementRecognitionResult {
+  success: boolean
+  confidence: number
+  data: {
+    caseNumber?: string // 公文文號
+    agency?: string // 執行處/機關
+    contactPhone?: string // 窗口電話
+    subject?: string // 案由/內容摘要
+    totalAmount?: number // 強執金額
+    issuedDate?: string // 公文日期 YYYY-MM-DD
+  }
+  rawResponse?: string
+  error?: string
+}
+
+const ENFORCEMENT_PROMPT = `你是專業的法律文書辨識系統。這是一張「行政執行/強制執行」公文（常見來源：法務部行政執行署各分署、國稅局、勞保局健保署移送執行）。請提取：
+1. caseNumber（公文文號/案號，如「113年度健保執特專字第XXXXX號」）
+2. agency（執行機關/分署名稱）
+3. contactPhone（承辦窗口電話，含分機）
+4. subject（案由/執行內容摘要，例如「滯納健保費」「欠繳勞保費」「營業稅」）
+5. totalAmount（執行/應納總金額，只取數字）
+6. issuedDate（發文日期，格式 YYYY-MM-DD；民國年請換算西元）
+
+注意：金額只取數字不含符號；民國年＋1911＝西元年；辨識不到的欄位留空；準確辨識台灣繁體中文公文。`
+
+export async function recognizeEnforcementDocument(
+  imageBase64: string,
+  mimeType: string = "image/jpeg"
+): Promise<EnforcementRecognitionResult> {
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: [
+        {
+          role: "user",
+          parts: [{ text: ENFORCEMENT_PROMPT }, { inlineData: { mimeType, data: imageBase64 } }],
+        },
+      ],
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            confidence: { type: Type.NUMBER },
+            caseNumber: { type: Type.STRING },
+            agency: { type: Type.STRING },
+            contactPhone: { type: Type.STRING },
+            subject: { type: Type.STRING },
+            totalAmount: { type: Type.NUMBER },
+            issuedDate: { type: Type.STRING },
+          },
+          required: ["confidence"],
+        },
+      },
+    })
+    const rawText = response.text || "{}"
+    const p = JSON.parse(rawText)
+    return {
+      success: true,
+      confidence: p.confidence ?? 0.5,
+      data: {
+        caseNumber: p.caseNumber,
+        agency: p.agency,
+        contactPhone: p.contactPhone,
+        subject: p.subject,
+        totalAmount: p.totalAmount,
+        issuedDate: p.issuedDate,
+      },
+      rawResponse: rawText,
+    }
+  } catch (error: unknown) {
+    console.error("Enforcement recognition error:", error)
+    return {
+      success: false,
+      confidence: 0,
+      data: {},
+      error: error instanceof Error ? error.message : "辨識失敗",
+    }
+  }
+}
+
 export async function getDocumentSuggestions(
   extractedData: DocumentRecognitionResult["extractedData"],
   documentType: "bill" | "payment" | "invoice"
