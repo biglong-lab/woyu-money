@@ -5,23 +5,17 @@
 
 import { useState } from "react"
 import { useQuery, useMutation } from "@tanstack/react-query"
-import { Calendar, CheckCircle2, CalendarPlus } from "lucide-react"
+import { Calendar, CalendarPlus } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
 import { apiRequest, queryClient } from "@/lib/queryClient"
 import { formatNT, friendlyApiError } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 import { useCopyAmount } from "@/hooks/use-copy-amount"
 import { useDocumentTitle } from "@/hooks/use-document-title"
 import { BackToTop } from "@/components/back-to-top"
+import PaymentCellDetail from "@/components/payment-cell-detail"
+import type { PaymentItem } from "@/components/installment-types"
 
 type CellStatus = "paid" | "partial" | "unpaid" | "upcoming" | "out_of_contract"
 
@@ -127,31 +121,14 @@ function LegendBar() {
   )
 }
 
-interface PreviewItem {
-  id: number
-  contractName: string
-  tenantName: string | null
-  expectedAmount: number
-}
-interface PreviewData {
-  year: number
-  month: number
-  count: number
-  totalAmount: number
-  items: PreviewItem[]
-}
-
-interface CellTarget {
-  cell: Cell
-  contractName: string
-}
-
 export default function RentalMatrixPage() {
   useDocumentTitle("租金矩陣")
   const [year, setYear] = useState(new Date().getFullYear())
-  const [batchOpen, setBatchOpen] = useState(false)
-  const [cellTarget, setCellTarget] = useState<CellTarget | null>(null)
-  const currentMonth = new Date().getMonth() + 1
+  const [detailCell, setDetailCell] = useState<{
+    contractId: number
+    contractName: string
+    month: number
+  } | null>(null)
   const { toast } = useToast()
   const copyAmount = useCopyAmount()
   const years = [year - 1, year, year + 1].filter((y) => y >= 2020)
@@ -160,10 +137,26 @@ export default function RentalMatrixPage() {
     queryKey: [`/api/rental-matrix?year=${year}`],
   })
 
-  const { data: preview } = useQuery<PreviewData>({
-    queryKey: [`/api/rental-batch/month-preview?year=${year}&month=${currentMonth}`],
-    enabled: batchOpen,
+  // 取得所有應付項目, 供點格逐筆記錄付款 (此矩陣 contractId 即 projectId)
+  const { data: payItemsResp } = useQuery({
+    queryKey: ["/api/payment/items", { includeAll: true }],
+    queryFn: () => fetch("/api/payment/items?includeAll=true").then((r) => r.json()),
   })
+  const payItems: PaymentItem[] = Array.isArray(payItemsResp)
+    ? payItemsResp
+    : payItemsResp?.items || []
+
+  const detailItems = detailCell
+    ? payItems.filter((it) => {
+        if (!it.startDate) return false
+        const d = new Date(it.startDate)
+        return (
+          it.projectId === detailCell.contractId &&
+          d.getFullYear() === year &&
+          d.getMonth() + 1 === detailCell.month
+        )
+      })
+    : []
 
   const yearlyCreateMutation = useMutation<
     { createdCount: number; skipped: number },
@@ -208,48 +201,11 @@ export default function RentalMatrixPage() {
     yearlyCreateMutation.mutate({ projectId, monthlyAmount, contractName })
   }
 
-  const cellPaidMutation = useMutation<
-    { processedCount: number; totalPaid: number },
-    Error,
-    { projectId: number; year: number; month: number }
-  >({
-    mutationFn: (data) => apiRequest("POST", "/api/rental-batch/mark-cell-paid", data),
-    onSuccess: (result) => {
-      toast({
-        title: `已標記 ${result.processedCount} 筆已付`,
-        description: `合計 NT$ ${Math.round(result.totalPaid).toLocaleString()}`,
-      })
-      setCellTarget(null)
-      queryClient.invalidateQueries({ queryKey: [`/api/rental-matrix?year=${year}`] })
-      queryClient.invalidateQueries({ queryKey: ["/api/payment/priority-report?includeLow=true"] })
-    },
-    onError: (err) =>
-      toast({ title: "標記失敗", description: friendlyApiError(err), variant: "destructive" }),
-  })
-
-  const markPaidMutation = useMutation<{ processedCount: number; totalPaid: number }, Error, void>({
-    mutationFn: async () => {
-      return apiRequest("POST", "/api/rental-batch/mark-month-paid", {
-        year,
-        month: currentMonth,
-      })
-    },
-    onSuccess: (result) => {
-      toast({
-        title: `已標記 ${result.processedCount} 筆租金為已付`,
-        description: `合計 NT$ ${Math.round(result.totalPaid).toLocaleString()}`,
-      })
-      setBatchOpen(false)
-      queryClient.invalidateQueries({ queryKey: [`/api/rental-matrix?year=${year}`] })
-      queryClient.invalidateQueries({
-        queryKey: [`/api/rental-batch/month-preview?year=${year}&month=${currentMonth}`],
-      })
-      queryClient.invalidateQueries({ queryKey: ["/api/payment/priority-report?includeLow=true"] })
-    },
-    onError: (err) => {
-      toast({ title: "批次標記失敗", description: friendlyApiError(err), variant: "destructive" })
-    },
-  })
+  // 點格後刷新矩陣 (付款記錄由 PaymentCellDetail 內部處理)
+  const refreshMatrix = () => {
+    queryClient.invalidateQueries({ queryKey: [`/api/rental-matrix?year=${year}`] })
+    queryClient.invalidateQueries({ queryKey: ["/api/payment/priority-report?includeLow=true"] })
+  }
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -259,7 +215,7 @@ export default function RentalMatrixPage() {
           租金月度矩陣
         </h1>
         <p className="mt-1 text-sm text-gray-600">
-          一眼看出哪間房哪個月欠租。<strong>點 🔴 或 🟡 格子即可一鍵標記已付</strong>
+          一眼看出哪間房哪個月欠租。<strong>點格子可逐筆記錄付款（可分多次直到付清）</strong>
         </p>
       </div>
 
@@ -284,15 +240,6 @@ export default function RentalMatrixPage() {
                   {y}
                 </Button>
               ))}
-              <Button
-                size="sm"
-                onClick={() => setBatchOpen(true)}
-                className="text-xs bg-green-600 hover:bg-green-700"
-                data-testid="button-batch-mark-paid"
-              >
-                <CheckCircle2 className="h-3 w-3 mr-1" />
-                {currentMonth} 月全部已付
-              </Button>
             </div>
           </div>
         </CardHeader>
@@ -354,7 +301,13 @@ export default function RentalMatrixPage() {
                             key={cell.month}
                             cell={cell}
                             contractName={c.contractName}
-                            onClick={(cell, contractName) => setCellTarget({ cell, contractName })}
+                            onClick={(cell, contractName) =>
+                              setDetailCell({
+                                contractId: cell.contractId,
+                                contractName,
+                                month: cell.month,
+                              })
+                            }
                           />
                         ))}
                         <td className="p-2 text-right text-xs text-gray-700">
@@ -438,130 +391,14 @@ export default function RentalMatrixPage() {
         </CardContent>
       </Card>
 
-      {/* 點格子標記已付 Dialog */}
-      <Dialog open={!!cellTarget} onOpenChange={(open) => !open && setCellTarget(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              標記 {cellTarget?.contractName} {year}/{cellTarget?.cell.month} 月已付
-            </DialogTitle>
-            <DialogDescription>
-              將為該專案該月份所有未付清的「租金」項目建立付款記錄
-            </DialogDescription>
-          </DialogHeader>
-          {cellTarget && (
-            <div className="py-2 space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-600">應付金額</span>
-                <span className="font-bold">{formatNT(cellTarget.cell.expectedAmount)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">已付金額</span>
-                <span>{formatNT(cellTarget.cell.paidAmount)}</span>
-              </div>
-              <div className="flex justify-between border-t pt-2">
-                <span className="text-gray-600">將要標記為已付</span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const due = Math.max(
-                      0,
-                      cellTarget.cell.expectedAmount - cellTarget.cell.paidAmount
-                    )
-                    copyAmount(due, cellTarget.contractName)
-                  }}
-                  className="font-bold text-green-700 hover:underline cursor-pointer"
-                  title="點擊複製金額（轉帳用）"
-                  data-testid="copy-cell-due-amount"
-                >
-                  {formatNT(
-                    Math.max(0, cellTarget.cell.expectedAmount - cellTarget.cell.paidAmount)
-                  )}
-                </button>
-              </div>
-            </div>
-          )}
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setCellTarget(null)}
-              disabled={cellPaidMutation.isPending}
-            >
-              取消
-            </Button>
-            <Button
-              onClick={() =>
-                cellTarget &&
-                cellPaidMutation.mutate({
-                  projectId: cellTarget.cell.contractId,
-                  year,
-                  month: cellTarget.cell.month,
-                })
-              }
-              disabled={cellPaidMutation.isPending}
-              data-testid="button-confirm-cell-paid"
-            >
-              {cellPaidMutation.isPending ? "處理中..." : "確認標記已付"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={batchOpen} onOpenChange={setBatchOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              批次標記 {year}/{currentMonth} 月租金已付
-            </DialogTitle>
-            <DialogDescription>
-              系統會為以下符合租金類別的付款項目，建立已付款記錄（交易保護）
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-2 max-h-[50vh] overflow-auto space-y-2">
-            {!preview && <div className="text-sm text-gray-500">載入中...</div>}
-            {preview && preview.count === 0 && (
-              <div className="text-sm text-gray-600">本月沒有符合條件的租金項目。</div>
-            )}
-            {preview && preview.count > 0 && (
-              <>
-                <div className="text-sm text-gray-700">
-                  共 <strong>{preview.count}</strong> 筆，合計 NT${" "}
-                  <strong>{Math.round(preview.totalAmount).toLocaleString()}</strong>
-                </div>
-                <ul className="text-sm border rounded divide-y">
-                  {preview.items.map((it) => (
-                    <li key={it.id} className="p-2 flex justify-between">
-                      <span>
-                        {it.contractName}
-                        {it.tenantName && (
-                          <span className="text-gray-500 ml-1">（{it.tenantName}）</span>
-                        )}
-                      </span>
-                      <span>NT$ {Math.round(it.expectedAmount).toLocaleString()}</span>
-                    </li>
-                  ))}
-                </ul>
-              </>
-            )}
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setBatchOpen(false)}
-              disabled={markPaidMutation.isPending}
-            >
-              取消
-            </Button>
-            <Button
-              onClick={() => markPaidMutation.mutate()}
-              disabled={markPaidMutation.isPending || !preview || preview.count === 0}
-              data-testid="button-confirm-batch"
-            >
-              {markPaidMutation.isPending ? "處理中..." : "確認批次標記已付"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* 點格 → 逐筆記錄付款 (共用元件; 只記錄不刪除, 結構性項目調整請回租約設定) */}
+      <PaymentCellDetail
+        open={!!detailCell}
+        onClose={() => setDetailCell(null)}
+        title={detailCell ? `${detailCell.contractName} · ${detailCell.month}月` : ""}
+        items={detailItems}
+        onChanged={refreshMatrix}
+      />
       <BackToTop />
     </div>
   )
