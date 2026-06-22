@@ -187,6 +187,12 @@ export const toolboxNavItems: NavItem[] = [
     description: "執行處公文/圈存/分期對帳（公文OCR帶入）、被強執款項分流",
   },
   {
+    title: "帳單到期看板",
+    href: "/bills",
+    icon: CalendarClock,
+    description: "通盤近期應繳（法定付款日+強執分期），逾期/即將到期、避免遲繳",
+  },
+  {
     title: "收據對應助手",
     href: "/receipt-match-helper",
     icon: Receipt,
