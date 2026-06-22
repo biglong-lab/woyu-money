@@ -84,6 +84,10 @@ export async function getPaymentItems(
     conditions.push(sql`pi.start_date <= CURRENT_DATE`)
   }
 
+  if (filters?.excludeEnforced) {
+    conditions.push(sql`pi.enforcement_case_id IS NULL`)
+  }
+
   const whereClause = sql`WHERE ${sql.join(conditions, sql` AND `)}`
 
   const query = sql`
@@ -149,6 +153,10 @@ export async function getPaymentItemsCount(filters?: PaymentItemFilters): Promis
 
   if (filters?.excludeFuture) {
     conditions.push(sql`pi.start_date <= CURRENT_DATE`)
+  }
+
+  if (filters?.excludeEnforced) {
+    conditions.push(sql`pi.enforcement_case_id IS NULL`)
   }
 
   const whereClause = sql`WHERE ${sql.join(conditions, sql` AND `)}`
