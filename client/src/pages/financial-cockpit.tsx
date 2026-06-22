@@ -19,6 +19,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { PayableManager } from "@/components/cockpit/payable-manager"
 import { ArrearsPlanner } from "@/components/cockpit/arrears-planner"
 import { AiAdvisor, type AdvisorSnapshot } from "@/components/cockpit/ai-advisor"
+import OverviewTabs from "@/components/overview-tabs"
 import {
   Activity,
   TrendingUp,
@@ -296,6 +297,7 @@ export default function FinancialCockpitPage() {
 
   return (
     <div className="container mx-auto py-4 sm:py-6 space-y-4 sm:space-y-6">
+      <OverviewTabs />
       {/* 標題 + 健康分數 */}
       <Card className="border-2">
         <CardContent className="pt-5">

@@ -38,6 +38,7 @@ import { useDocumentTitle } from "@/hooks/use-document-title"
 import { BackToTop } from "@/components/back-to-top"
 import { formatStatus, isCompletedStatus } from "@/lib/status-labels"
 import CostStructureAnnualView from "@/components/cost-structure-annual-view"
+import OverviewTabs from "@/components/overview-tabs"
 
 interface RentalItem {
   contractId: number
@@ -230,6 +231,7 @@ export default function CostOverviewPage() {
 
   return (
     <div className="container mx-auto py-4 sm:py-6 space-y-4">
+      <OverviewTabs />
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">

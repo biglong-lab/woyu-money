@@ -47,6 +47,7 @@ import {
 } from "lucide-react"
 import { formatNT } from "@/lib/utils"
 import { BackToTop } from "@/components/back-to-top"
+import OverviewTabs from "@/components/overview-tabs"
 
 // ─────────────────────────────────────────────
 // 型別
@@ -200,6 +201,7 @@ export default function FinancialOverviewV2() {
 
   return (
     <div className="container mx-auto p-4 sm:p-6 max-w-6xl">
+      <OverviewTabs />
       {/* Header */}
       <div className="mb-6 flex items-start justify-between gap-3 flex-wrap">
         <div>

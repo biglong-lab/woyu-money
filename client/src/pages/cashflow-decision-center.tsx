@@ -22,6 +22,7 @@ import { useToast } from "@/hooks/use-toast"
 import { useCopyAmount } from "@/hooks/use-copy-amount"
 import { useDocumentTitle } from "@/hooks/use-document-title"
 import { MarkPaidConfirmDialog } from "@/components/mark-paid-confirm-dialog"
+import OverviewTabs from "@/components/overview-tabs"
 
 type Basis = "last_year_same_month" | "recent_average" | "overall_average" | "no_data"
 type Confidence = "high" | "medium" | "low"
@@ -307,6 +308,7 @@ export default function CashflowDecisionCenterPage() {
 
   return (
     <div className="space-y-4 sm:space-y-6">
+      <OverviewTabs />
       <div>
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 flex items-center gap-2">
           <TrendingUp className="h-7 w-7 text-blue-600" />

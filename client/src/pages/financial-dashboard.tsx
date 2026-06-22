@@ -36,6 +36,7 @@ import {
 } from "lucide-react"
 import { useDocumentTitle } from "@/hooks/use-document-title"
 import { BackToTop } from "@/components/back-to-top"
+import OverviewTabs from "@/components/overview-tabs"
 import { formatStatus, isCompletedStatus } from "@/lib/status-labels"
 import { Link } from "wouter"
 import {
@@ -389,6 +390,7 @@ export default function FinancialDashboardPage() {
 
   return (
     <div className="container mx-auto py-4 sm:py-6 space-y-4">
+      <OverviewTabs />
       <div>
         <h1 className="text-2xl font-bold flex items-center gap-2">
           <LayoutDashboard className="h-6 w-6 text-indigo-600" />

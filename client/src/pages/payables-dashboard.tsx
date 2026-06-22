@@ -40,6 +40,7 @@ import {
 import { formatNT } from "@/lib/utils"
 import { useDocumentTitle } from "@/hooks/use-document-title"
 import { BackToTop } from "@/components/back-to-top"
+import OverviewTabs from "@/components/overview-tabs"
 import type { PaymentItem } from "@/components/installment-types"
 import type { DebtCategory, PaymentProject } from "@/../../shared/schema/category"
 
@@ -252,6 +253,7 @@ export default function PayablesDashboard() {
 
   return (
     <div className="space-y-6 px-4 sm:px-0">
+      <OverviewTabs />
       {/* 標題 + 控制 */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
