@@ -85,6 +85,7 @@ import ScenarioPlannerPage from "@/pages/scenario-planner"
 import ScenarioSimulatorPage from "@/pages/scenario-simulator"
 import LateFeeSettingsPage from "@/pages/late-fee-settings"
 import FinancialDashboardPage from "@/pages/financial-dashboard"
+import PayablesDashboard from "@/pages/payables-dashboard"
 
 function Router() {
   const [quickPaymentOpen, setQuickPaymentOpen] = useState(false)
@@ -169,6 +170,7 @@ function Router() {
                 <ProtectedRoute path="/property-pl" component={PropertyPLReport} />
                 <ProtectedRoute path="/variance-report" component={VarianceReport} />
                 <ProtectedRoute path="/financial-overview-v2" component={FinancialOverviewV2} />
+                <ProtectedRoute path="/payables-dashboard" component={PayablesDashboard} />
 
                 {/* System Management */}
                 <ProtectedRoute path="/user-management" component={UserManagement} />

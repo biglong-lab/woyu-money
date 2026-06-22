@@ -64,6 +64,13 @@ export const mainNavItems: NavItem[] = [
     icon: Home,
   },
   {
+    title: "應付總覽看板",
+    href: "/payables-dashboard",
+    icon: Wallet,
+    badge: "總覽",
+    description: "一頁看完：給付、應付、還有多少未付（分類/專案 × 12 月矩陣）",
+  },
+  {
     title: "記帳窗口",
     href: "/document-inbox",
     icon: Inbox,
@@ -641,16 +648,8 @@ export const breadcrumbConfig: Record<string, BreadcrumbItem[]> = {
     { title: "財務助理" },
     { title: "勞健保矩陣" },
   ],
-  "/enforcement": [
-    { title: "首頁", href: "/" },
-    { title: "財務助理" },
-    { title: "強制執行管理" },
-  ],
-  "/bills": [
-    { title: "首頁", href: "/" },
-    { title: "財務助理" },
-    { title: "帳單到期看板" },
-  ],
+  "/enforcement": [{ title: "首頁", href: "/" }, { title: "財務助理" }, { title: "強制執行管理" }],
+  "/bills": [{ title: "首頁", href: "/" }, { title: "財務助理" }, { title: "帳單到期看板" }],
   "/cashflow-decision-center": [
     { title: "首頁", href: "/" },
     { title: "財務助理" },
