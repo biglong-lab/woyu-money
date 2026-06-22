@@ -6,7 +6,7 @@
  * 依「起始月份」投影到 12 個月矩陣，無需新增資料表。
  */
 import { useMemo, useState } from "react"
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useMutation } from "@tanstack/react-query"
 import { Link } from "wouter"
 import {
   Wallet,
@@ -37,10 +37,16 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Plus, CheckCheck, Trash2 } from "lucide-react"
 import { formatNT } from "@/lib/utils"
+import { apiRequest, queryClient } from "@/lib/queryClient"
+import { useToast } from "@/hooks/use-toast"
 import { useDocumentTitle } from "@/hooks/use-document-title"
 import { BackToTop } from "@/components/back-to-top"
 import OverviewTabs from "@/components/overview-tabs"
+import MatrixItemActions from "@/components/matrix-item-actions"
 import type { PaymentItem } from "@/components/installment-types"
 import type { DebtCategory, PaymentProject } from "@/../../shared/schema/category"
 
@@ -84,9 +90,20 @@ export default function PayablesDashboard() {
   const currentYear = now.getFullYear()
   const currentMonth = now.getMonth() // 0-11
 
+  const { toast } = useToast()
   const [year, setYear] = useState(currentYear)
   const [groupBy, setGroupBy] = useState<GroupBy>("category")
-  const [detail, setDetail] = useState<{ title: string; rows: PaymentItem[] } | null>(null)
+  const [detail, setDetail] = useState<{
+    title: string
+    rows: PaymentItem[]
+    rowKey: string
+    monthIdx: number
+  } | null>(null)
+  const [actionItem, setActionItem] = useState<PaymentItem | null>(null)
+  const [selected, setSelected] = useState<number[]>([])
+  const [createOpen, setCreateOpen] = useState(false)
+  const [newName, setNewName] = useState("")
+  const [newAmount, setNewAmount] = useState("")
 
   const { data: itemsResp, isLoading } = useQuery({
     queryKey: ["/api/payment/items", { includeAll: true }],
@@ -236,8 +253,63 @@ export default function PayablesDashboard() {
   const openCell = (rowKey: string, rowName: string, monthIdx: number) => {
     const rows = cellItems(rowKey, monthIdx)
     if (rows.length === 0) return
-    setDetail({ title: `${rowName} · ${MONTHS[monthIdx]}`, rows })
+    setSelected([])
+    setDetail({ title: `${rowName} · ${MONTHS[monthIdx]}`, rows, rowKey, monthIdx })
   }
+
+  const refresh = () =>
+    queryClient.invalidateQueries({ queryKey: ["/api/payment/items"], refetchType: "all" })
+
+  // 批次：標記已付 / 刪除(移回收站)
+  const batchMutation = useMutation({
+    mutationFn: async (action: "paid" | "archive") => {
+      const body =
+        action === "paid"
+          ? { itemIds: selected, action: "updateStatus", data: { status: "paid" } }
+          : { itemIds: selected, action: "archive", data: {} }
+      return apiRequest("POST", "/api/batch/update", body)
+    },
+    onSuccess: (_d, action) => {
+      refresh()
+      setSelected([])
+      setDetail(null)
+      toast({
+        title: action === "paid" ? "批次已標記已付" : "批次已刪除",
+        description: `處理 ${selected.length} 筆`,
+      })
+    },
+    onError: (e: Error) =>
+      toast({ title: "批次失敗", description: e.message, variant: "destructive" }),
+  })
+
+  // 新增應付 (帶入該格分類/專案/月份)
+  const createMutation = useMutation({
+    mutationFn: async () => {
+      if (!detail) return
+      const monthDate = `${year}-${String(detail.monthIdx + 1).padStart(2, "0")}-01`
+      const gid = detail.rowKey !== "none" ? Number(detail.rowKey) : null
+      const body: Record<string, unknown> = {
+        itemName: newName,
+        totalAmount: newAmount,
+        startDate: monthDate,
+        paymentType: "single",
+      }
+      if (gid) body[groupBy === "category" ? "categoryId" : "projectId"] = gid
+      return apiRequest("POST", "/api/payment/items", body)
+    },
+    onSuccess: () => {
+      refresh()
+      setCreateOpen(false)
+      setNewName("")
+      setNewAmount("")
+      toast({ title: "已新增應付項目" })
+    },
+    onError: (e: Error) =>
+      toast({ title: "新增失敗", description: e.message, variant: "destructive" }),
+  })
+
+  const toggleSel = (id: number) =>
+    setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]))
 
   const cellClass = (c: Cell) => {
     if (c.payable === 0) return "bg-gray-50 text-gray-300"
@@ -458,17 +530,54 @@ export default function PayablesDashboard() {
           </DialogHeader>
           {detail && (
             <div className="space-y-2">
+              {/* 工具列: 新增 + 批次 */}
+              <div className="flex flex-wrap items-center gap-2 pb-1">
+                <Button size="sm" variant="outline" onClick={() => setCreateOpen(true)}>
+                  <Plus className="w-4 h-4 mr-1" />
+                  新增應付
+                </Button>
+                {selected.length > 0 && (
+                  <>
+                    <span className="text-xs text-gray-500">已選 {selected.length} 筆</span>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-emerald-700"
+                      disabled={batchMutation.isPending}
+                      onClick={() => batchMutation.mutate("paid")}
+                    >
+                      <CheckCheck className="w-4 h-4 mr-1" />
+                      批次標記已付
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-red-600"
+                      disabled={batchMutation.isPending}
+                      onClick={() => {
+                        if (window.confirm(`批次刪除 ${selected.length} 筆？(移回收站)`))
+                          batchMutation.mutate("archive")
+                      }}
+                    >
+                      <Trash2 className="w-4 h-4 mr-1" />
+                      批次刪除
+                    </Button>
+                  </>
+                )}
+              </div>
+
               {detail.rows.map((it) => {
                 const payable = parseFloat(it.totalAmount || "0") || 0
                 const paid = parseFloat(it.paidAmount || "0") || 0
                 const unpaid = Math.max(0, payable - paid)
                 const done = unpaid === 0
                 return (
-                  <div
-                    key={it.id}
-                    className="flex items-center justify-between gap-3 border rounded-lg p-3"
-                  >
-                    <div className="min-w-0">
+                  <div key={it.id} className="flex items-center gap-3 border rounded-lg p-3">
+                    <Checkbox
+                      checked={selected.includes(it.id)}
+                      onCheckedChange={() => toggleSel(it.id)}
+                    />
+                    <div className="min-w-0 flex-1">
                       <div className="text-sm font-medium text-gray-800 truncate">
                         {it.itemName}
                       </div>
@@ -484,6 +593,14 @@ export default function PayablesDashboard() {
                         {done ? "已付清" : `未付 ${formatNT(unpaid)}`}
                       </div>
                     </div>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="shrink-0 text-blue-600"
+                      onClick={() => setActionItem(it)}
+                    >
+                      處理
+                    </Button>
                   </div>
                 )
               })}
@@ -507,6 +624,43 @@ export default function PayablesDashboard() {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* 單筆動作 (歸帳/備註/刪除) */}
+      <MatrixItemActions item={actionItem} onClose={() => setActionItem(null)} />
+
+      {/* 新增應付 (帶入該格分類/專案/月份) */}
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent className="w-[95vw] max-w-md">
+          <DialogHeader>
+            <DialogTitle>新增應付項目</DialogTitle>
+            <DialogDescription>
+              將新增到「{detail?.title}」（{groupBy === "category" ? "分類" : "專案"} /
+              月份自動帶入）
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <Input
+              placeholder="項目名稱"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+            />
+            <Input
+              type="number"
+              step="0.01"
+              placeholder="金額"
+              value={newAmount}
+              onChange={(e) => setNewAmount(e.target.value)}
+            />
+            <Button
+              className="w-full"
+              disabled={createMutation.isPending || !newName || !newAmount}
+              onClick={() => createMutation.mutate()}
+            >
+              {createMutation.isPending ? "新增中…" : "新增"}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
 
