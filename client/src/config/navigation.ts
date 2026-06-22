@@ -634,6 +634,11 @@ export const breadcrumbConfig: Record<string, BreadcrumbItem[]> = {
     { title: "財務助理" },
     { title: "勞健保矩陣" },
   ],
+  "/enforcement": [
+    { title: "首頁", href: "/" },
+    { title: "財務助理" },
+    { title: "強制執行管理" },
+  ],
   "/cashflow-decision-center": [
     { title: "首頁", href: "/" },
     { title: "財務助理" },
