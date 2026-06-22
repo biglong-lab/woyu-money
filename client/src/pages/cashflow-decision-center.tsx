@@ -302,6 +302,15 @@ function MonthCard({ forecast, gap }: { forecast: ForecastMonth; gap: GapItem })
 export default function CashflowDecisionCenterPage() {
   useDocumentTitle("現金流預估")
   const [monthsAhead, setMonthsAhead] = useState(6)
+  const nowDate = new Date()
+  const [viewYear, setViewYear] = useState(nowDate.getFullYear())
+  const [viewMonth, setViewMonth] = useState(nowDate.getMonth() + 1)
+  const viewYears = [
+    nowDate.getFullYear() - 2,
+    nowDate.getFullYear() - 1,
+    nowDate.getFullYear(),
+    nowDate.getFullYear() + 1,
+  ]
   const { data, isLoading } = useQuery<ForecastResponse>({
     queryKey: [`/api/cashflow/forecast?monthsAhead=${monthsAhead}`],
   })
@@ -318,6 +327,43 @@ export default function CashflowDecisionCenterPage() {
           基於歷史營收推算未來 {monthsAhead} 月現金流，讓你提前規劃資金調度
         </p>
       </div>
+
+      {/* 查看任一月份明細 (含過去月份, 如 5 月) */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base sm:text-lg">查看指定月份未付明細</CardTitle>
+          <CardDescription className="text-xs">
+            可查任一月份（含過去）。預估卡片僅含未來月; 此處可回看歷史月份的未付項目。
+          </CardDescription>
+          <div className="flex items-center gap-2 pt-2">
+            <select
+              value={viewYear}
+              onChange={(e) => setViewYear(Number(e.target.value))}
+              className="border rounded px-2 py-1 text-sm"
+            >
+              {viewYears.map((y) => (
+                <option key={y} value={y}>
+                  {y} 年
+                </option>
+              ))}
+            </select>
+            <select
+              value={viewMonth}
+              onChange={(e) => setViewMonth(Number(e.target.value))}
+              className="border rounded px-2 py-1 text-sm"
+            >
+              {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                <option key={m} value={m}>
+                  {m} 月
+                </option>
+              ))}
+            </select>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <MonthDetail year={viewYear} month={viewMonth} />
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
