@@ -92,7 +92,11 @@ export default function PayablesDashboard() {
     queryKey: ["/api/payment/items", { includeAll: true }],
     queryFn: () => fetch("/api/payment/items?includeAll=true").then((r) => r.json()),
   })
-  const items: PaymentItem[] = Array.isArray(itemsResp) ? itemsResp : itemsResp?.items || []
+  const rawItems: PaymentItem[] = Array.isArray(itemsResp) ? itemsResp : itemsResp?.items || []
+  // 只保留「應付」項目：排除 itemType='income'（PM API 導入的訂房收入, 如 Agoda/官方訂房, 屬收入非應付）
+  const items: PaymentItem[] = rawItems.filter(
+    (it) => (it as { itemType?: string }).itemType !== "income"
+  )
 
   const { data: categories = [] } = useQuery<DebtCategory[]>({
     queryKey: ["/api/categories/project"],
