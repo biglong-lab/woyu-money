@@ -23,7 +23,13 @@ import {
   analyzeInstallmentItem,
   calculateInstallmentStats,
   calculateInstallmentPayments,
+  monthsFromMonthlyAmount,
+  monthsBetweenInclusive,
+  finalMonthFromStart,
 } from "@/components/installment-utils"
+
+// 分期計算模式: 期數 / 每期金額 / 首末日期
+export type InstallmentCalcMode = "periods" | "monthly" | "dateRange"
 
 // 表單資料型別定義
 interface CreateFormData {
@@ -40,6 +46,9 @@ interface CreateFormData {
   extraFirstPayment: string
   extraLastPayment: string
   installmentMonths: string
+  calcMode: InstallmentCalcMode
+  monthlyAmount: string
+  finalDate: string
 }
 
 interface EditFormData {
@@ -162,6 +171,9 @@ export default function InstallmentPaymentManagement() {
       extraFirstPayment: "",
       extraLastPayment: "",
       installmentMonths: "",
+      calcMode: "periods",
+      monthlyAmount: "",
+      finalDate: "",
     },
   })
 
@@ -171,13 +183,47 @@ export default function InstallmentPaymentManagement() {
     },
   })
 
-  // 分期計算即時預覽
+  // 分期計算即時預覽 + 三種互算模式
   const watchTotalAmount = createForm.watch("totalAmount")
   const watchInstallments = createForm.watch("installments")
+  const watchCalcMode = createForm.watch("calcMode")
+  const watchMonthlyAmount = createForm.watch("monthlyAmount")
+  const watchStartDate = createForm.watch("startDate")
+  const watchFinalDate = createForm.watch("finalDate")
+
+  // 依模式反向推算期數 → 一律回寫 installments (單一真實來源)
+  useEffect(() => {
+    const total = parseFloat(watchTotalAmount) || 0
+    if (watchCalcMode === "monthly") {
+      // 金額 + 每期金額 → 期數
+      const n = monthsFromMonthlyAmount(total, parseFloat(watchMonthlyAmount) || 0)
+      if (n > 0 && n !== Number(watchInstallments)) {
+        createForm.setValue("installments", n)
+      }
+    } else if (watchCalcMode === "dateRange") {
+      // 首期 + 末期 → 期數
+      const n = monthsBetweenInclusive(watchStartDate, watchFinalDate)
+      if (n > 0 && n !== Number(watchInstallments)) {
+        createForm.setValue("installments", n)
+      }
+    }
+  }, [
+    watchCalcMode,
+    watchTotalAmount,
+    watchMonthlyAmount,
+    watchStartDate,
+    watchFinalDate,
+    watchInstallments,
+    createForm,
+  ])
+
   const paymentCalculation = calculateInstallmentPayments(
     parseFloat(watchTotalAmount) || 0,
     parseInt(watchInstallments?.toString()) || 0
   )
+
+  // 由首期 + 期數推算的末期日期 (供顯示; periods 模式自動算末月)
+  const derivedFinalMonth = finalMonthFromStart(watchStartDate, Number(watchInstallments) || 0)
 
   // 分類選擇聯動
   useEffect(() => {
@@ -248,7 +294,16 @@ export default function InstallmentPaymentManagement() {
   // 事件處理
   const handleCreateSubmit = async (data: CreateFormData) => {
     const totalAmount = parseFloat(data.totalAmount)
-    const installmentMonths = parseInt(data.installmentMonths)
+    // 以 installments 為單一真實來源 (三種模式最終都回寫到此)
+    const installmentMonths = parseInt(data.installments?.toString() || "0")
+    if (!totalAmount || !installmentMonths || installmentMonths <= 0) {
+      toast({
+        title: "資料不完整",
+        description: "請確認總金額與期數 (或每期金額/末期日期) 已填寫",
+        variant: "destructive",
+      })
+      return
+    }
     const calculation = calculateInstallmentPayments(totalAmount, installmentMonths)
     const startDate = new Date(data.startDate)
 
@@ -333,6 +388,8 @@ export default function InstallmentPaymentManagement() {
           paymentCalculation={paymentCalculation}
           watchTotalAmount={watchTotalAmount}
           watchInstallments={watchInstallments}
+          calcMode={watchCalcMode}
+          derivedFinalMonth={derivedFinalMonth}
         />
       </div>
 

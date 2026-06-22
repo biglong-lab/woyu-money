@@ -34,7 +34,15 @@ export interface InstallmentCreateDialogProps {
   paymentCalculation: PaymentCalculation
   watchTotalAmount: string
   watchInstallments: number
+  calcMode: string
+  derivedFinalMonth: string
 }
+
+const CALC_MODES: { value: string; label: string; hint: string }[] = [
+  { value: "periods", label: "輸入期數", hint: "金額 + 期數 → 自動算每期金額" },
+  { value: "monthly", label: "輸入每期金額", hint: "金額 + 每期金額 → 自動算期數" },
+  { value: "dateRange", label: "輸入首末月", hint: "金額 + 首期/末期 → 自動算期數" },
+]
 
 export default function InstallmentCreateDialog({
   open,
@@ -45,6 +53,8 @@ export default function InstallmentCreateDialog({
   paymentCalculation,
   watchTotalAmount,
   watchInstallments,
+  calcMode,
+  derivedFinalMonth,
 }: InstallmentCreateDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -104,26 +114,36 @@ export default function InstallmentCreateDialog({
               />
             </div>
 
+            {/* 計算模式選擇 */}
+            <div>
+              <FormLabel className="mb-2 block">計算方式</FormLabel>
+              <div className="grid grid-cols-3 gap-2">
+                {CALC_MODES.map((m) => (
+                  <Button
+                    key={m.value}
+                    type="button"
+                    variant={calcMode === m.value ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => form.setValue("calcMode", m.value)}
+                    className="text-xs h-auto py-2 whitespace-normal"
+                  >
+                    {m.label}
+                  </Button>
+                ))}
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                {CALC_MODES.find((m) => m.value === calcMode)?.hint}
+              </p>
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="installments"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>分期期數</FormLabel>
-                    <FormControl>
-                      <Input {...field} type="number" min="1" max="60" placeholder="期數（月）" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              {/* 開始日期 (所有模式都需要) */}
               <FormField
                 control={form.control}
                 name="startDate"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>開始日期</FormLabel>
+                    <FormLabel>首期日期</FormLabel>
                     <FormControl>
                       <Input {...field} type="date" />
                     </FormControl>
@@ -131,6 +151,69 @@ export default function InstallmentCreateDialog({
                   </FormItem>
                 )}
               />
+
+              {/* 模式 A: 直接輸入期數 */}
+              {calcMode === "periods" && (
+                <FormField
+                  control={form.control}
+                  name="installments"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>分期期數</FormLabel>
+                      <FormControl>
+                        <Input {...field} type="number" min="1" max="60" placeholder="期數（月）" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+
+              {/* 模式 B: 輸入每期金額 → 自動算期數 */}
+              {calcMode === "monthly" && (
+                <FormField
+                  control={form.control}
+                  name="monthlyAmount"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>每期金額</FormLabel>
+                      <FormControl>
+                        <Input {...field} type="number" step="0.01" placeholder="每期應付金額" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+
+              {/* 模式 C: 輸入末期日期 → 自動算期數 */}
+              {calcMode === "dateRange" && (
+                <FormField
+                  control={form.control}
+                  name="finalDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>末期日期</FormLabel>
+                      <FormControl>
+                        <Input {...field} type="date" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+            </div>
+
+            {/* 推算結果摘要 */}
+            <div className="text-sm text-gray-600 bg-gray-50 rounded px-3 py-2 flex flex-wrap gap-x-6 gap-y-1">
+              <span>
+                推算期數：<b className="text-gray-900">{watchInstallments || 0}</b> 期
+              </span>
+              {derivedFinalMonth && (
+                <span>
+                  末期月份：<b className="text-gray-900">{derivedFinalMonth.slice(0, 7)}</b>
+                </span>
+              )}
             </div>
 
             {/* 分期計算結果顯示 */}

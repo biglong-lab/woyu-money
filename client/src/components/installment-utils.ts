@@ -156,6 +156,38 @@ export function calculateInstallmentPayments(
 }
 
 /**
+ * 反向推算：由「總金額 + 每期金額」推算期數。
+ * 期數 = 無條件進位(總額 / 每期額)，零頭併入首期 (與 calculateInstallmentPayments 一致)。
+ */
+export function monthsFromMonthlyAmount(totalAmount: number, monthlyAmount: number): number {
+  if (!totalAmount || !monthlyAmount || monthlyAmount <= 0) return 0
+  return Math.max(1, Math.ceil(totalAmount / monthlyAmount))
+}
+
+/**
+ * 由「首期日期 + 期數」推算最終期日期 (YYYY-MM-DD)。
+ * 每期間隔一個月，末期 = 首期 + (期數 - 1) 個月。
+ */
+export function finalMonthFromStart(startDateISO: string, months: number): string {
+  if (!startDateISO || !months || months <= 0) return ""
+  const d = new Date(startDateISO)
+  d.setMonth(d.getMonth() + (months - 1))
+  return d.toISOString().split("T")[0]
+}
+
+/**
+ * 反向推算：由「首期日期 + 末期日期」推算期數 (含頭尾，逐月)。
+ * 例：2026-01 ~ 2026-12 = 12 期。
+ */
+export function monthsBetweenInclusive(startDateISO: string, endDateISO: string): number {
+  if (!startDateISO || !endDateISO) return 0
+  const s = new Date(startDateISO)
+  const e = new Date(endDateISO)
+  const diff = (e.getFullYear() - s.getFullYear()) * 12 + (e.getMonth() - s.getMonth()) + 1
+  return Math.max(0, diff)
+}
+
+/**
  * 計算付款進度百分比
  */
 export function calculateProgress(item: PaymentItem): number {
