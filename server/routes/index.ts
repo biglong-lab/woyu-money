@@ -59,6 +59,7 @@ import expenseLedgerRoutes from "./expense-ledger"
 import fixedExpenseMatrixRoutes from "./fixed-expense-matrix"
 import laborInsuranceMatrixRoutes from "./labor-insurance-matrix"
 import enforcementRoutes from "./enforcement"
+import billsRoutes from "./bills"
 import scenarioPresetRoutes from "./scenario-presets"
 
 export async function registerRoutes(app: Express): Promise<Server> {
