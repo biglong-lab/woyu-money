@@ -49,6 +49,20 @@ import { asyncHandler, AppError } from "../middleware/error-handler"
 
 const router = Router()
 
+/** 由 year/month 字串算出付款記錄查詢的日期範圍 (給 getPaymentRecords filters) */
+function monthRange(year?: string, month?: string): { startDate?: Date; endDate?: Date } {
+  if (!year) return {}
+  const y = parseInt(year)
+  if (Number.isNaN(y)) return {}
+  if (month) {
+    const m = parseInt(month)
+    if (!Number.isNaN(m) && m >= 1 && m <= 12) {
+      return { startDate: new Date(y, m - 1, 1), endDate: new Date(y, m, 0) }
+    }
+  }
+  return { startDate: new Date(y, 0, 1), endDate: new Date(y, 11, 31) }
+}
+
 // 專案統計 API
 router.get(
   "/api/payment/projects/stats",
@@ -102,7 +116,12 @@ router.get(
   asyncHandler(async (req, res) => {
     const { year, month, projectId } = req.query
 
-    const paymentRecords = (await storage.getPaymentRecords()) as PaymentRecordRow[]
+    // 依選定年/月取得該期間付款記錄 (避免預設 limit=100 漏掉非近期月份)
+    const paymentRecords = (await storage.getPaymentRecords(
+      monthRange(year as string | undefined, month as string | undefined),
+      1,
+      100000
+    )) as PaymentRecordRow[]
     const items = (await storage.getPaymentItems({}, undefined, 10000)) as PaymentItemWithJoins[]
     const itemsMap = new Map(items.map((item) => [item.id, item]))
 
@@ -157,7 +176,11 @@ router.get(
   asyncHandler(async (req, res) => {
     const { year, month, projectId, page = 1, limit = 50 } = req.query
 
-    const paymentRecords = (await storage.getPaymentRecords()) as PaymentRecordRow[]
+    const paymentRecords = (await storage.getPaymentRecords(
+      monthRange(year as string | undefined, month as string | undefined),
+      1,
+      100000
+    )) as PaymentRecordRow[]
     const paymentItems = (await storage.getPaymentItems(
       {},
       undefined,
