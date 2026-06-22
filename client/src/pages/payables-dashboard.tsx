@@ -30,6 +30,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog"
 import { formatNT } from "@/lib/utils"
 import { useDocumentTitle } from "@/hooks/use-document-title"
 import { BackToTop } from "@/components/back-to-top"
@@ -78,6 +85,7 @@ export default function PayablesDashboard() {
 
   const [year, setYear] = useState(currentYear)
   const [groupBy, setGroupBy] = useState<GroupBy>("category")
+  const [detail, setDetail] = useState<{ title: string; rows: PaymentItem[] } | null>(null)
 
   const { data: itemsResp, isLoading } = useQuery({
     queryKey: ["/api/payment/items", { includeAll: true }],
@@ -173,15 +181,58 @@ export default function PayablesDashboard() {
     return { rows, monthTotals, grand }
   }, [items, year, groupBy, nameOf])
 
-  // KPI：本月（僅當檢視年份=今年）
-  const thisMonth = year === currentYear ? monthTotals[currentMonth] : null
-  const overdueTotal = useMemo(
-    () =>
-      rows.reduce((s, r) => s + r.cells.reduce((cs, c) => cs + (c.overdue ? c.unpaid : 0), 0), 0),
-    [rows]
-  )
+  // KPI 一律以「現在」為準：本月(應付/已付/未付) + 今年累積逾期, 不受矩陣年份切換影響
+  const kpi = useMemo(() => {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    let mPayable = 0,
+      mPaid = 0,
+      mUnpaid = 0,
+      mCount = 0,
+      overdueYear = 0,
+      overdueCount = 0
+    for (const it of items) {
+      if (!it.startDate) continue
+      const d = new Date(it.startDate)
+      const payable = parseFloat(it.totalAmount || "0") || 0
+      const paid = parseFloat(it.paidAmount || "0") || 0
+      const unpaid = Math.max(0, payable - paid)
+      if (d.getFullYear() === currentYear && d.getMonth() === currentMonth) {
+        mPayable += payable
+        mPaid += paid
+        mUnpaid += unpaid
+        mCount++
+      }
+      if (d.getFullYear() === currentYear && unpaid > 0) {
+        const dd = new Date(it.startDate)
+        dd.setHours(0, 0, 0, 0)
+        if (dd.getTime() < today.getTime()) {
+          overdueYear += unpaid
+          overdueCount++
+        }
+      }
+    }
+    return { mPayable, mPaid, mUnpaid, mCount, overdueYear, overdueCount }
+  }, [items, currentYear, currentMonth])
 
+  const monthLabel = `${currentMonth + 1}月`
   const years = [currentYear - 1, currentYear, currentYear + 1]
+
+  // 取某格 (群組 × 月) 的實際應付項目, 供點擊看明細
+  const cellItems = (rowKey: string, monthIdx: number): PaymentItem[] =>
+    items.filter((it) => {
+      if (!it.startDate) return false
+      const d = new Date(it.startDate)
+      if (d.getFullYear() !== year || d.getMonth() !== monthIdx) return false
+      const gid = groupBy === "category" ? it.categoryId : it.projectId
+      return String(gid ?? "none") === rowKey
+    })
+
+  const openCell = (rowKey: string, rowName: string, monthIdx: number) => {
+    const rows = cellItems(rowKey, monthIdx)
+    if (rows.length === 0) return
+    setDetail({ title: `${rowName} · ${MONTHS[monthIdx]}`, rows })
+  }
 
   const cellClass = (c: Cell) => {
     if (c.payable === 0) return "bg-gray-50 text-gray-300"
@@ -246,34 +297,38 @@ export default function PayablesDashboard() {
         </div>
       </div>
 
-      {/* KPI */}
+      {/* KPI：聚焦本月 + 今年逾期 */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <KpiCard
           icon={<CircleDollarSign className="w-5 h-5 text-blue-600" />}
-          label={`${year} 年應付總額`}
-          value={grand.payable}
-          sub={thisMonth ? `本月應付 ${formatNT(thisMonth.payable)}` : undefined}
+          label={`本月應付（${monthLabel}）`}
+          value={kpi.mPayable}
+          sub={`本月共 ${kpi.mCount} 筆應付`}
           tone="blue"
         />
         <KpiCard
           icon={<CheckCircle2 className="w-5 h-5 text-emerald-600" />}
-          label="已付"
-          value={grand.paid}
-          sub={thisMonth ? `本月已付 ${formatNT(thisMonth.paid)}` : undefined}
+          label={`本月已付（${monthLabel}）`}
+          value={kpi.mPaid}
+          sub={
+            kpi.mPayable > 0
+              ? `本月已付 ${Math.round((kpi.mPaid / kpi.mPayable) * 100)}%`
+              : "本月無應付"
+          }
           tone="emerald"
         />
         <KpiCard
           icon={<Wallet className="w-5 h-5 text-indigo-600" />}
-          label="未付"
-          value={grand.unpaid}
-          sub={thisMonth ? `本月未付 ${formatNT(thisMonth.unpaid)}` : undefined}
+          label={`本月未付（${monthLabel}）`}
+          value={kpi.mUnpaid}
+          sub={kpi.mUnpaid > 0 ? "本月尚待支付" : "本月已付清"}
           tone="indigo"
         />
         <KpiCard
           icon={<AlertTriangle className="w-5 h-5 text-red-600" />}
-          label="逾期未付"
-          value={overdueTotal}
-          sub={overdueTotal > 0 ? "請優先處理" : "無逾期"}
+          label="逾期未付（今年累積）"
+          value={kpi.overdueYear}
+          sub={kpi.overdueYear > 0 ? `共 ${kpi.overdueCount} 筆 · 請優先處理` : "今年無逾期 👍"}
           tone="red"
         />
       </div>
@@ -297,7 +352,7 @@ export default function PayablesDashboard() {
             <span>
               <i className="inline-block w-3 h-3 rounded bg-emerald-100 align-middle" /> 已付清
             </span>
-            <span>格內顯示「未付」金額</span>
+            <span>格內顯示未付金額 · 點格看明細</span>
           </div>
         </CardHeader>
         <CardContent className="overflow-x-auto">
@@ -330,8 +385,13 @@ export default function PayablesDashboard() {
                     {r.cells.map((c, i) => (
                       <td
                         key={i}
-                        className={`p-2 text-right tabular-nums rounded ${cellClass(c)}`}
-                        title={`應付 ${formatNT(c.payable)} / 已付 ${formatNT(c.paid)} / 未付 ${formatNT(c.unpaid)}`}
+                        onClick={() => openCell(r.key, r.name, i)}
+                        className={`p-2 text-right tabular-nums rounded ${cellClass(c)} ${c.payable > 0 ? "cursor-pointer hover:ring-2 hover:ring-blue-300" : ""}`}
+                        title={
+                          c.payable === 0
+                            ? undefined
+                            : `應付 ${formatNT(c.payable)} / 已付 ${formatNT(c.paid)} / 未付 ${formatNT(c.unpaid)}（點擊看明細）`
+                        }
                       >
                         {c.payable === 0 ? "–" : c.unpaid === 0 ? "✓" : formatNT(c.unpaid)}
                       </td>
@@ -382,6 +442,67 @@ export default function PayablesDashboard() {
           </div>
         </CardContent>
       </Card>
+
+      {/* 格子明細 Dialog */}
+      <Dialog open={!!detail} onOpenChange={(o) => !o && setDetail(null)}>
+        <DialogContent className="w-[95vw] max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{detail?.title} — 應付明細</DialogTitle>
+            <DialogDescription className="sr-only">應付項目明細清單</DialogDescription>
+          </DialogHeader>
+          {detail && (
+            <div className="space-y-2">
+              {detail.rows.map((it) => {
+                const payable = parseFloat(it.totalAmount || "0") || 0
+                const paid = parseFloat(it.paidAmount || "0") || 0
+                const unpaid = Math.max(0, payable - paid)
+                const done = unpaid === 0
+                return (
+                  <div
+                    key={it.id}
+                    className="flex items-center justify-between gap-3 border rounded-lg p-3"
+                  >
+                    <div className="min-w-0">
+                      <div className="text-sm font-medium text-gray-800 truncate">
+                        {it.itemName}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        {it.startDate?.slice(0, 10)}
+                        {" · "}應付 {formatNT(payable)} / 已付 {formatNT(paid)}
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <div
+                        className={`text-sm font-semibold tabular-nums ${done ? "text-emerald-600" : "text-indigo-700"}`}
+                      >
+                        {done ? "已付清" : `未付 ${formatNT(unpaid)}`}
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+              <div className="flex justify-between border-t pt-2 mt-2 text-sm font-semibold">
+                <span>合計（{detail.rows.length} 筆）</span>
+                <span className="tabular-nums text-indigo-700">
+                  未付{" "}
+                  {formatNT(
+                    detail.rows.reduce(
+                      (s, it) =>
+                        s +
+                        Math.max(
+                          0,
+                          (parseFloat(it.totalAmount || "0") || 0) -
+                            (parseFloat(it.paidAmount || "0") || 0)
+                        ),
+                      0
+                    )
+                  )}
+                </span>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <BackToTop />
     </div>
