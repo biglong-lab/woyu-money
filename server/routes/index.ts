@@ -169,6 +169,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use(fixedExpenseMatrixRoutes)
   app.use(laborInsuranceMatrixRoutes)
   app.use(enforcementRoutes)
+  app.use(billsRoutes)
   app.use(scenarioPresetRoutes)
 
   const httpServer = createServer(app)
