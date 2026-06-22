@@ -180,6 +180,12 @@ export const toolboxNavItems: NavItem[] = [
     description: "勞保/健保/勞退 雇主負擔×12月、整月一鍵標已繳",
   },
   {
+    title: "強制執行管理",
+    href: "/enforcement",
+    icon: Gavel,
+    description: "執行處公文/圈存/分期對帳（公文OCR帶入）、被強執款項分流",
+  },
+  {
     title: "收據對應助手",
     href: "/receipt-match-helper",
     icon: Receipt,
