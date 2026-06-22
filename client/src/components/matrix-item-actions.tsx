@@ -17,8 +17,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
-import { Trash2 } from "lucide-react"
-import { apiRequest, queryClient } from "@/lib/queryClient"
+import { Info } from "lucide-react"
+import { queryClient } from "@/lib/queryClient"
 import { useToast } from "@/hooks/use-toast"
 import { formatNT, localDateISO } from "@/lib/utils"
 import PaymentItemNotes from "@/components/payment-item-notes"
@@ -82,20 +82,6 @@ export default function MatrixItemActions({
     },
     onError: (e: Error) =>
       toast({ title: "歸帳失敗", description: e.message, variant: "destructive" }),
-  })
-
-  const deleteMutation = useMutation({
-    mutationFn: async () => {
-      if (!item) return
-      return apiRequest("DELETE", `/api/payment/items/${item.id}`)
-    },
-    onSuccess: () => {
-      refresh()
-      toast({ title: "已刪除", description: "項目已移至回收站" })
-      onClose()
-    },
-    onError: (e: Error) =>
-      toast({ title: "刪除失敗", description: e.message, variant: "destructive" }),
   })
 
   return (
@@ -179,21 +165,13 @@ export default function MatrixItemActions({
           </TabsContent>
         </Tabs>
 
-        {/* 危險操作 */}
-        <div className="border-t pt-3 mt-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-red-600 hover:bg-red-50"
-            disabled={deleteMutation.isPending}
-            onClick={() => {
-              if (window.confirm(`確定刪除「${item?.itemName}」？(移至回收站, 可復原)`))
-                deleteMutation.mutate()
-            }}
-          >
-            <Trash2 className="w-4 h-4 mr-1" />
-            刪除此項目
-          </Button>
+        {/* 不在矩陣刪除：定期/合約/分期項目刪除會破壞結構, 一律回原設定處理 */}
+        <div className="border-t pt-3 mt-1 flex items-start gap-2 text-xs text-gray-500">
+          <Info className="w-4 h-4 shrink-0 mt-0.5" />
+          <span>
+            此處僅記錄付款。若需刪除或調整金額/期數，請至原設定頁處理（租約設定 / 週期模板 /
+            分期管理），避免定期項目被重新產生造成混亂。
+          </span>
         </div>
       </DialogContent>
     </Dialog>

@@ -14,8 +14,7 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Plus, CheckCheck, Trash2 } from "lucide-react"
+import { Plus, Info } from "lucide-react"
 import { apiRequest, queryClient } from "@/lib/queryClient"
 import { useToast } from "@/hooks/use-toast"
 import { formatNT } from "@/lib/utils"
@@ -41,7 +40,6 @@ export default function PaymentCellDetail({
 }: PaymentCellDetailProps) {
   const { toast } = useToast()
   const [actionItem, setActionItem] = useState<PaymentItem | null>(null)
-  const [selected, setSelected] = useState<number[]>([])
   const [createOpen, setCreateOpen] = useState(false)
   const [newName, setNewName] = useState("")
   const [newAmount, setNewAmount] = useState("")
@@ -50,28 +48,6 @@ export default function PaymentCellDetail({
     queryClient.invalidateQueries({ queryKey: ["/api/payment/items"], refetchType: "all" })
     onChanged?.()
   }
-
-  const batchMutation = useMutation({
-    mutationFn: async (action: "paid" | "archive") => {
-      const body =
-        action === "paid"
-          ? { itemIds: selected, action: "updateStatus", data: { status: "paid" } }
-          : { itemIds: selected, action: "archive", data: {} }
-      return apiRequest("POST", "/api/batch/update", body)
-    },
-    onSuccess: (_d, action) => {
-      refresh()
-      const n = selected.length
-      setSelected([])
-      onClose()
-      toast({
-        title: action === "paid" ? "批次已標記已付" : "批次已刪除",
-        description: `處理 ${n} 筆`,
-      })
-    },
-    onError: (e: Error) =>
-      toast({ title: "批次失敗", description: e.message, variant: "destructive" }),
-  })
 
   const createMutation = useMutation({
     mutationFn: async () => {
@@ -96,9 +72,6 @@ export default function PaymentCellDetail({
       toast({ title: "新增失敗", description: e.message, variant: "destructive" }),
   })
 
-  const toggleSel = (id: number) =>
-    setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]))
-
   const totalUnpaid = items.reduce(
     (s, it) =>
       s +
@@ -118,43 +91,15 @@ export default function PaymentCellDetail({
             <DialogDescription className="sr-only">應付項目明細清單</DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
-            {/* 工具列 */}
-            <div className="flex flex-wrap items-center gap-2 pb-1">
-              {createPrefill && (
+            {/* 工具列 (僅新增; 不提供刪除/批次, 結構性項目須回原設定處理) */}
+            {createPrefill && (
+              <div className="pb-1">
                 <Button size="sm" variant="outline" onClick={() => setCreateOpen(true)}>
                   <Plus className="w-4 h-4 mr-1" />
                   新增應付
                 </Button>
-              )}
-              {selected.length > 0 && (
-                <>
-                  <span className="text-xs text-gray-500">已選 {selected.length} 筆</span>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="text-emerald-700"
-                    disabled={batchMutation.isPending}
-                    onClick={() => batchMutation.mutate("paid")}
-                  >
-                    <CheckCheck className="w-4 h-4 mr-1" />
-                    批次標記已付
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="text-red-600"
-                    disabled={batchMutation.isPending}
-                    onClick={() => {
-                      if (window.confirm(`批次刪除 ${selected.length} 筆？(移回收站)`))
-                        batchMutation.mutate("archive")
-                    }}
-                  >
-                    <Trash2 className="w-4 h-4 mr-1" />
-                    批次刪除
-                  </Button>
-                </>
-              )}
-            </div>
+              </div>
+            )}
 
             {items.length === 0 && (
               <p className="text-gray-400 text-sm py-6 text-center">此格無應付項目</p>
@@ -167,10 +112,6 @@ export default function PaymentCellDetail({
               const done = unpaid === 0
               return (
                 <div key={it.id} className="flex items-center gap-3 border rounded-lg p-3">
-                  <Checkbox
-                    checked={selected.includes(it.id)}
-                    onCheckedChange={() => toggleSel(it.id)}
-                  />
                   <div className="min-w-0 flex-1">
                     <div className="text-sm font-medium text-gray-800 truncate">{it.itemName}</div>
                     <div className="text-xs text-gray-500">
@@ -203,6 +144,13 @@ export default function PaymentCellDetail({
                 <span className="tabular-nums text-indigo-700">未付 {formatNT(totalUnpaid)}</span>
               </div>
             )}
+
+            <div className="flex items-start gap-1.5 text-xs text-gray-400 pt-1">
+              <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+              <span>
+                每筆可分多次記錄付款直到付清。如需刪除或調整定期/合約/分期項目，請至原設定頁處理。
+              </span>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
