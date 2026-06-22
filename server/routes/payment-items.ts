@@ -9,6 +9,23 @@ import { asyncHandler, AppError } from "../middleware/error-handler"
 
 const router = Router()
 
+// 分流：把應付款標記為「被強制執行」連到強執案（或取消，傳 null）
+router.patch(
+  "/api/payment/items/:id/enforcement",
+  asyncHandler(async (req, res) => {
+    const id = parseInt(req.params.id)
+    if (isNaN(id)) throw new AppError(400, "無效的 ID")
+    const raw = req.body?.enforcementCaseId
+    const enforcementCaseId =
+      raw === null || raw === undefined || raw === "" ? null : parseInt(String(raw))
+    if (enforcementCaseId !== null && isNaN(enforcementCaseId))
+      throw new AppError(400, "enforcementCaseId 無效")
+    const updated = await storage.updatePaymentItem(id, { enforcementCaseId })
+    if (!updated) throw new AppError(404, "找不到付款項目")
+    res.json(updated)
+  })
+)
+
 router.get(
   "/api/payment/items",
   asyncHandler(async (req, res) => {
