@@ -47,6 +47,8 @@ interface PaymentItemFilters {
   excludeRental?: boolean
   // 時間焦點：排除未來項目（start_date > 今天）
   excludeFuture?: boolean
+  // 分流：排除已被強制執行（連到強執案）的項目，避免與強執分期重複列為應付款
+  excludeEnforced?: boolean
 }
 
 export async function getPaymentItems(
