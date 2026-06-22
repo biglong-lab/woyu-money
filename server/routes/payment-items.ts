@@ -42,6 +42,11 @@ router.get(
       filters.excludeFuture = true
     }
 
+    // 分流：一般應付款清單排除已被強制執行的項目（改由強執分期管理，不重複列）
+    if (!shouldIncludeAll) {
+      filters.excludeEnforced = true
+    }
+
     if (shouldIncludeAll) {
       // 特殊情況：需要所有數據時（如導出功能）
       const items = await storage.getPaymentItems(filters)
