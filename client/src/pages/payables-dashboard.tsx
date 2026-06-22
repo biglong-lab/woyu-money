@@ -7,7 +7,20 @@
  */
 import { useMemo, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
-import { Wallet, AlertTriangle, CheckCircle2, CircleDollarSign } from "lucide-react"
+import { Link } from "wouter"
+import {
+  Wallet,
+  AlertTriangle,
+  CheckCircle2,
+  CircleDollarSign,
+  Calendar,
+  CalendarRange,
+  Shield,
+  Layers,
+  Gavel,
+  CalendarClock,
+  ChevronRight,
+} from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import {
@@ -347,10 +360,52 @@ export default function PayablesDashboard() {
         </CardContent>
       </Card>
 
+      {/* 深入工具：下鑽既有矩陣與看板 */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">深入查看</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            {DRILL_LINKS.map((l) => (
+              <Link key={l.href} href={l.href}>
+                <div className="flex items-center gap-3 p-3 rounded-lg border hover:border-blue-400 hover:bg-blue-50/40 transition cursor-pointer h-full">
+                  <l.icon className="w-5 h-5 text-blue-600 shrink-0" />
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium text-gray-800">{l.title}</div>
+                    <div className="text-xs text-gray-500 truncate">{l.desc}</div>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-gray-300 ml-auto shrink-0" />
+                </div>
+              </Link>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
       <BackToTop />
     </div>
   )
 }
+
+const DRILL_LINKS = [
+  { href: "/rental-matrix", title: "租金月度矩陣", desc: "合約 × 12 月 給付狀態", icon: Calendar },
+  {
+    href: "/fixed-expense-matrix",
+    title: "固定開銷矩陣",
+    desc: "預算 vs 實際 × 12 月",
+    icon: CalendarRange,
+  },
+  {
+    href: "/labor-insurance-matrix",
+    title: "勞健保矩陣",
+    desc: "勞保/健保/勞退 × 12 月",
+    icon: Shield,
+  },
+  { href: "/cost-overview", title: "成本結構中樞", desc: "全年成本結構 + 占比", icon: Layers },
+  { href: "/enforcement", title: "強制執行管理", desc: "公文/圈存/分期對帳", icon: Gavel },
+  { href: "/bills", title: "帳單到期看板", desc: "近期應繳/逾期提醒", icon: CalendarClock },
+]
 
 function KpiCard({
   icon,
