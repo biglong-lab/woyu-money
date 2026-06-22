@@ -193,6 +193,7 @@ function Router() {
                 <ProtectedRoute path="/rental-matrix" component={RentalMatrix} />
                 <ProtectedRoute path="/fixed-expense-matrix" component={FixedExpenseMatrix} />
                 <ProtectedRoute path="/labor-insurance-matrix" component={LaborInsuranceMatrix} />
+                <ProtectedRoute path="/enforcement" component={Enforcement} />
 
                 {/* Cashflow Decision Center — 現金流決策中心 */}
                 <ProtectedRoute
