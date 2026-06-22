@@ -3,11 +3,14 @@
  * 五桶（租金/人事含勞健保/固定開銷/流水雜支/其他單項）× 12 月，
  * 成本組成占比 + 預算 vs 實際 + 下鑽到各矩陣/明細。
  */
+import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { Link } from "wouter"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { ExternalLink } from "lucide-react"
 import { formatNT } from "@/lib/utils"
+
+type PeriodMode = "month" | "quarter" | "year"
 
 interface BucketCell {
   month: number
@@ -79,7 +82,24 @@ const BUCKET_META: Record<string, { bar: string; chip: string; href: string; dri
   },
 }
 
+const QUARTER_MONTHS: Record<number, number[]> = {
+  1: [1, 2, 3],
+  2: [4, 5, 6],
+  3: [7, 8, 9],
+  4: [10, 11, 12],
+}
+
 export default function CostStructureAnnualView({ year }: { year: number }) {
+  const now = new Date()
+  const isCurrentYear = year === now.getFullYear()
+  const curMonth = now.getMonth() + 1
+  const curQuarter = Math.floor((curMonth - 1) / 3) + 1
+
+  // 成本組成期間：預設本月（非當年則預設該年 1 月 / Q1）
+  const [periodMode, setPeriodMode] = useState<PeriodMode>("month")
+  const [selMonth, setSelMonth] = useState(isCurrentYear ? curMonth : 1)
+  const [selQuarter, setSelQuarter] = useState(isCurrentYear ? curQuarter : 1)
+
   const { data, isLoading } = useQuery<AnnualData>({
     queryKey: [`/api/dashboard/cost-structure/annual?year=${year}`],
   })
@@ -87,7 +107,26 @@ export default function CostStructureAnnualView({ year }: { year: number }) {
   if (isLoading) return <div className="text-center text-gray-400 py-8">載入中…</div>
   if (!data) return null
 
-  const grand = data.totals.actual
+  // 依期間選出要加總的月份
+  const periodMonths =
+    periodMode === "year"
+      ? data.months
+      : periodMode === "quarter"
+        ? QUARTER_MONTHS[selQuarter]
+        : [selMonth]
+
+  // 依期間重算各桶實際 + 占比
+  const compBuckets = data.buckets.map((b) => {
+    const actual = periodMonths.reduce((s, m) => s + (b.cells[m - 1]?.actual ?? 0), 0)
+    return { key: b.key, label: b.label, actual }
+  })
+  const compTotal = compBuckets.reduce((s, b) => s + b.actual, 0)
+  const periodLabel =
+    periodMode === "year"
+      ? `${year} 全年`
+      : periodMode === "quarter"
+        ? `${year} Q${selQuarter}`
+        : `${year}/${String(selMonth).padStart(2, "0")}`
 
   return (
     <div className="space-y-4">
@@ -122,30 +161,90 @@ export default function CostStructureAnnualView({ year }: { year: number }) {
         </Card>
       </div>
 
-      {/* 成本組成占比 */}
+      {/* 成本組成占比（可切 月/季/年） */}
       <Card>
         <CardHeader>
-          <CardTitle>成本組成（依實際）</CardTitle>
-          <CardDescription>各成本類別占比，點類別前往對應矩陣/明細</CardDescription>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <CardTitle>成本組成（依實際 · {periodLabel}）</CardTitle>
+              <CardDescription>各成本類別占比，點類別前往對應矩陣/明細</CardDescription>
+            </div>
+            <div className="flex flex-wrap gap-2 items-center">
+              {/* 月/季/年 切換 */}
+              <div className="inline-flex rounded-md border overflow-hidden">
+                {(
+                  [
+                    ["month", "每月"],
+                    ["quarter", "每季"],
+                    ["year", "每年"],
+                  ] as [PeriodMode, string][]
+                ).map(([m, label]) => (
+                  <button
+                    key={m}
+                    type="button"
+                    className={`px-3 py-1 text-sm ${periodMode === m ? "bg-indigo-600 text-white" : "bg-white text-gray-600"}`}
+                    onClick={() => setPeriodMode(m)}
+                    data-testid={`period-${m}`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              {/* 月份/季別選擇 */}
+              {periodMode === "month" && (
+                <select
+                  className="border rounded px-2 py-1 text-sm"
+                  value={selMonth}
+                  onChange={(e) => setSelMonth(Number(e.target.value))}
+                  data-testid="period-month-select"
+                >
+                  {data.months.map((m) => (
+                    <option key={m} value={m}>
+                      {m} 月
+                    </option>
+                  ))}
+                </select>
+              )}
+              {periodMode === "quarter" && (
+                <select
+                  className="border rounded px-2 py-1 text-sm"
+                  value={selQuarter}
+                  onChange={(e) => setSelQuarter(Number(e.target.value))}
+                  data-testid="period-quarter-select"
+                >
+                  {[1, 2, 3, 4].map((q) => (
+                    <option key={q} value={q}>
+                      Q{q}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="space-y-3">
+          <div className="text-sm text-gray-500">
+            {periodLabel} 實際成本合計{" "}
+            <span className="font-bold text-gray-800">{formatNT(compTotal)}</span>
+          </div>
           {/* 堆疊條 */}
-          <div className="flex w-full h-5 rounded overflow-hidden border">
-            {data.buckets.map((b) =>
-              b.actualTotal > 0 ? (
+          <div className="flex w-full h-5 rounded overflow-hidden border bg-gray-50">
+            {compBuckets.map((b) =>
+              b.actual > 0 ? (
                 <div
                   key={b.key}
                   className={BUCKET_META[b.key]?.bar ?? "bg-gray-300"}
-                  style={{ width: `${grand > 0 ? (b.actualTotal / grand) * 100 : 0}%` }}
-                  title={`${b.label} ${b.sharePct}%`}
+                  style={{ width: `${compTotal > 0 ? (b.actual / compTotal) * 100 : 0}%` }}
+                  title={`${b.label} ${compTotal > 0 ? Math.round((b.actual / compTotal) * 1000) / 10 : 0}%`}
                 />
               ) : null
             )}
           </div>
           {/* 圖例 + 下鑽 */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-            {data.buckets.map((b) => {
+            {compBuckets.map((b) => {
               const meta = BUCKET_META[b.key]
+              const pct = compTotal > 0 ? Math.round((b.actual / compTotal) * 1000) / 10 : 0
               return (
                 <Link key={b.key} href={meta?.href ?? "#"}>
                   <div
@@ -157,10 +256,10 @@ export default function CostStructureAnnualView({ year }: { year: number }) {
                         className={`inline-block w-3 h-3 rounded-sm ${meta?.bar ?? "bg-gray-300"}`}
                       />
                       <span className="font-medium">{b.label}</span>
-                      <span className="text-xs opacity-70">{b.sharePct}%</span>
+                      <span className="text-xs opacity-70">{pct}%</span>
                     </div>
                     <div className="flex items-center gap-1 text-sm font-semibold">
-                      {formatNT(b.actualTotal)}
+                      {formatNT(b.actual)}
                       <ExternalLink className="h-3 w-3 opacity-50" />
                     </div>
                   </div>
