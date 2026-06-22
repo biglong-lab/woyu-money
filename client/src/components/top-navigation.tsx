@@ -39,6 +39,7 @@ import { useAuth } from "@/hooks/use-auth"
 import { useQuery } from "@tanstack/react-query"
 import {
   mainNavItems,
+  overviewCenterNavItems,
   coreDecisionNavItems,
   toolboxNavItems,
   advancedNavItems,
@@ -59,8 +60,15 @@ interface CategoryConfig {
 
 const categoryConfigs: CategoryConfig[] = [
   {
+    id: "overview-center",
+    title: "🎯 財務總覽中心",
+    titleClass: "text-blue-900",
+    hoverClass: "hover:bg-blue-50",
+    items: overviewCenterNavItems,
+  },
+  {
     id: "decision-core",
-    title: "💡 核心決策",
+    title: "💡 規劃工具",
     titleClass: "text-amber-900",
     hoverClass: "hover:bg-amber-50",
     items: coreDecisionNavItems,
@@ -206,14 +214,14 @@ export default function TopNavigation() {
   // 展開狀態持久化（localStorage、跨頁面/重新整理保留）
   const STORAGE_KEY = "topnav.expandedCategories"
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>(() => {
-    if (typeof window === "undefined") return { "decision-core": true }
+    if (typeof window === "undefined") return { "overview-center": true }
     try {
       const saved = window.localStorage.getItem(STORAGE_KEY)
       if (saved) return JSON.parse(saved) as Record<string, boolean>
     } catch {
       // ignore parse errors
     }
-    return { "decision-core": true }
+    return { "overview-center": true }
   })
   useEffect(() => {
     if (typeof window === "undefined") return

@@ -64,13 +64,6 @@ export const mainNavItems: NavItem[] = [
     icon: Home,
   },
   {
-    title: "應付總覽看板",
-    href: "/payables-dashboard",
-    icon: Wallet,
-    badge: "總覽",
-    description: "一頁看完：給付、應付、還有多少未付（分類/專案 × 12 月矩陣）",
-  },
-  {
     title: "記帳窗口",
     href: "/document-inbox",
     icon: Inbox,
@@ -133,10 +126,35 @@ export const cockpitNavItem: NavItem = {
   description: "現況 + 應付款排序 + 現金缺口，一頁看完並導向深度工具",
 }
 
-// 核心決策（駕駛艙為首要入口）
-// 扁平化建議（audit 2026-05-24 P1）：14 項 → 駕駛艙領頭 + 工具箱可摺疊
+// 財務總覽中心（收納所有相似的總覽/儀表板頁，主入口=應付總覽看板）
+// 這些頁面原本散在核心決策/進階工具/主入口，整合收進此單一群組（不刪頁，只收納）
+export const overviewCenterNavItems: NavItem[] = [
+  {
+    title: "應付總覽看板",
+    href: "/payables-dashboard",
+    icon: Wallet,
+    badge: "總覽",
+    description: "一頁看完：給付、應付、還有多少未付（分類/專案 × 12 月矩陣，可點格看明細）",
+  },
+  cockpitNavItem, // 財務健康駕駛艙
+  dashboardNavItem, // 綜合儀表板：YTD + 3 月預估
+  {
+    title: "財務總覽 v2",
+    href: "/financial-overview-v2",
+    icon: BarChart3,
+    description: "預估 vs 實際 / 各館組損益一頁看完",
+  },
+  costOverviewNavItem, // 成本結構中樞
+  {
+    title: "現金流決策中心",
+    href: "/cashflow-decision-center",
+    icon: TrendingUp,
+    description: "未來 3-6 月收支預估 + 缺口警示",
+  },
+]
+
+// 核心決策（規劃工具）— 總覽類已移至「財務總覽中心」
 export const coreDecisionNavItems: NavItem[] = [
-  cockpitNavItem, // 🚀 主入口：一頁看完 + 導向
   {
     title: "排程分配規劃台",
     href: "/payment-planner",
@@ -144,14 +162,6 @@ export const coreDecisionNavItems: NavItem[] = [
     description: "一頁安排所有應付款付款月份，推估每月/季/年所需金額",
   },
   scenarioPlannerNavItem, // 沙盤推演 2.0：未來現金模擬
-  dashboardNavItem, // 全局：YTD + 3 月預估
-  costOverviewNavItem, // 細節：四大成本
-  {
-    title: "現金流決策中心",
-    href: "/cashflow-decision-center",
-    icon: TrendingUp,
-    description: "未來 3-6 月收支預估 + 缺口警示",
-  },
 ]
 
 // 工具箱（常用、可摺疊、依使用頻率排序）
@@ -235,16 +245,11 @@ export const advancedNavItems: NavItem[] = [
     icon: AlertTriangle,
     description: "年度損失儀表 + 三層提醒",
   },
-  {
-    title: "財務總覽 v2",
-    href: "/financial-overview-v2",
-    icon: BarChart3,
-    description: "預估 vs 實際 / 各館組損益一頁看完",
-  },
 ]
 
-// 保留 decisionNavItems export 對舊呼叫者相容（合併 core + toolbox + advanced）
+// 保留 decisionNavItems export 對舊呼叫者相容（合併 總覽中心 + core + toolbox + advanced）
 export const decisionNavItems: NavItem[] = [
+  ...overviewCenterNavItems,
   ...coreDecisionNavItems,
   ...toolboxNavItems,
   ...advancedNavItems,
