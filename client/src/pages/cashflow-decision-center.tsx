@@ -90,6 +90,41 @@ interface MonthDetailData {
   items: MonthDetailItem[]
 }
 
+interface MonthSummaryData {
+  year: number
+  month: number
+  incomeTotal: number
+  expenseTotal: number
+  expensePaid: number
+  expenseUnpaid: number
+  net: number
+  expenseCount: number
+}
+
+function MonthSummary({ year, month }: { year: number; month: number }) {
+  const { data } = useQuery<MonthSummaryData>({
+    queryKey: [`/api/cashflow/month-summary?year=${year}&month=${month}`],
+  })
+  if (!data) return null
+  const cells: { label: string; value: number; cls: string }[] = [
+    { label: "收入", value: data.incomeTotal, cls: "text-emerald-700" },
+    { label: "支出", value: data.expenseTotal, cls: "text-gray-900" },
+    { label: "已付", value: data.expensePaid, cls: "text-blue-700" },
+    { label: "未付", value: data.expenseUnpaid, cls: "text-indigo-700" },
+    { label: "淨額", value: data.net, cls: data.net >= 0 ? "text-emerald-700" : "text-red-600" },
+  ]
+  return (
+    <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 mb-2">
+      {cells.map((c) => (
+        <div key={c.label} className="border rounded-lg p-2 text-center">
+          <div className="text-xs text-gray-500">{c.label}</div>
+          <div className={`text-sm font-semibold tabular-nums ${c.cls}`}>{formatNT(c.value)}</div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function MonthDetail({ year, month }: { year: number; month: number }) {
   const { toast } = useToast()
   const copyAmount = useCopyAmount()
@@ -361,6 +396,7 @@ export default function CashflowDecisionCenterPage() {
           </div>
         </CardHeader>
         <CardContent>
+          <MonthSummary year={viewYear} month={viewMonth} />
           <MonthDetail year={viewYear} month={viewMonth} />
         </CardContent>
       </Card>

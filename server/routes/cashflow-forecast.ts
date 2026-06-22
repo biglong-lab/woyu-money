@@ -211,4 +211,44 @@ router.get(
   })
 )
 
+// 月度收支彙總 (依 start_date 月份): 收入 / 支出 / 已付 / 未付 / 淨額
+const MONTH_SUMMARY_SQL = `
+  SELECT
+    COALESCE(SUM(total_amount::numeric) FILTER (WHERE item_type = 'income'), 0) AS income_total,
+    COALESCE(SUM(total_amount::numeric) FILTER (WHERE item_type IS NULL OR item_type != 'income'), 0) AS expense_total,
+    COALESCE(SUM(paid_amount::numeric) FILTER (WHERE item_type IS NULL OR item_type != 'income'), 0) AS expense_paid,
+    COUNT(*) FILTER (WHERE item_type IS NULL OR item_type != 'income') AS expense_count
+  FROM payment_items
+  WHERE is_deleted = false
+    AND EXTRACT(YEAR FROM start_date) = $1
+    AND EXTRACT(MONTH FROM start_date) = $2
+`
+
+router.get(
+  "/api/cashflow/month-summary",
+  asyncHandler(async (req, res) => {
+    const parsed = monthDetailQuerySchema.safeParse(req.query)
+    if (!parsed.success) {
+      throw errors.badRequest("year/month 參數錯誤")
+    }
+    const { year, month } = parsed.data
+    const { pool } = await import("../db")
+    const r = await pool.query(MONTH_SUMMARY_SQL, [year, month])
+    const row = r.rows[0] ?? {}
+    const incomeTotal = Number(row.income_total ?? 0)
+    const expenseTotal = Number(row.expense_total ?? 0)
+    const expensePaid = Number(row.expense_paid ?? 0)
+    res.json({
+      year,
+      month,
+      incomeTotal,
+      expenseTotal,
+      expensePaid,
+      expenseUnpaid: expenseTotal - expensePaid,
+      net: incomeTotal - expenseTotal,
+      expenseCount: Number(row.expense_count ?? 0),
+    })
+  })
+)
+
 export default router
