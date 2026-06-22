@@ -116,8 +116,8 @@ export async function getSystemStats(): Promise<SystemStatsResult> {
         paidItems: sql<number>`COUNT(CASE WHEN status = 'paid' THEN 1 END)`,
         pendingItems: sql<number>`COUNT(CASE WHEN status = 'pending' THEN 1 END)`,
         overdueItems: sql<number>`COUNT(CASE WHEN status = 'overdue' THEN 1 END)`,
-        totalAmount: sql<string>`COALESCE(SUM(total_amount::numeric), 0)`,
-        paidAmount: sql<string>`COALESCE(SUM(paid_amount::numeric), 0)`,
+        totalAmount: sql<string>`COALESCE(SUM(CASE WHEN (item_type IS NULL OR item_type != 'income') THEN total_amount::numeric ELSE 0 END), 0)`,
+        paidAmount: sql<string>`COALESCE(SUM(CASE WHEN (item_type IS NULL OR item_type != 'income') THEN paid_amount::numeric ELSE 0 END), 0)`,
       })
       .from(paymentItems)
       .where(eq(paymentItems.isDeleted, false))

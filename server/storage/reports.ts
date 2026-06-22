@@ -56,6 +56,7 @@ export async function generateIntelligentReport(
         totalAmount: paymentItems.totalAmount,
         status: paymentItems.status,
         startDate: paymentItems.startDate,
+        itemType: paymentItems.itemType,
         categoryName: debtCategories.categoryName,
       })
       .from(paymentItems)
@@ -114,11 +115,13 @@ export async function generateIntelligentReport(
     }
 
     // 計算關鍵績效指標
-    const totalPlanned = paymentItemsData.reduce(
+    // 排除收入項目：支出統計不計入 itemType='income' 的項目
+    const expenseItemsData = paymentItemsData.filter((item) => item.itemType !== "income")
+    const totalPlanned = expenseItemsData.reduce(
       (sum, item) => sum + parseFloat(item.totalAmount || "0"),
       0
     )
-    const totalPaid = paymentItemsData
+    const totalPaid = expenseItemsData
       .filter((item) => item.status === "paid")
       .reduce((sum, item) => sum + parseFloat(item.totalAmount || "0"), 0)
     const completionRate = totalPlanned > 0 ? Math.round((totalPaid / totalPlanned) * 100) : 0

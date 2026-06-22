@@ -60,6 +60,7 @@ export async function getSubcategoryStatus(
         and(
           eq(paymentItems.categoryId, category.id),
           eq(paymentItems.isDeleted, false),
+          sql`(item_type IS NULL OR item_type != 'income')`,
           sql`EXTRACT(YEAR FROM start_date) = ${currentYear}`,
           sql`EXTRACT(MONTH FROM start_date) = ${currentMonth}`,
           ...(projectId ? [eq(paymentItems.projectId, projectId)] : [])
@@ -76,6 +77,7 @@ export async function getSubcategoryStatus(
         and(
           eq(paymentItems.categoryId, category.id),
           eq(paymentItems.isDeleted, false),
+          sql`(item_type IS NULL OR item_type != 'income')`,
           sql`status != 'paid'`,
           ...(projectId ? [eq(paymentItems.projectId, projectId)] : [])
         )
@@ -106,6 +108,7 @@ export async function getSubcategoryStatus(
         and(
           eq(paymentItems.categoryId, category.id),
           eq(paymentItems.isDeleted, false),
+          sql`(item_type IS NULL OR item_type != 'income')`,
           sql`status != 'paid'`,
           ...(projectId ? [eq(paymentItems.projectId, projectId)] : [])
         )
@@ -145,6 +148,7 @@ export async function getSubcategoryPaymentPriority(subcategoryId: number): Prom
       and(
         eq(paymentItems.categoryId, subcategoryId),
         eq(paymentItems.isDeleted, false),
+        sql`(item_type IS NULL OR item_type != 'income')`,
         sql`status != 'paid'`
       )
     )

@@ -58,7 +58,9 @@ router.get(
     const paymentRecords = (await storage.getPaymentRecords({}, 1, 10000)) as PaymentRecordRow[]
 
     const projectStats = projects.map((project) => {
-      const projectItems = paymentItems.filter((item) => item.projectId === project.id)
+      const projectItems = paymentItems.filter(
+        (item) => item.projectId === project.id && item.itemType !== "income"
+      )
       const projectRecords = paymentRecords.filter((record) =>
         projectItems.some((item) => item.id === record.itemId)
       )
@@ -106,6 +108,9 @@ router.get(
 
     const filteredRecords = paymentRecords.filter((record) => {
       if (!record.paymentDate) return false
+      // 排除收入項目：支出現金流不計入 itemType='income' 的項目
+      const recordItem = itemsMap.get(record.itemId)
+      if (recordItem?.itemType === "income") return false
       const recordDate = new Date(record.paymentDate)
       const recordYear = recordDate.getFullYear()
       const recordMonth = recordDate.getMonth() + 1
@@ -165,6 +170,9 @@ router.get(
 
     const filteredRecords = paymentRecords.filter((record) => {
       if (!record.paymentDate) return false
+      // 排除收入項目：支出現金流明細不計入 itemType='income' 的項目
+      const recordItem = itemsMap.get(record.itemId)
+      if (recordItem?.itemType === "income") return false
       const recordDate = new Date(record.paymentDate)
       const recordYear = recordDate.getFullYear()
       const recordMonth = recordDate.getMonth() + 1
