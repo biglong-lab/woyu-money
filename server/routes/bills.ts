@@ -21,6 +21,8 @@ interface BillRow {
   amount: number
   billIssuedDate: string | null
   dueDate: string | null
+  finalDueDate: string | null
+  penaltyNote: string | null
   status: string
 }
 
@@ -36,12 +38,14 @@ router.get(
              (pi.total_amount::numeric - COALESCE(pi.paid_amount,0)::numeric) AS "amount",
              pi.bill_issued_date AS "billIssuedDate",
              COALESCE(pi.legal_due_date, pi.start_date) AS "dueDate",
+             pi.final_due_date AS "finalDueDate",
+             pi.penalty_note AS "penaltyNote",
              pi.status
       FROM payment_items pi
       WHERE NOT pi.is_deleted
         AND pi.enforcement_case_id IS NULL
         AND pi.status <> 'paid'
-        AND COALESCE(pi.legal_due_date, pi.start_date) <= (CURRENT_DATE + ${days} * INTERVAL '1 day')
+        AND COALESCE(pi.final_due_date, pi.legal_due_date, pi.start_date) <= (CURRENT_DATE + ${days} * INTERVAL '1 day')
         AND (pi.total_amount::numeric - COALESCE(pi.paid_amount,0)::numeric) > 0
       ORDER BY "dueDate"
     `)
@@ -54,6 +58,8 @@ router.get(
       amount: Number(r.amount),
       billIssuedDate: r.billIssuedDate ? String(r.billIssuedDate) : null,
       dueDate: r.dueDate ? String(r.dueDate) : null,
+      finalDueDate: r.finalDueDate ? String(r.finalDueDate) : null,
+      penaltyNote: r.penaltyNote ? String(r.penaltyNote) : null,
       status: String(r.status),
     }))
 
@@ -79,28 +85,42 @@ router.get(
             amount: Number(r.amount),
             billIssuedDate: null,
             dueDate: due,
+            finalDueDate: null,
+            penaltyNote: null,
             status: "pending",
           })
         }
       }
     }
 
+    const dayDiff = (d: string | null) =>
+      d ? Math.round((new Date(d + "T00:00:00").getTime() - now.getTime()) / 86400000) : null
+
     const all = [...items, ...installments]
       .map((b) => {
-        const diff = b.dueDate
-          ? Math.round((new Date(b.dueDate + "T00:00:00").getTime() - now.getTime()) / 86400000)
-          : 999
+        const diff = dayDiff(b.dueDate) ?? 999
+        const finalDiff = dayDiff(b.finalDueDate)
+        // 罰款風險：已過最終必繳日 → penalty（最嚴重）
+        // 過法定但未過最終 → grace（緩衝期、再不繳要罰）
+        let urgency: "penalty" | "overdue" | "grace" | "soon" | "upcoming"
+        if (finalDiff !== null && finalDiff < 0) urgency = "penalty"
+        else if (diff < 0) urgency = b.finalDueDate ? "grace" : "overdue"
+        else if (diff <= 7) urgency = "soon"
+        else urgency = "upcoming"
         return {
           ...b,
           daysUntil: diff,
+          finalDaysUntil: finalDiff,
           overdue: diff < 0,
-          urgency: diff < 0 ? "overdue" : diff <= 7 ? "soon" : "upcoming",
+          penaltyRisk: urgency === "penalty",
+          urgency,
         }
       })
       .sort((a, b) => (a.dueDate ?? "").localeCompare(b.dueDate ?? ""))
 
     const totalDue = all.reduce((s, b) => s + b.amount, 0)
     const overdueTotal = all.filter((b) => b.overdue).reduce((s, b) => s + b.amount, 0)
+    const penaltyRiskTotal = all.filter((b) => b.penaltyRisk).reduce((s, b) => s + b.amount, 0)
 
     res.json({
       today,
@@ -108,6 +128,7 @@ router.get(
       count: all.length,
       totalDue,
       overdueTotal,
+      penaltyRiskTotal,
       bills: all,
     })
   })

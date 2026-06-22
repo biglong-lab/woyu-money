@@ -273,18 +273,22 @@ function SeizureSection({
   const { toast } = useToast()
   const invalidate = useEnfInvalidate()
   const [f, setF] = useState({ caseId: "", bankName: "", amount: "", seizureDate: "" })
+  const [file, setFile] = useState<File | null>(null)
   const add = useMutation({
-    mutationFn: async () =>
-      apiRequest("POST", "/api/enforcement/seizures", {
-        caseId: f.caseId ? Number(f.caseId) : null,
-        bankName: f.bankName || null,
-        amount: f.amount,
-        seizureDate: f.seizureDate || null,
-      }),
+    mutationFn: async () => {
+      const fd = new FormData()
+      if (f.caseId) fd.append("caseId", f.caseId)
+      if (f.bankName) fd.append("bankName", f.bankName)
+      fd.append("amount", f.amount)
+      if (f.seizureDate) fd.append("seizureDate", f.seizureDate)
+      if (file) fd.append("receiptFile", file)
+      return apiRequest("POST", "/api/enforcement/seizures", fd)
+    },
     onSuccess: () => {
       invalidate()
       toast({ title: "✅ 已記圈存" })
       setF({ caseId: "", bankName: "", amount: "", seizureDate: "" })
+      setFile(null)
     },
     onError: (e: Error) => toast({ title: "失敗", description: e.message, variant: "destructive" }),
   })
@@ -334,6 +338,14 @@ function SeizureSection({
             記圈存
           </Button>
         </div>
+        <Input
+          type="file"
+          accept="image/*"
+          className="text-xs"
+          onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+          data-testid="seizure-file"
+        />
+        {file && <div className="text-xs text-gray-400">截圖：{file.name}</div>}
         {seizures.map((s) => (
           <div
             key={s.id}
@@ -394,6 +406,28 @@ function InstallmentSection({
       invalidate()
       toast({ title: "✅ 已建分期" })
       setF({ caseId: "", monthlyAmount: "", periods: "", totalAmount: "", startDate: "" })
+    },
+    onError: (e: Error) => toast({ title: "失敗", description: e.message, variant: "destructive" }),
+  })
+
+  // 記實付（含截圖）
+  const [payingId, setPayingId] = useState<number | null>(null)
+  const [pf, setPf] = useState({ paymentDate: "", amount: "" })
+  const [pfile, setPfile] = useState<File | null>(null)
+  const pay = useMutation({
+    mutationFn: async (instId: number) => {
+      const fd = new FormData()
+      fd.append("paymentDate", pf.paymentDate || new Date().toISOString().slice(0, 10))
+      fd.append("amount", pf.amount)
+      if (pfile) fd.append("receiptFile", pfile)
+      return apiRequest("POST", `/api/enforcement/installments/${instId}/payments`, fd)
+    },
+    onSuccess: () => {
+      invalidate()
+      toast({ title: "✅ 已記分期實付" })
+      setPayingId(null)
+      setPf({ paymentDate: "", amount: "" })
+      setPfile(null)
     },
     onError: (e: Error) => toast({ title: "失敗", description: e.message, variant: "destructive" }),
   })
@@ -468,6 +502,14 @@ function InstallmentSection({
             <span className="text-xs text-gray-400 w-24">起 {i.startDate || "—"}</span>
             <span className="flex-1 text-xs text-gray-400">→ {caseName(i.caseId)}</span>
             <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPayingId(payingId === i.id ? null : i.id)}
+              data-testid={`inst-pay-toggle-${i.id}`}
+            >
+              記實付
+            </Button>
+            <Button
               variant="ghost"
               size="icon"
               className="text-gray-400 hover:text-red-500"
@@ -475,6 +517,36 @@ function InstallmentSection({
             >
               <Trash2 className="h-4 w-4" />
             </Button>
+            {payingId === i.id && (
+              <div className="w-full grid grid-cols-2 sm:grid-cols-4 gap-2 bg-amber-50 rounded p-2 mt-1">
+                <Input
+                  type="date"
+                  value={pf.paymentDate}
+                  onChange={(e) => setPf({ ...pf, paymentDate: e.target.value })}
+                />
+                <Input
+                  type="number"
+                  placeholder="實付金額"
+                  value={pf.amount}
+                  onChange={(e) => setPf({ ...pf, amount: e.target.value })}
+                  data-testid={`inst-pay-amount-${i.id}`}
+                />
+                <Input
+                  type="file"
+                  accept="image/*"
+                  className="text-xs"
+                  onChange={(e) => setPfile(e.target.files?.[0] ?? null)}
+                />
+                <Button
+                  onClick={() => pay.mutate(i.id)}
+                  disabled={!pf.amount || pay.isPending}
+                  className="bg-amber-600 hover:bg-amber-700"
+                  data-testid={`inst-pay-submit-${i.id}`}
+                >
+                  記一筆
+                </Button>
+              </div>
+            )}
           </div>
         ))}
       </CardContent>

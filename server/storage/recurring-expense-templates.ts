@@ -134,6 +134,12 @@ export async function generateItemsForMonth(
 
     const day = Math.min(28, Math.max(1, tpl.dayOfMonth)) // 限 1-28 避免月底邊界
     const startDate = `${targetMonth}-${day.toString().padStart(2, "0")}`
+    // 帳單時間：依模板的帳單日/法定繳費日/最終必繳日（1-28）產出對應日期
+    const dayStr = (d: number | null) =>
+      d ? `${targetMonth}-${String(Math.min(28, Math.max(1, d))).padStart(2, "0")}` : null
+    const billIssuedDate = dayStr(tpl.billDay)
+    const legalDueDate = dayStr(tpl.legalDueDay)
+    const finalDueDate = dayStr(tpl.finalDueDay)
 
     const [item] = await db
       .insert(paymentItems)
@@ -146,6 +152,10 @@ export async function generateItemsForMonth(
         categoryId: tpl.categoryId,
         fixedCategoryId: tpl.fixedCategoryId,
         startDate,
+        billIssuedDate,
+        legalDueDate,
+        finalDueDate,
+        penaltyNote: tpl.penaltyNote ?? null,
         status: "unpaid",
         paidAmount: "0",
         // 區分一次性 backfill（2026-05 刪掉的 125 筆）與週期 scheduler 自動產出

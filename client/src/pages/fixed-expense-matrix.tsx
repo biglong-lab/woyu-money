@@ -116,6 +116,11 @@ export default function FixedExpenseMatrixPage() {
   const [addAmount, setAddAmount] = useState("")
   const [addCategory, setAddCategory] = useState<string>("none")
   const [addMonths, setAddMonths] = useState("*")
+  // 帳單時間（選填）：帳單日/法定繳費日/最終必繳日 + 罰款註記
+  const [addBillDay, setAddBillDay] = useState("")
+  const [addLegalDay, setAddLegalDay] = useState("")
+  const [addFinalDay, setAddFinalDay] = useState("")
+  const [addPenalty, setAddPenalty] = useState("")
 
   const url =
     categoryId === "all"
@@ -185,6 +190,10 @@ export default function FixedExpenseMatrixPage() {
         estimatedAmount: addAmount,
         activeMonths: addMonths.trim() || "*",
         categoryId: addCategory === "none" ? undefined : Number(addCategory),
+        billDay: addBillDay ? Number(addBillDay) : undefined,
+        legalDueDay: addLegalDay ? Number(addLegalDay) : undefined,
+        finalDueDay: addFinalDay ? Number(addFinalDay) : undefined,
+        penaltyNote: addPenalty || undefined,
         isActive: true,
       }),
     onSuccess: () => {
@@ -195,6 +204,10 @@ export default function FixedExpenseMatrixPage() {
       setAddAmount("")
       setAddCategory("none")
       setAddMonths("*")
+      setAddBillDay("")
+      setAddLegalDay("")
+      setAddFinalDay("")
+      setAddPenalty("")
     },
     onError: (e: Error) =>
       toast({ title: "新增失敗", description: e.message, variant: "destructive" }),
@@ -536,6 +549,56 @@ export default function FixedExpenseMatrixPage() {
               <div className="text-xs text-gray-400 mt-1">
                 每月留「*」；只有特定月份（如年繳）填如「6」或「1,7」
               </div>
+            </div>
+            <div className="border-t pt-3">
+              <div className="text-xs text-gray-600 mb-2">
+                帳單時間（選填，可做避免遲繳/罰款提醒）
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <label className="text-[11px] text-gray-500 block mb-1">帳單日</label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={28}
+                    placeholder="如 5"
+                    value={addBillDay}
+                    onChange={(e) => setAddBillDay(e.target.value)}
+                    data-testid="add-billday"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] text-gray-500 block mb-1">法定繳費日</label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={28}
+                    placeholder="如 15"
+                    value={addLegalDay}
+                    onChange={(e) => setAddLegalDay(e.target.value)}
+                    data-testid="add-legalday"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] text-gray-500 block mb-1">最終必繳日</label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={28}
+                    placeholder="如 25"
+                    value={addFinalDay}
+                    onChange={(e) => setAddFinalDay(e.target.value)}
+                    data-testid="add-finalday"
+                  />
+                </div>
+              </div>
+              <Input
+                className="mt-2"
+                placeholder="罰款說明（如：逾期每日加徵 0.1% 滯納金）"
+                value={addPenalty}
+                onChange={(e) => setAddPenalty(e.target.value)}
+                data-testid="add-penalty"
+              />
             </div>
           </div>
           <DialogFooter>

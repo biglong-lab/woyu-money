@@ -37,9 +37,11 @@ export const recurringExpenseTemplates = pgTable(
     dayOfMonth: integer("day_of_month").notNull().default(10), // 每月幾號到期
     activeMonths: text("active_months").notNull().default("*"), // '*' 或 '1,3,6,9'
 
-    // 帳單時間掌握（選填）：帳單來的日 / 法定繳費日
+    // 帳單時間掌握（選填）：帳單來的日 / 法定繳費日 / 最終必繳日 + 罰款說明
     billDay: integer("bill_day"),
     legalDueDay: integer("legal_due_day"),
+    finalDueDay: integer("final_due_day"),
+    penaltyNote: text("penalty_note"),
 
     // 標籤 + 備註
     tags: text("tags"),

@@ -131,11 +131,22 @@ router.get(
 )
 router.post(
   "/api/enforcement/seizures",
+  receiptUpload.single("receiptFile"),
   asyncHandler(async (req, res) => {
     try {
-      res
-        .status(201)
-        .json(await store.createSeizure(insertEnforcementSeizureSchema.parse(req.body)))
+      const b = req.body
+      const data = insertEnforcementSeizureSchema.parse({
+        caseId: b.caseId ? Number(b.caseId) : null,
+        bankName: b.bankName || null,
+        amount: b.amount,
+        seizureDate: b.seizureDate || null,
+        status: b.status || undefined,
+        notes: b.notes || null,
+        receiptImageUrl: req.file
+          ? `/uploads/receipts/${req.file.filename}`
+          : b.receiptImageUrl || null,
+      })
+      res.status(201).json(await store.createSeizure(data))
     } catch (e) {
       handleZod(e)
     }
@@ -213,11 +224,18 @@ router.get(
 )
 router.post(
   "/api/enforcement/installments/:id/payments",
+  receiptUpload.single("receiptFile"),
   asyncHandler(async (req, res) => {
     try {
+      const b = req.body
       const data = insertEnforcementInstallmentPaymentSchema.parse({
-        ...req.body,
         installmentId: parseId(req.params.id),
+        paymentDate: b.paymentDate,
+        amount: b.amount,
+        notes: b.notes || null,
+        receiptImageUrl: req.file
+          ? `/uploads/receipts/${req.file.filename}`
+          : b.receiptImageUrl || null,
       })
       res.status(201).json(await store.createInstallmentPayment(data))
     } catch (e) {

@@ -109,6 +109,8 @@ export async function getPaymentItems(
       pi.end_date as "endDate",
       pi.bill_issued_date as "billIssuedDate",
       pi.legal_due_date as "legalDueDate",
+      pi.final_due_date as "finalDueDate",
+      pi.penalty_note as "penaltyNote",
       pi.enforcement_case_id as "enforcementCaseId",
       pi.status,
       pi.priority,

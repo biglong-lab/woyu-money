@@ -24,9 +24,13 @@ interface Bill {
   amount: number
   billIssuedDate: string | null
   dueDate: string | null
+  finalDueDate: string | null
+  penaltyNote: string | null
   daysUntil: number
+  finalDaysUntil: number | null
   overdue: boolean
-  urgency: "overdue" | "soon" | "upcoming"
+  penaltyRisk: boolean
+  urgency: "penalty" | "overdue" | "grace" | "soon" | "upcoming"
 }
 interface BillsData {
   today: string
@@ -34,11 +38,14 @@ interface BillsData {
   count: number
   totalDue: number
   overdueTotal: number
+  penaltyRiskTotal: number
   bills: Bill[]
 }
 
 const URGENCY: Record<string, { label: string; cls: string }> = {
+  penalty: { label: "罰款風險", cls: "bg-red-200 text-red-900 border-red-400" },
   overdue: { label: "逾期", cls: "bg-red-100 text-red-800 border-red-300" },
+  grace: { label: "緩衝期", cls: "bg-orange-100 text-orange-800 border-orange-300" },
   soon: { label: "7天內", cls: "bg-amber-100 text-amber-800 border-amber-300" },
   upcoming: { label: "近期", cls: "bg-gray-100 text-gray-600 border-gray-200" },
 }
@@ -98,6 +105,16 @@ export default function BillsPage() {
               </div>
             </CardContent>
           </Card>
+          <Card className={data.penaltyRiskTotal > 0 ? "border-red-300 bg-red-100/50" : ""}>
+            <CardContent className="p-4">
+              <div className="text-xs text-gray-500">罰款風險（過最終必繳日）</div>
+              <div
+                className={`text-xl font-bold ${data.penaltyRiskTotal > 0 ? "text-red-700" : ""}`}
+              >
+                {formatNT(data.penaltyRiskTotal)}
+              </div>
+            </CardContent>
+          </Card>
         </div>
       )}
 
@@ -126,13 +143,19 @@ export default function BillsPage() {
                     <div className="font-medium">{b.name}</div>
                     <div className="text-xs text-gray-400">
                       法定付款 {b.dueDate ?? "—"}
+                      {b.finalDueDate ? ` · 最終必繳 ${b.finalDueDate}` : ""}
                       {b.billIssuedDate ? ` · 帳單到 ${b.billIssuedDate}` : ""}
                     </div>
+                    {b.penaltyNote && <div className="text-xs text-red-500">⚠ {b.penaltyNote}</div>}
                   </div>
                   <span
                     className={`text-xs shrink-0 ${b.overdue ? "text-red-600 font-medium" : "text-gray-500"}`}
                   >
-                    {b.overdue ? `逾期 ${-b.daysUntil} 天` : `${b.daysUntil} 天後`}
+                    {b.penaltyRisk && b.finalDaysUntil !== null
+                      ? `過必繳 ${-b.finalDaysUntil} 天`
+                      : b.overdue
+                        ? `逾期 ${-b.daysUntil} 天`
+                        : `${b.daysUntil} 天後`}
                   </span>
                 </div>
               )
