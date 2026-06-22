@@ -21,6 +21,7 @@ import {
   Clipboard,
   Calendar,
   CalendarRange,
+  CalendarClock,
   Shield,
   Gavel,
   Receipt,
