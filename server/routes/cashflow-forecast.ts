@@ -163,6 +163,7 @@ const MONTH_ITEMS_SQL = `
   LEFT JOIN fixed_categories fc ON fc.id = pi.fixed_category_id
   LEFT JOIN debt_categories dc ON dc.id = pi.category_id
   WHERE pi.is_deleted = false
+    AND (pi.item_type IS NULL OR pi.item_type != 'income')
     AND COALESCE(pi.status, 'pending') != 'paid'
     AND (pi.total_amount::numeric - COALESCE(pi.paid_amount, 0)::numeric) > 0
     AND EXTRACT(YEAR FROM COALESCE(
