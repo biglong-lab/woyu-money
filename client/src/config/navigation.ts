@@ -22,6 +22,7 @@ import {
   Calendar,
   CalendarRange,
   Shield,
+  Gavel,
   Receipt,
   FileText,
   Layers,
