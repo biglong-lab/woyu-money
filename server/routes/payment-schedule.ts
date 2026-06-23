@@ -165,11 +165,12 @@ router.get(
   asyncHandler(async (req, res) => {
     const { year, month } = req.query
 
-    // 獲取所有付款項目
-    const items = await storage.getPaymentItems({}, undefined, 10000)
+    // 獲取所有付款項目 (排除收入 itemType='income'; 專案付款=支出)
+    const allItems = await storage.getPaymentItems({}, undefined, 10000)
+    const items = allItems.filter((i) => (i as { itemType?: string }).itemType !== "income")
 
-    // 獲取所有付款記錄
-    const records = (await storage.getPaymentRecords({})) as PaymentRecordRow[]
+    // 獲取所有付款記錄 (放大 limit 避免預設 100 筆漏資料)
+    const records = (await storage.getPaymentRecords({}, 1, 100000)) as PaymentRecordRow[]
 
     // 獲取所有排程記錄（不限月份，確保跨月追蹤）
     const allSchedules = await getAllPaymentSchedules()

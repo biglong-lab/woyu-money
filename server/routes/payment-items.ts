@@ -65,8 +65,8 @@ router.get(
     }
 
     if (shouldIncludeAll) {
-      // 特殊情況：需要所有數據時（如導出功能）
-      const items = await storage.getPaymentItems(filters)
+      // 特殊情況：需要所有數據時（如看板/導出）。明確放大 limit, 避免預設 5000 截斷(總筆數已超過)
+      const items = await storage.getPaymentItems(filters, 1, 100000)
 
       res.json(items)
     } else {

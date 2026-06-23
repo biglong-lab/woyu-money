@@ -268,8 +268,12 @@ router.get(
 router.get(
   "/api/payment/project/stats",
   asyncHandler(async (req, res) => {
-    const paymentItems = await storage.getPaymentItems({}, undefined, 10000)
-    const paymentRecords = (await storage.getPaymentRecords({})) as PaymentRecordRow[]
+    // 排除收入(itemType='income'); 付款記錄放大 limit 避免預設 100 筆漏資料
+    const allItems = await storage.getPaymentItems({}, 1, 100000)
+    const paymentItems = allItems.filter((i) => i.itemType !== "income")
+    const allRecords = (await storage.getPaymentRecords({}, 1, 100000)) as PaymentRecordRow[]
+    const itemIdSet = new Set(paymentItems.map((i) => i.id))
+    const paymentRecords = allRecords.filter((r) => itemIdSet.has(r.itemId))
 
     const totalPlanned = paymentItems.reduce(
       (sum, item) => sum + parseFloat(item.totalAmount || "0"),
@@ -365,8 +369,12 @@ router.get(
 router.get(
   "/api/payment/analytics/intelligent",
   asyncHandler(async (req, res) => {
-    const paymentItems = await storage.getPaymentItems()
-    const paymentRecords = (await storage.getPaymentRecords()) as PaymentRecordRow[]
+    // 排除收入; items/records 放大 limit (預設 5000/100 會截斷, 總筆數已超過)
+    const allItems = await storage.getPaymentItems({}, 1, 100000)
+    const paymentItems = allItems.filter((i) => i.itemType !== "income")
+    const allRecords = (await storage.getPaymentRecords({}, 1, 100000)) as PaymentRecordRow[]
+    const itemIdSet = new Set(paymentItems.map((i) => i.id))
+    const paymentRecords = allRecords.filter((r) => itemIdSet.has(r.itemId))
 
     const now = new Date()
     const totalPending = paymentItems
