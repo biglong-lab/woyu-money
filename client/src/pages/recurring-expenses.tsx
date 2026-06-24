@@ -45,6 +45,7 @@ import {
   CheckCircle2,
   AlertCircle,
   Receipt,
+  Settings,
 } from "lucide-react"
 import { useDocumentTitle } from "@/hooks/use-document-title"
 import { EmptyState } from "@/components/ui/empty-state"
@@ -165,6 +166,10 @@ export default function RecurringExpensesPage() {
       })
       queryClient.invalidateQueries({ queryKey: ["/api/recurring-expense-templates"] })
       queryClient.invalidateQueries({ queryKey: ["/api/payment/items"] })
+      // 同步刷新「本月待填」列表（否則產出後畫面不更新、易誤以為沒產生）
+      queryClient.invalidateQueries({
+        queryKey: ["/api/recurring-expense-templates/scheduled-items", selectedMonth],
+      })
     },
   })
 
@@ -178,10 +183,11 @@ export default function RecurringExpensesPage() {
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <Repeat className="h-6 w-6 text-blue-600" />
-            週期性支出模板
+            固定開銷模板
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            每月固定支出（人事、洗滌、水電、保險...）模板。每月 1-3 號自動產出 unpaid 待確認項目。
+            設定每月固定支出規則（人事、洗滌、水電、保險…）。系統每月 1-3
+            號**自動產出**當月項目，平常不用手動。
           </p>
         </div>
         <div className="flex gap-2 items-center flex-wrap">
@@ -282,22 +288,41 @@ export default function RecurringExpensesPage() {
         </Card>
       )}
 
-      {/* 占位 → 實際金額（本月待填）*/}
-      {pendingItems.length > 0 && (
-        <Card className="border-amber-300 bg-amber-50">
-          <CardContent className="py-3 px-3 sm:px-4 space-y-2">
-            <div className="flex items-center gap-2 flex-wrap">
-              <AlertCircle className="h-4 w-4 text-amber-700" />
-              <span className="font-semibold text-amber-900">
-                {selectedMonth} 待填實際金額（{pendingItems.length} 筆）
-              </span>
+      {/* ① 本月待辦：填入實際金額（永遠顯示，含空狀態，避免其他帳號以為沒列表）*/}
+      <Card className="border-amber-300 bg-amber-50">
+        <CardContent className="py-3 px-3 sm:px-4 space-y-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <Receipt className="h-4 w-4 text-amber-700" />
+            <span className="font-semibold text-amber-900">
+              ① {selectedMonth} 本月待辦 · 填入實際金額（{pendingItems.length} 筆）
+            </span>
+            {pendingItems.length > 0 && (
               <span className="text-xs text-amber-700">
                 估算總額 $
                 {Math.round(
                   pendingItems.reduce((s, it) => s + parseFloat(String(it.estimatedAmount)), 0)
                 ).toLocaleString()}
               </span>
+            )}
+          </div>
+          {pendingItems.length === 0 ? (
+            <div className="text-sm text-amber-800 bg-white/70 rounded px-3 py-2 flex flex-wrap items-center gap-2">
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              <span>
+                {selectedMonth} 沒有待填項目。可能本月尚未產出、或都已填實際金額。
+                若其他人看不到，請確認上方選的是同一個月份。
+              </span>
+              <Button
+                size="sm"
+                onClick={() => generateAllMutation.mutate(selectedMonth)}
+                disabled={generateAllMutation.isPending}
+                className="bg-amber-600 hover:bg-amber-700 text-white"
+              >
+                <Play className="h-3.5 w-3.5 mr-1" />
+                立即產出本月項目
+              </Button>
             </div>
+          ) : (
             <div className="space-y-1.5">
               {pendingItems.map((it) => (
                 <div
@@ -329,9 +354,9 @@ export default function RecurringExpensesPage() {
                 </div>
               ))}
             </div>
-          </CardContent>
-        </Card>
-      )}
+          )}
+        </CardContent>
+      </Card>
 
       {paidItems.length > 0 && (
         <details className="rounded-md border border-green-200 bg-green-50 px-3 py-2">
@@ -370,6 +395,15 @@ export default function RecurringExpensesPage() {
           </div>
         </details>
       )}
+
+      {/* ② 模板設定 */}
+      <div className="flex items-center gap-2 pt-1">
+        <Settings className="h-4 w-4 text-gray-500" />
+        <span className="font-semibold text-gray-700">② 固定開銷模板設定</span>
+        <span className="text-xs text-gray-400">
+          管理每月固定支出規則（金額/發生日/月份）。改這裡只影響「之後」自動產出，不動已產出項目。
+        </span>
+      </div>
 
       {/* 列表 */}
       {templates.length === 0 ? (
@@ -463,7 +497,7 @@ function TemplateCard({
   isGenerating: boolean
 }) {
   const now = new Date()
-  const currentMonth = now.toISOString().slice(0, 7)
+  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
   const alreadyGeneratedThisMonth = tpl.lastGeneratedMonth === currentMonth
 
   return (
@@ -510,21 +544,24 @@ function TemplateCard({
             </div>
             {tpl.notes && <div className="text-xs text-gray-500 mt-1.5">{tpl.notes}</div>}
           </div>
-          <div className="flex gap-1 flex-wrap">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => onGenerate(false)}
-              disabled={isGenerating || !tpl.isActive}
-              title={
-                alreadyGeneratedThisMonth ? "本月已產出（用編輯重設可重新產）" : "立即產出當月"
-              }
-            >
-              <Play className="h-3.5 w-3.5 mr-1" />
-              立即產出
-            </Button>
-            <Button size="sm" variant="ghost" onClick={onEdit}>
-              <Pencil className="h-3.5 w-3.5" />
+          <div className="flex gap-1 flex-wrap items-center">
+            {/* 立即產出為進階操作：僅在「啟用中且本月尚未產出」時顯示（平常靠自動產出）*/}
+            {tpl.isActive && !alreadyGeneratedThisMonth && (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="text-gray-500"
+                onClick={() => onGenerate(false)}
+                disabled={isGenerating}
+                title="通常不用按：系統每月自動產出。這裡可立即補產當月。"
+              >
+                <Play className="h-3.5 w-3.5 mr-1" />
+                補產本月
+              </Button>
+            )}
+            <Button size="sm" variant="outline" onClick={onEdit}>
+              <Pencil className="h-3.5 w-3.5 mr-1" />
+              編輯
             </Button>
             <Button size="sm" variant="ghost" onClick={onDelete}>
               <Trash2 className="h-3.5 w-3.5 text-red-600" />
