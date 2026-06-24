@@ -6,6 +6,32 @@
 
 ---
 
+## [1.1.0] - 2026-06-25
+
+### 新功能 — 財務收斂、三大成本矩陣、成本中樞、強制執行 + 帳單時間（opt3 + opt4）
+
+詳見 `docs/changes/2026-06-25-cost-enforcement-bills.md`。部署範圍 `050056c` → `f3a8b9e`。
+
+- **開銷流水帳**（`expense_ledger`，migration 0025）：先記錄後分帳，整合進記帳窗口
+- **三大成本矩陣**：固定開銷 `/fixed-expense-matrix`（預算vs實際、點格記付款含收據）、勞健保 `/labor-insurance-matrix`（勞保/健保/勞退×12月）、租金（既有）
+- **成本結構中樞** `/cost-overview`：年度五桶 × 12 月、組成占比（月/季/年切換）、`GET /api/dashboard/cost-structure/annual`
+- **強制執行管理** `/enforcement`：公文/圈存/分期對帳（強執≈圈存+分期）、公文多檔 OCR 自動帶入、被強執款項分流
+- **帳單到期看板** `/bills`：通盤應繳（法定付款日 + 強執分期投影）、最終必繳日 + 罰款風險分級（migration 0028）
+- **強執/帳單欄位**：payment_items 加 bill_issued/legal_due/final_due/penalty/enforcement_case；templates 加 bill/legal/final day（migration 0026~0028）
+
+### 改善
+
+- **成本結構**：流水帳併入（第 6 桶）、年度視圖下鑽三大矩陣
+- **固定開銷模板頁**：月份範圍放寬（過去36月~未來12月）、修 UTC 偏移；雙段釐清（本月待辦／模板設定）、立即產出降級為補產本月、修待填列表刷新
+- **專案系統請款嫁接**：`/integrations` 一鍵樣板 + runbook
+
+### SSH 部署備註
+
+- 生產 SSH 埠改為 `52099`（非 22）；容器 app=`woyu-money` / db=`woyu-money-db`
+- migration 用 `docker exec -i woyu-money-db psql < migrations/*.sql`
+
+---
+
 ## [1.0.5] - 2026-05-19
 
 ### 改善 — UX 細部優化連續 loop（12 phase、38 commit）
