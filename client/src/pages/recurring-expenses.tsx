@@ -188,9 +188,10 @@ export default function RecurringExpensesPage() {
           {/* 月份快速跳轉 */}
           {(() => {
             const now = new Date()
+            // 本地時區 YYYY-MM（避免 toISOString UTC 偏移在月初/月底位移月份）
             const offsetMonth = (offset: number) => {
               const d = new Date(now.getFullYear(), now.getMonth() + offset, 1)
-              return d.toISOString().slice(0, 7)
+              return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
             }
             const thisMonth = offsetMonth(0)
             const lastMonth = offsetMonth(-1)
@@ -228,17 +229,19 @@ export default function RecurringExpensesPage() {
             className="h-9 px-2 text-sm border border-gray-300 rounded bg-white"
           >
             {(() => {
-              // 過去 3 月 ~ 未來 6 月
-              const opts: string[] = []
+              // 過去 36 月 ~ 未來 12 月（本地時區，新到舊排序）
               const now = new Date()
-              for (let i = -3; i <= 6; i++) {
-                const d = new Date(now.getFullYear(), now.getMonth() + i, 1)
-                opts.push(d.toISOString().slice(0, 7))
+              const fmt = (d: Date) =>
+                `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
+              const thisMonth = fmt(now)
+              const opts: string[] = []
+              for (let i = 12; i >= -36; i--) {
+                opts.push(fmt(new Date(now.getFullYear(), now.getMonth() + i, 1)))
               }
               return opts.map((m) => (
                 <option key={m} value={m}>
                   {m}
-                  {m === new Date().toISOString().slice(0, 7) ? "（本月）" : ""}
+                  {m === thisMonth ? "（本月）" : ""}
                 </option>
               ))
             })()}
