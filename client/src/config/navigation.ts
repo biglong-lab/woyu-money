@@ -71,6 +71,13 @@ export const mainNavItems: NavItem[] = [
     badge: "記帳",
     description: "單據收件箱 + 開銷流水帳：先記錄、後分帳的統一窗口",
   },
+  {
+    title: "歷史欠款整理",
+    href: "/debts",
+    icon: ClipboardList,
+    badge: "整理",
+    description: "過去散落欠款先登打看全貌，再分期還款與歸帳；獨立於記帳窗口",
+  },
 ]
 
 // 財務助理分類（決策工具 — 解決記帳焦慮、拖延成本、現金缺口）
@@ -222,12 +229,6 @@ export const toolboxNavItems: NavItem[] = [
     href: "/card-claims",
     icon: CreditCard,
     description: "記錄刷卡請款金額、銀行、標籤、館別、狀態 + 月度統計",
-  },
-  {
-    title: "歷史欠款整理",
-    href: "/debts",
-    icon: ClipboardList,
-    description: "過去散落欠款先登打看全貌，再分期還款與歸帳；獨立於記帳窗口",
   },
 ]
 
