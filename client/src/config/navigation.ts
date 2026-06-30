@@ -19,6 +19,7 @@ import {
   BarChart3,
   Target,
   Clipboard,
+  ClipboardList,
   Calendar,
   CalendarRange,
   CalendarClock,
@@ -221,6 +222,12 @@ export const toolboxNavItems: NavItem[] = [
     href: "/card-claims",
     icon: CreditCard,
     description: "記錄刷卡請款金額、銀行、標籤、館別、狀態 + 月度統計",
+  },
+  {
+    title: "歷史欠款整理",
+    href: "/debts",
+    icon: ClipboardList,
+    description: "過去散落欠款先登打看全貌，再分期還款與歸帳；獨立於記帳窗口",
   },
 ]
 
@@ -583,6 +590,7 @@ export const breadcrumbConfig: Record<string, BreadcrumbItem[]> = {
     { title: "財務助理" },
     { title: "信用卡請款紀錄" },
   ],
+  "/debts": [{ title: "首頁", href: "/" }, { title: "財務助理" }, { title: "歷史欠款整理" }],
   "/financial-cockpit": [{ title: "首頁", href: "/" }, { title: "財務健康駕駛艙" }],
   "/payment-planner": [
     { title: "首頁", href: "/" },

@@ -79,6 +79,7 @@ import AdminCronHealthPage from "@/pages/admin-cron-health"
 import RecurringExpensesPage from "@/pages/recurring-expenses"
 import RevenueForecastPage from "@/pages/revenue-forecast"
 import CardClaimsPage from "@/pages/card-claims"
+import DebtsPage from "@/pages/debts"
 import FinancialCockpitPage from "@/pages/financial-cockpit"
 import PaymentPlannerPage from "@/pages/payment-planner"
 import ScenarioPlannerPage from "@/pages/scenario-planner"
@@ -212,6 +213,7 @@ function Router() {
                 <ProtectedRoute path="/recurring-expenses" component={RecurringExpensesPage} />
                 <ProtectedRoute path="/revenue-forecast" component={RevenueForecastPage} />
                 <ProtectedRoute path="/card-claims" component={CardClaimsPage} />
+                <ProtectedRoute path="/debts" component={DebtsPage} />
                 <ProtectedRoute path="/financial-cockpit" component={FinancialCockpitPage} />
                 <ProtectedRoute path="/payment-planner" component={PaymentPlannerPage} />
                 <ProtectedRoute path="/scenario-planner" component={ScenarioPlannerPage} />

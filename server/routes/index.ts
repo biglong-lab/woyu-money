@@ -60,6 +60,7 @@ import fixedExpenseMatrixRoutes from "./fixed-expense-matrix"
 import laborInsuranceMatrixRoutes from "./labor-insurance-matrix"
 import enforcementRoutes from "./enforcement"
 import billsRoutes from "./bills"
+import debtRoutes from "./debts"
 import scenarioPresetRoutes from "./scenario-presets"
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -170,6 +171,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use(laborInsuranceMatrixRoutes)
   app.use(enforcementRoutes)
   app.use(billsRoutes)
+  app.use(debtRoutes)
   app.use(scenarioPresetRoutes)
 
   const httpServer = createServer(app)
