@@ -132,6 +132,41 @@ export const overviewCenterNavItems: NavItem[] = [
   costOverviewNavItem, // 下鑽：成本結構中樞
 ]
 
+// 頁內分頁（tab 互達）頁面 — 不列主導航、但保留給 Cmd+K 搜尋與 findNavItem
+// （2026-07-03 導航收斂後，這些頁只能從各自的 tab 列進入；沒有這組 palette 會搜不到）
+export const tabPagesNavItems: NavItem[] = [
+  {
+    title: "綜合儀表板",
+    href: "/financial-dashboard",
+    icon: BarChart3,
+    description: "YTD + 未來 3 月預估（總覽中心 tab）",
+  },
+  {
+    title: "現金流決策中心",
+    href: "/cashflow-decision-center",
+    icon: TrendingUp,
+    description: "未來 3-6 月收支預估 + 缺口警示（總覽中心 tab）",
+  },
+  {
+    title: "沙盤推演 · 下月精算",
+    href: "/scenario-simulator",
+    icon: Sparkles,
+    description: "調行銷/訂價/固定支出看下月收支（沙盤推演內）",
+  },
+  {
+    title: "收入預測",
+    href: "/revenue-forecast",
+    icon: TrendingUp,
+    description: "每日累積走勢 + 月底推估（收入分析 tab）",
+  },
+  {
+    title: "收入比對",
+    href: "/revenue/compare",
+    icon: Scale,
+    description: "PMS（發票）vs PM（逐筆）雙軌比對（收入分析 tab）",
+  },
+]
+
 // 核心決策（規劃工具）— 總覽類已移至「財務總覽中心」
 export const coreDecisionNavItems: NavItem[] = [
   {
@@ -424,11 +459,15 @@ export const systemNavItems: NavItem[] = [
 // 導航分類配置（新架構：財務助理優先 + 兩大核心 + 系統管理）
 export const navigationCategories: NavCategory[] = [
   { title: "主要功能", items: mainNavItems },
+  { title: "🎯 財務總覽中心", items: overviewCenterNavItems },
   { title: "💡 核心決策", items: coreDecisionNavItems },
   { title: "🧰 工具箱", items: toolboxNavItems },
+  { title: "🔬 進階工具", items: advancedNavItems },
   { title: "付款方式管理", items: managementNavItems },
   { title: "統一查看", items: viewNavItems },
   { title: "系統管理", items: systemNavItems },
+  // 頁內分頁：只給 Cmd+K 搜尋用（top-navigation 用自己的 categoryConfigs、不會顯示這組）
+  { title: "頁內分頁（tab 互達）", items: tabPagesNavItems },
 ]
 
 // 手機版底部 Tab Bar 項目（5 個主要入口）
