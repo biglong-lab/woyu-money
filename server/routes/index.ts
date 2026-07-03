@@ -79,6 +79,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // 全域 API 認證保護（排除公開端點）
   // 注意：middleware 掛在 "/api"，req.path 已不含 /api 前綴
   // 例如請求 /api/line/callback，這裡的 req.path 是 /line/callback
+  //
+  // ★ 認證慣例（2026-07-03 明文化）：
+  //   1. 此全域閘門是唯一的認證真相來源 — 所有領域路由都掛在它之後，
+  //      即使 route 未寫 requireAuth 也「不是公開端點」
+  //   2. 部分舊 route 檔內散見 requireAuth，屬冗餘雙保險：保留無害、
+  //      新 route 不需要再加（除非它需要 req.user 的型別提示）
+  //   3. 真正要公開的端點只能透過下方 publicPaths 白名單或 webhook 前綴放行
   app.use("/api", (req, res, next) => {
     // 公開端點白名單（不需要認證）— 路徑不含 /api 前綴
     // - /login /register /logout /user：setupAuth() 註冊，理論上在此 middleware 之前已處理，
