@@ -10,9 +10,12 @@ router.get(
   asyncHandler(async (req, res) => {
     const { year, month, category, invoiceType } = req.query
 
+    // NaN 防護：無效數字視為未提供
+    const yearNum = year ? parseInt(year as string) : NaN
+    const monthNum = month ? parseInt(month as string) : NaN
     const records = await getInvoiceRecords({
-      year: year ? parseInt(year as string) : undefined,
-      month: month ? parseInt(month as string) : undefined,
+      year: isNaN(yearNum) ? undefined : yearNum,
+      month: isNaN(monthNum) ? undefined : monthNum,
       category: category as string | undefined,
       invoiceType: invoiceType as string | undefined,
     })
@@ -26,7 +29,8 @@ router.get(
   "/api/invoice-records/stats",
   asyncHandler(async (req, res) => {
     const { year } = req.query
-    const targetYear = year ? parseInt(year as string) : new Date().getFullYear()
+    const parsed = year ? parseInt(year as string) : NaN
+    const targetYear = isNaN(parsed) ? new Date().getFullYear() : parsed
 
     const result = await getInvoiceStats(targetYear)
     res.json(result)

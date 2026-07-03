@@ -68,9 +68,10 @@ router.post(
   requireAuth,
   asyncHandler(async (req, res) => {
     const userId = req.user!.id
+    // userId 放在 spread 之後：以登入者為準，body 帶 userId 也不能替別人建通知
     const notification = await storage.createNotification({
-      userId,
       ...req.body,
+      userId,
     })
     res.json(notification)
   })

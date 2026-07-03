@@ -15,12 +15,19 @@ interface PaymentRecordRow extends Record<string, unknown> {
 
 const router = Router()
 
+/** 解析必為正整數的參數，否則 400 */
+function parseId(value: unknown, fieldName: string): number {
+  const n = parseInt(String(value))
+  if (isNaN(n) || n <= 0) throw new AppError(400, `${fieldName} 需為正整數`)
+  return n
+}
+
 // 取得指定年月的付款排程
 router.get(
   "/api/payment/schedule/:year/:month",
   asyncHandler(async (req, res) => {
-    const year = parseInt(req.params.year)
-    const month = parseInt(req.params.month)
+    const year = parseId(req.params.year, "year")
+    const month = parseId(req.params.month, "month")
 
     const schedules = await storage.getPaymentSchedules(year, month)
     res.json(schedules)
@@ -52,12 +59,22 @@ router.post(
   })
 )
 
-// 更新付款排程
+// 更新付款排程（欄位白名單，避免 mass assignment 蓋掉不允許改的欄位）
 router.put(
   "/api/payment/schedule/:id",
   asyncHandler(async (req, res) => {
-    const id = parseInt(req.params.id)
-    const updateData = req.body
+    const id = parseId(req.params.id, "id")
+    const { scheduledDate, scheduledAmount, notes, status } = req.body ?? {}
+    if (scheduledAmount !== undefined && isNaN(parseFloat(String(scheduledAmount)))) {
+      throw new AppError(400, "scheduledAmount 格式錯誤")
+    }
+    const updateData = {
+      ...(scheduledDate !== undefined && { scheduledDate }),
+      ...(scheduledAmount !== undefined && { scheduledAmount: String(scheduledAmount) }),
+      ...(notes !== undefined && { notes }),
+      ...(status !== undefined && { status }),
+    }
+    if (Object.keys(updateData).length === 0) throw new AppError(400, "沒有可更新的欄位")
 
     const schedule = await storage.updatePaymentSchedule(id, updateData)
     res.json(schedule)
@@ -68,7 +85,7 @@ router.put(
 router.delete(
   "/api/payment/schedule/:id",
   asyncHandler(async (req, res) => {
-    const id = parseInt(req.params.id)
+    const id = parseId(req.params.id, "id")
     await storage.deletePaymentSchedule(id)
     res.status(204).send()
   })
