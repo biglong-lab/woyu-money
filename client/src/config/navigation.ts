@@ -277,8 +277,7 @@ export const managementNavItems: NavItem[] = [
 ]
 
 // 統一查看分類（重排序：常用直達 → 報表類 → 分析類 → 預算類）
-// 註：舊版 /financial-overview 已下架（從導航移除），統一改用財務助理區的「財務總覽」(/financial-overview-v2)
-// 路由保留可訪問供深度連結，但不再列入導航
+// 註：舊版 /financial-overview 與 /financial-overview-v2 均已下架，主入口為財務健康駕駛艙 /financial-cockpit
 export const viewNavItems: NavItem[] = [
   // ── 主視直達：每日操作高頻 ──
   {
@@ -546,11 +545,7 @@ export const breadcrumbConfig: Record<string, BreadcrumbItem[]> = {
   "/budget-estimates": [{ title: "首頁", href: "/" }, { title: "財務助理" }, { title: "月度預估" }],
   "/property-pl": [{ title: "首頁", href: "/" }, { title: "財務助理" }, { title: "館別損益" }],
   "/variance-report": [{ title: "首頁", href: "/" }, { title: "財務助理" }, { title: "差異對賬" }],
-  "/financial-overview-v2": [
-    { title: "首頁", href: "/" },
-    { title: "財務助理" },
-    { title: "財務總覽 v2" },
-  ],
+  // /financial-overview-v2 已於 2026-07-03 拆散下架（館組視圖→/property-pl、待處理→駕駛艙），路由 redirect 至駕駛艙
 
   // 系統管理
   "/property-groups": [

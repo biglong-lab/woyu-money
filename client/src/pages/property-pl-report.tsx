@@ -59,6 +59,37 @@ interface CompanyItem {
   categoryName: string | null
 }
 
+// ── 館組視圖（自 financial-overview-v2 移植，2026-07-03 導航收斂）──
+
+interface PropertyGroupMember {
+  id: number
+  groupId: number
+  projectId: number
+  projectName: string | null
+  weight: string
+}
+
+interface PropertyGroup {
+  id: number
+  name: string
+  description: string | null
+  isActive: boolean
+  members: PropertyGroupMember[]
+}
+
+interface GroupCard {
+  key: string
+  title: string
+  isGroup: boolean
+  members: string[]
+  revenue: number
+  directExpense: number
+  allocatedExpense: number
+  netProfit: number
+  marginPercent: number
+  badge?: string
+}
+
 interface ReportResponse {
   year: number
   month: number
@@ -93,10 +124,21 @@ export default function PropertyPLReport() {
   const [month, setMonth] = useState(initialMonth)
   const [expandedId, setExpandedId] = useState<number | null>(null)
   const [showCompanyItems, setShowCompanyItems] = useState(false)
+  const [viewMode, setViewMode] = useState<"property" | "group">("property")
 
   const { data, isLoading, error } = useQuery<ReportResponse>({
     queryKey: [`/api/reports/property-pl?year=${year}&month=${month}`],
   })
+
+  const { data: groups = [] } = useQuery<PropertyGroup[]>({
+    queryKey: ["/api/property-groups"],
+    enabled: viewMode === "group",
+  })
+
+  const groupCards =
+    viewMode === "group" && data
+      ? aggregateByGroup(data.properties, groups, data.companyLevel.totalExpense)
+      : []
 
   return (
     <div className="container mx-auto p-4 sm:p-6 max-w-5xl">
@@ -142,6 +184,27 @@ export default function PropertyPLReport() {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">視圖</label>
+              <div className="flex rounded-md border overflow-hidden">
+                <Button
+                  variant={viewMode === "property" ? "default" : "ghost"}
+                  size="sm"
+                  className="rounded-none"
+                  onClick={() => setViewMode("property")}
+                >
+                  單館
+                </Button>
+                <Button
+                  variant={viewMode === "group" ? "default" : "ghost"}
+                  size="sm"
+                  className="rounded-none"
+                  onClick={() => setViewMode("group")}
+                >
+                  館組
+                </Button>
+              </div>
             </div>
           </div>
         </CardContent>
@@ -207,8 +270,30 @@ export default function PropertyPLReport() {
             </CardContent>
           </Card>
 
-          {/* 各館明細 */}
-          {data.properties.length === 0 ? (
+          {/* 館組視圖（依 property_groups 聚合，含公司級費用卡）*/}
+          {viewMode === "group" ? (
+            groupCards.length === 0 ? (
+              <Card className="mb-4">
+                <CardContent className="py-12 text-center text-muted-foreground">
+                  <Building2 className="h-10 w-10 mx-auto mb-2 opacity-30" />
+                  <p>該月沒有任何館別有收入或開銷紀錄</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-3 mb-4">
+                <h2 className="text-base font-semibold flex items-center gap-2">
+                  <Building2 className="h-5 w-5 text-blue-600" />
+                  館組損益（{groupCards.length} 組，依淨利排序）
+                </h2>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {groupCards.map((card) => (
+                    <GroupCardView key={card.key} card={card} />
+                  ))}
+                </div>
+              </div>
+            )
+          ) : /* 各館明細 */
+          data.properties.length === 0 ? (
             <Card>
               <CardContent className="py-12 text-center text-muted-foreground">
                 <Building2 className="h-10 w-10 mx-auto mb-2 opacity-30" />
@@ -395,5 +480,146 @@ function Stat({ label, value, icon, valueColor = "text-foreground" }: StatProps)
       </div>
       <div className={`text-base sm:text-lg font-bold mt-1 ${valueColor}`}>{value}</div>
     </div>
+  )
+}
+
+// ─────────────────────────────────────────────
+// 館組聚合（自 financial-overview-v2 移植）
+// ─────────────────────────────────────────────
+
+function aggregateByGroup(
+  properties: PropertyRow[],
+  groups: PropertyGroup[],
+  companyExpense: number
+): GroupCard[] {
+  const cards: GroupCard[] = []
+  const inGroupIds = new Set<number>()
+
+  // 1. 群組卡（如「輕旅櫃台組」）
+  for (const g of groups) {
+    if (!g.isActive || g.members.length === 0) continue
+    const memberIds = g.members.map((m) => m.projectId)
+    memberIds.forEach((id) => inGroupIds.add(id))
+
+    const memberProps = properties.filter((p) => memberIds.includes(p.projectId))
+    if (memberProps.length === 0) continue
+
+    const revenue = memberProps.reduce((s, p) => s + p.revenue, 0)
+    const direct = memberProps.reduce((s, p) => s + p.directExpense, 0)
+    const allocated = memberProps.reduce((s, p) => s + p.allocatedExpense, 0)
+    const net = revenue - direct - allocated
+    const margin = revenue > 0 ? Math.round((net / revenue) * 1000) / 10 : 0
+
+    cards.push({
+      key: `group-${g.id}`,
+      title: g.name,
+      isGroup: true,
+      members: memberProps.map((p) => p.projectName),
+      revenue,
+      directExpense: direct,
+      allocatedExpense: allocated,
+      netProfit: net,
+      marginPercent: margin,
+      badge: `${memberProps.length} 館`,
+    })
+  }
+
+  // 2. 不在 group 的單館
+  for (const p of properties) {
+    if (inGroupIds.has(p.projectId)) continue
+    cards.push({
+      key: `prop-${p.projectId}`,
+      title: p.projectName,
+      isGroup: false,
+      members: [p.projectName],
+      revenue: p.revenue,
+      directExpense: p.directExpense,
+      allocatedExpense: p.allocatedExpense,
+      netProfit: p.netProfit,
+      marginPercent: p.marginPercent,
+    })
+  }
+
+  // 3. 公司級費用（如有）
+  if (companyExpense > 0) {
+    cards.push({
+      key: "company",
+      title: "公司級費用",
+      isGroup: false,
+      members: [],
+      revenue: 0,
+      directExpense: companyExpense,
+      allocatedExpense: 0,
+      netProfit: -companyExpense,
+      marginPercent: 0,
+      badge: "公司級",
+    })
+  }
+
+  // 依淨利排序（高 → 低）
+  return cards.sort((a, b) => b.netProfit - a.netProfit)
+}
+
+function GroupCardView({ card }: { card: GroupCard }) {
+  const isLoss = card.netProfit < 0
+  const totalExpense = card.directExpense + card.allocatedExpense
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between gap-2">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Building2 className="h-5 w-5 text-blue-600" />
+            {card.title}
+            {card.badge && (
+              <Badge variant="outline" className="text-[10px]">
+                {card.badge}
+              </Badge>
+            )}
+          </CardTitle>
+          {!isLoss && card.revenue > 0 && (
+            <Badge
+              variant="outline"
+              className={
+                card.marginPercent >= 20
+                  ? "border-emerald-300 text-emerald-700"
+                  : card.marginPercent >= 0
+                    ? "border-yellow-300 text-yellow-700"
+                    : "border-red-300 text-red-700"
+              }
+            >
+              {card.marginPercent}%
+            </Badge>
+          )}
+        </div>
+        {card.isGroup && card.members.length > 0 && (
+          <CardDescription className="text-xs">含：{card.members.join(" / ")}</CardDescription>
+        )}
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-3 gap-2 text-xs">
+          <div>
+            <div className="text-muted-foreground">收入</div>
+            <div className="font-semibold text-green-700 mt-0.5">{formatNT(card.revenue)}</div>
+          </div>
+          <div>
+            <div className="text-muted-foreground">開銷</div>
+            <div className="font-semibold text-red-700 mt-0.5">{formatNT(totalExpense)}</div>
+            {card.allocatedExpense > 0 && (
+              <div className="text-[10px] text-orange-600 mt-0.5">
+                含攤提 {formatNT(card.allocatedExpense)}
+              </div>
+            )}
+          </div>
+          <div>
+            <div className="text-muted-foreground">淨利</div>
+            <div className={`font-semibold mt-0.5 ${isLoss ? "text-red-700" : "text-blue-700"}`}>
+              {card.netProfit >= 0 ? "+" : ""}
+              {formatNT(card.netProfit)}
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   )
 }

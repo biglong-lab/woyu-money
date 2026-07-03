@@ -1,4 +1,4 @@
-import { Switch, Route } from "wouter"
+import { Switch, Route, Redirect } from "wouter"
 import { useState } from "react"
 import { queryClient } from "./lib/queryClient"
 import { QueryClientProvider } from "@tanstack/react-query"
@@ -50,7 +50,6 @@ import FamilyPage from "@/pages/family"
 import FamilyKidPage from "@/pages/family-kid"
 import PropertyPLReport from "@/pages/property-pl-report"
 import VarianceReport from "@/pages/variance-report"
-import FinancialOverviewV2 from "@/pages/financial-overview-v2"
 import UserManagement from "@/pages/user-management"
 import PaymentProject from "@/pages/payment-project"
 import PaymentSchedule from "@/pages/payment-schedule-optimized"
@@ -170,7 +169,10 @@ function Router() {
                 <ProtectedRoute path="/budget-estimates" component={BudgetEstimates} />
                 <ProtectedRoute path="/property-pl" component={PropertyPLReport} />
                 <ProtectedRoute path="/variance-report" component={VarianceReport} />
-                <ProtectedRoute path="/financial-overview-v2" component={FinancialOverviewV2} />
+                {/* 2026-07-03 導航收斂：財務總覽 v2 已拆散（館組視圖→館別損益、待處理→駕駛艙/首頁），舊路由導向駕駛艙 */}
+                <Route path="/financial-overview-v2">
+                  <Redirect to="/financial-cockpit" replace />
+                </Route>
                 <ProtectedRoute path="/payables-dashboard" component={PayablesDashboard} />
 
                 {/* System Management */}

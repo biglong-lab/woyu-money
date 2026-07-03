@@ -11,7 +11,6 @@ const TABS: { href: string; label: string }[] = [
   { href: "/payables-dashboard", label: "應付看板" },
   { href: "/cost-overview", label: "成本結構" },
   { href: "/financial-dashboard", label: "綜合儀表板" },
-  { href: "/financial-overview-v2", label: "財務總覽" },
   { href: "/cashflow-decision-center", label: "現金流" },
 ]
 
