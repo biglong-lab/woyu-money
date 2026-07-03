@@ -2,26 +2,29 @@
 
 ## 專案狀態：開發中
 
-**最後更新**: 2026-05-31
-**最新提交**: `b4ef76d` — 已推送至 GitHub
+**最後更新**: 2026-07-03
+**最新提交**: `fcec3e9` — 已推送至 GitHub（未部署）
 
 ---
 
-## 🎯 當前階段：P0/P1 系統強化（audit 2026-05-30）
+## 🎯 當前階段：全系統五階段優化 ✅ 完成（2026-07-03）
 
-### 已完成
-- ✅ **Phase A** — 個資外洩停損（git filter-repo + force push）、docker-compose 密碼注入、完整 pg_dump 備份腳本
-- ✅ **Phase B2** — payment_records 軟刪除（migration 0016）
-- ✅ **Phase B1 子集** — server 6 處 toISOString → localDateTPE 跨日 bug 修
-- ✅ **Phase C1** — `scripts/migrate.sh` 自動化 migration tracking（取代人工 scp + psql）
-- ✅ **Phase C2** — CI 加 ESLint 步驟（baseline 314 warnings）
-- ✅ **Phase C3** — 文件同步（docs/README 補索引、根目錄 README、archive 過時 BACKUP_README）
+詳：[docs/changes/2026-07-03-system-optimization-phases.md](docs/changes/2026-07-03-system-optimization-phases.md)
 
-### 待處理
-- ⏸️ family-kids.ts 16 處 timing bug（task #339、需配 SQL DATE() AT TIME ZONE）
+- ✅ **Phase 0** — 快贏清理：死頁/死元件刪除、getDebt 修復、migration 治理文件化、孤兒路由補入口
+- ✅ **Phase 1** — 導航整併：駕駛艙唯一主入口（總覽 6→3）、沙盤二合一、收入分析收攏、總覽 v2 拆散下架
+- ✅ **Phase 2** — API 品質：mass assignment / 身分覆蓋修復、request-params 共用、bills service 化（月底日 bug）
+- ✅ **Phase 3** — 巨檔拆分：family-kids.ts 16.4K→26 檔、family.tsx 9.5K→1.2K、family-kid.tsx 4.9K→37 行
+- ✅ **Phase 4** — 架構收尾：DatabaseStorage shim 移除、60 頁 lazy code splitting（bundle -57%）、household 拆分、路由順序解耦
+
+**驗證**：全套 2,370 測試 / tsc strict / 生產 build / pre-push 全過
+
+### 上階段遺留待處理
+- ⏸️ family-kids timing bug（task #339、需配 SQL DATE() AT TIME ZONE）
 - ⏸️ payment_records SELECT filter 補 20 處（task #338）
-- ⏸️ Phase D — family-kids.ts 16K 行單檔拆 6 模組
-- ⏸️ Phase E — ESLint 314 warnings 分批清、安全 Headers 補齊
+- ⏸️ ESLint 314 warnings 分批清、安全 Headers 補齊
+- ⏸️ KidDashboard（1,025 行）/ HouseholdBudget（1,190 行）內聚元件手工拆分
+- ⏸️ family-kids 測試跨檔狀態污染（建議 tests/setup 加全域 truncate）
 
 ### 歷史推進
 詳：[docs/changes/](docs/changes/)

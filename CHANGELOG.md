@@ -6,6 +6,25 @@
 
 ---
 
+## [1.2.0] - 2026-07-03
+
+### 全系統五階段優化（導航整併 + API 品質 + 巨檔拆分 + 架構收尾）
+
+詳見 `docs/changes/2026-07-03-system-optimization-phases.md`。範圍 `493816a` → `fcec3e9`（已推送、未部署）。
+
+- **導航整併**：財務總覽中心 6 → 3（駕駛艙為唯一主入口）、沙盤推演二合一、
+  收入分析三頁收攏（RevenueTabs）、財務總覽 v2 拆散下架（館組視圖 → 館別損益）、
+  手機選單補總覽中心、刪 4 死頁 + 5 死元件
+- **安全修復**：payment-schedule mass assignment、notifications 身分覆蓋、
+  bills NaN 進 SQL、分期月底日失真（31 號帳單小月提早顯示）
+- **巨檔拆分**：family-kids.ts 16,363 行 → 26 檔；family.tsx 9,524 → 1,187 行；
+  family-kid.tsx 4,927 → 37 行；household.ts 1,968 行 → 3 檔（端點 parity 腳本驗證）
+- **架構**：移除 DatabaseStorage God shim（203 處呼叫轉直接 import）、
+  60 頁全 lazy code splitting（主 bundle 1.5MB → 648KB）、路由順序耦合解除
+- 全套 2,370 測試 + tsc strict + 生產 build 通過
+
+---
+
 ## [1.1.1] - 2026-06-30
 
 ### 新功能 — 歷史欠款整理（獨立模組）
