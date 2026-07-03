@@ -3,6 +3,7 @@ import { storage, getPaymentRecordsCashFlow } from "../storage"
 import { requireAuth } from "../auth"
 import { insertPaymentRecordSchema, insertPaymentItemNoteSchema } from "@shared/schema"
 import { asyncHandler, AppError } from "../middleware/error-handler"
+import { optionalInt, intWithDefault, optionalDateStr } from "./request-params"
 
 const router = Router()
 
@@ -10,14 +11,17 @@ const router = Router()
 router.get(
   "/api/payment/records",
   asyncHandler(async (req, res) => {
-    const { itemId, startDate, endDate, page = "1", limit = "100" } = req.query
-    const pageNum = parseInt(page as string)
-    const limitNum = parseInt(limit as string)
+    const { itemId, startDate, endDate, page, limit } = req.query
+    const pageNum = intWithDefault(page, 1)
+    const limitNum = intWithDefault(limit, 100, 1, 500)
 
     const filters: Record<string, number | Date> = {}
-    if (itemId) filters.itemId = parseInt(itemId as string)
-    if (startDate) filters.startDate = new Date(startDate as string)
-    if (endDate) filters.endDate = new Date(endDate as string)
+    const itemIdNum = optionalInt(itemId)
+    if (itemIdNum !== undefined) filters.itemId = itemIdNum
+    const startStr = optionalDateStr(startDate, "startDate")
+    if (startStr) filters.startDate = new Date(startStr)
+    const endStr = optionalDateStr(endDate, "endDate")
+    if (endStr) filters.endDate = new Date(endStr)
 
     const records = await storage.getPaymentRecords(filters, pageNum, limitNum)
     res.json(records)

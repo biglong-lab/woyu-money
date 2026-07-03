@@ -2,6 +2,7 @@ import { Router } from "express"
 import { storage, getAllPaymentSchedules, getPaymentSchedulesByItemId } from "../storage"
 import { generateSmartSchedule, type ScheduleItem } from "@shared/schedule-utils"
 import { asyncHandler, AppError } from "../middleware/error-handler"
+import { parseId } from "./request-params"
 
 /** getPaymentRecords 回傳的付款記錄行（extends Record 以相容 storage 回傳型別） */
 interface PaymentRecordRow extends Record<string, unknown> {
@@ -14,13 +15,6 @@ interface PaymentRecordRow extends Record<string, unknown> {
 }
 
 const router = Router()
-
-/** 解析必為正整數的參數，否則 400 */
-function parseId(value: unknown, fieldName: string): number {
-  const n = parseInt(String(value))
-  if (isNaN(n) || n <= 0) throw new AppError(400, `${fieldName} 需為正整數`)
-  return n
-}
 
 // 取得指定年月的付款排程
 router.get(

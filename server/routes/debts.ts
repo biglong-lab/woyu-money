@@ -20,28 +20,9 @@ import {
   insertLegacyDebtPaymentSchema as insertDebtPaymentSchema,
 } from "@shared/schema"
 import * as store from "../storage/debts"
-import { ZodError } from "zod"
+import { parseId, optionalInt, handleZod } from "./request-params"
 
 const router = Router()
-
-function parseId(raw: string): number {
-  const id = parseInt(raw, 10)
-  if (isNaN(id)) throw new AppError(400, "無效的 ID")
-  return id
-}
-
-function handleZod(error: unknown): never {
-  if (error instanceof ZodError) {
-    throw new AppError(400, "資料驗證失敗：" + error.errors.map((e) => e.message).join("、"))
-  }
-  throw error
-}
-
-function optionalInt(raw: unknown): number | undefined {
-  if (raw === undefined || raw === "") return undefined
-  const n = parseInt(String(raw), 10)
-  return isNaN(n) ? undefined : n
-}
 
 function paymentStatusOf(raw: unknown): store.DebtFilters["paymentStatus"] {
   if (raw === "unpaid" || raw === "partial" || raw === "paid") return raw
