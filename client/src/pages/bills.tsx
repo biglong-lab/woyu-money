@@ -1,11 +1,27 @@
 /**
  * 帳單到期看板 — 通盤本月/近期應繳（法定付款日 + 強執分期），避免遲繳
+ *
+ * 2026-07-04：加「立即處理」— 每筆帳單可直接開付款 dialog 記錄付款，
+ * payment_item 走 /api/payment/items/:id/payments（同步更新狀態+預算回沖）、
+ * 強執分期走 /api/enforcement/installments/:id/payments。
  */
 import { useState } from "react"
-import { useQuery } from "@tanstack/react-query"
-import { CalendarClock, AlertCircle } from "lucide-react"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { CalendarClock, AlertCircle, CheckCircle2, Banknote } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import {
   Select,
   SelectContent,
@@ -14,6 +30,8 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { formatNT } from "@/lib/utils"
+import { apiRequest } from "@/lib/queryClient"
+import { useToast } from "@/hooks/use-toast"
 import { useDocumentTitle } from "@/hooks/use-document-title"
 import { BackToTop } from "@/components/back-to-top"
 
@@ -50,11 +68,62 @@ const URGENCY: Record<string, { label: string; cls: string }> = {
   upcoming: { label: "近期", cls: "bg-gray-100 text-gray-600 border-gray-200" },
 }
 
+const todayStr = () => {
+  const tpe = new Date(Date.now() + 8 * 60 * 60 * 1000)
+  return tpe.toISOString().slice(0, 10)
+}
+
 export default function BillsPage() {
   useDocumentTitle("帳單到期看板")
+  const { toast } = useToast()
+  const queryClient = useQueryClient()
   const [days, setDays] = useState("45")
   const { data, isLoading } = useQuery<BillsData>({
     queryKey: [`/api/bills/upcoming?days=${days}`],
+  })
+
+  // ── 立即處理（付款 dialog）──
+  const [payTarget, setPayTarget] = useState<Bill | null>(null)
+  const [payAmount, setPayAmount] = useState("")
+  const [payDate, setPayDate] = useState(todayStr())
+  const [payMethod, setPayMethod] = useState("bank_transfer")
+  const [payNotes, setPayNotes] = useState("")
+
+  function openPay(b: Bill) {
+    setPayTarget(b)
+    setPayAmount(String(Math.round(b.amount * 100) / 100))
+    setPayDate(todayStr())
+    setPayMethod("bank_transfer")
+    setPayNotes("")
+  }
+
+  const payMutation = useMutation({
+    mutationFn: async () => {
+      if (!payTarget) throw new Error("無付款對象")
+      const amt = parseFloat(payAmount)
+      if (!(amt > 0)) throw new Error("金額需為正數")
+      if (payTarget.source === "enforcement_installment") {
+        return apiRequest("POST", `/api/enforcement/installments/${payTarget.refId}/payments`, {
+          amount: String(amt),
+          paymentDate: payDate,
+          notes: payNotes || `帳單看板立即處理（${payTarget.name}）`,
+        })
+      }
+      return apiRequest("POST", `/api/payment/items/${payTarget.refId}/payments`, {
+        amount: String(amt),
+        paymentDate: payDate,
+        paymentMethod: payMethod,
+        notes: payNotes || "帳單看板立即處理",
+      })
+    },
+    onSuccess: () => {
+      toast({ title: `✅ 已付款 ${formatNT(parseFloat(payAmount))}`, description: payTarget?.name })
+      setPayTarget(null)
+      queryClient.invalidateQueries({ queryKey: [`/api/bills/upcoming?days=${days}`] })
+      queryClient.invalidateQueries({ queryKey: ["/api/payment/priority-report"] })
+    },
+    onError: (e: Error) =>
+      toast({ title: "付款失敗", description: e.message, variant: "destructive" }),
   })
 
   return (
@@ -157,12 +226,104 @@ export default function BillsPage() {
                         ? `逾期 ${-b.daysUntil} 天`
                         : `${b.daysUntil} 天後`}
                   </span>
+                  <Button
+                    size="sm"
+                    variant={b.overdue || b.penaltyRisk ? "default" : "outline"}
+                    className="shrink-0 h-7 px-2.5 text-xs"
+                    onClick={() => openPay(b)}
+                    data-testid={`pay-${b.source}-${b.refId}`}
+                  >
+                    <Banknote className="h-3.5 w-3.5 mr-1" />
+                    立即處理
+                  </Button>
                 </div>
               )
             })
           )}
         </CardContent>
       </Card>
+
+      {/* 立即處理付款 Dialog */}
+      <Dialog open={!!payTarget} onOpenChange={(open) => !open && setPayTarget(null)}>
+        <DialogContent className="w-[95vw] max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Banknote className="h-5 w-5 text-emerald-600" />
+              立即處理付款
+            </DialogTitle>
+            <DialogDescription>
+              {payTarget?.name}
+              {payTarget?.source === "enforcement_installment" ? "（強執分期）" : ""}
+              {payTarget?.dueDate ? ` · 法定付款日 ${payTarget.dueDate}` : ""}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label htmlFor="pay-amount">
+                付款金額（應繳 {formatNT(payTarget?.amount ?? 0)}）
+              </Label>
+              <Input
+                id="pay-amount"
+                type="number"
+                inputMode="decimal"
+                value={payAmount}
+                onChange={(e) => setPayAmount(e.target.value)}
+                autoFocus
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="pay-date">付款日期</Label>
+                <Input
+                  id="pay-date"
+                  type="date"
+                  value={payDate}
+                  onChange={(e) => setPayDate(e.target.value)}
+                />
+              </div>
+              {payTarget?.source !== "enforcement_installment" && (
+                <div>
+                  <Label>付款方式</Label>
+                  <Select value={payMethod} onValueChange={setPayMethod}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="bank_transfer">銀行轉帳</SelectItem>
+                      <SelectItem value="cash">現金</SelectItem>
+                      <SelectItem value="credit_card">信用卡</SelectItem>
+                      <SelectItem value="check">支票</SelectItem>
+                      <SelectItem value="other">其他</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </div>
+            <div>
+              <Label htmlFor="pay-notes">備註（選填）</Label>
+              <Textarea
+                id="pay-notes"
+                value={payNotes}
+                onChange={(e) => setPayNotes(e.target.value)}
+                placeholder="例：郵局臨櫃繳納"
+                rows={2}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPayTarget(null)}>
+              取消
+            </Button>
+            <Button
+              onClick={() => payMutation.mutate()}
+              disabled={payMutation.isPending || !(parseFloat(payAmount) > 0)}
+            >
+              <CheckCircle2 className="h-4 w-4 mr-1" />
+              {payMutation.isPending ? "處理中…" : "確認付款"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <BackToTop />
     </div>
   )
