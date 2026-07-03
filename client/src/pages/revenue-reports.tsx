@@ -34,6 +34,7 @@ import {
 import { DailyRevenueDialog } from "@/components/daily-revenue-dialog"
 import { useDocumentTitle } from "@/hooks/use-document-title"
 import { BackToTop } from "@/components/back-to-top"
+import RevenueTabs from "@/components/revenue-tabs"
 
 // 收入統計概覽
 interface RevenueStats {
@@ -164,6 +165,7 @@ export default function RevenueReports() {
 
   return (
     <div className="space-y-6">
+      <RevenueTabs />
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

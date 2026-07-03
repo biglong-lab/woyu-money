@@ -81,12 +81,8 @@ export const mainNavItems: NavItem[] = [
 ]
 
 // 財務助理分類（決策工具 — 解決記帳焦慮、拖延成本、現金缺口）
-export const forecastNavItem: NavItem = {
-  title: "收入預測",
-  href: "/revenue-forecast",
-  icon: TrendingUp,
-  description: "每日累積走勢 + 月底推估 + 同期比較",
-}
+// 註：收入預測 /revenue-forecast、收入比對 /revenue/compare 已收攏進「收入分析」
+// (/revenue/reports) 的 RevenueTabs tab 列（2026-07-03），不再獨立列導航
 
 // 註：/scenario-simulator（下月精算）已從導航移除（2026-07-03 沙盤二合一），
 // 由沙盤推演主頁（/scenario-planner）頁首的「下月精算模式」連結進入
@@ -150,7 +146,6 @@ export const coreDecisionNavItems: NavItem[] = [
 // 工具箱（常用、可摺疊、依使用頻率排序）
 export const toolboxNavItems: NavItem[] = [
   familyNavItem,
-  forecastNavItem,
   {
     title: "館別損益報表",
     href: "/property-pl",
@@ -317,12 +312,7 @@ export const viewNavItems: NavItem[] = [
     title: "📊 收入分析",
     href: "/revenue/reports",
     icon: TrendingUp,
-  },
-  {
-    title: "📊 收入比對",
-    href: "/revenue/compare",
-    icon: Scale,
-    description: "PMS（發票）vs PM（逐筆）收入雙軌比對",
+    description: "收入分析 / PMS vs PM 比對 / 收入預測（頁內 tab 切換）",
   },
   // ── 🔍 分析類 ──
   {
@@ -564,7 +554,11 @@ export const breadcrumbConfig: Record<string, BreadcrumbItem[]> = {
     { title: "系統管理" },
     { title: "週期性支出模板" },
   ],
-  "/revenue-forecast": [{ title: "首頁", href: "/" }, { title: "財務助理" }, { title: "收入預測" }],
+  "/revenue-forecast": [
+    { title: "首頁", href: "/" },
+    { title: "收入分析", href: "/revenue/reports" },
+    { title: "收入預測" },
+  ],
   "/card-claims": [
     { title: "首頁", href: "/" },
     { title: "財務助理" },
@@ -610,7 +604,11 @@ export const breadcrumbConfig: Record<string, BreadcrumbItem[]> = {
     { title: "系統管理" },
     { title: "收入來源管理" },
   ],
-  "/revenue/compare": [{ title: "首頁", href: "/" }, { title: "統一查看" }, { title: "收入比對" }],
+  "/revenue/compare": [
+    { title: "首頁", href: "/" },
+    { title: "收入分析", href: "/revenue/reports" },
+    { title: "收入比對" },
+  ],
   "/admin/cron-health": [
     { title: "首頁", href: "/" },
     { title: "系統管理" },

@@ -38,6 +38,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient"
 import { useMutation } from "@tanstack/react-query"
 import { useToast } from "@/hooks/use-toast"
 import { BackToTop } from "@/components/back-to-top"
+import RevenueTabs from "@/components/revenue-tabs"
 
 interface Snapshot {
   id: number
@@ -361,6 +362,7 @@ export default function RevenueForecastPage() {
 
   return (
     <div className="container mx-auto py-4 sm:py-6 space-y-4 sm:space-y-6">
+      <RevenueTabs />
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">

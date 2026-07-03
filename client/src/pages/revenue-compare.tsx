@@ -52,6 +52,7 @@ import { apiRequest } from "@/lib/queryClient"
 import { useToast } from "@/hooks/use-toast"
 import { useDocumentTitle } from "@/hooks/use-document-title"
 import { BackToTop } from "@/components/back-to-top"
+import RevenueTabs from "@/components/revenue-tabs"
 
 // ─────────────────────────────────────────────
 // 型別
@@ -259,6 +260,7 @@ export default function RevenueCompare() {
 
   return (
     <div className="p-4 md:p-6 space-y-5 max-w-6xl mx-auto">
+      <RevenueTabs />
       {/* ── 標題列 ── */}
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
