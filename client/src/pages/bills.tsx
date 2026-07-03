@@ -11,6 +11,7 @@ import { CalendarClock, AlertCircle, CheckCircle2, Banknote } from "lucide-react
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -126,6 +127,91 @@ export default function BillsPage() {
       toast({ title: "付款失敗", description: e.message, variant: "destructive" }),
   })
 
+  // ── 批次處理 ──
+  const billKey = (b: Bill) => `${b.source}-${b.refId}-${b.dueDate}`
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [batchOpen, setBatchOpen] = useState(false)
+  const [batchDate, setBatchDate] = useState(todayStr())
+  const [batchMethod, setBatchMethod] = useState("bank_transfer")
+  const [batchNotes, setBatchNotes] = useState("")
+  const [batchProgress, setBatchProgress] = useState<string | null>(null)
+
+  const selectedBills = (data?.bills ?? []).filter((b) => selected.has(billKey(b)))
+  const selectedTotal = selectedBills.reduce((s, b) => s + b.amount, 0)
+
+  function toggleSelect(b: Bill) {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      const k = billKey(b)
+      if (next.has(k)) next.delete(k)
+      else next.add(k)
+      return next
+    })
+  }
+  function toggleSelectAll() {
+    const bills = data?.bills ?? []
+    setSelected((prev) => (prev.size === bills.length ? new Set() : new Set(bills.map(billKey))))
+  }
+
+  /** 強執下月投影用其到期日入帳（歸對月份）；其餘用批次日期 */
+  function paymentDateFor(b: Bill): string {
+    if (b.source === "enforcement_installment" && b.dueDate) {
+      if (b.dueDate.slice(0, 7) !== batchDate.slice(0, 7)) return b.dueDate
+    }
+    return batchDate
+  }
+
+  const batchMutation = useMutation({
+    mutationFn: async () => {
+      let ok = 0
+      const failed: string[] = []
+      for (let i = 0; i < selectedBills.length; i++) {
+        const b = selectedBills[i]
+        setBatchProgress(`處理中 ${i + 1}/${selectedBills.length}：${b.name}`)
+        try {
+          if (b.source === "enforcement_installment") {
+            await apiRequest("POST", `/api/enforcement/installments/${b.refId}/payments`, {
+              amount: String(b.amount),
+              paymentDate: paymentDateFor(b),
+              notes: batchNotes || `帳單看板批次處理（${b.name}）`,
+            })
+          } else {
+            await apiRequest("POST", `/api/payment/items/${b.refId}/payments`, {
+              amount: String(b.amount),
+              paymentDate: batchDate,
+              paymentMethod: batchMethod,
+              notes: batchNotes || "帳單看板批次處理",
+            })
+          }
+          ok++
+        } catch (e) {
+          failed.push(`${b.name}（${e instanceof Error ? e.message : "未知錯誤"}）`)
+        }
+      }
+      return { ok, failed }
+    },
+    onSuccess: ({ ok, failed }) => {
+      setBatchProgress(null)
+      setBatchOpen(false)
+      setSelected(new Set())
+      queryClient.invalidateQueries({ queryKey: [`/api/bills/upcoming?days=${days}`] })
+      queryClient.invalidateQueries({ queryKey: ["/api/payment/priority-report"] })
+      if (failed.length === 0) {
+        toast({ title: `✅ 批次完成：${ok} 筆全數付款` })
+      } else {
+        toast({
+          title: `批次完成：成功 ${ok} 筆、失敗 ${failed.length} 筆`,
+          description: failed.slice(0, 3).join("；") + (failed.length > 3 ? "…" : ""),
+          variant: "destructive",
+        })
+      }
+    },
+    onError: (e: Error) => {
+      setBatchProgress(null)
+      toast({ title: "批次處理失敗", description: e.message, variant: "destructive" })
+    },
+  })
+
   return (
     <div className="container mx-auto py-6 space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -187,10 +273,42 @@ export default function BillsPage() {
         </div>
       )}
 
+      {/* 批次操作列（有勾選時顯示、sticky 置頂） */}
+      {selected.size > 0 && (
+        <div className="sticky top-2 z-10 flex flex-wrap items-center gap-3 rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-2.5 shadow-sm">
+          <span className="text-sm font-medium text-emerald-900">
+            已勾選 {selected.size} 筆 · 合計 {formatNT(selectedTotal)}
+          </span>
+          <div className="ml-auto flex gap-2">
+            <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>
+              取消勾選
+            </Button>
+            <Button size="sm" onClick={() => setBatchOpen(true)} data-testid="batch-pay-open">
+              <Banknote className="h-4 w-4 mr-1" />
+              批次處理（{selected.size} 筆）
+            </Button>
+          </div>
+        </div>
+      )}
+
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">應繳清單</CardTitle>
-          <CardDescription>依到期日排序；強執分期自動投影本月與下月應付</CardDescription>
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <CardTitle className="text-base">應繳清單</CardTitle>
+              <CardDescription>依到期日排序；強執分期自動投影本月與下月應付</CardDescription>
+            </div>
+            {data && data.bills.length > 0 && (
+              <label className="flex items-center gap-2 text-xs text-gray-500 cursor-pointer select-none">
+                <Checkbox
+                  checked={selected.size === data.bills.length && data.bills.length > 0}
+                  onCheckedChange={toggleSelectAll}
+                  data-testid="select-all"
+                />
+                全選
+              </label>
+            )}
+          </div>
         </CardHeader>
         <CardContent className="space-y-1.5">
           {isLoading ? (
@@ -203,9 +321,17 @@ export default function BillsPage() {
               return (
                 <div
                   key={`${b.source}-${b.refId}-${i}`}
-                  className="flex items-center gap-3 border-b py-2 text-sm flex-wrap"
+                  className={`flex items-center gap-3 border-b py-2 text-sm flex-wrap ${
+                    selected.has(billKey(b)) ? "bg-emerald-50/60 -mx-2 px-2 rounded" : ""
+                  }`}
                   data-testid={`bill-${b.source}-${b.refId}`}
                 >
+                  <Checkbox
+                    checked={selected.has(billKey(b))}
+                    onCheckedChange={() => toggleSelect(b)}
+                    className="shrink-0"
+                    data-testid={`select-${b.source}-${b.refId}`}
+                  />
                   <span className="font-bold w-24 shrink-0">{formatNT(b.amount)}</span>
                   <Badge className={`shrink-0 border ${u.cls}`}>{u.label}</Badge>
                   <div className="flex-1 min-w-[140px]">
@@ -320,6 +446,98 @@ export default function BillsPage() {
             >
               <CheckCircle2 className="h-4 w-4 mr-1" />
               {payMutation.isPending ? "處理中…" : "確認付款"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* 批次處理 Dialog */}
+      <Dialog
+        open={batchOpen}
+        onOpenChange={(open) => !batchMutation.isPending && setBatchOpen(open)}
+      >
+        <DialogContent className="w-[95vw] max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Banknote className="h-5 w-5 text-emerald-600" />
+              批次處理付款（{selectedBills.length} 筆）
+            </DialogTitle>
+            <DialogDescription>
+              合計 {formatNT(selectedTotal)} · 每筆以其未付餘額入帳
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="max-h-36 overflow-y-auto rounded border bg-gray-50 p-2 text-xs space-y-1">
+              {selectedBills.map((b) => (
+                <div key={billKey(b)} className="flex justify-between gap-2">
+                  <span className="truncate">{b.name}</span>
+                  <span className="font-mono shrink-0">{formatNT(b.amount)}</span>
+                </div>
+              ))}
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="batch-date">付款日期</Label>
+                <Input
+                  id="batch-date"
+                  type="date"
+                  value={batchDate}
+                  onChange={(e) => setBatchDate(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label>付款方式</Label>
+                <Select value={batchMethod} onValueChange={setBatchMethod}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="bank_transfer">銀行轉帳</SelectItem>
+                    <SelectItem value="cash">現金</SelectItem>
+                    <SelectItem value="credit_card">信用卡</SelectItem>
+                    <SelectItem value="check">支票</SelectItem>
+                    <SelectItem value="other">其他</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            {selectedBills.some(
+              (b) =>
+                b.source === "enforcement_installment" &&
+                b.dueDate &&
+                b.dueDate.slice(0, 7) !== batchDate.slice(0, 7)
+            ) && (
+              <p className="text-xs text-amber-600">
+                ⚠ 內含下月的強執分期：該筆會以其到期日入帳（歸對月份）
+              </p>
+            )}
+            <div>
+              <Label htmlFor="batch-notes">備註（選填、套用到每筆）</Label>
+              <Textarea
+                id="batch-notes"
+                value={batchNotes}
+                onChange={(e) => setBatchNotes(e.target.value)}
+                rows={2}
+              />
+            </div>
+            {batchProgress && (
+              <p className="text-sm text-emerald-700 animate-pulse">{batchProgress}</p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setBatchOpen(false)}
+              disabled={batchMutation.isPending}
+            >
+              取消
+            </Button>
+            <Button
+              onClick={() => batchMutation.mutate()}
+              disabled={batchMutation.isPending || selectedBills.length === 0}
+              data-testid="batch-pay-confirm"
+            >
+              <CheckCircle2 className="h-4 w-4 mr-1" />
+              {batchMutation.isPending ? "處理中…" : `確認付款 ${formatNT(selectedTotal)}`}
             </Button>
           </DialogFooter>
         </DialogContent>
