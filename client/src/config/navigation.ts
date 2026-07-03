@@ -102,13 +102,6 @@ export const scenarioPlannerNavItem: NavItem = {
   description: "收入↑/成本↓/還款三軸推未來 12 月現金走勢",
 }
 
-export const dashboardNavItem: NavItem = {
-  title: "綜合儀表板",
-  href: "/financial-dashboard",
-  icon: BarChart3,
-  description: "YTD + 未來 3 月預估 + 缺口警示一頁看完",
-}
-
 export const costOverviewNavItem: NavItem = {
   title: "成本結構中樞",
   href: "/cost-overview",
@@ -134,31 +127,18 @@ export const cockpitNavItem: NavItem = {
   description: "現況 + 應付款排序 + 現金缺口，一頁看完並導向深度工具",
 }
 
-// 財務總覽中心（收納所有相似的總覽/儀表板頁，主入口=應付總覽看板）
-// 這些頁面原本散在核心決策/進階工具/主入口，整合收進此單一群組（不刪頁，只收納）
+// 財務總覽中心（單一主入口=財務健康駕駛艙、其餘為下鑽頁）
+// 2026-07-03 導航收斂：綜合儀表板 / 財務總覽 v2 / 現金流決策中心 從選單移除，
+// 改由各總覽頁內的 OverviewTabs tab 列互達（頁面保留、路由保留、不刪功能）
 export const overviewCenterNavItems: NavItem[] = [
+  { ...cockpitNavItem, badge: "主入口" }, // 財務健康駕駛艙 — 唯一財務主入口
   {
     title: "應付總覽看板",
     href: "/payables-dashboard",
     icon: Wallet,
-    badge: "總覽",
-    description: "一頁看完：給付、應付、還有多少未付（分類/專案 × 12 月矩陣，可點格看明細）",
+    description: "下鑽：給付、應付、還有多少未付（分類/專案 × 12 月矩陣，可點格看明細）",
   },
-  cockpitNavItem, // 財務健康駕駛艙
-  dashboardNavItem, // 綜合儀表板：YTD + 3 月預估
-  {
-    title: "財務總覽 v2",
-    href: "/financial-overview-v2",
-    icon: BarChart3,
-    description: "預估 vs 實際 / 各館組損益一頁看完",
-  },
-  costOverviewNavItem, // 成本結構中樞
-  {
-    title: "現金流決策中心",
-    href: "/cashflow-decision-center",
-    icon: TrendingUp,
-    description: "未來 3-6 月收支預估 + 缺口警示",
-  },
+  costOverviewNavItem, // 下鑽：成本結構中樞
 ]
 
 // 核心決策（規劃工具）— 總覽類已移至「財務總覽中心」
@@ -253,14 +233,6 @@ export const advancedNavItems: NavItem[] = [
     icon: AlertTriangle,
     description: "年度損失儀表 + 三層提醒",
   },
-]
-
-// 保留 decisionNavItems export 對舊呼叫者相容（合併 總覽中心 + core + toolbox + advanced）
-export const decisionNavItems: NavItem[] = [
-  ...overviewCenterNavItems,
-  ...coreDecisionNavItems,
-  ...toolboxNavItems,
-  ...advancedNavItems,
 ]
 
 // 付款方式管理分類

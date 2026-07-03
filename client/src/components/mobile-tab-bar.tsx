@@ -10,6 +10,7 @@ import {
   managementNavItems,
   viewNavItems,
   systemNavItems,
+  overviewCenterNavItems,
   coreDecisionNavItems,
   toolboxNavItems,
   advancedNavItems,
@@ -587,6 +588,7 @@ export function MobileTabBar() {
       <PopupMenu
         title="報表 & 設定"
         sections={[
+          { label: "🎯 財務總覽中心", color: "amber", items: overviewCenterNavItems },
           { label: "💡 核心決策", color: "amber", items: coreDecisionNavItems },
           { label: "🧰 工具箱", color: "amber", items: toolboxNavItems },
           { label: "🔬 進階工具", color: "amber", items: advancedNavItems },

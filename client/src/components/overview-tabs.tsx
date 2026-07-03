@@ -5,12 +5,13 @@
  */
 import { Link, useLocation } from "wouter"
 
+// 駕駛艙為主入口排首位；後三個 tab 已從主導航移除（2026-07-03 導航收斂）、僅由此 tab 列互達
 const TABS: { href: string; label: string }[] = [
-  { href: "/payables-dashboard", label: "應付看板" },
   { href: "/financial-cockpit", label: "財務駕駛艙" },
+  { href: "/payables-dashboard", label: "應付看板" },
+  { href: "/cost-overview", label: "成本結構" },
   { href: "/financial-dashboard", label: "綜合儀表板" },
   { href: "/financial-overview-v2", label: "財務總覽" },
-  { href: "/cost-overview", label: "成本結構" },
   { href: "/cashflow-decision-center", label: "現金流" },
 ]
 
