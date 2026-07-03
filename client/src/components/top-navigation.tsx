@@ -39,12 +39,10 @@ import { useAuth } from "@/hooks/use-auth"
 import { useQuery } from "@tanstack/react-query"
 import {
   mainNavItems,
-  overviewCenterNavItems,
-  coreDecisionNavItems,
-  toolboxNavItems,
-  advancedNavItems,
-  managementNavItems,
-  viewNavItems,
+  paymentActionNavItems,
+  fixedCostNavItems,
+  reportsNavItems,
+  familyAreaNavItems,
   systemNavItems,
   NavItem,
 } from "@/config/navigation"
@@ -58,52 +56,39 @@ interface CategoryConfig {
   items: NavItem[]
 }
 
+// 2026-07-04 資訊架構重整：7 群（工具型）→ 5 群（做事型），項目 emoji 前綴 = 群內小節
 const categoryConfigs: CategoryConfig[] = [
   {
-    id: "overview-center",
-    title: "🎯 財務總覽中心",
+    id: "payment-action",
+    title: "💸 付款與排程",
     titleClass: "text-blue-900",
     hoverClass: "hover:bg-blue-50",
-    items: overviewCenterNavItems,
+    items: paymentActionNavItems,
   },
   {
-    id: "decision-core",
-    title: "💡 規劃工具",
+    id: "fixed-cost",
+    title: "🏢 固定成本與合約",
     titleClass: "text-amber-900",
     hoverClass: "hover:bg-amber-50",
-    items: coreDecisionNavItems,
+    items: fixedCostNavItems,
   },
   {
-    id: "decision-toolbox",
-    title: "🧰 工具箱",
-    titleClass: "text-amber-700",
-    hoverClass: "hover:bg-amber-50",
-    items: toolboxNavItems,
-  },
-  {
-    id: "decision-advanced",
-    title: "🔬 進階工具",
-    titleClass: "text-amber-700",
-    hoverClass: "hover:bg-amber-50",
-    items: advancedNavItems,
-  },
-  {
-    id: "management",
-    title: "付款方式管理",
-    titleClass: "text-blue-900",
-    hoverClass: "hover:bg-blue-50",
-    items: managementNavItems,
-  },
-  {
-    id: "view",
-    title: "統一查看",
+    id: "reports",
+    title: "📊 報表與規劃",
     titleClass: "text-green-900",
     hoverClass: "hover:bg-green-50",
-    items: viewNavItems,
+    items: reportsNavItems,
+  },
+  {
+    id: "family",
+    title: "👨‍👩‍👧 家庭",
+    titleClass: "text-purple-900",
+    hoverClass: "hover:bg-purple-50",
+    items: familyAreaNavItems,
   },
   {
     id: "system",
-    title: "系統管理",
+    title: "⚙️ 系統管理",
     titleClass: "text-orange-900",
     hoverClass: "hover:bg-orange-50",
     items: systemNavItems,

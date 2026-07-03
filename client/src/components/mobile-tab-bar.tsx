@@ -7,13 +7,11 @@
 import { Link, useLocation } from "wouter"
 import { cn } from "@/lib/utils"
 import {
-  managementNavItems,
-  viewNavItems,
+  paymentActionNavItems,
+  fixedCostNavItems,
+  reportsNavItems,
+  familyAreaNavItems,
   systemNavItems,
-  overviewCenterNavItems,
-  coreDecisionNavItems,
-  toolboxNavItems,
-  advancedNavItems,
 } from "@/config/navigation"
 import { useQuery } from "@tanstack/react-query"
 import { useState, useRef, useEffect } from "react"
@@ -553,10 +551,10 @@ export function MobileTabBar() {
   }, [urgentCount, inboxStats?.pending])
 
   // 判斷當前路徑是否在某個分類下
-  const isInPaymentSection = managementNavItems.some(
+  const isInPaymentSection = [...paymentActionNavItems, ...fixedCostNavItems].some(
     (item) => location === item.href || location.startsWith(item.href)
   )
-  const isInViewSection = viewNavItems.some(
+  const isInViewSection = [...reportsNavItems, ...familyAreaNavItems].some(
     (item) => location === item.href || location.startsWith(item.href)
   )
   const isInSystemSection = systemNavItems.some(
@@ -579,8 +577,11 @@ export function MobileTabBar() {
     <>
       {/* 展開選單 */}
       <PopupMenu
-        title="付款項目管理"
-        items={managementNavItems}
+        title="💸 付款與排程"
+        sections={[
+          { label: "💸 付款與排程", color: "blue", items: paymentActionNavItems },
+          { label: "🏢 固定成本與合約", color: "amber", items: fixedCostNavItems },
+        ]}
         isOpen={openMenu === "payment"}
         onClose={() => setOpenMenu(null)}
         color="blue"
@@ -588,11 +589,8 @@ export function MobileTabBar() {
       <PopupMenu
         title="報表 & 設定"
         sections={[
-          { label: "🎯 財務總覽中心", color: "amber", items: overviewCenterNavItems },
-          { label: "💡 核心決策", color: "amber", items: coreDecisionNavItems },
-          { label: "🧰 工具箱", color: "amber", items: toolboxNavItems },
-          { label: "🔬 進階工具", color: "amber", items: advancedNavItems },
-          { label: "📊 查看 & 報表", color: "green", items: viewNavItems },
+          { label: "📊 報表與規劃", color: "green", items: reportsNavItems },
+          { label: "👨‍👩‍👧 家庭", color: "amber", items: familyAreaNavItems },
           { label: "⚙️ 系統管理", color: "orange", items: systemNavItems },
         ]}
         isOpen={openMenu === "view"}
