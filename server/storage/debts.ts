@@ -56,6 +56,7 @@ export async function deleteCategory(id: number): Promise<void> {
 // ─────────────────────────────────────────────
 
 export interface DebtFilters {
+  id?: number
   status?: string
   categoryId?: number
   // 還款進度：unpaid 未還 / partial 部分 / paid 已還清
@@ -73,6 +74,7 @@ export interface DebtWithProgress extends Debt {
 
 function buildConditions(filters: DebtFilters) {
   const conditions = []
+  if (filters.id) conditions.push(eq(debts.id, filters.id))
   if (filters.status) conditions.push(eq(debts.status, filters.status))
   if (filters.categoryId) conditions.push(eq(debts.categoryId, filters.categoryId))
   return conditions.length > 0 ? and(...conditions) : undefined
@@ -144,8 +146,9 @@ export async function listDebts(filters: DebtFilters = {}): Promise<DebtWithProg
 }
 
 export async function getDebt(id: number): Promise<DebtWithProgress | undefined> {
-  const list = await listDebts({})
-  return list.find((d) => d.id === id)
+  // 帶 id 條件單筆查詢，避免全表載入
+  const [row] = await listDebts({ id })
+  return row
 }
 
 export async function createDebt(data: InsertDebt): Promise<Debt> {

@@ -386,11 +386,10 @@ describe("storage/household.ts - 家用支出管理", () => {
 
   // ========== deleteHouseholdExpense ==========
   describe("deleteHouseholdExpense", () => {
-    it("成功刪除支出", async () => {
-      state.deleteResult = undefined
-
+    it("成功刪除支出（軟刪除：update is_deleted 而非 delete）", async () => {
       await expect(deleteHouseholdExpense(1)).resolves.toBeUndefined()
-      expect(mockDb.delete).toHaveBeenCalled()
+      expect(mockDb.update).toHaveBeenCalled()
+      expect(mockDb.delete).not.toHaveBeenCalled()
     })
   })
 })
