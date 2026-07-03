@@ -9,11 +9,8 @@
 
 import { Router } from "express"
 import { asyncHandler, AppError } from "../middleware/error-handler"
-import {
-  syncPmsRevenues,
-  previewPmsRevenues,
-  ensurePmsBridgeSource,
-} from "../storage/pms-bridge"
+import { syncPmsRevenues, previewPmsRevenues, ensurePmsBridgeSource } from "../storage/pms-bridge"
+import { EXCLUDED_PM_COMPANY_IDS } from "@shared/pm-excluded-companies"
 
 const router = Router()
 
@@ -37,10 +34,7 @@ function parseMonth(value: unknown, fieldName: string): string {
 router.get(
   "/api/pms-bridge/preview",
   asyncHandler(async (req, res) => {
-    const startMonth = parseMonth(
-      req.query.startMonth ?? "2025-07",
-      "startMonth"
-    )
+    const startMonth = parseMonth(req.query.startMonth ?? "2025-07", "startMonth")
     const endMonth = parseMonth(
       req.query.endMonth ?? new Date().toISOString().slice(0, 7),
       "endMonth"
@@ -58,10 +52,7 @@ router.get(
       })
     } catch (err: unknown) {
       if (err instanceof Error && err.message.includes("PMS_DATABASE_URL")) {
-        throw new AppError(
-          503,
-          "PMS 系統資料庫未設定，請確認 PMS_DATABASE_URL 環境變數"
-        )
+        throw new AppError(503, "PMS 系統資料庫未設定，請確認 PMS_DATABASE_URL 環境變數")
       }
       throw err
     }
@@ -82,10 +73,7 @@ router.post(
     }
 
     const startMonth = parseMonth(rawStart ?? "2025-07", "startMonth")
-    const endMonth = parseMonth(
-      rawEnd ?? new Date().toISOString().slice(0, 7),
-      "endMonth"
-    )
+    const endMonth = parseMonth(rawEnd ?? new Date().toISOString().slice(0, 7), "endMonth")
 
     try {
       const result = await syncPmsRevenues(startMonth, endMonth)
@@ -96,10 +84,7 @@ router.post(
       })
     } catch (err: unknown) {
       if (err instanceof Error && err.message.includes("PMS_DATABASE_URL")) {
-        throw new AppError(
-          503,
-          "PMS 系統資料庫未設定，請確認 PMS_DATABASE_URL 環境變數"
-        )
+        throw new AppError(503, "PMS 系統資料庫未設定，請確認 PMS_DATABASE_URL 環境變數")
       }
       throw err
     }
@@ -153,12 +138,13 @@ router.get(
 
     const { Pool } = await import("pg")
     const pmsPool = new Pool({ connectionString: process.env.PMS_DATABASE_URL, max: 2 })
-    const pmPool  = new Pool({ connectionString: process.env.PM_DATABASE_URL,  max: 2 })
+    const pmPool = new Pool({ connectionString: process.env.PM_DATABASE_URL, max: 2 })
 
     try {
       const [pmsMonthly, pmsBranch, pmResult] = await Promise.all([
         // PMS 月度彙總
-        pmsPool.query<{ month: string; total: string; branches: string }>(`
+        pmsPool.query<{ month: string; total: string; branches: string }>(
+          `
           WITH latest AS (
             SELECT DISTINCT ON (branch_id, TO_CHAR(date, 'YYYY-MM'))
               TO_CHAR(date, 'YYYY-MM') AS month,
@@ -174,13 +160,20 @@ router.get(
                  COUNT(*)::text                   AS branches
           FROM latest
           GROUP BY month ORDER BY month
-        `, [startMonth, endMonth]),
+        `,
+          [startMonth, endMonth]
+        ),
 
         // PMS 分店明細（每月每分店最後一筆）
         pmsPool.query<{
-          month: string; branch_id: string; branch_name: string
-          branch_code: string; revenue: string; last_date: string
-        }>(`
+          month: string
+          branch_id: string
+          branch_name: string
+          branch_code: string
+          revenue: string
+          last_date: string
+        }>(
+          `
           WITH latest AS (
             SELECT DISTINCT ON (pe.branch_id, TO_CHAR(pe.date, 'YYYY-MM'))
               TO_CHAR(pe.date, 'YYYY-MM')      AS month,
@@ -196,21 +189,29 @@ router.get(
             ORDER BY pe.branch_id, TO_CHAR(pe.date, 'YYYY-MM'), pe.date DESC
           )
           SELECT * FROM latest ORDER BY month, branch_id
-        `, [startMonth, endMonth]),
+        `,
+          [startMonth, endMonth]
+        ),
 
         // PM 月度彙總
-        pmPool.query<{ month: string; total: string; records: string }>(`
+        // ⚠️ 必須排除大號文創/大哉文旅（company 6/7）：它們不屬於 Money/PMS 範圍，
+        //    佔 PM 總收入 ~65%，不排除會讓比對每月虛差百萬（2026-07-04 修復）
+        pmPool.query<{ month: string; total: string; records: string }>(
+          `
           SELECT
             TO_CHAR(date AT TIME ZONE 'Asia/Taipei', 'YYYY-MM') AS month,
             SUM(amount::numeric)::text AS total,
             COUNT(*)::text             AS records
           FROM revenues
           WHERE deleted_at IS NULL
+            AND company_id <> ALL($3::int[])
             AND TO_CHAR(date AT TIME ZONE 'Asia/Taipei', 'YYYY-MM') >= $1
             AND TO_CHAR(date AT TIME ZONE 'Asia/Taipei', 'YYYY-MM') <= $2
           GROUP BY TO_CHAR(date AT TIME ZONE 'Asia/Taipei', 'YYYY-MM')
           ORDER BY month
-        `, [startMonth, endMonth]),
+        `,
+          [startMonth, endMonth, [...EXCLUDED_PM_COMPANY_IDS]]
+        ),
       ])
 
       // 建立分店明細 Map（按月份）
@@ -226,51 +227,53 @@ router.get(
         ...pmResult.rows.map((r) => r.month),
       ])
       const pmsMap = new Map(pmsMonthly.rows.map((r) => [r.month, r]))
-      const pmMap  = new Map(pmResult.rows.map((r) => [r.month, r]))
+      const pmMap = new Map(pmResult.rows.map((r) => [r.month, r]))
 
-      const comparison = Array.from(months).sort().map((month) => {
-        const pms = pmsMap.get(month)
-        const pm  = pmMap.get(month)
-        const pmsTotal = pms ? parseFloat(pms.total) : 0
-        const pmTotal  = pm  ? parseFloat(pm.total)  : 0
-        const diff     = pmsTotal - pmTotal
-        // 若 PM 幾乎無資料（< 10 筆），diffPct 不具參考意義，標為 null
-        const pmRecords = pm ? parseInt(pm.records) : 0
-        const diffPct =
-          pmTotal > 0 && pmRecords >= 10
-            ? Math.round(((diff / pmTotal) * 100) * 10) / 10
-            : null
+      const comparison = Array.from(months)
+        .sort()
+        .map((month) => {
+          const pms = pmsMap.get(month)
+          const pm = pmMap.get(month)
+          const pmsTotal = pms ? parseFloat(pms.total) : 0
+          const pmTotal = pm ? parseFloat(pm.total) : 0
+          const diff = pmsTotal - pmTotal
+          // 若 PM 幾乎無資料（< 10 筆），diffPct 不具參考意義，標為 null
+          const pmRecords = pm ? parseInt(pm.records) : 0
+          const diffPct =
+            pmTotal > 0 && pmRecords >= 10 ? Math.round((diff / pmTotal) * 100 * 10) / 10 : null
 
-        return {
-          month,
-          pms: {
-            total: pmsTotal,
-            branches: pms ? parseInt(pms.branches) : 0,
-            branchDetail: (branchDetailMap.get(month) ?? []).map((b) => ({
-              branchId:   parseInt(b.branch_id),
-              branchName: b.branch_name,
-              branchCode: b.branch_code,
-              revenue:    parseFloat(b.revenue),
-              lastDate:   b.last_date,
-            })),
-          },
-          pm: {
-            total:   pmTotal,
-            records: pmRecords,
-          },
-          diff,
-          diffPct,
-          // 若 PM 資料不足，不作 match/higher 判斷
-          status:
-            pmRecords < 10
-              ? "insufficient_pm"
-              : Math.abs(diff) < 1000
-                ? "match"
-                : diff > 0
-                  ? "pms_higher"
-                  : "pm_higher",
-        }
-      })
+          return {
+            month,
+            pms: {
+              total: pmsTotal,
+              branches: pms ? parseInt(pms.branches) : 0,
+              branchDetail: (branchDetailMap.get(month) ?? []).map((b) => ({
+                branchId: parseInt(b.branch_id),
+                branchName: b.branch_name,
+                branchCode: b.branch_code,
+                revenue: parseFloat(b.revenue),
+                lastDate: b.last_date,
+              })),
+            },
+            pm: {
+              total: pmTotal,
+              records: pmRecords,
+            },
+            diff,
+            diffPct,
+            // PMS 該月完全沒 performance_entries（對方未填）→ 標 missing_pms、不作差異判斷
+            // 若 PM 資料不足，同樣不作 match/higher 判斷
+            status: !pms
+              ? "missing_pms"
+              : pmRecords < 10
+                ? "insufficient_pm"
+                : Math.abs(diff) < 1000
+                  ? "match"
+                  : diff > 0
+                    ? "pms_higher"
+                    : "pm_higher",
+          }
+        })
 
       res.json({ startMonth, endMonth, comparison })
     } finally {

@@ -72,7 +72,7 @@ interface CompareRow {
   pm: { total: number; records: number }
   diff: number
   diffPct: number | null
-  status: "match" | "pms_higher" | "pm_higher" | "insufficient_pm"
+  status: "match" | "pms_higher" | "pm_higher" | "insufficient_pm" | "missing_pms"
 }
 
 interface CompareData {
@@ -103,6 +103,13 @@ function monthOptions() {
 }
 
 function statusBadge(status: CompareRow["status"], diff: number) {
+  if (status === "missing_pms")
+    return (
+      <Badge variant="outline" className="border-amber-300 text-amber-600 text-xs">
+        <Minus className="h-3 w-3 mr-1" />
+        PMS 未填該月
+      </Badge>
+    )
   if (status === "insufficient_pm")
     return (
       <Badge variant="outline" className="border-gray-300 text-gray-500 text-xs">
@@ -235,7 +242,10 @@ export default function RevenueCompare() {
   const comparison = data?.comparison ?? []
 
   // 過濾有效月份（PM 有足夠資料）
-  const validComparison = comparison.filter((r) => r.status !== "insufficient_pm")
+  // 排除資料不足的月份（PM 筆數不足 / PMS 未填），避免 0 值拉偏總計與吻合率
+  const validComparison = comparison.filter(
+    (r) => r.status !== "insufficient_pm" && r.status !== "missing_pms"
+  )
 
   // 統計
   const totalPms = validComparison.reduce((s, r) => s + r.pms.total, 0)
