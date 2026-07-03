@@ -1,15 +1,16 @@
-import { useAuth } from "@/hooks/use-auth";
-import { Loader2 } from "lucide-react";
-import { Redirect, Route } from "wouter";
+import { useAuth } from "@/hooks/use-auth"
+import { Loader2 } from "lucide-react"
+import { Redirect, Route } from "wouter"
 
 export function ProtectedRoute({
   path,
   component: Component,
 }: {
-  path: string;
-  component: () => React.JSX.Element;
+  path: string
+  // ComponentType 同時相容一般元件與 React.lazy 元件（Phase 4.2 code splitting）
+  component: React.ComponentType
 }) {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading } = useAuth()
 
   if (isLoading) {
     return (
@@ -18,7 +19,7 @@ export function ProtectedRoute({
           <Loader2 className="h-8 w-8 animate-spin text-border" />
         </div>
       </Route>
-    );
+    )
   }
 
   if (!user) {
@@ -26,8 +27,12 @@ export function ProtectedRoute({
       <Route path={path}>
         <Redirect to="/auth" />
       </Route>
-    );
+    )
   }
 
-  return <Route path={path}><Component /></Route>;
+  return (
+    <Route path={path}>
+      <Component />
+    </Route>
+  )
 }
