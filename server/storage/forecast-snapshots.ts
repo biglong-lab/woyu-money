@@ -16,7 +16,12 @@ const PM_DATABASE_URL = process.env.PM_DATABASE_URL
 let pmPool: pg.Pool | null = null
 function getPmPool(): pg.Pool | null {
   if (!PM_DATABASE_URL) return null
-  if (!pmPool) pmPool = new pg.Pool({ connectionString: PM_DATABASE_URL })
+  // PM 正式資料在 t_wodao schema（2026-06-14 起）
+  if (!pmPool)
+    pmPool = new pg.Pool({
+      connectionString: PM_DATABASE_URL,
+      options: "-c search_path=t_wodao,public",
+    })
   return pmPool
 }
 

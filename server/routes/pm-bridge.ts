@@ -38,9 +38,7 @@ router.get(
   asyncHandler(async (req, res) => {
     const startDate = parseDate(req.query.startDate, "startDate")
     const endDate = parseDate(req.query.endDate, "endDate")
-    const companyId = req.query.companyId
-      ? parseInt(String(req.query.companyId))
-      : undefined
+    const companyId = req.query.companyId ? parseInt(String(req.query.companyId)) : undefined
 
     if (companyId !== undefined && isNaN(companyId)) {
       throw new AppError(400, "companyId 格式錯誤")
@@ -71,7 +69,11 @@ router.get(
 router.post(
   "/api/pm-bridge/sync",
   asyncHandler(async (req, res) => {
-    const { startDate: rawStart, endDate: rawEnd, companyId: rawCompanyId } = req.body as {
+    const {
+      startDate: rawStart,
+      endDate: rawEnd,
+      companyId: rawCompanyId,
+    } = req.body as {
       startDate?: unknown
       endDate?: unknown
       companyId?: unknown
@@ -122,7 +124,11 @@ router.get(
     if (!connStr) {
       throw new AppError(503, "PM 旅館系統資料庫未設定，請確認 PM_DATABASE_URL 環境變數")
     }
-    const pool = new Pool({ connectionString: connStr, max: 1 })
+    const pool = new Pool({
+      connectionString: connStr,
+      max: 1,
+      options: "-c search_path=t_wodao,public",
+    })
     try {
       // 排除不納入 Money 的公司（大號文創 6 / 大哉文旅 7）
       const result = await pool.query(
@@ -154,7 +160,11 @@ router.get(
       pmError = "PM_DATABASE_URL 未設定"
     } else {
       const { Pool } = await import("pg")
-      const pool = new Pool({ connectionString: connStr, max: 1 })
+      const pool = new Pool({
+        connectionString: connStr,
+        max: 1,
+        options: "-c search_path=t_wodao,public",
+      })
       try {
         const r = await pool.query("SELECT COUNT(*) as cnt FROM revenues WHERE deleted_at IS NULL")
         pmConnected = true
