@@ -11,25 +11,21 @@ import { asyncHandler } from "../middleware/error-handler"
 import { db } from "../db"
 import { sql } from "drizzle-orm"
 import { localDateTPE } from "@shared/date-utils"
+import { intWithDefault } from "./request-params"
+import {
+  type BillRow,
+  projectInstallmentDues,
+  classifyBills,
+  summarizeBills,
+} from "../services/bills.service"
 
 const router = Router()
-
-interface BillRow {
-  source: string
-  refId: number
-  name: string
-  amount: number
-  billIssuedDate: string | null
-  dueDate: string | null
-  finalDueDate: string | null
-  penaltyNote: string | null
-  status: string
-}
 
 router.get(
   "/api/bills/upcoming",
   asyncHandler(async (req, res) => {
-    const days = Math.min(Math.max(parseInt((req.query.days as string) ?? "45"), 7), 120)
+    // NaN 防護：無效值回預設 45（原 parseInt 直通會讓 NaN 進 SQL interval）
+    const days = intWithDefault(req.query.days, 45, 7, 120)
     const today = localDateTPE()
 
     // 1. 未付 payment_items（排除已強執分流），以法定付款日優先
@@ -63,72 +59,30 @@ router.get(
       status: String(r.status),
     }))
 
-    // 2. 強執分期 active → 投影本月與下月應付（dayOfMonth）
+    // 2. 強執分期 active → 投影本月與下月應付（日期邏輯在 bills.service，可單元測試）
     const instRows = await db.execute(sql`
       SELECT id AS "refId", COALESCE(plan_name, '強執分期') AS "name",
              monthly_amount::numeric AS "amount", day_of_month AS "dayOfMonth"
       FROM enforcement_installments WHERE status = 'active'
     `)
-    const installments: BillRow[] = []
-    const now = new Date(today + "T00:00:00")
-    for (const r of (instRows as unknown as { rows: Array<Record<string, unknown>> }).rows) {
-      const day = Math.min(28, Math.max(1, Number(r.dayOfMonth) || 10))
-      for (let offset = 0; offset <= 1; offset++) {
-        const d = new Date(now.getFullYear(), now.getMonth() + offset, day)
-        const due = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`
-        const diffDays = Math.round((d.getTime() - now.getTime()) / 86400000)
-        if (diffDays >= -45 && diffDays <= days) {
-          installments.push({
-            source: "enforcement_installment",
-            refId: Number(r.refId),
-            name: `${r.name}（強執分期）`,
-            amount: Number(r.amount),
-            billIssuedDate: null,
-            dueDate: due,
-            finalDueDate: null,
-            penaltyNote: null,
-            status: "pending",
-          })
-        }
-      }
-    }
+    const installments = projectInstallmentDues(
+      (instRows as unknown as { rows: Array<Record<string, unknown>> }).rows.map((r) => ({
+        refId: Number(r.refId),
+        name: String(r.name),
+        amount: Number(r.amount),
+        dayOfMonth: Number(r.dayOfMonth) || 10,
+      })),
+      today,
+      days
+    )
 
-    const dayDiff = (d: string | null) =>
-      d ? Math.round((new Date(d + "T00:00:00").getTime() - now.getTime()) / 86400000) : null
-
-    const all = [...items, ...installments]
-      .map((b) => {
-        const diff = dayDiff(b.dueDate) ?? 999
-        const finalDiff = dayDiff(b.finalDueDate)
-        // 罰款風險：已過最終必繳日 → penalty（最嚴重）
-        // 過法定但未過最終 → grace（緩衝期、再不繳要罰）
-        let urgency: "penalty" | "overdue" | "grace" | "soon" | "upcoming"
-        if (finalDiff !== null && finalDiff < 0) urgency = "penalty"
-        else if (diff < 0) urgency = b.finalDueDate ? "grace" : "overdue"
-        else if (diff <= 7) urgency = "soon"
-        else urgency = "upcoming"
-        return {
-          ...b,
-          daysUntil: diff,
-          finalDaysUntil: finalDiff,
-          overdue: diff < 0,
-          penaltyRisk: urgency === "penalty",
-          urgency,
-        }
-      })
-      .sort((a, b) => (a.dueDate ?? "").localeCompare(b.dueDate ?? ""))
-
-    const totalDue = all.reduce((s, b) => s + b.amount, 0)
-    const overdueTotal = all.filter((b) => b.overdue).reduce((s, b) => s + b.amount, 0)
-    const penaltyRiskTotal = all.filter((b) => b.penaltyRisk).reduce((s, b) => s + b.amount, 0)
+    const all = classifyBills([...items, ...installments], today)
+    const summary = summarizeBills(all)
 
     res.json({
       today,
       days,
-      count: all.length,
-      totalDue,
-      overdueTotal,
-      penaltyRiskTotal,
+      ...summary,
       bills: all,
     })
   })
