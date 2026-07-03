@@ -19,6 +19,7 @@ import InstallmentDetailDialog from "@/components/installment-detail-dialog"
 // 型別與工具函式
 import type { PaymentItem, AnalyzedInstallmentItem } from "@/components/installment-types"
 import type { DebtCategory, PaymentProject, FixedCategory } from "@/../../shared/schema/category"
+import PaymentTypeTabs from "@/components/payment-type-tabs"
 import {
   analyzeInstallmentItem,
   calculateInstallmentStats,
@@ -368,6 +369,7 @@ export default function InstallmentPaymentManagement() {
 
   return (
     <div className="space-y-4 sm:space-y-6 px-4 sm:px-0">
+      <PaymentTypeTabs />
       {/* 頁面標題與建立按鈕 */}
       <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
         <div className="w-full sm:w-auto">

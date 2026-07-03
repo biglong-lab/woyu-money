@@ -21,6 +21,8 @@ import { MonthlyPaymentBatchToolbar } from "@/components/monthly-payment-batch-t
 import { BatchDeleteDialog, BatchPayDialog } from "@/components/monthly-payment-batch-dialogs"
 import { BackToTop } from "@/components/back-to-top"
 
+import PaymentTypeTabs from "@/components/payment-type-tabs"
+
 // 型別
 import type {
   PaymentItem,
@@ -561,6 +563,7 @@ export default function MonthlyPaymentManagement() {
 
   return (
     <div className="space-y-4 sm:space-y-6 px-4 sm:px-0">
+      <PaymentTypeTabs />
       {/* 頁面標題 */}
       <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
         <div className="w-full sm:w-auto">

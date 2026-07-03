@@ -165,6 +165,18 @@ export const tabPagesNavItems: NavItem[] = [
     icon: Scale,
     description: "PMS（發票）vs PM（逐筆）雙軌比對（收入分析 tab）",
   },
+  {
+    title: "分期管理",
+    href: "/installment-payment-management",
+    icon: CreditCard,
+    description: "分期付款項目（付款項目管理 tab）",
+  },
+  {
+    title: "一般付款管理",
+    href: "/general-payment-management",
+    icon: DollarSign,
+    description: "一般付款項目（付款項目管理 tab）",
+  },
 ]
 
 // 核心決策（規劃工具）— 總覽類已移至「財務總覽中心」
@@ -261,23 +273,13 @@ export const advancedNavItems: NavItem[] = [
 
 // 付款方式管理分類
 export const managementNavItems: NavItem[] = [
+  // 2026-07-03 UX2：月付/分期/一般 三頁由頁內 PaymentTypeTabs 互達、選單收成一項
   {
-    title: "月付管理",
+    title: "付款項目管理",
     href: "/monthly-payment-management",
     icon: Repeat,
-    badge: "月付",
-  },
-  {
-    title: "分期管理",
-    href: "/installment-payment-management",
-    icon: CreditCard,
-    badge: "分期",
-  },
-  {
-    title: "一般付款",
-    href: "/general-payment-management",
-    icon: DollarSign,
-    badge: "一般",
+    badge: "項目",
+    description: "月付 / 分期 / 一般付款（頁內 tab 切換）",
   },
   {
     title: "租金管理",

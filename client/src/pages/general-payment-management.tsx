@@ -20,6 +20,7 @@ import { GeneralPaymentPaymentDialog } from "@/components/general-payment-paymen
 import { GeneralPaymentDetailDialog } from "@/components/general-payment-detail-dialog"
 import { GeneralPaymentDeleteDialog } from "@/components/general-payment-delete-dialog"
 import { BackToTop } from "@/components/back-to-top"
+import PaymentTypeTabs from "@/components/payment-type-tabs"
 
 // 型別
 import type {
@@ -777,6 +778,7 @@ export default function GeneralPaymentManagement() {
 
   return (
     <div className="space-y-4 sm:space-y-6 px-4 sm:px-0">
+      <PaymentTypeTabs />
       {/* 頁面標題與操作按鈕 */}
       <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
         <div className="w-full sm:w-auto">
