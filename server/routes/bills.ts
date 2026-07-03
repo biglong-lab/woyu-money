@@ -14,6 +14,7 @@ import { localDateTPE } from "@shared/date-utils"
 import { intWithDefault } from "./request-params"
 import {
   type BillRow,
+  type InstallmentPaidMap,
   projectInstallmentDues,
   classifyBills,
   summarizeBills,
@@ -65,6 +66,24 @@ router.get(
              monthly_amount::numeric AS "amount", day_of_month AS "dayOfMonth"
       FROM enforcement_installments WHERE status = 'active'
     `)
+
+    // 2b. 本月與下月已繳合計（已繳足的月份不再投影 → 立即處理後帳單消失）
+    const paidRows = await db.execute(sql`
+      SELECT installment_id AS "installmentId",
+             TO_CHAR(payment_date, 'YYYY-MM') AS "month",
+             SUM(amount::numeric) AS "paid"
+      FROM enforcement_installment_payments
+      WHERE payment_date >= date_trunc('month', CURRENT_DATE)
+        AND payment_date < date_trunc('month', CURRENT_DATE) + INTERVAL '2 months'
+      GROUP BY 1, 2
+    `)
+    const paidByMonth: InstallmentPaidMap = new Map()
+    for (const r of (paidRows as unknown as { rows: Array<Record<string, unknown>> }).rows) {
+      const instId = Number(r.installmentId)
+      if (!paidByMonth.has(instId)) paidByMonth.set(instId, new Map())
+      paidByMonth.get(instId)!.set(String(r.month), Number(r.paid))
+    }
+
     const installments = projectInstallmentDues(
       (instRows as unknown as { rows: Array<Record<string, unknown>> }).rows.map((r) => ({
         refId: Number(r.refId),
@@ -73,7 +92,8 @@ router.get(
         dayOfMonth: Number(r.dayOfMonth) || 10,
       })),
       today,
-      days
+      days,
+      paidByMonth
     )
 
     const all = classifyBills([...items, ...installments], today)

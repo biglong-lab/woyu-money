@@ -36,6 +36,9 @@ interface InstallmentInput {
   dayOfMonth: number
 }
 
+/** installmentId → { "YYYY-MM": 該月已繳合計 } */
+export type InstallmentPaidMap = Map<number, Map<string, number>>
+
 const MS_PER_DAY = 86400000
 
 function toDate(dateStr: string): Date {
@@ -52,11 +55,15 @@ export function dueDayInMonth(year: number, monthIndex: number, rawDay: number):
 /**
  * 強執分期投影：以 today 為基準，投影本月與下月的應繳日
  * 只保留 [-45, +days] 天視窗內的項目（與看板顯示範圍一致）
+ *
+ * paidByMonth（選填）：該月已繳合計 >= 月付額 → 該月不再投影（已繳足）；
+ * 部分繳 → 只投影剩餘金額。讓「立即處理」付款後帳單從看板消失。
  */
 export function projectInstallmentDues(
   installments: InstallmentInput[],
   today: string,
-  days: number
+  days: number,
+  paidByMonth?: InstallmentPaidMap
 ): BillRow[] {
   const now = toDate(today)
   const out: BillRow[] = []
@@ -66,21 +73,26 @@ export function projectInstallmentDues(
       const monthIndex = now.getMonth() + offset
       const day = dueDayInMonth(year, monthIndex, inst.dayOfMonth)
       const d = new Date(year, monthIndex, day)
-      const due = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+      const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
+      const due = `${monthKey}-${String(d.getDate()).padStart(2, "0")}`
       const diffDays = Math.round((d.getTime() - now.getTime()) / MS_PER_DAY)
-      if (diffDays >= -45 && diffDays <= days) {
-        out.push({
-          source: "enforcement_installment",
-          refId: inst.refId,
-          name: `${inst.name}（強執分期）`,
-          amount: inst.amount,
-          billIssuedDate: null,
-          dueDate: due,
-          finalDueDate: null,
-          penaltyNote: null,
-          status: "pending",
-        })
-      }
+      if (diffDays < -45 || diffDays > days) continue
+
+      const paidThisMonth = paidByMonth?.get(inst.refId)?.get(monthKey) ?? 0
+      const remaining = Math.round((inst.amount - paidThisMonth) * 100) / 100
+      if (remaining <= 0) continue // 該月已繳足
+
+      out.push({
+        source: "enforcement_installment",
+        refId: inst.refId,
+        name: `${inst.name}（強執分期）`,
+        amount: remaining,
+        billIssuedDate: null,
+        dueDate: due,
+        finalDueDate: null,
+        penaltyNote: null,
+        status: "pending",
+      })
     }
   }
   return out

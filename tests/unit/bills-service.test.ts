@@ -135,3 +135,33 @@ describe("summarizeBills 彙總", () => {
     expect(s.penaltyRiskTotal).toBe(300)
   })
 })
+
+describe("projectInstallmentDues 已繳月份排除（立即處理後消失）", () => {
+  const inst = { refId: 7, name: "執行處分期", amount: 5000, dayOfMonth: 10 }
+
+  it("本月已繳足 → 只投影下月", () => {
+    const paid = new Map([[7, new Map([["2026-07", 5000]])]])
+    const out = projectInstallmentDues([inst], "2026-07-03", 45, paid)
+    expect(out).toHaveLength(1)
+    expect(out[0].dueDate).toBe("2026-08-10")
+  })
+
+  it("本月部分繳 → 投影剩餘金額", () => {
+    const paid = new Map([[7, new Map([["2026-07", 2000]])]])
+    const out = projectInstallmentDues([inst], "2026-07-03", 45, paid)
+    expect(out[0].dueDate).toBe("2026-07-10")
+    expect(out[0].amount).toBe(3000)
+  })
+
+  it("繳超過月付額 → 該月不投影、不出現負數", () => {
+    const paid = new Map([[7, new Map([["2026-07", 6000]])]])
+    const out = projectInstallmentDues([inst], "2026-07-03", 45, paid)
+    expect(out).toHaveLength(1)
+    expect(out[0].dueDate).toBe("2026-08-10")
+  })
+
+  it("無 paidByMonth → 行為不變（向後相容）", () => {
+    const out = projectInstallmentDues([inst], "2026-07-03", 45)
+    expect(out).toHaveLength(2)
+  })
+})
