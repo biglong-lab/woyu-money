@@ -6,16 +6,19 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 
 // mock storage 模組（避免連線資料庫）
-vi.mock("../../server/storage", () => ({
-  storage: {
-    getPaymentProjects: vi.fn().mockResolvedValue([]),
-    getProjectCategories: vi.fn().mockResolvedValue([]),
-    createPaymentProject: vi.fn().mockResolvedValue({ id: 1 }),
-    createDebtCategory: vi.fn().mockResolvedValue({ id: 1 }),
-    createPaymentItem: vi.fn().mockResolvedValue({ id: 1 }),
-    createPaymentRecord: vi.fn().mockResolvedValue({ id: 1 }),
-    updatePaymentItemAmounts: vi.fn().mockResolvedValue(undefined),
-  },
+// Phase 4.1：batch-import-processor 改直接 import 領域模組，mock 對應調整
+vi.mock("../../server/storage/categories", () => ({
+  getPaymentProjects: vi.fn().mockResolvedValue([]),
+  getProjectCategories: vi.fn().mockResolvedValue([]),
+  createPaymentProject: vi.fn().mockResolvedValue({ id: 1 }),
+  createDebtCategory: vi.fn().mockResolvedValue({ id: 1 }),
+}))
+vi.mock("../../server/storage/payment-items", () => ({
+  createPaymentItem: vi.fn().mockResolvedValue({ id: 1 }),
+}))
+vi.mock("../../server/storage/payment-records", () => ({
+  createPaymentRecord: vi.fn().mockResolvedValue({ id: 1 }),
+  updatePaymentItemAmounts: vi.fn().mockResolvedValue(undefined),
 }))
 
 import { BatchImportProcessor } from "../../server/batch-import-processor"

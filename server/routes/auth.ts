@@ -1,8 +1,9 @@
 import { Router } from "express"
-import { storage } from "../storage"
+
 import { requireAuth } from "../auth"
 import { hashPassword, comparePasswords } from "./helpers"
 import { receiptUpload } from "./upload-config"
+import { updateUser } from "../storage/users"
 
 const router = Router()
 
@@ -26,7 +27,7 @@ router.put("/api/user/profile", requireAuth, async (req, res) => {
     const { fullName, email } = req.body
     const userId = req.user!.id
 
-    const updatedUser = await storage.updateUser(userId, {
+    const updatedUser = await updateUser(userId, {
       fullName,
       email,
     })
@@ -62,7 +63,7 @@ router.put("/api/user/password", requireAuth, async (req, res) => {
 
     const hashedNewPassword = await hashPassword(newPassword)
 
-    await storage.updateUser(user.id, {
+    await updateUser(user.id, {
       password: hashedNewPassword,
     })
 

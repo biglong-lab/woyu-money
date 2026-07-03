@@ -1,5 +1,5 @@
 import { Router } from "express"
-import { storage } from "../storage"
+
 import { requireAuth } from "../auth"
 import { batchImportProcessor } from "../batch-import-processor"
 import { batchImportUpload } from "./upload-config"
@@ -46,6 +46,18 @@ interface ProjectCashFlowStat {
 }
 
 import { asyncHandler, AppError } from "../middleware/error-handler"
+import {
+  advancedSearchCategories,
+  advancedSearchPaymentItems,
+  advancedSearchProjects,
+} from "../storage/advanced-search"
+import { batchUpdatePaymentItems } from "../storage/batch-operations"
+import { getPaymentProjects } from "../storage/categories"
+import { getPaymentItems as storeGetPaymentItems } from "../storage/payment-items"
+import { getPaymentRecords as storeGetPaymentRecords } from "../storage/payment-records"
+import { exportReport, generateIntelligentReport } from "../storage/reports"
+import { dismissSmartAlert, getSmartAlertStats, getSmartAlerts } from "../storage/smart-alerts"
+import { getPaymentOverview, getPaymentStatistics } from "../storage/statistics"
 
 const router = Router()
 
@@ -67,9 +79,9 @@ function monthRange(year?: string, month?: string): { startDate?: Date; endDate?
 router.get(
   "/api/payment/projects/stats",
   asyncHandler(async (req, res) => {
-    const projects = await storage.getPaymentProjects()
-    const paymentItems = await storage.getPaymentItems({}, 1, 10000)
-    const paymentRecords = (await storage.getPaymentRecords({}, 1, 10000)) as PaymentRecordRow[]
+    const projects = await getPaymentProjects()
+    const paymentItems = await storeGetPaymentItems({}, 1, 10000)
+    const paymentRecords = (await storeGetPaymentRecords({}, 1, 10000)) as PaymentRecordRow[]
 
     const projectStats = projects.map((project) => {
       const projectItems = paymentItems.filter(
@@ -117,12 +129,12 @@ router.get(
     const { year, month, projectId } = req.query
 
     // 依選定年/月取得該期間付款記錄 (避免預設 limit=100 漏掉非近期月份)
-    const paymentRecords = (await storage.getPaymentRecords(
+    const paymentRecords = (await storeGetPaymentRecords(
       monthRange(year as string | undefined, month as string | undefined),
       1,
       100000
     )) as PaymentRecordRow[]
-    const items = (await storage.getPaymentItems({}, undefined, 10000)) as PaymentItemWithJoins[]
+    const items = (await storeGetPaymentItems({}, undefined, 10000)) as PaymentItemWithJoins[]
     const itemsMap = new Map(items.map((item) => [item.id, item]))
 
     const filteredRecords = paymentRecords.filter((record) => {
@@ -176,17 +188,17 @@ router.get(
   asyncHandler(async (req, res) => {
     const { year, month, projectId, page = 1, limit = 50 } = req.query
 
-    const paymentRecords = (await storage.getPaymentRecords(
+    const paymentRecords = (await storeGetPaymentRecords(
       monthRange(year as string | undefined, month as string | undefined),
       1,
       100000
     )) as PaymentRecordRow[]
-    const paymentItems = (await storage.getPaymentItems(
+    const paymentItems = (await storeGetPaymentItems(
       {},
       undefined,
       10000
     )) as PaymentItemWithJoins[]
-    const projects = await storage.getPaymentProjects()
+    const projects = await getPaymentProjects()
 
     const itemsMap = new Map(paymentItems.map((item) => [item.id, item]))
     const projectsMap = new Map(projects.map((project) => [project.id, project]))
@@ -269,9 +281,9 @@ router.get(
   "/api/payment/project/stats",
   asyncHandler(async (req, res) => {
     // 排除收入(itemType='income'); 付款記錄放大 limit 避免預設 100 筆漏資料
-    const allItems = await storage.getPaymentItems({}, 1, 100000)
+    const allItems = await storeGetPaymentItems({}, 1, 100000)
     const paymentItems = allItems.filter((i) => i.itemType !== "income")
-    const allRecords = (await storage.getPaymentRecords({}, 1, 100000)) as PaymentRecordRow[]
+    const allRecords = (await storeGetPaymentRecords({}, 1, 100000)) as PaymentRecordRow[]
     const itemIdSet = new Set(paymentItems.map((i) => i.id))
     const paymentRecords = allRecords.filter((r) => itemIdSet.has(r.itemId))
 
@@ -351,7 +363,7 @@ router.get(
     if (projectId) filters.projectId = parseInt(projectId as string)
     if (categoryId) filters.categoryId = parseInt(categoryId as string)
 
-    const stats = await storage.getPaymentStatistics(filters)
+    const stats = await getPaymentStatistics(filters)
     res.json(stats)
   })
 )
@@ -360,7 +372,7 @@ router.get(
 router.get(
   "/api/payment-overview",
   asyncHandler(async (req, res) => {
-    const overview = await storage.getPaymentOverview()
+    const overview = await getPaymentOverview()
     res.json(overview)
   })
 )
@@ -370,9 +382,9 @@ router.get(
   "/api/payment/analytics/intelligent",
   asyncHandler(async (req, res) => {
     // 排除收入; items/records 放大 limit (預設 5000/100 會截斷, 總筆數已超過)
-    const allItems = await storage.getPaymentItems({}, 1, 100000)
+    const allItems = await storeGetPaymentItems({}, 1, 100000)
     const paymentItems = allItems.filter((i) => i.itemType !== "income")
-    const allRecords = (await storage.getPaymentRecords({}, 1, 100000)) as PaymentRecordRow[]
+    const allRecords = (await storeGetPaymentRecords({}, 1, 100000)) as PaymentRecordRow[]
     const itemIdSet = new Set(paymentItems.map((i) => i.id))
     const paymentRecords = allRecords.filter((r) => itemIdSet.has(r.itemId))
 
@@ -496,7 +508,7 @@ router.get(
 router.get(
   "/api/smart-alerts",
   asyncHandler(async (req, res) => {
-    const alerts = await storage.getSmartAlerts()
+    const alerts = await getSmartAlerts()
     res.json(alerts)
   })
 )
@@ -504,7 +516,7 @@ router.get(
 router.get(
   "/api/smart-alerts/stats",
   asyncHandler(async (req, res) => {
-    const stats = await storage.getSmartAlertStats()
+    const stats = await getSmartAlertStats()
     res.json(stats)
   })
 )
@@ -513,7 +525,7 @@ router.post(
   "/api/smart-alerts/dismiss",
   asyncHandler(async (req, res) => {
     const { alertId } = req.body
-    await storage.dismissSmartAlert(alertId)
+    await dismissSmartAlert(alertId)
     res.json({ message: "Alert dismissed successfully" })
   })
 )
@@ -528,13 +540,13 @@ router.post(
     let results
     switch (searchType) {
       case "payment_items":
-        results = await storage.advancedSearchPaymentItems(filters)
+        results = await advancedSearchPaymentItems(filters)
         break
       case "projects":
-        results = await storage.advancedSearchProjects(filters)
+        results = await advancedSearchProjects(filters)
         break
       case "categories":
-        results = await storage.advancedSearchCategories(filters)
+        results = await advancedSearchCategories(filters)
         break
       default:
         throw new AppError(400, "不支援的搜尋類型")
@@ -551,7 +563,7 @@ router.post(
   asyncHandler(async (req, res) => {
     const userId = req.user!.id
     const { action, itemIds, data } = req.body
-    const result = await storage.batchUpdatePaymentItems(itemIds, action, data, userId)
+    const result = await batchUpdatePaymentItems(itemIds, action, data, userId)
     res.json(result)
   })
 )
@@ -591,7 +603,7 @@ router.get(
   asyncHandler(async (req, res) => {
     const userId = req.user!.id
     const { period = "monthly", reportType = "overview" } = req.query
-    const reportData = await storage.generateIntelligentReport(
+    const reportData = await generateIntelligentReport(
       period as string,
       reportType as string,
       userId
@@ -606,7 +618,7 @@ router.post(
   asyncHandler(async (req, res) => {
     const userId = req.user!.id
     const { format, reportType, filters } = req.body
-    const exportData = await storage.exportReport(format, reportType, filters, userId)
+    const exportData = await exportReport(format, reportType, filters, userId)
     res.json(exportData)
   })
 )

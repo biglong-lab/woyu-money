@@ -4,8 +4,16 @@ import { Express } from "express"
 import session from "express-session"
 import { scrypt, randomBytes, timingSafeEqual } from "crypto"
 import { promisify } from "util"
-import { storage } from "./storage"
+
 import { User as SchemaUser } from "@shared/schema"
+import {
+  createUser,
+  getUserById,
+  getUserByUsername,
+  updateUser,
+  updateUserLoginAttempts,
+} from "./storage/users"
+import { sessionStore } from "./session"
 
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
@@ -48,7 +56,7 @@ export function setupAuth(app: Express) {
     secret: process.env.SESSION_SECRET || "your-fallback-secret-key-for-dev",
     resave: false,
     saveUninitialized: false,
-    store: storage.sessionStore,
+    store: sessionStore,
     cookie: {
       secure: isProduction,
       httpOnly: true,
@@ -66,7 +74,7 @@ export function setupAuth(app: Express) {
   passport.use(
     new LocalStrategy(async (username, password, done) => {
       try {
-        const user = await storage.getUserByUsername(username)
+        const user = await getUserByUsername(username)
 
         if (!user) {
           return done(null, false, { message: "用戶名或密碼錯誤" })
@@ -83,18 +91,18 @@ export function setupAuth(app: Express) {
           const attempts = (user.failedLoginAttempts || 0) + 1
           const lockUntil = attempts >= 5 ? new Date(Date.now() + 15 * 60 * 1000) : undefined // Lock for 15 minutes after 5 failed attempts
 
-          await storage.updateUserLoginAttempts(user.id, attempts, lockUntil)
+          await updateUserLoginAttempts(user.id, attempts, lockUntil)
 
           return done(null, false, { message: "用戶名或密碼錯誤" })
         }
 
         // Reset failed login attempts on successful login
         if (user.failedLoginAttempts && user.failedLoginAttempts > 0) {
-          await storage.updateUserLoginAttempts(user.id, 0)
+          await updateUserLoginAttempts(user.id, 0)
         }
 
         // Update last login
-        await storage.updateUser(user.id, { lastLogin: new Date() })
+        await updateUser(user.id, { lastLogin: new Date() })
 
         return done(null, user)
       } catch (error) {
@@ -107,7 +115,7 @@ export function setupAuth(app: Express) {
 
   passport.deserializeUser(async (id: number, done) => {
     try {
-      const user = await storage.getUserById(id)
+      const user = await getUserById(id)
       done(null, user || false)
     } catch (error) {
       done(error)
@@ -129,14 +137,14 @@ export function setupAuth(app: Express) {
       }
 
       // Check if username already exists
-      const existingUser = await storage.getUserByUsername(username)
+      const existingUser = await getUserByUsername(username)
       if (existingUser) {
         return res.status(400).json({ message: "用戶名已存在" })
       }
 
       // Hash password and create user
       const hashedPassword = await hashPassword(password)
-      const user = await storage.createUser({
+      const user = await createUser({
         username,
         password: hashedPassword,
         email: email || null,
@@ -216,7 +224,7 @@ export function setupAuth(app: Express) {
     // Check session-based authentication (for LINE login)
     if (req.session.userId && req.session.isAuthenticated) {
       try {
-        const user = await storage.getUserById(req.session.userId)
+        const user = await getUserById(req.session.userId)
         if (user) {
           return res.json({
             id: user.id,
@@ -255,7 +263,7 @@ export async function requireAuth(
   // 否則所有讀 req.user.id 的端點對 LINE 登入用戶都會 crash
   if (req.session.userId && req.session.isAuthenticated) {
     try {
-      const user = await storage.getUserById(req.session.userId)
+      const user = await getUserById(req.session.userId)
       if (!user) {
         // session 過期或用戶已被刪除
         req.session.userId = undefined

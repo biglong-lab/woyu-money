@@ -1,5 +1,5 @@
 import { Router } from "express"
-import { storage } from "../storage"
+
 import { insertHouseholdBudgetSchema, insertHouseholdExpenseSchema } from "@shared/schema"
 import { receiptUpload } from "./upload-config"
 import { asyncHandler, AppError } from "../middleware/error-handler"
@@ -9,6 +9,16 @@ import { localMonthTPE, localDateTPE } from "@shared/date-utils"
 import { recognizeDocument } from "../document-ai"
 import fs from "fs"
 import path from "path"
+import { getFixedCategories } from "../storage/categories"
+import {
+  createHouseholdExpense,
+  createOrUpdateHouseholdBudget,
+  deleteHouseholdExpense,
+  getHouseholdCategoryBudgets,
+  getHouseholdExpenses,
+  updateHouseholdCategoryBudget,
+  updateHouseholdExpense,
+} from "../storage/household"
 
 const router = Router()
 
@@ -29,7 +39,7 @@ const TOTAL_BUDGET_CATEGORY_ID = 0
 router.get(
   "/api/household-categories",
   asyncHandler(async (req, res) => {
-    const categories = await storage.getFixedCategories()
+    const categories = await getFixedCategories()
     res.json(categories)
   })
 )
@@ -38,7 +48,7 @@ router.get(
 router.get(
   "/api/household-budgets",
   asyncHandler(async (req, res) => {
-    const budgets = await storage.getHouseholdCategoryBudgets()
+    const budgets = await getHouseholdCategoryBudgets()
     res.json(budgets)
   })
 )
@@ -50,7 +60,7 @@ router.post(
     if (!result.success) {
       return res.status(400).json({ message: "Invalid budget data", errors: result.error.errors })
     }
-    const budget = await storage.createOrUpdateHouseholdBudget(result.data)
+    const budget = await createOrUpdateHouseholdBudget(result.data)
     res.status(201).json(budget)
   })
 )
@@ -63,7 +73,7 @@ router.put(
     if (!result.success) {
       return res.status(400).json({ message: "Invalid budget data", errors: result.error.errors })
     }
-    const budget = await storage.updateHouseholdCategoryBudget(id, result.data)
+    const budget = await updateHouseholdCategoryBudget(id, result.data)
     res.json(budget)
   })
 )
@@ -81,7 +91,7 @@ router.get(
     if (startDate) filters.startDate = new Date(startDate as string)
     if (endDate) filters.endDate = new Date(endDate as string)
 
-    const expenses = await storage.getHouseholdExpenses(filters, pageNum, limitNum)
+    const expenses = await getHouseholdExpenses(filters, pageNum, limitNum)
     res.json(expenses)
   })
 )
@@ -93,7 +103,7 @@ router.post(
     if (!result.success) {
       return res.status(400).json({ message: "Invalid expense data", errors: result.error.errors })
     }
-    const expense = await storage.createHouseholdExpense(result.data)
+    const expense = await createHouseholdExpense(result.data)
     res.status(201).json(expense)
   })
 )
@@ -106,7 +116,7 @@ router.put(
     if (!result.success) {
       return res.status(400).json({ message: "Invalid expense data", errors: result.error.errors })
     }
-    const expense = await storage.updateHouseholdExpense(id, result.data)
+    const expense = await updateHouseholdExpense(id, result.data)
     res.json(expense)
   })
 )
@@ -115,7 +125,7 @@ router.delete(
   "/api/household-expenses/:id",
   asyncHandler(async (req, res) => {
     const id = parseInt(req.params.id)
-    await storage.deleteHouseholdExpense(id)
+    await deleteHouseholdExpense(id)
     res.status(204).send()
   })
 )
@@ -329,7 +339,7 @@ router.post(
         "資料格式錯誤：" + result.error.errors.map((e) => e.message).join(", ")
       )
     }
-    const expense = await storage.createHouseholdExpense(result.data)
+    const expense = await createHouseholdExpense(result.data)
     res.status(201).json(expense)
   })
 )
@@ -410,7 +420,7 @@ router.get(
 router.get(
   "/api/categories/household",
   asyncHandler(async (_req, res) => {
-    const categories = await storage.getFixedCategories()
+    const categories = await getFixedCategories()
     res.json(categories)
   })
 )
@@ -641,7 +651,7 @@ router.delete(
   asyncHandler(async (req, res) => {
     const id = parseInt(req.params.id, 10)
     if (isNaN(id)) throw new AppError(400, "無效的 ID")
-    await storage.deleteHouseholdExpense(id)
+    await deleteHouseholdExpense(id)
     res.status(204).send()
   })
 )

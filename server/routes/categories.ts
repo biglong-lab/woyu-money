@@ -1,8 +1,34 @@
 import { Router } from "express"
-import { storage } from "../storage"
+
 import { requireAuth } from "../auth"
 import { insertDebtCategorySchema, insertPaymentProjectSchema } from "@shared/schema"
 import { asyncHandler, AppError } from "../middleware/error-handler"
+import {
+  createCategory,
+  createFixedCategory,
+  createFixedCategorySubOption,
+  createPaymentProject,
+  createProjectCategoryTemplate,
+  deleteCategory,
+  deleteFixedCategory,
+  deleteFixedCategorySubOption,
+  deletePaymentProject,
+  deleteProjectCategoryTemplate,
+  getCategories,
+  getDebtCategories,
+  getFixedCategories,
+  getFixedCategorySubOptions,
+  getHouseholdCategories,
+  getPaymentProjects,
+  getProjectCategories,
+  getProjectCategoryTemplates,
+  updateCategory,
+  updateFixedCategory,
+  updateFixedCategorySubOption,
+  updatePaymentProject,
+  updateProjectCategoryTemplate,
+} from "../storage/categories"
+import { getHouseholdCategoryStats } from "../storage/household"
 
 const router = Router()
 
@@ -11,7 +37,7 @@ router.get(
   "/api/categories",
   requireAuth,
   asyncHandler(async (req, res) => {
-    const categories = await storage.getCategories()
+    const categories = await getCategories()
     res.json(categories)
   })
 )
@@ -24,7 +50,7 @@ router.post(
     if (!result.success) {
       return res.status(400).json({ message: "Invalid category data", errors: result.error.errors })
     }
-    const category = await storage.createCategory(result.data)
+    const category = await createCategory(result.data)
     res.status(201).json(category)
   })
 )
@@ -38,7 +64,7 @@ router.put(
     if (!result.success) {
       return res.status(400).json({ message: "Invalid category data", errors: result.error.errors })
     }
-    const category = await storage.updateCategory(id, result.data)
+    const category = await updateCategory(id, result.data)
     res.json(category)
   })
 )
@@ -48,7 +74,7 @@ router.delete(
   "/api/categories/:id",
   asyncHandler(async (req, res) => {
     const id = parseInt(req.params.id)
-    await storage.deleteCategory(id)
+    await deleteCategory(id)
     res.status(204).send()
   })
 )
@@ -57,7 +83,7 @@ router.delete(
 router.get(
   "/api/projects",
   asyncHandler(async (req, res) => {
-    const projects = await storage.getPaymentProjects()
+    const projects = await getPaymentProjects()
     res.json(projects)
   })
 )
@@ -65,7 +91,7 @@ router.get(
 router.get(
   "/api/payment/projects",
   asyncHandler(async (req, res) => {
-    const projects = await storage.getPaymentProjects()
+    const projects = await getPaymentProjects()
     res.json(projects)
   })
 )
@@ -77,7 +103,7 @@ router.post(
     if (!result.success) {
       return res.status(400).json({ message: "Invalid project data", errors: result.error.errors })
     }
-    const project = await storage.createPaymentProject(result.data)
+    const project = await createPaymentProject(result.data)
     res.status(201).json(project)
   })
 )
@@ -90,7 +116,7 @@ router.put(
     if (!result.success) {
       return res.status(400).json({ message: "Invalid project data", errors: result.error.errors })
     }
-    const project = await storage.updatePaymentProject(id, result.data)
+    const project = await updatePaymentProject(id, result.data)
     res.json(project)
   })
 )
@@ -99,7 +125,7 @@ router.delete(
   "/api/projects/:id",
   asyncHandler(async (req, res) => {
     const id = parseInt(req.params.id)
-    await storage.deletePaymentProject(id)
+    await deletePaymentProject(id)
     res.status(204).send()
   })
 )
@@ -108,7 +134,7 @@ router.delete(
 router.get(
   "/api/fixed-categories",
   asyncHandler(async (req, res) => {
-    const categories = await storage.getFixedCategories()
+    const categories = await getFixedCategories()
     res.json(categories)
   })
 )
@@ -117,7 +143,7 @@ router.get(
 router.get(
   "/api/categories/debt",
   asyncHandler(async (req, res) => {
-    const categories = await storage.getDebtCategories()
+    const categories = await getDebtCategories()
     res.json(categories)
   })
 )
@@ -126,7 +152,7 @@ router.get(
 router.get(
   "/api/categories/project",
   asyncHandler(async (req, res) => {
-    const categories = await storage.getProjectCategories()
+    const categories = await getProjectCategories()
     res.json(categories)
   })
 )
@@ -135,7 +161,7 @@ router.post(
   "/api/categories/project",
   asyncHandler(async (req, res) => {
     const categoryData = { ...req.body, categoryType: "project" }
-    const category = await storage.createCategory(categoryData)
+    const category = await createCategory(categoryData)
     res.status(201).json(category)
   })
 )
@@ -145,7 +171,7 @@ router.put(
   asyncHandler(async (req, res) => {
     const categoryId = parseInt(req.params.id)
     const categoryData = { ...req.body, categoryType: "project" }
-    const category = await storage.updateCategory(categoryId, categoryData)
+    const category = await updateCategory(categoryId, categoryData)
     res.json(category)
   })
 )
@@ -154,7 +180,7 @@ router.delete(
   "/api/categories/project/:id",
   asyncHandler(async (req, res) => {
     const categoryId = parseInt(req.params.id)
-    await storage.deleteCategory(categoryId)
+    await deleteCategory(categoryId)
     res.status(204).send()
   })
 )
@@ -163,7 +189,7 @@ router.delete(
 router.get(
   "/api/categories/household",
   asyncHandler(async (req, res) => {
-    const categories = await storage.getHouseholdCategories()
+    const categories = await getHouseholdCategories()
     res.json(categories)
   })
 )
@@ -172,7 +198,7 @@ router.post(
   "/api/categories/household",
   asyncHandler(async (req, res) => {
     const categoryData = { ...req.body, categoryType: "household" }
-    const category = await storage.createCategory(categoryData)
+    const category = await createCategory(categoryData)
     res.status(201).json(category)
   })
 )
@@ -182,7 +208,7 @@ router.put(
   asyncHandler(async (req, res) => {
     const categoryId = parseInt(req.params.id)
     const categoryData = { ...req.body, categoryType: "household" }
-    const category = await storage.updateCategory(categoryId, categoryData)
+    const category = await updateCategory(categoryId, categoryData)
     res.json(category)
   })
 )
@@ -191,7 +217,7 @@ router.delete(
   "/api/categories/household/:id",
   asyncHandler(async (req, res) => {
     const categoryId = parseInt(req.params.id)
-    await storage.deleteCategory(categoryId)
+    await deleteCategory(categoryId)
     res.status(204).send()
   })
 )
@@ -200,7 +226,7 @@ router.delete(
 router.get(
   "/api/categories/fixed",
   asyncHandler(async (req, res) => {
-    const categories = await storage.getFixedCategories()
+    const categories = await getFixedCategories()
     res.json(categories)
   })
 )
@@ -208,7 +234,7 @@ router.get(
 router.post(
   "/api/categories/fixed",
   asyncHandler(async (req, res) => {
-    const category = await storage.createFixedCategory(req.body)
+    const category = await createFixedCategory(req.body)
     res.status(201).json(category)
   })
 )
@@ -217,7 +243,7 @@ router.put(
   "/api/categories/fixed/:id",
   asyncHandler(async (req, res) => {
     const categoryId = parseInt(req.params.id)
-    const category = await storage.updateFixedCategory(categoryId, req.body)
+    const category = await updateFixedCategory(categoryId, req.body)
     res.json(category)
   })
 )
@@ -226,7 +252,7 @@ router.delete(
   "/api/categories/fixed/:id",
   asyncHandler(async (req, res) => {
     const categoryId = parseInt(req.params.id)
-    await storage.deleteFixedCategory(categoryId)
+    await deleteFixedCategory(categoryId)
     res.status(204).send()
   })
 )
@@ -237,11 +263,7 @@ router.get(
   asyncHandler(async (req, res) => {
     const categoryId = parseInt(req.params.id)
     const { year, month } = req.query
-    const stats = await storage.getHouseholdCategoryStats(
-      categoryId,
-      year as string,
-      month as string
-    )
+    const stats = await getHouseholdCategoryStats(categoryId, year as string, month as string)
     res.json(stats)
   })
 )
@@ -252,7 +274,7 @@ router.get(
   asyncHandler(async (req, res) => {
     const projectId = parseInt(req.params.projectId)
     const categoryId = req.query.categoryId ? parseInt(req.query.categoryId as string) : undefined
-    const templates = await storage.getProjectCategoryTemplates(projectId, categoryId)
+    const templates = await getProjectCategoryTemplates(projectId, categoryId)
     res.json(templates)
   })
 )
@@ -261,7 +283,7 @@ router.post(
   "/api/project-category-templates",
   asyncHandler(async (req, res) => {
     const templateData = req.body
-    const template = await storage.createProjectCategoryTemplate(templateData)
+    const template = await createProjectCategoryTemplate(templateData)
     res.json(template)
   })
 )
@@ -271,7 +293,7 @@ router.put(
   asyncHandler(async (req, res) => {
     const id = parseInt(req.params.id)
     const templateData = req.body
-    const template = await storage.updateProjectCategoryTemplate(id, templateData)
+    const template = await updateProjectCategoryTemplate(id, templateData)
     res.json(template)
   })
 )
@@ -280,7 +302,7 @@ router.delete(
   "/api/project-category-templates/:id",
   asyncHandler(async (req, res) => {
     const id = parseInt(req.params.id)
-    await storage.deleteProjectCategoryTemplate(id)
+    await deleteProjectCategoryTemplate(id)
     res.json({ message: "Template deleted successfully" })
   })
 )
@@ -293,7 +315,7 @@ router.get(
     const fixedCategoryId = req.query.fixedCategoryId
       ? parseInt(req.query.fixedCategoryId as string)
       : undefined
-    const subOptions = await storage.getFixedCategorySubOptions(projectId, fixedCategoryId)
+    const subOptions = await getFixedCategorySubOptions(projectId, fixedCategoryId)
     res.json(subOptions)
   })
 )
@@ -305,7 +327,7 @@ router.get(
     const fixedCategoryId = req.query.fixedCategoryId
       ? parseInt(req.query.fixedCategoryId as string)
       : undefined
-    const subOptions = await storage.getFixedCategorySubOptions(projectId, fixedCategoryId)
+    const subOptions = await getFixedCategorySubOptions(projectId, fixedCategoryId)
     res.json(subOptions)
   })
 )
@@ -319,7 +341,7 @@ router.post(
       throw new AppError(400, "Missing required fields: projectId, fixedCategoryId, itemName")
     }
 
-    const newItem = await storage.createFixedCategorySubOption({
+    const newItem = await createFixedCategorySubOption({
       projectId,
       fixedCategoryId,
       subOptionName: itemName,
@@ -340,7 +362,7 @@ router.put(
       throw new AppError(400, "Missing required fields: projectId, fixedCategoryId, itemName")
     }
 
-    const updatedItem = await storage.updateFixedCategorySubOption(id, {
+    const updatedItem = await updateFixedCategorySubOption(id, {
       projectId,
       fixedCategoryId,
       subOptionName: itemName,
@@ -355,7 +377,7 @@ router.delete(
   "/api/fixed-category-sub-options/:id",
   asyncHandler(async (req, res) => {
     const id = parseInt(req.params.id)
-    await storage.deleteFixedCategorySubOption(id)
+    await deleteFixedCategorySubOption(id)
     res.json({ message: "Fixed category sub option deleted successfully" })
   })
 )

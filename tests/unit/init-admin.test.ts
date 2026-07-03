@@ -25,10 +25,9 @@ vi.mock("../../server/auth", () => ({
 }))
 
 // Mock storage 模組（init-admin.ts 不直接用，但 auth.ts import 時需要）
-vi.mock("../../server/storage", () => ({
-  storage: {
-    sessionStore: {},
-  },
+// Phase 4.1：sessionStore 移至 server/session
+vi.mock("../../server/session", () => ({
+  sessionStore: {},
 }))
 
 // Mock @shared/schema

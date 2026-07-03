@@ -1,13 +1,15 @@
 import express from "express"
-import { storage } from "./storage"
+
 import { requireAuth } from "./auth"
+import { getLineConfig } from "./storage/line-config"
+import { updateUser } from "./storage/users"
 
 export function setupLineAuth(app: express.Express) {
   // 解除 LINE 帳號綁定（需登入）
   app.post("/api/auth/line/unlink", requireAuth, async (req, res) => {
     try {
       const userId = req.user!.id
-      await storage.updateUser(userId, {
+      await updateUser(userId, {
         lineUserId: null,
         lineDisplayName: null,
         linePictureUrl: null,
@@ -22,7 +24,7 @@ export function setupLineAuth(app: express.Express) {
   // LINE登入授權URL
   app.get("/api/auth/line", async (req, res) => {
     try {
-      const config = await storage.getLineConfig()
+      const config = await getLineConfig()
 
       if (!config || !config.isEnabled || !config.channelId || !config.channelSecret) {
         return res.status(400).json({ message: "LINE登入尚未設定或已停用" })

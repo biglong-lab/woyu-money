@@ -1,9 +1,19 @@
 import { Router } from "express"
-import { storage, getPaymentRecordsCashFlow } from "../storage"
+import { getPaymentRecordsCashFlow } from "../storage"
 import { requireAuth } from "../auth"
 import { insertPaymentRecordSchema, insertPaymentItemNoteSchema } from "@shared/schema"
 import { asyncHandler, AppError } from "../middleware/error-handler"
 import { optionalInt, intWithDefault, optionalDateStr } from "./request-params"
+import {
+  createPaymentItemNote,
+  createPaymentRecord,
+  deletePaymentItemNote,
+  deletePaymentRecord,
+  getPaymentItemNotes,
+  getPaymentRecords,
+  updatePaymentItemNote,
+  updatePaymentRecord,
+} from "../storage/payment-records"
 
 const router = Router()
 
@@ -23,7 +33,7 @@ router.get(
     const endStr = optionalDateStr(endDate, "endDate")
     if (endStr) filters.endDate = new Date(endStr)
 
-    const records = await storage.getPaymentRecords(filters, pageNum, limitNum)
+    const records = await getPaymentRecords(filters, pageNum, limitNum)
     res.json(records)
   })
 )
@@ -38,7 +48,7 @@ router.post(
         .status(400)
         .json({ message: "Invalid payment record data", errors: result.error.errors })
     }
-    const record = await storage.createPaymentRecord(result.data)
+    const record = await createPaymentRecord(result.data)
     res.status(201).json(record)
   })
 )
@@ -54,7 +64,7 @@ router.put(
         .status(400)
         .json({ message: "Invalid payment record data", errors: result.error.errors })
     }
-    const record = await storage.updatePaymentRecord(id, result.data)
+    const record = await updatePaymentRecord(id, result.data)
     res.json(record)
   })
 )
@@ -64,7 +74,7 @@ router.delete(
   "/api/payment-records/:id",
   asyncHandler(async (req, res) => {
     const id = parseInt(req.params.id)
-    await storage.deletePaymentRecord(id)
+    await deletePaymentRecord(id)
     res.status(204).send()
   })
 )
@@ -118,7 +128,7 @@ router.get(
   "/api/payment-items/:itemId/notes",
   asyncHandler(async (req, res) => {
     const itemId = parseInt(req.params.itemId)
-    const notes = await storage.getPaymentItemNotes(itemId)
+    const notes = await getPaymentItemNotes(itemId)
     res.json(notes)
   })
 )
@@ -145,7 +155,7 @@ router.post(
       return res.status(400).json({ message: "Invalid note data", errors: result.error.errors })
     }
 
-    const note = await storage.createPaymentItemNote(result.data)
+    const note = await createPaymentItemNote(result.data)
     res.status(201).json(note)
   })
 )
@@ -161,7 +171,7 @@ router.put(
       return res.status(400).json({ message: "Invalid note data", errors: result.error.errors })
     }
 
-    const note = await storage.updatePaymentItemNote(id, result.data)
+    const note = await updatePaymentItemNote(id, result.data)
     res.json(note)
   })
 )
@@ -172,7 +182,7 @@ router.delete(
   requireAuth,
   asyncHandler(async (req, res) => {
     const id = parseInt(req.params.id)
-    await storage.deletePaymentItemNote(id)
+    await deletePaymentItemNote(id)
     res.status(204).send()
   })
 )

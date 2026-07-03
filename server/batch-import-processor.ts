@@ -1,7 +1,14 @@
 import * as XLSX from "xlsx"
 import csv from "csv-parser"
 import { Readable } from "stream"
-import { storage } from "./storage"
+import {
+  createDebtCategory,
+  createPaymentProject,
+  getPaymentProjects,
+  getProjectCategories,
+} from "./storage/categories"
+import { createPaymentItem } from "./storage/payment-items"
+import { createPaymentRecord, updatePaymentItemAmounts } from "./storage/payment-records"
 
 export interface ImportRecord {
   itemName: string
@@ -103,7 +110,9 @@ export class BatchImportProcessor {
 
       return records
     } catch (error: unknown) {
-      throw new Error(`Excel 解析錯誤: ${error instanceof Error ? error.message : String(error)}`, { cause: error })
+      throw new Error(`Excel 解析錯誤: ${error instanceof Error ? error.message : String(error)}`, {
+        cause: error,
+      })
     }
   }
 
@@ -250,14 +259,14 @@ export class BatchImportProcessor {
 
     // 驗證專案是否存在，如果不存在就自動創建
     try {
-      const projects = await storage.getPaymentProjects()
+      const projects = await getPaymentProjects()
       const existingProject = projects.find(
         (p) => p.projectName.toLowerCase() === record.projectName.toLowerCase()
       )
 
       if (!existingProject) {
         // 自動創建專案
-        await storage.createPaymentProject({
+        await createPaymentProject({
           projectName: record.projectName,
           projectType: "general",
           description: `自動創建於批量導入 - ${new Date().toLocaleDateString()}`,
@@ -270,14 +279,14 @@ export class BatchImportProcessor {
     // 驗證分類是否存在，如果不存在就使用預設分類
     if (record.categoryName) {
       try {
-        const categories = await storage.getProjectCategories()
+        const categories = await getProjectCategories()
         const existingCategory = categories.find(
           (c) => c.categoryName.toLowerCase() === record.categoryName.toLowerCase()
         )
 
         if (!existingCategory) {
           // 自動創建分類
-          await storage.createDebtCategory({
+          await createDebtCategory({
             categoryName: record.categoryName,
             categoryType: "project",
           })
@@ -317,8 +326,8 @@ export class BatchImportProcessor {
 
       try {
         // 獲取專案和分類 ID
-        const projects = await storage.getPaymentProjects()
-        const categories = await storage.getProjectCategories()
+        const projects = await getPaymentProjects()
+        const categories = await getProjectCategories()
 
         const project = projects.find(
           (p) => p.projectName.toLowerCase() === record.projectName.toLowerCase()
@@ -332,7 +341,7 @@ export class BatchImportProcessor {
         }
 
         // 創建付款項目
-        const paymentItem = await storage.createPaymentItem({
+        const paymentItem = await createPaymentItem({
           itemName: record.itemName,
           totalAmount: record.amount.toString(),
           categoryId: category?.id,
@@ -349,7 +358,7 @@ export class BatchImportProcessor {
 
         // 如果是已付款狀態，創建付款記錄
         if (record.paymentStatus === "已付款" && record.paymentDate) {
-          const paymentRecord = await storage.createPaymentRecord({
+          const paymentRecord = await createPaymentRecord({
             itemId: paymentItem.id,
             amountPaid: record.amount.toString(),
             paymentDate: record.paymentDate,
@@ -359,7 +368,7 @@ export class BatchImportProcessor {
           paymentId = paymentRecord.id
 
           // 重要：創建付款記錄後更新付款項目的已付金額
-          await storage.updatePaymentItemAmounts(paymentItem.id)
+          await updatePaymentItemAmounts(paymentItem.id)
         }
 
         results.success++

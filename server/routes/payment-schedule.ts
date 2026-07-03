@@ -1,8 +1,20 @@
 import { Router } from "express"
-import { storage, getAllPaymentSchedules, getPaymentSchedulesByItemId } from "../storage"
+import { getAllPaymentSchedules, getPaymentSchedulesByItemId } from "../storage"
 import { generateSmartSchedule, type ScheduleItem } from "@shared/schedule-utils"
 import { asyncHandler, AppError } from "../middleware/error-handler"
 import { parseId } from "./request-params"
+import { getPaymentItems as storeGetPaymentItems } from "../storage/payment-items"
+import {
+  createPaymentSchedule,
+  deletePaymentSchedule,
+  getOverdueSchedules,
+  getPaymentRecords as storeGetPaymentRecords,
+  getPaymentSchedules,
+  getUnscheduledPaymentItems,
+  reschedulePayment,
+  updatePaymentSchedule,
+} from "../storage/payment-records"
+import { getOverduePaymentItems } from "../storage/statistics"
 
 /** getPaymentRecords 回傳的付款記錄行（extends Record 以相容 storage 回傳型別） */
 interface PaymentRecordRow extends Record<string, unknown> {
@@ -23,7 +35,7 @@ router.get(
     const year = parseId(req.params.year, "year")
     const month = parseId(req.params.month, "month")
 
-    const schedules = await storage.getPaymentSchedules(year, month)
+    const schedules = await getPaymentSchedules(year, month)
     res.json(schedules)
   })
 )
@@ -41,7 +53,7 @@ router.post(
       )
     }
 
-    const schedule = await storage.createPaymentSchedule({
+    const schedule = await createPaymentSchedule({
       paymentItemId,
       scheduledDate,
       scheduledAmount: scheduledAmount.toString(),
@@ -70,7 +82,7 @@ router.put(
     }
     if (Object.keys(updateData).length === 0) throw new AppError(400, "沒有可更新的欄位")
 
-    const schedule = await storage.updatePaymentSchedule(id, updateData)
+    const schedule = await updatePaymentSchedule(id, updateData)
     res.json(schedule)
   })
 )
@@ -80,7 +92,7 @@ router.delete(
   "/api/payment/schedule/:id",
   asyncHandler(async (req, res) => {
     const id = parseId(req.params.id, "id")
-    await storage.deletePaymentSchedule(id)
+    await deletePaymentSchedule(id)
     res.status(204).send()
   })
 )
@@ -89,7 +101,7 @@ router.delete(
 router.get(
   "/api/payment/overdue",
   asyncHandler(async (req, res) => {
-    const schedules = await storage.getOverdueSchedules()
+    const schedules = await getOverdueSchedules()
     res.json(schedules)
   })
 )
@@ -105,7 +117,7 @@ router.post(
       throw new AppError(400, "Missing required field: newDate")
     }
 
-    const schedule = await storage.reschedulePayment(id, newDate, notes)
+    const schedule = await reschedulePayment(id, newDate, notes)
     res.json(schedule)
   })
 )
@@ -117,7 +129,7 @@ router.get(
     const year = parseInt(req.params.year)
     const month = parseInt(req.params.month)
 
-    const schedules = await storage.getPaymentSchedules(year, month)
+    const schedules = await getPaymentSchedules(year, month)
 
     // 計算每日統計
     const dailyStats: Record<string, { amount: number; count: number }> = {}
@@ -154,7 +166,7 @@ router.get(
     const month = parseInt(req.params.month)
 
     // 取得當月未排程的付款項目
-    const unscheduledItems = await storage.getUnscheduledPaymentItems(year, month)
+    const unscheduledItems = await getUnscheduledPaymentItems(year, month)
 
     res.json(unscheduledItems)
   })
@@ -164,7 +176,7 @@ router.get(
 router.get(
   "/api/payment/items/overdue",
   asyncHandler(async (req, res) => {
-    const overdueItems = await storage.getOverduePaymentItems()
+    const overdueItems = await getOverduePaymentItems()
 
     res.json(overdueItems)
   })
@@ -177,19 +189,19 @@ router.get(
     const { year, month } = req.query
 
     // 獲取所有付款項目 (排除收入 itemType='income'; 專案付款=支出)
-    const allItems = await storage.getPaymentItems({}, undefined, 10000)
+    const allItems = await storeGetPaymentItems({}, undefined, 10000)
     const items = allItems.filter((i) => (i as { itemType?: string }).itemType !== "income")
 
     // 獲取所有付款記錄 (放大 limit 避免預設 100 筆漏資料)
-    const records = (await storage.getPaymentRecords({}, 1, 100000)) as PaymentRecordRow[]
+    const records = (await storeGetPaymentRecords({}, 1, 100000)) as PaymentRecordRow[]
 
     // 獲取所有排程記錄（不限月份，確保跨月追蹤）
     const allSchedules = await getAllPaymentSchedules()
 
     // 獲取當月排程記錄（用於計算當月排程金額）
-    let monthSchedules: Awaited<ReturnType<typeof storage.getPaymentSchedules>> = []
+    let monthSchedules: Awaited<ReturnType<typeof getPaymentSchedules>> = []
     if (year && month) {
-      monthSchedules = await storage.getPaymentSchedules(
+      monthSchedules = await getPaymentSchedules(
         parseInt(year as string),
         parseInt(month as string)
       )
@@ -267,11 +279,11 @@ router.post(
     const budgetNum = parseFloat(budget)
 
     // 取得所有待付款項目
-    const items = await storage.getPaymentItems({}, undefined, 10000)
+    const items = await storeGetPaymentItems({}, undefined, 10000)
     const today = new Date()
 
     // 取得已有排程
-    const existingSchedules = await storage.getPaymentSchedules(yearNum, monthNum)
+    const existingSchedules = await getPaymentSchedules(yearNum, monthNum)
     const scheduledItemIds = new Set(existingSchedules.map((s) => s.paymentItemId))
 
     // 篩選需要排程的項目
@@ -339,7 +351,7 @@ router.post(
     }
 
     // 取得所有逾期排程
-    const overdueSchedules = await storage.getOverdueSchedules()
+    const overdueSchedules = await getOverdueSchedules()
 
     if (overdueSchedules.length === 0) {
       return res.json({ message: "沒有逾期項目需要重排", rescheduled: 0 })
@@ -351,7 +363,7 @@ router.post(
 
     for (const schedule of overdueSchedules) {
       try {
-        await storage.reschedulePayment(
+        await reschedulePayment(
           schedule.id,
           targetDate,
           `自動重排：原排期 ${schedule.scheduledDate}，逾期移至 ${targetDate}`

@@ -207,7 +207,7 @@ describe.skipIf(skipIfNoDb)("Rental Extended API", () => {
       const contractId = createdContractIds[0]
       if (!contractId) return
 
-      const { storage } = await import("../../server/storage")
+      const storage = await import("../../server/storage")
       const details = await storage.getContractDetails(contractId)
 
       expect(details).not.toBeNull()
@@ -239,7 +239,7 @@ describe.skipIf(skipIfNoDb)("Rental Extended API", () => {
     })
 
     it("不存在的合約應回傳 null", async () => {
-      const { storage } = await import("../../server/storage")
+      const storage = await import("../../server/storage")
       const details = await storage.getContractDetails(999999)
       expect(details).toBeNull()
     })
@@ -249,14 +249,14 @@ describe.skipIf(skipIfNoDb)("Rental Extended API", () => {
 
   describe("合約搜尋 — searchContracts", () => {
     it("無篩選條件應回傳所有合約", async () => {
-      const { storage } = await import("../../server/storage")
+      const storage = await import("../../server/storage")
       const results = await storage.searchContracts({})
       expect(Array.isArray(results)).toBe(true)
       expect(results.length).toBeGreaterThan(0)
     })
 
     it("以關鍵字搜尋應回傳匹配結果", async () => {
-      const { storage } = await import("../../server/storage")
+      const storage = await import("../../server/storage")
       // 使用建立測試時的關鍵字「多階段合約」
       const results = await storage.searchContracts({ keyword: "多階段合約" })
       expect(Array.isArray(results)).toBe(true)
@@ -265,7 +265,7 @@ describe.skipIf(skipIfNoDb)("Rental Extended API", () => {
     })
 
     it("以 projectId 搜尋應回傳匹配結果", async () => {
-      const { storage } = await import("../../server/storage")
+      const storage = await import("../../server/storage")
       const results = await storage.searchContracts({ projectId: 1 })
       expect(Array.isArray(results)).toBe(true)
       for (const r of results) {
@@ -274,7 +274,7 @@ describe.skipIf(skipIfNoDb)("Rental Extended API", () => {
     })
 
     it("以日期範圍搜尋應回傳匹配結果", async () => {
-      const { storage } = await import("../../server/storage")
+      const storage = await import("../../server/storage")
       const results = await storage.searchContracts({
         startDateFrom: "2025-01-01",
         startDateTo: "2026-12-31",
@@ -283,7 +283,7 @@ describe.skipIf(skipIfNoDb)("Rental Extended API", () => {
     })
 
     it("不匹配的搜尋應回傳空陣列", async () => {
-      const { storage } = await import("../../server/storage")
+      const storage = await import("../../server/storage")
       const results = await storage.searchContracts({
         keyword: "完全不存在的合約名稱_xyz_99999",
       })
@@ -298,7 +298,7 @@ describe.skipIf(skipIfNoDb)("Rental Extended API", () => {
       const contractId = createdContractIds[0]
       if (!contractId) return
 
-      const { storage } = await import("../../server/storage")
+      const storage = await import("../../server/storage")
       const updated = await storage.updateContractPaymentInfo(contractId, {
         payeeName: "測試收款人",
         payeeUnit: "測試單位",
@@ -330,7 +330,7 @@ describe.skipIf(skipIfNoDb)("Rental Extended API", () => {
       const contractId = createdContractIds[0]
       if (!contractId) return
 
-      const { storage } = await import("../../server/storage")
+      const storage = await import("../../server/storage")
       const doc = await storage.createContractDocument({
         contractId,
         fileName: "測試文件.pdf",
@@ -349,7 +349,7 @@ describe.skipIf(skipIfNoDb)("Rental Extended API", () => {
       const contractId = createdContractIds[0]
       if (!contractId) return
 
-      const { storage } = await import("../../server/storage")
+      const storage = await import("../../server/storage")
       const docs = await storage.getContractDocuments(contractId)
       expect(Array.isArray(docs)).toBe(true)
       expect(docs.length).toBeGreaterThanOrEqual(1)
@@ -358,7 +358,7 @@ describe.skipIf(skipIfNoDb)("Rental Extended API", () => {
     it("應回傳單一文件", async () => {
       if (!createdDocId) return
 
-      const { storage } = await import("../../server/storage")
+      const storage = await import("../../server/storage")
       const doc = await storage.getContractDocument(createdDocId)
       expect(doc).toBeDefined()
       expect(doc?.id).toBe(createdDocId)
@@ -367,7 +367,7 @@ describe.skipIf(skipIfNoDb)("Rental Extended API", () => {
     it("應成功更新文件資訊", async () => {
       if (!createdDocId) return
 
-      const { storage } = await import("../../server/storage")
+      const storage = await import("../../server/storage")
       const updated = await storage.updateContractDocument(createdDocId, {
         fileName: "更新後文件.pdf",
       })
@@ -376,7 +376,7 @@ describe.skipIf(skipIfNoDb)("Rental Extended API", () => {
     })
 
     it("更新不存在的文件應拋出錯誤", async () => {
-      const { storage } = await import("../../server/storage")
+      const storage = await import("../../server/storage")
       await expect(
         storage.updateContractDocument(999999, { fileName: "不存在.pdf" })
       ).rejects.toThrow()
@@ -385,7 +385,7 @@ describe.skipIf(skipIfNoDb)("Rental Extended API", () => {
     it("應成功刪除文件", async () => {
       if (!createdDocId) return
 
-      const { storage } = await import("../../server/storage")
+      const storage = await import("../../server/storage")
       await storage.deleteContractDocument(createdDocId)
 
       // 確認已刪除
@@ -412,7 +412,7 @@ describe.skipIf(skipIfNoDb)("Rental Extended API", () => {
 
       if (!pendingPayment) return // 沒有待付款項目則跳過
 
-      const { storage } = await import("../../server/storage")
+      const storage = await import("../../server/storage")
       const plan = await storage.createInstallmentPlan({
         itemId: pendingPayment.id,
         totalAmount: pendingPayment.totalAmount,
@@ -431,7 +431,7 @@ describe.skipIf(skipIfNoDb)("Rental Extended API", () => {
     })
 
     it("不存在的分期計劃應拋出錯誤", async () => {
-      const { storage } = await import("../../server/storage")
+      const storage = await import("../../server/storage")
       await expect(storage.generateInstallmentPayments(999999)).rejects.toThrow("分期計劃不存在")
     })
   })

@@ -12,15 +12,16 @@ const mockGetUserById = vi.fn().mockResolvedValue({
   username: "lineuser",
   isActive: true,
 })
-vi.mock("../../server/storage", () => ({
-  storage: {
-    sessionStore: {},
-    getUserByUsername: vi.fn(),
-    getUserById: (id: number) => mockGetUserById(id),
-    updateUserLoginAttempts: vi.fn(),
-    updateUser: vi.fn(),
-    createUser: vi.fn(),
-  },
+// Phase 4.1：auth.ts 改直接 import storage/users 與 session，mock 對應調整
+vi.mock("../../server/storage/users", () => ({
+  getUserByUsername: vi.fn(),
+  getUserById: (id: number) => mockGetUserById(id),
+  updateUserLoginAttempts: vi.fn(),
+  updateUser: vi.fn(),
+  createUser: vi.fn(),
+}))
+vi.mock("../../server/session", () => ({
+  sessionStore: {},
 }))
 
 // Mock db 模組

@@ -1,10 +1,24 @@
 import { Router } from "express"
-import { storage } from "../storage"
+
 import { insertLoanInvestmentRecordSchema, insertLoanPaymentHistorySchema } from "@shared/schema"
 import { localDateTPE } from "@shared/date-utils"
 import { ZodError } from "zod"
 import OpenAI from "openai"
 import { asyncHandler, AppError } from "../middleware/error-handler"
+import {
+  addLoanPayment,
+  createLoanInvestmentRecord,
+  deleteLoanInvestmentRecord,
+  deleteLoanPaymentHistory,
+  getLoanInvestmentRecord,
+  getLoanInvestmentRecords,
+  getLoanInvestmentStats,
+  getLoanPaymentHistory,
+  getLoanPaymentStatistics,
+  updateLoanInvestmentRecord,
+  updateLoanPaymentHistory,
+  verifyLoanPayment,
+} from "../storage/loans"
 
 const router = Router()
 
@@ -12,7 +26,7 @@ const router = Router()
 router.get(
   "/api/loan-investment/records",
   asyncHandler(async (req, res) => {
-    const records = await storage.getLoanInvestmentRecords()
+    const records = await getLoanInvestmentRecords()
     res.json(records)
   })
 )
@@ -22,7 +36,7 @@ router.get(
   "/api/loan-investment/records/:id",
   asyncHandler(async (req, res) => {
     const recordId = parseInt(req.params.id)
-    const record = await storage.getLoanInvestmentRecord(recordId)
+    const record = await getLoanInvestmentRecord(recordId)
 
     if (!record) {
       throw new AppError(404, "Record not found")
@@ -38,7 +52,7 @@ router.post(
   asyncHandler(async (req, res) => {
     try {
       const validatedData = insertLoanInvestmentRecordSchema.parse(req.body)
-      const record = await storage.createLoanInvestmentRecord(validatedData)
+      const record = await createLoanInvestmentRecord(validatedData)
       res.status(201).json(record)
     } catch (error: unknown) {
       if (error instanceof AppError) throw error
@@ -57,7 +71,7 @@ router.put(
     try {
       const recordId = parseInt(req.params.id)
       const validatedData = insertLoanInvestmentRecordSchema.partial().parse(req.body)
-      const record = await storage.updateLoanInvestmentRecord(recordId, validatedData)
+      const record = await updateLoanInvestmentRecord(recordId, validatedData)
       res.json(record)
     } catch (error: unknown) {
       if (error instanceof AppError) throw error
@@ -74,7 +88,7 @@ router.delete(
   "/api/loan-investment/records/:id",
   asyncHandler(async (req, res) => {
     const recordId = parseInt(req.params.id)
-    await storage.deleteLoanInvestmentRecord(recordId)
+    await deleteLoanInvestmentRecord(recordId)
     res.status(204).send()
   })
 )
@@ -107,7 +121,7 @@ router.post(
       isVerified: req.body.isVerified || false,
     }
 
-    const payment = await storage.addLoanPayment(recordId, paymentData)
+    const payment = await addLoanPayment(recordId, paymentData)
     res.status(201).json(payment)
   })
 )
@@ -117,7 +131,7 @@ router.get(
   "/api/loan-investment/records/:id/payments",
   asyncHandler(async (req, res) => {
     const recordId = parseInt(req.params.id)
-    const payments = await storage.getLoanPaymentHistory(recordId)
+    const payments = await getLoanPaymentHistory(recordId)
     res.json(payments)
   })
 )
@@ -129,7 +143,7 @@ router.put(
     try {
       const paymentId = parseInt(req.params.id)
       const validatedData = insertLoanPaymentHistorySchema.partial().parse(req.body)
-      const payment = await storage.updateLoanPaymentHistory(paymentId, validatedData)
+      const payment = await updateLoanPaymentHistory(paymentId, validatedData)
       res.json(payment)
     } catch (error: unknown) {
       if (error instanceof AppError) throw error
@@ -146,7 +160,7 @@ router.delete(
   "/api/loan-investment/payments/:id",
   asyncHandler(async (req, res) => {
     const paymentId = parseInt(req.params.id)
-    await storage.deleteLoanPaymentHistory(paymentId)
+    await deleteLoanPaymentHistory(paymentId)
     res.status(204).send()
   })
 )
@@ -162,7 +176,7 @@ router.patch(
       throw new AppError(400, "verifiedBy is required")
     }
 
-    const payment = await storage.verifyLoanPayment(paymentId, verifiedBy, notes)
+    const payment = await verifyLoanPayment(paymentId, verifiedBy, notes)
     res.json(payment)
   })
 )
@@ -172,7 +186,7 @@ router.get(
   "/api/loan-investment/records/:id/payment-stats",
   asyncHandler(async (req, res) => {
     const recordId = parseInt(req.params.id)
-    const stats = await storage.getLoanPaymentStatistics(recordId)
+    const stats = await getLoanPaymentStatistics(recordId)
     res.json(stats)
   })
 )
@@ -181,7 +195,7 @@ router.get(
 router.get(
   "/api/loan-investment/stats",
   asyncHandler(async (req, res) => {
-    const stats = await storage.getLoanInvestmentStats()
+    const stats = await getLoanInvestmentStats()
     res.json(stats)
   })
 )

@@ -83,7 +83,7 @@ describe.skipIf(skipIfNoDb)("Admin 擴展測試 — LINE 配置與檔案附件",
       expect(res.status).toBe(403)
 
       // 清理
-      const { storage } = await import("../../server/storage")
+      const storage = await import("../../server/storage")
       const users = await storage.getAllUsers()
       const testUser = users.find((u) => u.username === "test_line_create_user")
       if (testUser) await storage.deleteUser(testUser.id)
@@ -159,7 +159,7 @@ describe.skipIf(skipIfNoDb)("Admin 擴展測試 — LINE 配置與檔案附件",
       expect(res.status).toBe(403)
 
       // 清理
-      const { storage } = await import("../../server/storage")
+      const storage = await import("../../server/storage")
       const users = await storage.getAllUsers()
       const testUser = users.find((u) => u.username === "test_line_update_user")
       if (testUser) await storage.deleteUser(testUser.id)
@@ -195,7 +195,7 @@ describe.skipIf(skipIfNoDb)("Admin 擴展測試 — LINE 配置與檔案附件",
       expect(res.status).toBe(403)
 
       // 清理
-      const { storage } = await import("../../server/storage")
+      const storage = await import("../../server/storage")
       const users = await storage.getAllUsers()
       const testUser = users.find((u) => u.username === "test_line_test_user")
       if (testUser) await storage.deleteUser(testUser.id)

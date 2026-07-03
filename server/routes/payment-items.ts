@@ -1,11 +1,25 @@
 import { Router } from "express"
-import { storage } from "../storage"
+
 import { requireAuth } from "../auth"
 import { insertPaymentItemSchema } from "@shared/schema"
 import { localDateTPE } from "@shared/date-utils"
 import { getAuditUserInfo } from "@shared/user-display"
 import { upload } from "./upload-config"
 import { asyncHandler, AppError } from "../middleware/error-handler"
+import {
+  createPaymentItem,
+  deletePaymentItem,
+  getAuditLogs,
+  getDeletedPaymentItems,
+  getPaymentItem,
+  getPaymentItems,
+  getPaymentItemsCount,
+  permanentlyDeletePaymentItem,
+  restorePaymentItem,
+  updatePaymentItem,
+} from "../storage/payment-items"
+import { createPaymentRecord, getPaymentRecords } from "../storage/payment-records"
+import { getPaginatedPaymentItems } from "../storage/statistics"
 
 const router = Router()
 
@@ -20,7 +34,7 @@ router.patch(
       raw === null || raw === undefined || raw === "" ? null : parseInt(String(raw))
     if (enforcementCaseId !== null && isNaN(enforcementCaseId))
       throw new AppError(400, "enforcementCaseId 無效")
-    const updated = await storage.updatePaymentItem(id, { enforcementCaseId })
+    const updated = await updatePaymentItem(id, { enforcementCaseId })
     if (!updated) throw new AppError(404, "找不到付款項目")
     res.json(updated)
   })
@@ -66,15 +80,15 @@ router.get(
 
     if (shouldIncludeAll) {
       // 特殊情況：需要所有數據時（如看板/導出）。明確放大 limit, 避免預設 5000 截斷(總筆數已超過)
-      const items = await storage.getPaymentItems(filters, 1, 100000)
+      const items = await getPaymentItems(filters, 1, 100000)
 
       res.json(items)
     } else {
       // 一般情況：使用分頁
-      const items = await storage.getPaymentItems(filters, pageNum, limitNum)
+      const items = await getPaymentItems(filters, pageNum, limitNum)
 
       // 計算總數用於分頁資訊
-      const totalCount = await storage.getPaymentItemsCount(filters)
+      const totalCount = await getPaymentItemsCount(filters)
       const totalPages = Math.ceil(totalCount / limitNum)
 
       res.json({
@@ -106,7 +120,7 @@ router.get(
       endDate: req.query.endDate as string,
     }
 
-    const result = await storage.getPaginatedPaymentItems(page, pageSize, filters)
+    const result = await getPaginatedPaymentItems(page, pageSize, filters)
     res.json(result)
   })
 )
@@ -134,7 +148,7 @@ router.post(
         .status(400)
         .json({ message: "Invalid payment item data", errors: result.error.errors })
     }
-    const item = await storage.createPaymentItem(result.data)
+    const item = await createPaymentItem(result.data)
     res.status(201).json(item)
   })
 )
@@ -159,7 +173,7 @@ router.put(
     }
 
     // Get current item to compare amounts
-    const currentItem = await storage.getPaymentItem(id)
+    const currentItem = await getPaymentItem(id)
     if (!currentItem) {
       throw new AppError(404, "Payment item not found")
     }
@@ -185,7 +199,7 @@ router.put(
         .status(400)
         .json({ message: "Invalid payment item data", errors: result.error.errors })
     }
-    const item = await storage.updatePaymentItem(id, result.data)
+    const item = await updatePaymentItem(id, result.data)
     res.json(item)
   })
 )
@@ -198,7 +212,7 @@ router.patch(
     const { changeReason, userInfo, ...updateData } = req.body
 
     // Get current item to merge with partial update
-    const currentItem = await storage.getPaymentItem(id)
+    const currentItem = await getPaymentItem(id)
     if (!currentItem) {
       throw new AppError(404, "Payment item not found")
     }
@@ -240,7 +254,7 @@ router.patch(
     }
 
     // Update the item
-    const item = await storage.updatePaymentItem(
+    const item = await updatePaymentItem(
       id,
       result.data,
       userInfo || "系統管理員",
@@ -255,7 +269,7 @@ router.patch(
 router.get(
   "/api/payment/items/deleted",
   asyncHandler(async (req, res) => {
-    const deletedItems = await storage.getDeletedPaymentItems()
+    const deletedItems = await getDeletedPaymentItems()
     res.json(deletedItems)
   })
 )
@@ -267,7 +281,7 @@ router.delete(
     const id = parseInt(req.params.id)
     const userInfo = getAuditUserInfo(req.user)
     const { reason } = req.body || {}
-    await storage.deletePaymentItem(id, userInfo, reason || "刪除項目")
+    await deletePaymentItem(id, userInfo, reason || "刪除項目")
     res.status(204).send()
   })
 )
@@ -279,7 +293,7 @@ router.post(
     const id = parseInt(req.params.id)
     const userInfo = getAuditUserInfo(req.user)
     const { reason } = req.body || {}
-    const item = await storage.restorePaymentItem(id, userInfo, reason || "恢復項目")
+    const item = await restorePaymentItem(id, userInfo, reason || "恢復項目")
     res.json(item)
   })
 )
@@ -292,7 +306,7 @@ router.delete(
     const id = parseInt(req.params.id)
     const userInfo = getAuditUserInfo(req.user)
     const { reason } = req.body || {}
-    await storage.permanentlyDeletePaymentItem(id, userInfo, reason || "永久刪除項目")
+    await permanentlyDeletePaymentItem(id, userInfo, reason || "永久刪除項目")
     res.status(204).send()
   })
 )
@@ -302,7 +316,7 @@ router.get(
   "/api/payment/items/:id/audit-logs",
   asyncHandler(async (req, res) => {
     const id = parseInt(req.params.id)
-    const logs = await storage.getAuditLogs("payment_items", id)
+    const logs = await getAuditLogs("payment_items", id)
     res.json(logs)
   })
 )
@@ -313,7 +327,7 @@ router.get(
   "/api/payment/items/:id/records",
   asyncHandler(async (req, res) => {
     const itemId = parseInt(req.params.id)
-    const records = await storage.getPaymentRecords({ itemId })
+    const records = await getPaymentRecords({ itemId })
     res.json(records)
   })
 )
@@ -331,7 +345,7 @@ router.post(
     }
 
     // Get current payment item
-    const item = await storage.getPaymentItem(itemId)
+    const item = await getPaymentItem(itemId)
     if (!item) {
       throw new AppError(404, "Payment item not found")
     }
@@ -347,13 +361,13 @@ router.post(
     }
 
     // Update payment item with new paid amount
-    const updatedItem = await storage.updatePaymentItem(itemId, {
+    const updatedItem = await updatePaymentItem(itemId, {
       paidAmount: newPaidAmount.toString(),
       status: newPaidAmount >= totalAmount ? "paid" : "partial",
     })
 
     // Create payment record with uploaded file and payment method
-    await storage.createPaymentRecord({
+    await createPaymentRecord({
       itemId: itemId,
       amountPaid: paymentAmountFloat.toString(),
       paymentDate: paymentDate || localDateTPE(),

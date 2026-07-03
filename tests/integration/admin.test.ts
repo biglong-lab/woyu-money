@@ -23,7 +23,7 @@ describe.skipIf(skipIfNoDb)("Admin API 整合測試", () => {
 
   // 清理測試資料（動態 import 避免無 DB 時載入失敗）
   afterEach(async () => {
-    const { storage } = await import("../../server/storage")
+    const storage = await import("../../server/storage")
     const users = await storage.getAllUsers()
     for (const user of users) {
       if (user.username.startsWith("test_")) {
@@ -295,7 +295,7 @@ describe.skipIf(skipIfNoDb)("Admin API 整合測試", () => {
       expect(res.body).toHaveProperty("message")
 
       // 驗證用戶已刪除
-      const { storage } = await import("../../server/storage")
+      const storage = await import("../../server/storage")
       const users = await storage.getAllUsers()
       const deletedUser = users.find((u) => u.id === userId)
       expect(deletedUser).toBeUndefined()
@@ -303,7 +303,7 @@ describe.skipIf(skipIfNoDb)("Admin API 整合測試", () => {
 
     it("不能刪除自己的帳戶", async () => {
       // 獲取 admin 用戶 ID
-      const { storage } = await import("../../server/storage")
+      const storage = await import("../../server/storage")
       const users = await storage.getAllUsers()
       const adminUser = users.find((u) => u.username === "admin")
 

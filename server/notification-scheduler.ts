@@ -1,10 +1,14 @@
 import { notificationSystem } from "./notification-system"
-import { storage } from "./storage"
+
 import { broadcastPush } from "./storage/push-subscriptions"
 import { db } from "./db"
 import { paymentItems } from "@shared/schema"
 import { and, eq, lte, gte, sql } from "drizzle-orm"
 import { getTodayReminderStatusWith, fetchUnpaidFromDb } from "./services/late-fee.service"
+import {
+  getUserUnreadNotifications,
+  getUsersWithEmailNotificationEnabled,
+} from "./storage/notifications"
 
 class NotificationScheduler {
   private intervalId: NodeJS.Timeout | null = null
@@ -189,9 +193,9 @@ class NotificationScheduler {
     try {
       // Email通知功能準備就緒（外部SMTP服務配置待完成）
       // 當SMTP配置完成後，可以取消註解以下代碼：
-      // const usersWithEmailNotification = await storage.getUsersWithEmailNotificationEnabled();
+      // const usersWithEmailNotification = await getUsersWithEmailNotificationEnabled();
       // for (const user of usersWithEmailNotification) {
-      //   const unreadNotifications = await storage.getUserUnreadNotifications(user.id);
+      //   const unreadNotifications = await getUserUnreadNotifications(user.id);
       //   if (unreadNotifications.length > 0) {
       //     await this.sendEmailDigest(user.email, unreadNotifications);
       //   }

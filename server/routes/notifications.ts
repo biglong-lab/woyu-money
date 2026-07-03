@@ -1,7 +1,18 @@
 import { Router } from "express"
-import { storage } from "../storage"
+
 import { requireAuth } from "../auth"
 import { asyncHandler } from "../middleware/error-handler"
+import {
+  createNotification,
+  deleteNotification,
+  generatePaymentReminders,
+  getNewNotifications,
+  getNotificationSettings,
+  getUserNotifications,
+  markAllNotificationsAsRead,
+  markNotificationAsRead,
+  updateNotificationSettings,
+} from "../storage/notifications"
 
 const router = Router()
 
@@ -12,7 +23,7 @@ router.get(
   asyncHandler(async (req, res) => {
     const userId = req.user!.id
     const limit = parseInt(req.query.limit as string) || 50
-    const notifications = await storage.getUserNotifications(userId, limit)
+    const notifications = await getUserNotifications(userId, limit)
     res.json(notifications)
   })
 )
@@ -24,7 +35,7 @@ router.get(
   asyncHandler(async (req, res) => {
     const userId = req.user!.id
     const lastCheck = req.query.lastCheck as string
-    const newNotifications = await storage.getNewNotifications(userId, lastCheck)
+    const newNotifications = await getNewNotifications(userId, lastCheck)
     res.json(newNotifications)
   })
 )
@@ -36,7 +47,7 @@ router.post(
   asyncHandler(async (req, res) => {
     const userId = req.user!.id
     const notificationId = req.params.id
-    await storage.markNotificationAsRead(userId, notificationId)
+    await markNotificationAsRead(userId, notificationId)
     res.json({ success: true })
   })
 )
@@ -47,7 +58,7 @@ router.post(
   requireAuth,
   asyncHandler(async (req, res) => {
     const userId = req.user!.id
-    await storage.markAllNotificationsAsRead(userId)
+    await markAllNotificationsAsRead(userId)
     res.json({ success: true })
   })
 )
@@ -57,7 +68,7 @@ router.post(
   "/api/notifications/generate-reminders",
   requireAuth,
   asyncHandler(async (req, res) => {
-    const count = await storage.generatePaymentReminders()
+    const count = await generatePaymentReminders()
     res.json({ success: true, generatedCount: count })
   })
 )
@@ -69,7 +80,7 @@ router.post(
   asyncHandler(async (req, res) => {
     const userId = req.user!.id
     // userId 放在 spread 之後：以登入者為準，body 帶 userId 也不能替別人建通知
-    const notification = await storage.createNotification({
+    const notification = await createNotification({
       ...req.body,
       userId,
     })
@@ -84,7 +95,7 @@ router.delete(
   asyncHandler(async (req, res) => {
     const userId = req.user!.id
     const notificationId = req.params.id
-    await storage.deleteNotification(userId, notificationId)
+    await deleteNotification(userId, notificationId)
     res.json({ success: true })
   })
 )
@@ -95,7 +106,7 @@ router.get(
   requireAuth,
   asyncHandler(async (req, res) => {
     const userId = req.user!.id
-    const settings = await storage.getNotificationSettings(userId)
+    const settings = await getNotificationSettings(userId)
     res.json(settings)
   })
 )
@@ -106,7 +117,7 @@ router.put(
   requireAuth,
   asyncHandler(async (req, res) => {
     const userId = req.user!.id
-    const settings = await storage.updateNotificationSettings(userId, req.body)
+    const settings = await updateNotificationSettings(userId, req.body)
     res.json(settings)
   })
 )
@@ -118,7 +129,7 @@ router.post(
   asyncHandler(async (req, res) => {
     const userId = req.user!.id
     const settings = req.body
-    await storage.updateNotificationSettings(userId, settings)
+    await updateNotificationSettings(userId, settings)
     res.json({ success: true })
   })
 )

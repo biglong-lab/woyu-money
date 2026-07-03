@@ -1,10 +1,22 @@
 import { Router } from "express"
-import { storage } from "../storage"
+
 import { insertRentalContractSchema, insertRentalPriceTierSchema } from "@shared/schema"
 import { localDateTPE } from "@shared/date-utils"
 import { ZodError } from "zod"
 import * as XLSX from "xlsx"
 import { asyncHandler, AppError } from "../middleware/error-handler"
+import {
+  createRentalContract,
+  deleteRentalContract,
+  generateRentalPayments,
+  getRentalContract,
+  getRentalContractPayments,
+  getRentalContracts,
+  getRentalPaymentItems as storeGetRentalPaymentItems,
+  getRentalPriceTiers,
+  getRentalStats,
+  updateRentalContract,
+} from "../storage/rental"
 
 /** getRentalPaymentItems 回傳的租金付款項目型別 */
 interface RentalPayment {
@@ -31,7 +43,7 @@ const router = Router()
 router.get(
   "/api/rental/contracts",
   asyncHandler(async (req, res) => {
-    const contracts = await storage.getRentalContracts()
+    const contracts = await getRentalContracts()
     res.json(contracts)
   })
 )
@@ -41,7 +53,7 @@ router.get(
   "/api/rental/contracts/:id",
   asyncHandler(async (req, res) => {
     const contractId = parseInt(req.params.id)
-    const contract = await storage.getRentalContract(contractId)
+    const contract = await getRentalContract(contractId)
     if (!contract) {
       throw new AppError(404, "Contract not found")
     }
@@ -66,7 +78,7 @@ router.post(
         )
       }
 
-      const contract = await storage.createRentalContract(validatedContract, validatedPriceTiers)
+      const contract = await createRentalContract(validatedContract, validatedPriceTiers)
       res.status(201).json(contract)
     } catch (error: unknown) {
       if (error instanceof AppError) throw error
@@ -87,7 +99,7 @@ router.put(
       const { priceTiers, ...contractData } = req.body
       const validatedData = insertRentalContractSchema.partial().parse(contractData)
 
-      const contract = await storage.updateRentalContract(contractId, validatedData, priceTiers)
+      const contract = await updateRentalContract(contractId, validatedData, priceTiers)
 
       res.json(contract)
     } catch (error: unknown) {
@@ -105,7 +117,7 @@ router.delete(
   "/api/rental/contracts/:id",
   asyncHandler(async (req, res) => {
     const contractId = parseInt(req.params.id)
-    await storage.deleteRentalContract(contractId)
+    await deleteRentalContract(contractId)
     res.json({ message: "Contract deleted successfully" })
   })
 )
@@ -115,7 +127,7 @@ router.get(
   "/api/rental/contracts/:id/price-tiers",
   asyncHandler(async (req, res) => {
     const contractId = parseInt(req.params.id)
-    const tiers = await storage.getRentalPriceTiers(contractId)
+    const tiers = await getRentalPriceTiers(contractId)
     res.json(tiers)
   })
 )
@@ -125,7 +137,7 @@ router.get(
   "/api/rental/contracts/:id/payments",
   asyncHandler(async (req, res) => {
     const contractId = parseInt(req.params.id)
-    const payments = await storage.getRentalContractPayments(contractId)
+    const payments = await getRentalContractPayments(contractId)
     res.json(payments)
   })
 )
@@ -135,7 +147,7 @@ router.post(
   "/api/rental/contracts/:id/generate-payments",
   asyncHandler(async (req, res) => {
     const contractId = parseInt(req.params.id)
-    const result = await storage.generateRentalPayments(contractId)
+    const result = await generateRentalPayments(contractId)
     res.json(result)
   })
 )
@@ -144,7 +156,7 @@ router.post(
 router.get(
   "/api/rental/stats",
   asyncHandler(async (req, res) => {
-    const stats = await storage.getRentalStats()
+    const stats = await getRentalStats()
     res.json(stats)
   })
 )
@@ -153,7 +165,7 @@ router.get(
 router.get(
   "/api/rental/payments",
   asyncHandler(async (req, res) => {
-    const payments = await storage.getRentalPaymentItems()
+    const payments = await storeGetRentalPaymentItems()
     res.json(payments)
   })
 )
@@ -164,7 +176,7 @@ router.get(
   asyncHandler(async (req, res) => {
     const { year, contractId, format = "excel", includeDetails = "true" } = req.query
 
-    const allPayments = await storage.getRentalPaymentItems()
+    const allPayments = await storeGetRentalPaymentItems()
 
     let filteredPayments = allPayments
     if (year) {

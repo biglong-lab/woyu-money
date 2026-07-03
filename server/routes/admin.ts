@@ -1,5 +1,5 @@
 import { Router } from "express"
-import { storage } from "../storage"
+
 import { requireAuth } from "../auth"
 import { hashPassword } from "./helpers"
 import { DEFAULT_PERMISSIONS } from "@shared/schema"
@@ -8,6 +8,37 @@ import path from "path"
 import { paymentFileUpload } from "./upload-config"
 import { asyncHandler, AppError } from "../middleware/error-handler"
 import { getRecentTicks, getTicksSummary } from "../storage/tick-log"
+import {
+  createFileAttachment,
+  deleteFileAttachment,
+  getFileAttachment,
+  getFileAttachments,
+  updateFileAttachment,
+} from "../storage/file-attachments"
+import {
+  createLineConfig,
+  getLineConfig,
+  testLineConnection,
+  updateLineConfig,
+} from "../storage/line-config"
+import {
+  clearSystemCache,
+  createBackup,
+  getAllUsers,
+  getSystemStats,
+  toggleUserStatus,
+  updateUserRole,
+  validateDataIntegrity,
+} from "../storage/system-admin"
+import {
+  createUser,
+  deleteUser,
+  getUserByLineUserId,
+  getUserByUsername,
+  updateUser,
+  updateUserPassword,
+  updateUserPermissions,
+} from "../storage/users"
 
 const router = Router()
 
@@ -21,7 +52,7 @@ router.get(
       throw new AppError(403, "需要管理員權限")
     }
 
-    const users = await storage.getAllUsers()
+    const users = await getAllUsers()
     const safeUsers = users.map((user) => ({
       id: user.id,
       username: user.username,
@@ -55,7 +86,7 @@ router.post(
       throw new AppError(400, "用戶名和密碼為必填項")
     }
 
-    const existingUser = await storage.getUserByUsername(username)
+    const existingUser = await getUserByUsername(username)
     if (existingUser) {
       throw new AppError(400, "用戶名已存在")
     }
@@ -64,7 +95,7 @@ router.post(
     const defaultPermissions =
       DEFAULT_PERMISSIONS[role as keyof typeof DEFAULT_PERMISSIONS] || DEFAULT_PERMISSIONS.user2
 
-    const newUser = await storage.createUser({
+    const newUser = await createUser({
       username,
       password: hashedPassword,
       email,
@@ -115,7 +146,7 @@ router.put(
     if (role !== undefined) updates.role = role
     if (isActive !== undefined) updates.isActive = isActive
 
-    const updatedUser = await storage.updateUser(userId, updates)
+    const updatedUser = await updateUser(userId, updates)
 
     res.json({
       id: updatedUser.id,
@@ -145,9 +176,9 @@ router.put(
       throw new AppError(400, "無效的角色")
     }
 
-    const updatedUser = await storage.updateUserRole(userId, role)
+    const updatedUser = await updateUserRole(userId, role)
     const defaultPermissions = DEFAULT_PERMISSIONS[role as keyof typeof DEFAULT_PERMISSIONS]
-    await storage.updateUserPermissions(userId, defaultPermissions)
+    await updateUserPermissions(userId, defaultPermissions)
 
     res.json({
       id: updatedUser.id,
@@ -170,7 +201,7 @@ router.put(
     const userId = parseInt(req.params.id)
     const { permissions } = req.body
 
-    const updatedUser = await storage.updateUserPermissions(userId, permissions)
+    const updatedUser = await updateUserPermissions(userId, permissions)
 
     res.json({
       id: updatedUser.id,
@@ -197,7 +228,7 @@ router.put(
     }
 
     const hashedPassword = await hashPassword(newPassword)
-    await storage.updateUserPassword(userId, hashedPassword)
+    await updateUserPassword(userId, hashedPassword)
 
     res.json({ message: "密碼更新成功" })
   })
@@ -216,7 +247,7 @@ router.put(
     const userId = parseInt(req.params.id)
     const { isActive } = req.body
 
-    const updatedUser = await storage.updateUser(userId, { isActive: isActive as boolean })
+    const updatedUser = await updateUser(userId, { isActive: isActive as boolean })
 
     res.json({
       id: updatedUser.id,
@@ -236,7 +267,7 @@ router.put(
     }
 
     const userId = parseInt(req.params.id)
-    const user = await storage.toggleUserStatus(userId)
+    const user = await toggleUserStatus(userId)
 
     res.json({
       message: `用戶狀態已${user.isActive ? "啟用" : "停用"}`,
@@ -265,7 +296,7 @@ router.delete(
       throw new AppError(400, "不能刪除自己的帳戶")
     }
 
-    await storage.deleteUser(userId)
+    await deleteUser(userId)
 
     res.json({ message: "用戶刪除成功" })
   })
@@ -282,7 +313,7 @@ router.get(
     }
 
     try {
-      const stats = await storage.getSystemStats()
+      const stats = await getSystemStats()
 
       const healthCheck = {
         database: true,
@@ -323,7 +354,7 @@ router.post(
     }
 
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-")
-    const backupData = await storage.createBackup()
+    const backupData = await createBackup()
 
     res.json({
       message: "備份建立成功",
@@ -344,7 +375,7 @@ router.post(
       throw new AppError(403, "需要管理員權限")
     }
 
-    const cacheCleared = await storage.clearSystemCache()
+    const cacheCleared = await clearSystemCache()
 
     res.json({
       message: "快取清理完成",
@@ -363,7 +394,7 @@ router.post(
       throw new AppError(403, "需要管理員權限")
     }
 
-    const validation = await storage.validateDataIntegrity()
+    const validation = await validateDataIntegrity()
 
     res.json({
       message: "資料驗證完成",
@@ -382,7 +413,7 @@ router.get(
       throw new AppError(403, "需要管理員權限")
     }
 
-    const config = await storage.getLineConfig()
+    const config = await getLineConfig()
     res.json(config || null)
   })
 )
@@ -404,7 +435,7 @@ router.post(
       configData.callbackUrl = `${protocol}://${host}/api/line/callback`
     }
 
-    const config = await storage.createLineConfig(configData)
+    const config = await createLineConfig(configData)
     res.status(201).json(config)
   })
 )
@@ -427,7 +458,7 @@ router.put(
     }
 
     const configId = parseInt(req.params.id)
-    const config = await storage.updateLineConfig(configId, configData)
+    const config = await updateLineConfig(configId, configData)
     res.json(config)
   })
 )
@@ -452,7 +483,7 @@ router.post(
       throw new AppError(403, "需要管理員權限")
     }
 
-    const testResult = await storage.testLineConnection(req.body)
+    const testResult = await testLineConnection(req.body)
     res.json(testResult)
   })
 )
@@ -462,7 +493,7 @@ router.get(
   "/api/line/callback",
   asyncHandler(async (req, res) => {
     try {
-      const lineConfig = await storage.getLineConfig()
+      const lineConfig = await getLineConfig()
       if (!lineConfig || !lineConfig.isEnabled) {
         return res.redirect("/auth?error=line_not_enabled")
       }
@@ -509,10 +540,10 @@ router.get(
         return res.redirect("/auth?error=profile_fetch_failed")
       }
 
-      let user = await storage.getUserByLineUserId(profileData.userId)
+      let user = await getUserByLineUserId(profileData.userId)
 
       if (!user) {
-        user = await storage.createUser({
+        user = await createUser({
           username: `line_${profileData.userId}`,
           email: profileData.email || null,
           fullName: profileData.displayName,
@@ -524,7 +555,7 @@ router.get(
           authProvider: "line",
         })
       } else {
-        await storage.updateUser(user.id, {
+        await updateUser(user.id, {
           lineDisplayName: profileData.displayName,
           linePictureUrl: profileData.pictureUrl,
           lastLogin: new Date(),
@@ -574,7 +605,7 @@ router.post(
       uploadedBy: "system",
     }
 
-    const attachment = await storage.createFileAttachment(fileData)
+    const attachment = await createFileAttachment(fileData)
     res.status(201).json(attachment)
   })
 )
@@ -589,7 +620,7 @@ router.get(
       throw new AppError(400, "Invalid entity ID")
     }
 
-    const attachments = await storage.getFileAttachments(entityType, parsedEntityId)
+    const attachments = await getFileAttachments(entityType, parsedEntityId)
     res.json(attachments)
   })
 )
@@ -598,7 +629,7 @@ router.delete(
   "/api/file-attachments/:id",
   asyncHandler(async (req, res) => {
     const id = parseInt(req.params.id)
-    const attachment = await storage.getFileAttachment(id)
+    const attachment = await getFileAttachment(id)
 
     if (!attachment) {
       throw new AppError(404, "File attachment not found")
@@ -609,7 +640,7 @@ router.delete(
       fs.unlinkSync(fullPath)
     }
 
-    await storage.deleteFileAttachment(id)
+    await deleteFileAttachment(id)
     res.json({ message: "File attachment deleted successfully" })
   })
 )
@@ -618,7 +649,7 @@ router.get(
   "/api/file-attachments/download/:id",
   asyncHandler(async (req, res) => {
     const id = parseInt(req.params.id)
-    const attachment = await storage.getFileAttachment(id)
+    const attachment = await getFileAttachment(id)
 
     if (!attachment) {
       throw new AppError(404, "File attachment not found")
@@ -663,7 +694,7 @@ router.post(
         description: req.body.notes || null,
       }
 
-      const attachment = await storage.createFileAttachment(fileData)
+      const attachment = await createFileAttachment(fileData)
       attachments.push(attachment)
     }
 
@@ -675,7 +706,7 @@ router.get(
   "/api/payment/:paymentId/files",
   asyncHandler(async (req, res) => {
     const paymentId = parseInt(req.params.paymentId)
-    const files = await storage.getFileAttachments("loan_payment", paymentId)
+    const files = await getFileAttachments("loan_payment", paymentId)
     res.json(files)
   })
 )
@@ -684,7 +715,7 @@ router.delete(
   "/api/files/:fileId",
   asyncHandler(async (req, res) => {
     const fileId = parseInt(req.params.fileId)
-    const file = await storage.getFileAttachment(fileId)
+    const file = await getFileAttachment(fileId)
 
     if (!file) {
       throw new AppError(404, "File not found")
@@ -694,7 +725,7 @@ router.delete(
       fs.unlinkSync(file.filePath)
     }
 
-    await storage.deleteFileAttachment(fileId)
+    await deleteFileAttachment(fileId)
     res.json({ message: "File deleted successfully" })
   })
 )
@@ -705,7 +736,7 @@ router.put(
     const fileId = parseInt(req.params.fileId)
     const { description } = req.body
 
-    const updatedFile = await storage.updateFileAttachment(fileId, { description })
+    const updatedFile = await updateFileAttachment(fileId, { description })
     res.json(updatedFile)
   })
 )
