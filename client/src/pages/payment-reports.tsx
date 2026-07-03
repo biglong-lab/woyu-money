@@ -47,6 +47,7 @@ import { apiRequest } from "@/lib/queryClient"
 import type { PaymentItem, PaymentProject, DebtCategory } from "@shared/schema"
 import { useDocumentTitle } from "@/hooks/use-document-title"
 import { BackToTop } from "@/components/back-to-top"
+import PaymentReportTabs from "@/components/payment-report-tabs"
 
 // API 回傳的付款項目（含 join 欄位）
 interface PaymentItemWithDetails extends PaymentItem {
@@ -292,6 +293,7 @@ export default function PaymentReports() {
 
   return (
     <div className="space-y-4 sm:space-y-6 px-4 sm:px-6">
+      <PaymentReportTabs />
       {/* 頁面標題和操作 - 響應式優化 */}
       <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
         <div className="w-full sm:w-auto">

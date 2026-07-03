@@ -177,6 +177,12 @@ export const tabPagesNavItems: NavItem[] = [
     icon: DollarSign,
     description: "一般付款項目（付款項目管理 tab）",
   },
+  {
+    title: "付款分析",
+    href: "/payment-analysis",
+    icon: PieChart,
+    description: "整合付款明細分析（付款報表 tab）",
+  },
 ]
 
 // 核心決策（規劃工具）— 總覽類已移至「財務總覽中心」
@@ -344,6 +350,7 @@ export const viewNavItems: NavItem[] = [
     title: "📊 付款報表",
     href: "/payment/reports",
     icon: FileText,
+    description: "付款報表（圖表）/ 付款分析（整合明細）— 頁內 tab 切換",
   },
   {
     title: "📊 收入分析",
@@ -351,12 +358,7 @@ export const viewNavItems: NavItem[] = [
     icon: TrendingUp,
     description: "收入分析 / PMS vs PM 比對 / 收入預測（頁內 tab 切換）",
   },
-  // ── 🔍 分析類 ──
-  {
-    title: "🔍 付款分析",
-    href: "/payment-analysis",
-    icon: PieChart,
-  },
+  // 「付款分析」已收攏進「付款報表」頁內 tab（2026-07-03 UX2）
   // ── 💰 預算類 ──
   {
     title: "💰 專案預算",

@@ -23,6 +23,7 @@ import {
 } from "@/components/integrated-payment-analysis"
 import type { PaymentItem, PaymentProject } from "@/components/integrated-payment-analysis"
 import { useDocumentTitle } from "@/hooks/use-document-title"
+import PaymentReportTabs from "@/components/payment-report-tabs"
 
 // ========================================
 // 付款分析與專案管理 - 主頁面
@@ -304,6 +305,7 @@ export default function IntegratedPaymentAnalysisOptimized() {
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto p-4 lg:p-6 space-y-6">
+        <PaymentReportTabs />
         {/* 頁面標題與操作按鈕 */}
         <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4">
           <div>
