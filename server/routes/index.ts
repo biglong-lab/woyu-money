@@ -121,8 +121,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // 註冊所有領域路由
   app.use(authRoutes)
-  // 統一 categories API 必須在 categoryRoutes 之前註冊
-  // 避免 /api/categories/:id 吃掉 /api/categories/unified 等子路徑
+  // 註：categories/budget 的 :id 路由已加「非數字 fallthrough」防護（Phase 4.4），
+  // 掛載順序不再是正確性前提；以下順序僅維持可讀性
   app.use(categoriesUnifiedRoutes)
   app.use(categoryRoutes)
   app.use(householdRoutes)
@@ -134,9 +134,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use(adminRoutes)
   app.use(notificationRoutes)
   app.use(paymentScheduleRoutes)
-  // 注意：budgetAutoGenerateRoutes 必須在 budgetRoutes 之前註冊
-  // 因為 budgetRoutes 有 /api/budget/plans/:id 會吃掉 /api/budget/plans/by-month
-  // （即使 :id 已加 \d+ regex 雙保險，順序仍維持正確以防 regex 改動）
+  // budget/plans/:id 已加非數字 fallthrough（Phase 4.4），順序不再是正確性前提
   app.use(budgetAutoGenerateRoutes)
   app.use(budgetRoutes)
   app.use(documentInboxRoutes)

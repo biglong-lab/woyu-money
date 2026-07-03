@@ -60,9 +60,12 @@ router.get(
 )
 
 // 取得單一預算計劃詳情
+// 兄弟字面路徑（by-month 在 budget-auto-generate.ts）fallthrough 給對應路由，
+// 消除對掛載順序的依賴；其餘非數字 id 照舊 400（Phase 4.4）
 router.get(
   "/api/budget/plans/:id",
-  asyncHandler(async (req, res) => {
+  asyncHandler(async (req, res, next) => {
+    if (req.params.id === "by-month") return next()
     const id = parseInt(req.params.id)
     if (isNaN(id)) throw new AppError(400, "無效的預算計劃 ID")
 

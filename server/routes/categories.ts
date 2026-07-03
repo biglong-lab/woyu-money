@@ -56,9 +56,12 @@ router.post(
 )
 
 // 更新分類
+// 兄弟字面路徑（unified 在 categories-unified.ts）fallthrough 給對應路由，
+// 消除對掛載順序的依賴；其餘照舊（Phase 4.4）
 router.put(
   "/api/categories/:id",
-  asyncHandler(async (req, res) => {
+  asyncHandler(async (req, res, next) => {
+    if (req.params.id === "unified") return next()
     const id = parseInt(req.params.id)
     const result = insertDebtCategorySchema.safeParse(req.body)
     if (!result.success) {
@@ -72,7 +75,8 @@ router.put(
 // 刪除分類
 router.delete(
   "/api/categories/:id",
-  asyncHandler(async (req, res) => {
+  asyncHandler(async (req, res, next) => {
+    if (req.params.id === "unified") return next()
     const id = parseInt(req.params.id)
     await deleteCategory(id)
     res.status(204).send()
