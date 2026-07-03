@@ -353,6 +353,12 @@ export const viewNavItems: NavItem[] = [
     href: "/revenue/reports",
     icon: TrendingUp,
   },
+  {
+    title: "📊 收入比對",
+    href: "/revenue/compare",
+    icon: Scale,
+    description: "PMS（發票）vs PM（逐筆）收入雙軌比對",
+  },
   // ── 🔍 分析類 ──
   {
     title: "🔍 付款分析",
@@ -417,6 +423,18 @@ export const systemNavItems: NavItem[] = [
     href: "/expense/inbox",
     icon: Inbox,
     description: "PM 系統推進來的帳單、待確認後變應付款項",
+  },
+  {
+    title: "進帳收件箱",
+    href: "/income/inbox",
+    icon: Inbox,
+    description: "PM/外部支付推進來的收入、確認後入帳（含一鍵批次確認）",
+  },
+  {
+    title: "收入來源管理",
+    href: "/income/sources",
+    icon: TrendingUp,
+    description: "進帳來源與預設專案設定（一鍵確認的前置設定）",
   },
   {
     title: "整合中心",
@@ -619,15 +637,23 @@ export const breadcrumbConfig: Record<string, BreadcrumbItem[]> = {
     { title: "成本結構總覽" },
   ],
   "/family": [{ title: "首頁", href: "/" }, { title: "財務助理" }, { title: "家庭記帳" }],
-  "/forecast-input": [
-    { title: "首頁", href: "/" },
-    { title: "財務助理" },
-    { title: "預訂金額輸入" },
-  ],
+  // /forecast-input 頁面已於 2026-07-03 刪除（PMS 已自動同步）
   "/expense/inbox": [
     { title: "首頁", href: "/" },
     { title: "系統管理" },
     { title: "外部帳單收件箱" },
+  ],
+  "/income/inbox": [{ title: "首頁", href: "/" }, { title: "系統管理" }, { title: "進帳收件箱" }],
+  "/income/sources": [
+    { title: "首頁", href: "/" },
+    { title: "系統管理" },
+    { title: "收入來源管理" },
+  ],
+  "/revenue/compare": [{ title: "首頁", href: "/" }, { title: "統一查看" }, { title: "收入比對" }],
+  "/admin/cron-health": [
+    { title: "首頁", href: "/" },
+    { title: "系統管理" },
+    { title: "Cron 健康觀測" },
   ],
   "/settings": [{ title: "首頁", href: "/" }, { title: "系統管理" }, { title: "設定" }],
   "/account": [{ title: "首頁", href: "/" }, { title: "系統管理" }, { title: "帳戶設定" }],
