@@ -375,86 +375,87 @@ export const viewNavItems: NavItem[] = [
 ]
 
 // 系統管理分類（含模板管理，收合顯示）
+// 系統管理（2026-07-03 UX2：依「收件/整合 → 資料管理 → 系統設定」三群排序 + emoji 前綴分組，
+// 模式同「統一查看」的 📊 前綴；桌面下拉與手機選單共用此順序）
 export const systemNavItems: NavItem[] = [
+  // ── 🔌 收件 / 整合 ──
   {
-    title: "館別共用組",
-    href: "/property-groups",
-    icon: Building2,
-    description: "管理共用人事/洗滌等費用的館別群組",
-  },
-  {
-    title: "分類管理",
-    href: "/categories",
-    icon: Layers,
-    description: "統一管理所有費用分類（含合併、清理、重複偵測）",
-  },
-  // 以下舊頁（PR-3）已合併至「分類管理」/categories：
-  //   - 固定分類管理 (/category-management)
-  //   - 專案專屬項目管理 (/project-specific-items)
-  //   - 統一專案模板管理 (/unified-project-template-management)
-  //   - 專案分類模板管理 (/project-template-management)
-  //   - 家庭分類管理 (/household-category-management)
-  // 路徑保留可訪問供回滾（30 天觀察期），但不顯示在導航
-  {
-    title: "用戶管理",
-    href: "/user-management",
-    icon: User,
-  },
-  {
-    title: "回收站",
-    href: "/recycle-bin",
-    icon: Trash2,
-    description: "查看和恢復已刪除的項目",
-  },
-  {
-    title: "資料品質中心",
-    href: "/settings/data-quality",
-    icon: AlertTriangle,
-    description: "偵測缺到期日 / 金額異常 / 殭屍項目 / 重複組",
-  },
-  {
-    title: "外部帳單收件箱",
+    title: "🔌 外部帳單收件箱",
     href: "/expense/inbox",
     icon: Inbox,
     description: "PM 系統推進來的帳單、待確認後變應付款項",
   },
   {
-    title: "進帳收件箱",
+    title: "🔌 進帳收件箱",
     href: "/income/inbox",
     icon: Inbox,
     description: "PM/外部支付推進來的收入、確認後入帳（含一鍵批次確認）",
   },
   {
-    title: "收入來源管理",
+    title: "🔌 收入來源管理",
     href: "/income/sources",
     icon: TrendingUp,
     description: "進帳來源與預設專案設定（一鍵確認的前置設定）",
   },
   {
-    title: "整合中心",
+    title: "🔌 整合中心",
     href: "/integrations",
     icon: Activity,
     description: "外部 API 嫁接（收入 / 支出 webhook、拋接紀錄、串接測試）",
   },
+  // ── 🗂️ 資料管理 ──
   {
-    title: "週期性支出模板",
+    title: "🗂️ 分類管理",
+    href: "/categories",
+    icon: Layers,
+    description: "統一管理所有費用分類（含合併、清理、重複偵測）",
+  },
+  // 以下舊頁（PR-3）已合併至「分類管理」/categories：
+  //   /category-management、/project-specific-items、/unified-project-template-management、
+  //   /project-template-management、/household-category-management（路徑保留供回滾）
+  {
+    title: "🗂️ 館別共用組",
+    href: "/property-groups",
+    icon: Building2,
+    description: "管理共用人事/洗滌等費用的館別群組",
+  },
+  {
+    title: "🗂️ 週期性支出模板",
     href: "/recurring-expenses",
     icon: Repeat,
     description: "人事/洗滌/水電/保險等每月固定支出模板，自動產出待確認項目",
   },
   {
-    title: "滯納金規則",
+    title: "🗂️ 滯納金規則",
     href: "/late-fee-settings",
     icon: AlertTriangle,
     description: "設定各類別費率與寬限期（勞健保/稅務有滯納金、其他預設關閉）",
   },
   {
-    title: "設定",
+    title: "🗂️ 資料品質中心",
+    href: "/settings/data-quality",
+    icon: AlertTriangle,
+    description: "偵測缺到期日 / 金額異常 / 殭屍項目 / 重複組",
+  },
+  {
+    title: "🗂️ 回收站",
+    href: "/recycle-bin",
+    icon: Trash2,
+    description: "查看和恢復已刪除的項目",
+  },
+  // ── ⚙️ 系統設定 ──
+  {
+    title: "⚙️ 用戶管理",
+    href: "/user-management",
+    icon: User,
+  },
+  {
+    title: "⚙️ 設定",
     href: "/settings",
     icon: Settings,
   },
   {
-    title: "帳戶設定",
+    title: "⚙️ 帳戶設定",
     href: "/account",
     icon: User,
   },
