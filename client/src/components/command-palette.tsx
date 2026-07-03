@@ -244,11 +244,11 @@ export function CommandPalette() {
             <span>收據對應助手</span>
           </CommandItem>
           <CommandItem
-            onSelect={() => runCommand(() => setLocation("/scenario-simulator"))}
-            keywords={["scenario", "沙盤", "simulator", "推演", "模擬"]}
+            onSelect={() => runCommand(() => setLocation("/scenario-planner"))}
+            keywords={["scenario", "沙盤", "simulator", "planner", "推演", "模擬"]}
           >
             <Sparkles className="mr-2 h-4 w-4 text-violet-600" />
-            <span>沙盤推演（場景模擬）</span>
+            <span>沙盤推演（現金模擬）</span>
           </CommandItem>
         </CommandGroup>
 

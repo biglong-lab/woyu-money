@@ -121,7 +121,7 @@ const formatMoney = (v: number) =>
   v >= 0 ? "$" + Math.round(v).toLocaleString() : "-$" + Math.round(-v).toLocaleString()
 
 export default function ScenarioSimulatorPage() {
-  useDocumentTitle("沙盤推演")
+  useDocumentTitle("沙盤推演 · 下月精算")
   const { toast } = useToast()
 
   const [targetMonth, setTargetMonth] = useState(() => {
@@ -500,10 +500,13 @@ export default function ScenarioSimulatorPage() {
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <Sparkles className="h-6 w-6 text-violet-600" />
-            沙盤推演
+            沙盤推演 · 下月精算
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            調整行銷、訂價、固定支出，即時看到對下月收支的影響
+            調整行銷、訂價、固定支出，即時看到對下月收支的影響；看未來 12 月走勢請用
+            <a href="/scenario-planner" className="text-violet-600 hover:underline ml-1">
+              沙盤推演主頁 →
+            </a>
           </p>
         </div>
         <div className="flex gap-2">

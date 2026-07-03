@@ -178,14 +178,8 @@ const TOOLS = [
   {
     href: "/scenario-planner",
     icon: Sparkles,
-    title: "沙盤推演 2.0",
-    desc: "收入↑/成本↓/還款三軸推未來現金走勢",
-  },
-  {
-    href: "/scenario-simulator",
-    icon: Sparkles,
-    title: "沙盤推演（單月）",
-    desc: "調行銷/訂價看下月收支",
+    title: "沙盤推演",
+    desc: "收入↑/成本↓/還款三軸推未來 12 月現金走勢（內含下月精算模式）",
   },
   {
     href: "/cashflow-decision-center",

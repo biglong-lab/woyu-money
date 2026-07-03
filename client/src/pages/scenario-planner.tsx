@@ -90,7 +90,7 @@ interface Levers {
 const MONTHS_AHEAD = 12
 
 export default function ScenarioPlannerPage() {
-  useDocumentTitle("沙盤推演 2.0")
+  useDocumentTitle("沙盤推演")
   const { toast } = useToast()
 
   const { data: forecast } = useQuery<ForecastResponse>({
@@ -187,17 +187,17 @@ export default function ScenarioPlannerPage() {
   }
 
   // 後端情境（跨裝置）
-  const { data: presets = [] } = useQuery<
-    Array<{ id: number; name: string; levers: Levers }>
-  >({ queryKey: ["/api/scenario-presets"] })
+  const { data: presets = [] } = useQuery<Array<{ id: number; name: string; levers: Levers }>>({
+    queryKey: ["/api/scenario-presets"],
+  })
   const savePreset = useMutation({
-    mutationFn: (name: string) =>
-      apiRequest("POST", "/api/scenario-presets", { name, levers }),
+    mutationFn: (name: string) => apiRequest("POST", "/api/scenario-presets", { name, levers }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/scenario-presets"] })
       toast({ title: "已儲存情境（跨裝置）" })
     },
-    onError: (e: Error) => toast({ title: "儲存失敗", description: e.message, variant: "destructive" }),
+    onError: (e: Error) =>
+      toast({ title: "儲存失敗", description: e.message, variant: "destructive" }),
   })
   const delPreset = useMutation({
     mutationFn: (id: number) => apiRequest("DELETE", `/api/scenario-presets/${id}`),
@@ -214,17 +214,24 @@ export default function ScenarioPlannerPage() {
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <Sparkles className="h-6 w-6 text-indigo-600" />
-            沙盤推演 2.0 · 未來現金模擬
+            沙盤推演 · 未來現金模擬
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
             調整「收入成長 / 成本刪減 / 還款計畫」，看未來 12 個月現金走勢與最低點
           </p>
         </div>
-        <Link href="/financial-cockpit">
-          <span className="text-sm text-indigo-600 hover:underline cursor-pointer inline-flex items-center gap-1">
-            <ArrowLeft className="h-3 w-3" /> 回駕駛艙
-          </span>
-        </Link>
+        <div className="flex items-center gap-4">
+          <Link href="/scenario-simulator">
+            <span className="text-sm text-indigo-600 hover:underline cursor-pointer inline-flex items-center gap-1">
+              🔬 下月精算模式（行銷/訂價/單筆支出細調）
+            </span>
+          </Link>
+          <Link href="/financial-cockpit">
+            <span className="text-sm text-indigo-600 hover:underline cursor-pointer inline-flex items-center gap-1">
+              <ArrowLeft className="h-3 w-3" /> 回駕駛艙
+            </span>
+          </Link>
+        </div>
       </div>
 
       {/* 已存情境（跨裝置）*/}
@@ -232,8 +239,15 @@ export default function ScenarioPlannerPage() {
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs text-muted-foreground">已存情境：</span>
           {presets.map((p) => (
-            <span key={p.id} className="inline-flex items-center gap-1 border rounded-full pl-3 pr-1 py-0.5 text-sm">
-              <button type="button" className="hover:text-indigo-600" onClick={() => setLevers(p.levers)}>
+            <span
+              key={p.id}
+              className="inline-flex items-center gap-1 border rounded-full pl-3 pr-1 py-0.5 text-sm"
+            >
+              <button
+                type="button"
+                className="hover:text-indigo-600"
+                onClick={() => setLevers(p.levers)}
+              >
                 {p.name}
               </button>
               <button
