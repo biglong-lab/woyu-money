@@ -15,7 +15,8 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
-import { Trash2, Zap, Wallet, AlertCircle } from "lucide-react"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Trash2, Zap, Wallet, AlertCircle, Layers } from "lucide-react"
 import type { ExpenseLedgerEntry } from "@shared/schema"
 
 type DebtCategory = { id: number; categoryName: string; categoryType: string }
@@ -112,6 +113,46 @@ export default function ExpenseLedgerPanel() {
       invalidate()
       toast({ title: "已刪除" })
     },
+  })
+
+  // ── 批次分帳：勾多筆 → 一次分到同一分類 ──
+  const [selected, setSelected] = useState<Set<number>>(new Set())
+  const unclassified = entries.filter((e) => e.status === "unclassified")
+  const selectedEntries = unclassified.filter((e) => selected.has(e.id))
+  const selectedSum = selectedEntries.reduce((s, e) => s + Number(e.amount), 0)
+
+  function toggleSelect(id: number) {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const batchClassifyMutation = useMutation({
+    mutationFn: async (categoryId: number) => {
+      let ok = 0
+      let fail = 0
+      for (const e of selectedEntries) {
+        try {
+          await apiRequest("PUT", `/api/expense-ledger/${e.id}`, { categoryId })
+          ok++
+        } catch {
+          fail++
+        }
+      }
+      return { ok, fail }
+    },
+    onSuccess: ({ ok, fail }) => {
+      invalidate()
+      setSelected(new Set())
+      toast({
+        title: `批次分帳完成：${ok} 筆${fail > 0 ? `，${fail} 筆失敗` : ""}`,
+      })
+    },
+    onError: (e: Error) =>
+      toast({ title: "批次分帳失敗", description: e.message, variant: "destructive" }),
   })
 
   const canSubmit = amount !== "" && Number(amount) >= 0 && entryDate !== ""
@@ -236,6 +277,36 @@ export default function ExpenseLedgerPanel() {
         ))}
       </div>
 
+      {/* 批次分帳操作列（有勾選時顯示） */}
+      {selected.size > 0 && (
+        <div className="sticky top-2 z-10 flex flex-wrap items-center gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2.5 shadow-sm">
+          <Layers className="h-4 w-4 text-amber-700" />
+          <span className="text-sm font-medium text-amber-900">
+            已勾選 {selected.size} 筆 · ${selectedSum.toLocaleString()}
+          </span>
+          <Select
+            onValueChange={(v) => batchClassifyMutation.mutate(Number(v))}
+            disabled={batchClassifyMutation.isPending}
+          >
+            <SelectTrigger className="w-44 bg-white" data-testid="ledger-batch-classify">
+              <SelectValue
+                placeholder={batchClassifyMutation.isPending ? "分帳中…" : "批次分帳到…"}
+              />
+            </SelectTrigger>
+            <SelectContent>
+              {categories.map((c) => (
+                <SelectItem key={c.id} value={String(c.id)}>
+                  {c.categoryName}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>
+            取消勾選
+          </Button>
+        </div>
+      )}
+
       {/* 列表 */}
       <div className="space-y-2">
         {isLoading ? (
@@ -246,6 +317,14 @@ export default function ExpenseLedgerPanel() {
           entries.map((e) => (
             <Card key={e.id} data-testid={`ledger-row-${e.id}`}>
               <CardContent className="p-3 flex items-center gap-3 flex-wrap">
+                {e.status === "unclassified" && (
+                  <Checkbox
+                    checked={selected.has(e.id)}
+                    onCheckedChange={() => toggleSelect(e.id)}
+                    className="shrink-0"
+                    data-testid={`ledger-select-${e.id}`}
+                  />
+                )}
                 <div className="text-lg font-bold w-24 shrink-0">
                   ${Number(e.amount).toLocaleString()}
                 </div>
