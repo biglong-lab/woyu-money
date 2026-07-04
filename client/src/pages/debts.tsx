@@ -38,6 +38,7 @@ import {
   CheckCircle2,
   AlertTriangle,
   ImageIcon,
+  Download,
 } from "lucide-react"
 import { DebtForm } from "@/components/debts/debt-form"
 import { PaymentsDialog } from "@/components/debts/payments-dialog"
@@ -102,6 +103,46 @@ export default function DebtsPage() {
     },
   })
 
+  /** 匯出目前篩選結果 CSV（BOM+UTF-8、Excel 直開）— 傳會計/留存全貌 */
+  function exportCsv() {
+    if (debts.length === 0) return
+    const header = [
+      "分類",
+      "債權人",
+      "金額",
+      "已還",
+      "未還",
+      "還款筆數",
+      "還款狀態",
+      "歸帳狀態",
+      "發生日",
+      "到期日",
+      "備註",
+    ]
+    const payLabel = { unpaid: "未還", partial: "部分還款", paid: "已還清" }
+    const rows = debts.map((d) => [
+      d.categoryName ?? "未分類",
+      d.creditor ?? "",
+      d.amount,
+      String(d.paidAmount),
+      String(d.remainingAmount),
+      String(d.paymentCount),
+      payLabel[d.paymentStatus] ?? d.paymentStatus,
+      d.status === "reconciled" ? "已歸帳" : d.status === "cancelled" ? "已作廢" : "整理中",
+      d.incurDate ?? "",
+      d.dueDate ?? "",
+      d.note ?? "",
+    ])
+    const esc = (v: string) => `"${v.replace(/"/g, '""')}"`
+    const csv = "﻿" + [header, ...rows].map((r) => r.map(esc).join(",")).join("\r\n")
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" })
+    const a = document.createElement("a")
+    a.href = URL.createObjectURL(blob)
+    a.download = `歷史欠款_${new Date(Date.now() + 8 * 3600e3).toISOString().slice(0, 10)}.csv`
+    a.click()
+    URL.revokeObjectURL(a.href)
+  }
+
   function openNew() {
     setEditing(null)
     setFormOpen(true)
@@ -124,6 +165,14 @@ export default function DebtsPage() {
           </p>
         </div>
         <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={exportCsv}
+            disabled={debts.length === 0}
+            data-testid="debts-export-csv"
+          >
+            <Download className="h-4 w-4 mr-1" /> 匯出 CSV
+          </Button>
           <Button variant="outline" onClick={() => setCategoriesOpen(true)}>
             <Tag className="h-4 w-4 mr-1" /> 分類
           </Button>
