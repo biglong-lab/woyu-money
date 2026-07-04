@@ -61,7 +61,7 @@ jobs:
         run: |
           psql "$DATABASE_URL" -c "INSERT INTO payment_projects (id, project_name, project_type, is_active) VALUES (1, 'CI 測試專案', 'general', true) ON CONFLICT (id) DO NOTHING;"
           psql "$DATABASE_URL" -c "SELECT setval('payment_projects_id_seq', GREATEST(1, (SELECT COALESCE(MAX(id),1) FROM payment_projects)));"
-          psql "$DATABASE_URL" -c "INSERT INTO debt_categories (category_name, category_type, is_active) SELECT '租金', 'project', true WHERE NOT EXISTS (SELECT 1 FROM debt_categories WHERE category_name='租金' AND category_type='project');"
+          psql "$DATABASE_URL" -c "INSERT INTO debt_categories (category_name, category_type) SELECT '租金', 'project' WHERE NOT EXISTS (SELECT 1 FROM debt_categories WHERE category_name='租金' AND category_type='project');"
 
       - name: 執行測試
         run: npm run test:coverage
