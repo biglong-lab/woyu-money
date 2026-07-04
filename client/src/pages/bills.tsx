@@ -7,7 +7,7 @@
  */
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { CalendarClock, AlertCircle, CheckCircle2, Banknote } from "lucide-react"
+import { CalendarClock, AlertCircle, CheckCircle2, Banknote, Download } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -153,6 +153,31 @@ export default function BillsPage() {
     setSelected((prev) => (prev.size === bills.length ? new Set() : new Set(bills.map(billKey))))
   }
 
+  /** 匯出應繳清單 CSV（BOM + UTF-8、Excel 可直接開；勾選了就只匯出勾選的） */
+  function exportCsv() {
+    const bills = selectedBills.length > 0 ? selectedBills : (data?.bills ?? [])
+    if (bills.length === 0) return
+    const header = ["名稱", "金額", "法定付款日", "最終必繳日", "狀態", "天數", "備註"]
+    const urgencyLabel = (u: Bill["urgency"]) => URGENCY[u]?.label ?? u
+    const rows = bills.map((b) => [
+      b.name,
+      String(b.amount),
+      b.dueDate ?? "",
+      b.finalDueDate ?? "",
+      urgencyLabel(b.urgency),
+      b.overdue ? `逾期 ${-b.daysUntil} 天` : `${b.daysUntil} 天後`,
+      b.penaltyNote ?? "",
+    ])
+    const esc = (v: string) => `"${v.replace(/"/g, '""')}"`
+    const csv = "﻿" + [header, ...rows].map((r) => r.map(esc).join(",")).join("\r\n")
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" })
+    const a = document.createElement("a")
+    a.href = URL.createObjectURL(blob)
+    a.download = `應繳帳單_${todayStr()}.csv`
+    a.click()
+    URL.revokeObjectURL(a.href)
+  }
+
   /** 強執下月投影用其到期日入帳（歸對月份）；其餘用批次日期 */
   function paymentDateFor(b: Bill): string {
     if (b.source === "enforcement_installment" && b.dueDate) {
@@ -224,18 +249,30 @@ export default function BillsPage() {
             通盤近期應繳：法定付款日優先 + 強執分期每月應付，逾期/即將到期一眼看，避免遲繳
           </p>
         </div>
-        <Select value={days} onValueChange={setDays}>
-          <SelectTrigger className="w-32" data-testid="days-select">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {["15", "30", "45", "60", "90"].map((d) => (
-              <SelectItem key={d} value={d}>
-                未來 {d} 天
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={exportCsv}
+            disabled={!data || data.bills.length === 0}
+            data-testid="export-csv"
+          >
+            <Download className="h-4 w-4 mr-1" />
+            匯出 CSV{selected.size > 0 ? `（勾選 ${selected.size} 筆）` : ""}
+          </Button>
+          <Select value={days} onValueChange={setDays}>
+            <SelectTrigger className="w-32" data-testid="days-select">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {["15", "30", "45", "60", "90"].map((d) => (
+                <SelectItem key={d} value={d}>
+                  未來 {d} 天
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {data && (

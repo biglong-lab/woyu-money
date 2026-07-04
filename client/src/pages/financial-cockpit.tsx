@@ -164,6 +164,12 @@ const URGENCY_BADGE: Record<UrgencyLevel, { label: string; cls: string }> = {
 // ─────────────────────────────────────────────
 const TOOLS = [
   {
+    href: "/bills",
+    icon: Activity,
+    title: "帳單到期看板",
+    desc: "近期應繳＋罰款風險，可原地單筆/批次付款",
+  },
+  {
     href: "/payment-planner",
     icon: Layers,
     title: "排程分配規劃台",
