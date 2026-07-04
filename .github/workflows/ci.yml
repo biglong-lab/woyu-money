@@ -51,6 +51,12 @@ jobs:
       - name: 初始化資料庫
         run: npx drizzle-kit push
 
+      - name: 建立測試 admin 帳號（整合測試登入用）
+        run: npx tsx server/init-admin.ts
+        env:
+          ADMIN_USERNAME: admin
+          ADMIN_PASSWORD: admin123
+
       - name: 執行測試
         run: npm run test:coverage
 
