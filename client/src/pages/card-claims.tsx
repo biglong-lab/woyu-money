@@ -22,7 +22,7 @@ import {
   TableHead,
   TableCell,
 } from "@/components/ui/table"
-import { CreditCard, Plus, Pencil, Trash2, Settings, Banknote } from "lucide-react"
+import { CreditCard, Plus, Pencil, Trash2, Settings, Banknote, Download } from "lucide-react"
 import { ClaimForm } from "@/components/card-claims/claim-form"
 import { OptionsDialog } from "@/components/card-claims/options-dialog"
 import { SettleDialog } from "@/components/card-claims/settle-dialog"
@@ -149,6 +149,31 @@ export default function CardClaimsPage() {
     setFormOpen(true)
   }
 
+  /** 匯出目前區間/篩選的請款紀錄 CSV（BOM+UTF-8、Excel 直開）— 對銀行到帳比對 */
+  function exportCsv() {
+    if (claims.length === 0) return
+    const header = ["刷卡日", "金額", "銀行", "標籤", "館別", "狀態", "實際到帳", "到帳日", "備註"]
+    const rows = claims.map((c) => [
+      c.swipeDate,
+      c.amount,
+      c.bank ?? "",
+      c.tagName ?? "",
+      c.propertyNames.length > 0 ? c.propertyNames.join("、") : (c.propertyName ?? ""),
+      statusMeta(c.status).label,
+      c.settledAmount ?? "",
+      c.settledDate ?? "",
+      c.notes ?? "",
+    ])
+    const esc = (v: string) => `"${v.replace(/"/g, '""')}"`
+    const csv = "\ufeff" + [header, ...rows].map((r) => r.map(esc).join(",")).join("\r\n")
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" })
+    const a = document.createElement("a")
+    a.href = URL.createObjectURL(blob)
+    a.download = `信用卡請款_${new Date(Date.now() + 8 * 3600e3).toISOString().slice(0, 10)}.csv`
+    a.click()
+    URL.revokeObjectURL(a.href)
+  }
+
   return (
     <div className="container mx-auto py-4 sm:py-6 space-y-4 sm:space-y-6">
       {/* 標題列 */}
@@ -163,6 +188,14 @@ export default function CardClaimsPage() {
           </p>
         </div>
         <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={exportCsv}
+            disabled={claims.length === 0}
+            data-testid="claims-export-csv"
+          >
+            <Download className="h-4 w-4 mr-1" /> 匯出 CSV
+          </Button>
           <Button variant="outline" onClick={() => setOptionsOpen(true)}>
             <Settings className="h-4 w-4 mr-1" /> 標籤/館別/銀行
           </Button>

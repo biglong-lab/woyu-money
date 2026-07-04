@@ -432,6 +432,10 @@ export default function BillsPage() {
                 inputMode="decimal"
                 value={payAmount}
                 onChange={(e) => setPayAmount(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && parseFloat(payAmount) > 0 && !payMutation.isPending)
+                    payMutation.mutate()
+                }}
                 autoFocus
               />
             </div>
