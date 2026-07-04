@@ -136,7 +136,7 @@ router.get(
       SELECT
         he.category_id AS "categoryId",
         COALESCE(fc.category_name, '(未分類)') AS "categoryName",
-        COALESCE(fc.color, '#9CA3AF') AS color,
+        '#9CA3AF' AS color,
         COUNT(*)::int AS uses,
         COALESCE(SUM(he.amount::numeric), 0)::text AS "totalAmount",
         MAX(he.date)::text AS "lastUsedAt"
@@ -144,7 +144,7 @@ router.get(
       LEFT JOIN fixed_categories fc ON he.category_id = fc.id
       WHERE NOT he.is_deleted AND he.date >= NOW() - (${days}::int * INTERVAL '1 day')
         AND he.category_id IS NOT NULL
-      GROUP BY he.category_id, fc.category_name, fc.color
+      GROUP BY he.category_id, fc.category_name
       ORDER BY uses DESC, MAX(he.date) DESC
       LIMIT ${limit}
     `)

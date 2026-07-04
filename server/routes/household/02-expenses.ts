@@ -421,7 +421,7 @@ router.get(
         he.receipt_images AS "receiptImages",
         he.category_id AS "categoryId",
         COALESCE(fc.category_name, '(未分類)') AS "categoryName",
-        COALESCE(fc.color, '#9CA3AF') AS color
+        '#9CA3AF' AS color
       FROM household_expenses he
       LEFT JOIN fixed_categories fc ON he.category_id = fc.id
       WHERE NOT he.is_deleted AND he.date >= ${startDate}::date AND he.date < ${endDate}::date
