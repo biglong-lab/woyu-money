@@ -216,6 +216,35 @@ router.post(
   })
 )
 
+/**
+ * POST /api/income/webhooks/batch-reject — 批次拒絕多筆 pending（標記不處理、不刪資料）
+ * Body: { ids: number[], reviewNote?: string }
+ * 用途：PMS 月度累計等「只供比對、不該入帳」的 pending 一次清空
+ */
+router.post(
+  "/api/income/webhooks/batch-reject",
+  asyncHandler(async (req, res) => {
+    const userId = (req.user as { id: number } | undefined)?.id
+    if (!userId) throw new AppError(401, "請先登入")
+
+    const rawIds = req.body?.ids
+    if (!Array.isArray(rawIds) || rawIds.length === 0) throw new AppError(400, "ids 必填")
+    if (rawIds.length > 500) throw new AppError(400, "單次最多 500 筆")
+    const ids = rawIds.map((x) => parseInt(String(x))).filter((n) => Number.isInteger(n) && n > 0)
+    const reviewNote =
+      typeof req.body?.reviewNote === "string" ? req.body.reviewNote.slice(0, 500) : undefined
+
+    let successCount = 0
+    let failCount = 0
+    for (const id of ids) {
+      const ok = await rejectWebhook(id, userId, reviewNote)
+      if (ok) successCount++
+      else failCount++
+    }
+    res.json({ ok: true, successCount, failCount, total: ids.length })
+  })
+)
+
 /** POST /api/income/webhooks/:id/reject — 拒絕（標記為不處理） */
 router.post(
   "/api/income/webhooks/:id/reject",

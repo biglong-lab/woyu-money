@@ -658,6 +658,32 @@ export default function IncomeWebhooksInboxPage() {
     },
   })
 
+  // ─── 批次拒絕（標記不處理、不刪資料）─────
+  const [showBatchReject, setShowBatchReject] = useState(false)
+  const [batchRejectNote, setBatchRejectNote] = useState("")
+  const batchRejectMutation = useMutation<{ successCount: number; failCount: number }, Error, void>(
+    {
+      mutationFn: () =>
+        apiRequest("POST", "/api/income/webhooks/batch-reject", {
+          ids: Array.from(selectedIds),
+          reviewNote: batchRejectNote || undefined,
+        }) as Promise<{ successCount: number; failCount: number }>,
+      onSuccess: (data) => {
+        queryClient.invalidateQueries({ queryKey: ["/api/income/webhooks"] })
+        queryClient.invalidateQueries({ queryKey: ["/api/income/webhooks/pending-count"] })
+        setSelectedIds(new Set())
+        setShowBatchReject(false)
+        setBatchRejectNote("")
+        toast({
+          title: `批次拒絕完成：${data.successCount} 筆${data.failCount > 0 ? `，${data.failCount} 筆失敗` : ""}`,
+        })
+      },
+      onError: (err: Error) => {
+        toast({ title: "批次拒絕失敗", description: err.message, variant: "destructive" })
+      },
+    }
+  )
+
   // ─── 一鍵 auto-confirm by source（用 source defaultProjectId）─────
   const autoConfirmMutation = useMutation<
     { ok: boolean; successCount: number; failCount: number; totalPending: number },
@@ -800,13 +826,63 @@ export default function IncomeWebhooksInboxPage() {
             })()}
 
           {selectedIds.size > 0 && statusFilter === "pending" && (
-            <Button onClick={() => setShowBatchConfirm(true)} className="gap-2">
-              <CheckCircle2 className="h-4 w-4" />
-              批次確認 {selectedIds.size} 筆
-            </Button>
+            <>
+              <Button onClick={() => setShowBatchConfirm(true)} className="gap-2">
+                <CheckCircle2 className="h-4 w-4" />
+                批次確認 {selectedIds.size} 筆
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setShowBatchReject(true)}
+                className="gap-2 border-red-300 text-red-600 hover:bg-red-50"
+                data-testid="batch-reject-open"
+              >
+                <XCircle className="h-4 w-4" />
+                批次拒絕 {selectedIds.size} 筆
+              </Button>
+            </>
           )}
         </div>
       </div>
+
+      {/* 批次拒絕 Dialog */}
+      <Dialog open={showBatchReject} onOpenChange={setShowBatchReject}>
+        <DialogContent className="w-[95vw] max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <XCircle className="h-5 w-5 text-red-500" />
+              批次拒絕 {selectedIds.size} 筆
+            </DialogTitle>
+            <DialogDescription>
+              標記為「不處理」：不會入帳、不刪資料、隨時可在「已拒絕」分頁查看。
+              適用於只供比對的彙總數字（如 PMS 月度累計）或測試殘留。
+            </DialogDescription>
+          </DialogHeader>
+          <div>
+            <Label htmlFor="batch-reject-note">拒絕原因（選填、套用到每筆）</Label>
+            <Textarea
+              id="batch-reject-note"
+              value={batchRejectNote}
+              onChange={(e) => setBatchRejectNote(e.target.value)}
+              placeholder="例：PMS 月度彙總僅供比對、不入帳"
+              rows={2}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowBatchReject(false)}>
+              取消
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => batchRejectMutation.mutate()}
+              disabled={batchRejectMutation.isPending}
+              data-testid="batch-reject-confirm"
+            >
+              {batchRejectMutation.isPending ? "處理中…" : `確認拒絕 ${selectedIds.size} 筆`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* 篩選列 */}
       <div className="flex gap-3 flex-wrap">

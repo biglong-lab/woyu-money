@@ -474,6 +474,30 @@ describe.skipIf(skipIfNoDb)("Income Webhooks API", () => {
     })
   })
 
+  describe("POST /api/income/webhooks/batch-reject", () => {
+    it("空 ids 應回傳 400", async () => {
+      const res = await request(app).post("/api/income/webhooks/batch-reject").send({ ids: [] })
+      expect(res.status).toBe(400)
+    })
+
+    it("超過 500 筆應回傳 400", async () => {
+      const res = await request(app)
+        .post("/api/income/webhooks/batch-reject")
+        .send({ ids: Array.from({ length: 501 }, (_, i) => i + 1) })
+      expect(res.status).toBe(400)
+    })
+
+    it("應回傳批次結果（不存在的 id 記為失敗、不炸）", async () => {
+      const res = await request(app)
+        .post("/api/income/webhooks/batch-reject")
+        .send({ ids: [99999901, 99999902], reviewNote: "測試批次拒絕" })
+        .expect(200)
+      expect(res.body).toHaveProperty("successCount")
+      expect(res.body).toHaveProperty("failCount")
+      expect(res.body.successCount + res.body.failCount).toBe(2)
+    })
+  })
+
   describe("POST /api/income/webhooks/:id/reject", () => {
     let rejectId: number
     beforeAll(async () => {
