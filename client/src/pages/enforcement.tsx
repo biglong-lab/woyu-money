@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
 import { useDocumentTitle } from "@/hooks/use-document-title"
 import { BackToTop } from "@/components/back-to-top"
-import { Gavel, Trash2, Plus } from "lucide-react"
+import { Gavel, Trash2, Plus, Download } from "lucide-react"
 import { formatNT } from "@/lib/utils"
 import EnforcementCaseDialog from "@/components/enforcement-case-dialog"
 
@@ -97,6 +97,81 @@ export default function EnforcementPage() {
     },
   })
 
+  /** 匯出強執全貌 CSV（對帳摘要 + 公文 + 圈存 + 分期三區、BOM+UTF-8）— 對法院/會計 */
+  function exportCsv() {
+    const esc = (v: string) => `"${v.replace(/"/g, '""')}"`
+    const row = (cols: string[]) => cols.map(esc).join(",")
+    const lines: string[] = []
+    if (rec) {
+      lines.push(row(["【對帳摘要】"]))
+      lines.push(row(["強執總額", "圈存合計", "分期計畫合計", "分期已繳", "差額", "案件數"]))
+      lines.push(
+        row([
+          String(rec.enforcedTotal),
+          String(rec.seizedTotal),
+          String(rec.installmentPlanTotal),
+          String(rec.installmentPaidTotal),
+          String(rec.diff),
+          String(rec.caseCount),
+        ])
+      )
+      lines.push("")
+    }
+    lines.push(row(["【公文案件】"]))
+    lines.push(row(["案號", "機關", "事由", "總額", "發文日", "狀態", "備註"]))
+    for (const c of cases) {
+      lines.push(
+        row([
+          c.caseNumber ?? "",
+          c.agency ?? "",
+          c.subject ?? "",
+          c.totalAmount,
+          c.issuedDate ?? "",
+          c.status,
+          c.notes ?? "",
+        ])
+      )
+    }
+    lines.push("")
+    lines.push(row(["【圈存】"]))
+    lines.push(row(["歸屬公文", "銀行", "金額", "圈存日", "狀態", "備註"]))
+    for (const s of seizures) {
+      lines.push(
+        row([
+          caseName(s.caseId),
+          s.bankName ?? "",
+          s.amount,
+          s.seizureDate ?? "",
+          s.status,
+          s.notes ?? "",
+        ])
+      )
+    }
+    lines.push("")
+    lines.push(row(["【分期計畫】"]))
+    lines.push(row(["歸屬公文", "計畫名稱", "起始日", "月付額", "期數", "總額", "狀態"]))
+    for (const i of installments) {
+      lines.push(
+        row([
+          caseName(i.caseId),
+          i.planName ?? "",
+          i.startDate ?? "",
+          i.monthlyAmount,
+          i.periods != null ? String(i.periods) : "",
+          i.totalAmount ?? "",
+          i.status,
+        ])
+      )
+    }
+    const csv = "﻿" + lines.join("\r\n")
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" })
+    const a = document.createElement("a")
+    a.href = URL.createObjectURL(blob)
+    a.download = `強制執行_${new Date(Date.now() + 8 * 3600e3).toISOString().slice(0, 10)}.csv`
+    a.click()
+    URL.revokeObjectURL(a.href)
+  }
+
   return (
     <div className="container mx-auto py-6 space-y-5">
       <div className="flex items-center justify-between">
@@ -109,16 +184,26 @@ export default function EnforcementPage() {
             公文 / 圈存 / 分期對帳：強執總額 ≈ 圈存 + 分期，掌握被執行的錢歸屬
           </p>
         </div>
-        <Button
-          onClick={() => {
-            setEditingCase(null)
-            setCaseDialogOpen(true)
-          }}
-          className="bg-rose-600 hover:bg-rose-700"
-          data-testid="add-case"
-        >
-          <Plus className="h-4 w-4 mr-1" /> 新增公文
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={exportCsv}
+            disabled={cases.length === 0 && seizures.length === 0 && installments.length === 0}
+            data-testid="enf-export-csv"
+          >
+            <Download className="h-4 w-4 mr-1" /> 匯出 CSV
+          </Button>
+          <Button
+            onClick={() => {
+              setEditingCase(null)
+              setCaseDialogOpen(true)
+            }}
+            className="bg-rose-600 hover:bg-rose-700"
+            data-testid="add-case"
+          >
+            <Plus className="h-4 w-4 mr-1" /> 新增公文
+          </Button>
+        </div>
       </div>
 
       {/* 對帳等式 */}
