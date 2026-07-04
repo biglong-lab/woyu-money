@@ -89,6 +89,7 @@ export default function BillsPage() {
   const [payDate, setPayDate] = useState(todayStr())
   const [payMethod, setPayMethod] = useState("bank_transfer")
   const [payNotes, setPayNotes] = useState("")
+  const [payFile, setPayFile] = useState<File | null>(null)
 
   function openPay(b: Bill) {
     setPayTarget(b)
@@ -96,6 +97,7 @@ export default function BillsPage() {
     setPayDate(todayStr())
     setPayMethod("bank_transfer")
     setPayNotes("")
+    setPayFile(null)
   }
 
   const payMutation = useMutation({
@@ -103,19 +105,18 @@ export default function BillsPage() {
       if (!payTarget) throw new Error("無付款對象")
       const amt = parseFloat(payAmount)
       if (!(amt > 0)) throw new Error("金額需為正數")
+      // 統一用 FormData（兩端點都收 multipart、receiptFile 選填）
+      const fd = new FormData()
+      fd.append("amount", String(amt))
+      fd.append("paymentDate", payDate)
+      if (payFile) fd.append("receiptFile", payFile)
       if (payTarget.source === "enforcement_installment") {
-        return apiRequest("POST", `/api/enforcement/installments/${payTarget.refId}/payments`, {
-          amount: String(amt),
-          paymentDate: payDate,
-          notes: payNotes || `帳單看板立即處理（${payTarget.name}）`,
-        })
+        fd.append("notes", payNotes || `帳單看板立即處理（${payTarget.name}）`)
+        return apiRequest("POST", `/api/enforcement/installments/${payTarget.refId}/payments`, fd)
       }
-      return apiRequest("POST", `/api/payment/items/${payTarget.refId}/payments`, {
-        amount: String(amt),
-        paymentDate: payDate,
-        paymentMethod: payMethod,
-        notes: payNotes || "帳單看板立即處理",
-      })
+      fd.append("paymentMethod", payMethod)
+      fd.append("notes", payNotes || "帳單看板立即處理")
+      return apiRequest("POST", `/api/payment/items/${payTarget.refId}/payments`, fd)
     },
     onSuccess: () => {
       toast({ title: `✅ 已付款 ${formatNT(parseFloat(payAmount))}`, description: payTarget?.name })
@@ -471,6 +472,28 @@ export default function BillsPage() {
                 placeholder="例：郵局臨櫃繳納"
                 rows={2}
               />
+            </div>
+            <div>
+              <Label htmlFor="pay-receipt">收據存證（選填、手機可直接拍照）</Label>
+              <Input
+                id="pay-receipt"
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={(e) => setPayFile(e.target.files?.[0] ?? null)}
+              />
+              {payFile && (
+                <p className="mt-1 flex items-center gap-2 text-xs text-emerald-700">
+                  📎 {payFile.name}（{Math.round(payFile.size / 1024)} KB）
+                  <button
+                    type="button"
+                    className="text-gray-400 underline"
+                    onClick={() => setPayFile(null)}
+                  >
+                    移除
+                  </button>
+                </p>
+              )}
             </div>
           </div>
           <DialogFooter>
