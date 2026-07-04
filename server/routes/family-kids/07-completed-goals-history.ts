@@ -7,6 +7,7 @@ import { asyncHandler, AppError } from "../../middleware/error-handler"
 import { db } from "../../db"
 import { sql, eq } from "drizzle-orm"
 import { kidsAccounts } from "@shared/schema"
+import { localDateTPE } from "@shared/date-utils"
 
 const router = Router()
 
@@ -320,7 +321,7 @@ router.get(
     }
 
     res.json({
-      date: new Date().toISOString().slice(0, 10),
+      date: localDateTPE(),
       totalKids,
       checkinCount,
       avgScore,

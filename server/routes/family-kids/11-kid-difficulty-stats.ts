@@ -7,6 +7,7 @@ import { asyncHandler, AppError } from "../../middleware/error-handler"
 import { db } from "../../db"
 import { sql, eq } from "drizzle-orm"
 import { kidsAccounts, kidsGoals } from "@shared/schema"
+import { localDateTPE } from "@shared/date-utils"
 
 const router = Router()
 
@@ -178,8 +179,6 @@ router.get(
     }
 
     const etaDays = Math.ceil(remaining / dailyNetSave)
-    const etaDate = new Date()
-    etaDate.setDate(etaDate.getDate() + etaDays)
 
     const suggestion =
       etaDays <= 7
@@ -195,7 +194,7 @@ router.get(
       status: "predictable",
       dailyNetSave: Math.round(dailyNetSave * 100) / 100,
       etaDays,
-      etaDate: etaDate.toISOString().slice(0, 10),
+      etaDate: localDateTPE(etaDays),
       remaining,
       suggestion,
     })
@@ -397,8 +396,8 @@ router.get(
     )
     let streak = 0
     if (dates.length > 0) {
-      const today = new Date().toISOString().slice(0, 10)
-      const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10)
+      const today = localDateTPE()
+      const yesterday = localDateTPE(-1)
       if (dates[0] === today || dates[0] === yesterday) {
         streak = 1
         for (let i = 1; i < dates.length; i++) {

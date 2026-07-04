@@ -6,6 +6,7 @@ import { Router } from "express"
 import { asyncHandler, AppError } from "../../middleware/error-handler"
 import { db } from "../../db"
 import { sql } from "drizzle-orm"
+import { localDateTPE } from "@shared/date-utils"
 
 const router = Router()
 
@@ -534,8 +535,7 @@ router.get(
       ORDER BY ka.id ASC
     `)
 
-    const now = new Date()
-    const todayStr = now.toISOString().slice(0, 10)
+    const todayStr = localDateTPE()
 
     const kids = (
       rows as unknown as {

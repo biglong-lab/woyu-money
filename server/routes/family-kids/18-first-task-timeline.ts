@@ -6,6 +6,7 @@ import { Router } from "express"
 import { asyncHandler } from "../../middleware/error-handler"
 import { db } from "../../db"
 import { sql } from "drizzle-orm"
+import { localDateTPE } from "@shared/date-utils"
 
 const router = Router()
 
@@ -260,12 +261,11 @@ router.get(
       let predictable = false
       if (current >= target) {
         etaDays = 0
-        etaDate = new Date().toISOString().slice(0, 10)
+        etaDate = localDateTPE()
         predictable = true
       } else if (velocity > 0) {
         etaDays = Math.ceil(remaining / velocity)
-        const eta = new Date(Date.now() + etaDays * 86400000)
-        etaDate = eta.toISOString().slice(0, 10)
+        etaDate = localDateTPE(etaDays)
         predictable = true
       }
       return {

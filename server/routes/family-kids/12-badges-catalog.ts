@@ -16,6 +16,7 @@ import {
   kidsTaskComments,
 } from "@shared/schema"
 import { calcStreak } from "./helpers"
+import { localDateTPE } from "@shared/date-utils"
 
 const router = Router()
 
@@ -563,7 +564,7 @@ router.get(
   "/api/family/mood-trends",
   asyncHandler(async (req, res) => {
     const days = Math.min(Math.max(parseInt((req.query.days as string) || "30", 10), 7), 90)
-    const sinceDate = new Date(Date.now() - days * 86400000).toISOString().slice(0, 10)
+    const sinceDate = localDateTPE(-days)
 
     const kids = await db.select().from(kidsAccounts).where(eq(kidsAccounts.isActive, true))
     if (kids.length === 0) {

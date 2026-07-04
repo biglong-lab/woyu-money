@@ -8,6 +8,7 @@ import { db } from "../../db"
 import { sql, eq } from "drizzle-orm"
 import { kidsBadges } from "@shared/schema"
 import { calcStreak } from "./helpers"
+import { localDateTPE } from "@shared/date-utils"
 
 const router = Router()
 
@@ -497,8 +498,8 @@ router.get(
       })
     }
 
-    const today = new Date().toISOString().slice(0, 10)
-    const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10)
+    const today = localDateTPE()
+    const yesterday = localDateTPE(-1)
 
     // currentStreak：從今天/昨天起連續
     let currentStreak = 0

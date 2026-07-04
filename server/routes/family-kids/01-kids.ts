@@ -13,6 +13,7 @@ import {
   insertKidsTaskSchema,
 } from "@shared/schema"
 import { ensureJarsRow } from "./helpers"
+import { localDateTPE } from "@shared/date-utils"
 
 const router = Router()
 
@@ -376,7 +377,7 @@ router.get(
       .orderBy(desc(kidsTasks.createdAt))
 
     // 計算逾期狀態（dueDate 已過 + 仍 pending/submitted 算逾期）
-    const today = new Date().toISOString().slice(0, 10)
+    const today = localDateTPE()
     const enhanced = rows.map((r) => {
       const isPending = r.status === "pending" || r.status === "submitted"
       const isOverdue = !!(r.dueDate && r.dueDate < today && isPending)

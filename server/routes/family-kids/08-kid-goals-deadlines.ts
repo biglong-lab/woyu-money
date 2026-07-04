@@ -6,6 +6,7 @@ import { Router } from "express"
 import { asyncHandler, AppError } from "../../middleware/error-handler"
 import { db } from "../../db"
 import { sql } from "drizzle-orm"
+import { localDateTPE } from "@shared/date-utils"
 
 const router = Router()
 
@@ -536,7 +537,7 @@ router.get(
     if (stats.newWishes > 0) highlights.push(`✨ 新增 ${stats.newWishes} 個願望`)
 
     // 生成可分享文字（一句總結、適合貼 LINE）
-    const today = new Date().toISOString().slice(0, 10)
+    const today = localDateTPE()
     const lines: string[] = [`📊 ${today} 全家成就：`]
     if (stats.approvedToday > 0)
       lines.push(`✅ 完成 ${stats.approvedToday} 個任務（獎勵 $${stats.rewardToday}）`)

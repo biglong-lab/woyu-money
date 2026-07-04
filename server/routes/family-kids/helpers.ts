@@ -8,6 +8,7 @@ import { sql, eq, and } from "drizzle-orm"
 import multer from "multer"
 import path from "path"
 import fs from "fs"
+import { localDateTPE } from "@shared/date-utils"
 import {
   kidsAccounts,
   kidsJars,
@@ -84,7 +85,7 @@ export async function ensureMonthlyAllowance(kidId: number): Promise<number> {
 
   // 寫進主系統（複用既有 tags=kids,allowance 規範）
   try {
-    const today = now.toISOString().slice(0, 10)
+    const today = localDateTPE()
     const [pi] = await db
       .insert(paymentItems)
       .values({
@@ -165,8 +166,8 @@ export async function calcStreak(kidId: number): Promise<number> {
   const dates = (rows as unknown as { rows: { d: string }[] }).rows.map((r) => r.d)
   if (dates.length === 0) return 0
 
-  const today = new Date().toISOString().slice(0, 10)
-  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10)
+  const today = localDateTPE()
+  const yesterday = localDateTPE(-1)
   // 寬限：今天 / 昨天有資料才算開始
   let cursor: string
   if (dates[0] === today) cursor = today
@@ -259,7 +260,7 @@ export async function bulkApproveOne(
 
   let paymentRecordId: number | null = null
   try {
-    const today = new Date().toISOString().slice(0, 10)
+    const today = localDateTPE()
     const [pi] = await db
       .insert(paymentItems)
       .values({

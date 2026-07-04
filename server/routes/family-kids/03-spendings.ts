@@ -8,6 +8,7 @@ import { db } from "../../db"
 import { sql, eq, and, desc } from "drizzle-orm"
 import { kidsAccounts, kidsBadges, kidsSpendings, kidsDailyMessages } from "@shared/schema"
 import { calcStreak } from "./helpers"
+import { localDateTPE } from "@shared/date-utils"
 
 const router = Router()
 
@@ -473,7 +474,7 @@ router.post(
     if (!message) throw new AppError(400, "message 必填")
     if (message.length > 500) throw new AppError(400, "訊息過長（500 字以內）")
 
-    const today = new Date().toISOString().slice(0, 10)
+    const today = localDateTPE()
     // Upsert by (kidId, messageDate)
     const existing = await db.execute(sql`
       SELECT id FROM kids_daily_messages
@@ -509,7 +510,7 @@ router.get(
   asyncHandler(async (req, res) => {
     const kidIdN = Number(req.query?.kidId)
     if (!kidIdN) throw new AppError(400, "kidId 必填")
-    const date = (req.query?.date as string) ?? new Date().toISOString().slice(0, 10)
+    const date = (req.query?.date as string) ?? localDateTPE()
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new AppError(400, "date 格式 YYYY-MM-DD")
     const [row] = await db
       .select()

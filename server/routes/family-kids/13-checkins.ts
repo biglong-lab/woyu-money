@@ -16,6 +16,7 @@ import {
   kidsCheckins,
 } from "@shared/schema"
 import { proofUpload } from "./helpers"
+import { localDateTPE } from "@shared/date-utils"
 
 const router = Router()
 
@@ -35,7 +36,7 @@ router.post(
     if (!kidIdN) throw new AppError(400, "kidId 必填")
     if (!VALID_MOODS.includes(mood)) throw new AppError(400, "mood 不合法")
 
-    const today = new Date().toISOString().slice(0, 10)
+    const today = localDateTPE()
     const existing = await db.execute(sql`
       SELECT id FROM kids_checkins
       WHERE kid_id = ${kidIdN} AND checkin_date = ${today}
@@ -70,13 +71,13 @@ router.get(
     const kidIdQ = Number(req.query.kidId)
     if (!Number.isInteger(kidIdQ) || kidIdQ < 1) throw new AppError(400, "需傳 kidId")
     const days = Math.min(Math.max(parseInt((req.query.days as string) || "30", 10), 1), 90)
-    const sinceDate = new Date(Date.now() - days * 86400000).toISOString().slice(0, 10)
+    const sinceDate = localDateTPE(-days)
     const rows = await db.execute(sql`
       SELECT * FROM kids_checkins
       WHERE kid_id = ${kidIdQ} AND checkin_date >= ${sinceDate}
       ORDER BY checkin_date DESC
     `)
-    const today = new Date().toISOString().slice(0, 10)
+    const today = localDateTPE()
     const items = (rows as unknown as { rows: Array<{ checkin_date: string }> }).rows
     const todayCheckin = items.find((x) => x.checkin_date === today) ?? null
     res.json({ kidId: kidIdQ, days, items, today: todayCheckin })

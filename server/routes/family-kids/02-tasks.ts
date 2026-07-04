@@ -18,6 +18,7 @@ import {
   paymentItems,
   paymentRecords,
 } from "@shared/schema"
+import { localDateTPE } from "@shared/date-utils"
 import {
   ensureMonthlyAllowance,
   ensureJarsRow,
@@ -113,7 +114,7 @@ router.post(
     let mainPaymentItemId: number | null = null
     let mainPaymentRecordId: number | null = null
     try {
-      const today = new Date().toISOString().slice(0, 10)
+      const today = localDateTPE()
       const [pi] = await db
         .insert(paymentItems)
         .values({
@@ -181,7 +182,10 @@ router.post(
     if (task.recurringInterval === "weekly" || task.recurringInterval === "monthly") {
       const intervalDays = task.recurringInterval === "weekly" ? 7 : 30
       // 計算下次到期日（從原本 dueDate 算起、無則從今天算）
-      const baseDate = task.dueDate ? new Date(task.dueDate) : new Date()
+      // 無 dueDate 用 TPE 今天（UTC midnight 錨定、後續純日期運算不受時區影響）
+      const baseDate = task.dueDate
+        ? new Date(task.dueDate)
+        : new Date(localDateTPE() + "T00:00:00Z")
       const nextDue = new Date(baseDate.getTime() + intervalDays * 86400000)
       const nextDueStr = nextDue.toISOString().slice(0, 10)
       try {
@@ -411,8 +415,8 @@ router.get(
       .orderBy(desc(kidsTasks.createdAt))
       .limit(20)
     // 加 isOverdue / isDueSoon / overdueDays（小孩端視覺警示用）
-    const today = new Date().toISOString().slice(0, 10)
-    const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10)
+    const today = localDateTPE()
+    const tomorrow = localDateTPE(1)
     const tasks = tasksRaw.map((r) => {
       const isPending = r.status === "pending" || r.status === "submitted"
       const isOverdue = !!(r.dueDate && r.dueDate < today && isPending)
@@ -477,7 +481,7 @@ router.post(
       amount: req.body?.amount,
       description: String(req.body?.description ?? "").trim(),
       emoji: req.body?.emoji ?? "💰",
-      spendDate: req.body?.spendDate ?? new Date().toISOString().slice(0, 10),
+      spendDate: req.body?.spendDate ?? localDateTPE(),
       // give 罐特殊欄位（可選）
       recipient: req.body?.recipient ? String(req.body.recipient).slice(0, 100) : null,
       reflection: req.body?.reflection ? String(req.body.reflection).slice(0, 1000) : null,
@@ -665,7 +669,7 @@ router.post(
       WHERE kid_id = ${toKidId}
     `)
 
-    const today = new Date().toISOString().slice(0, 10)
+    const today = localDateTPE()
     // from 紀錄（jar=give、recipient=toKid 名字）
     // to 方靠 jars.total_received 累計、不另建負值紀錄
     await db.insert(kidsSpendings).values({
