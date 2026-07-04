@@ -39,6 +39,10 @@ describe.skipIf(skipIfNoDb)("Family Kids API", () => {
 
   beforeAll(async () => {
     app = await createTestApp()
+    // 根治跨 run 污染（2026-07-04）：前次中斷的執行會留下同 TEST_PIN 小孩，
+    // PIN 登入/統計類查詢會撈到舊帳號的累積資料 → 數值翻倍 flaky。
+    // 開跑前先清同 PIN 殘留（cascade 清 jars/tasks/goals/badges/spendings）。
+    await db.execute(sql`DELETE FROM kids_accounts WHERE pin = ${TEST_PIN}`)
   })
 
   afterEach(async () => {
