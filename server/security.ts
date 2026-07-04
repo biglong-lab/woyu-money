@@ -183,6 +183,12 @@ export const securityHeaders = (req: Request, res: Response, next: NextFunction)
   // XSS保護
   res.setHeader("X-XSS-Protection", "1; mode=block")
 
+  // 控制來源資訊洩漏（安全 Headers 清單 2026-07-04 補齊）
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin")
+
+  // 限制瀏覽器 API（本站不需要攝影機/麥克風/定位）
+  res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+
   // 防止資訊洩露
   res.removeHeader("X-Powered-By")
 
