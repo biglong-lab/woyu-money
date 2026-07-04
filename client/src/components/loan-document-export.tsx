@@ -2,7 +2,6 @@ import React, { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Progress } from "@/components/ui/progress"
 import {
   Dialog,
   DialogContent,
@@ -12,7 +11,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { useQuery } from "@tanstack/react-query"
-import { Download, FileText, BarChart3, Calendar, DollarSign } from "lucide-react"
+import { Download, FileText, BarChart3 } from "lucide-react"
 import { format } from "date-fns"
 import { localDateISO } from "@/lib/utils"
 import type { LoanInvestmentRecord, LoanPaymentHistory } from "@shared/schema"

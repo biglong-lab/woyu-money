@@ -2,7 +2,7 @@ import { Router } from "express"
 import { getPaymentRecordsCashFlow } from "../storage"
 import { requireAuth } from "../auth"
 import { insertPaymentRecordSchema, insertPaymentItemNoteSchema } from "@shared/schema"
-import { asyncHandler, AppError } from "../middleware/error-handler"
+import { asyncHandler } from "../middleware/error-handler"
 import { optionalInt, intWithDefault, optionalDateStr } from "./request-params"
 import {
   createPaymentItemNote,

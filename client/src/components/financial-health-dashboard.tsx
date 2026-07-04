@@ -1,17 +1,6 @@
 import { useMemo } from "react"
-import { format, subMonths, differenceInDays } from "date-fns"
-import {
-  TrendingUp,
-  TrendingDown,
-  CheckCircle,
-  AlertTriangle,
-  Clock,
-  Target,
-  DollarSign,
-  Activity,
-  ArrowUpRight,
-  ArrowDownRight,
-} from "lucide-react"
+import { differenceInDays } from "date-fns"
+import { CheckCircle, AlertTriangle, Clock, Target, Activity } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"

@@ -5,7 +5,6 @@ import {
   paymentProjects,
   debtCategories,
   auditLogs,
-  type PaymentItem,
   type InsertPaymentItem,
 } from "@shared/schema"
 import {

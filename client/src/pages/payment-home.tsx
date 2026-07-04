@@ -16,7 +16,6 @@ import {
   DollarSign,
   CheckCircle2,
   Clock,
-  AlertTriangle,
   Search,
   Camera,
   ArrowRight,

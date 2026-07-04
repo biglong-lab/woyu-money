@@ -2,7 +2,6 @@
  * family 卡片元件（自 family.tsx 機械拆分 cards-09-family-savings-velocity-rank-car，2026-07-03）
  */
 import { useQuery } from "@tanstack/react-query"
-import { Task } from "./family-shared"
 
 export function FamilySavingsVelocityRankCard() {
   const { data } = useQuery<{

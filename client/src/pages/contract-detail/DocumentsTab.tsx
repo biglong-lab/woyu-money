@@ -1,7 +1,7 @@
 /** 合約文件 Tab 內容 */
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
 import {
   Table,
   TableBody,
@@ -9,7 +9,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
+} from "@/components/ui/table"
 import {
   Dialog,
   DialogContent,
@@ -17,27 +17,27 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Upload, Download, Trash2, FileText } from "lucide-react";
-import type { ContractDocument } from "./types";
-import type { UseMutationResult } from "@tanstack/react-query";
+} from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Upload, Download, Trash2, FileText } from "lucide-react"
+import type { ContractDocument } from "./types"
+import type { UseMutationResult } from "@tanstack/react-query"
 
 interface DocumentsTabProps {
-  contractId: string;
-  documents: ContractDocument[] | undefined;
-  isLoading: boolean;
+  contractId: string
+  documents: ContractDocument[] | undefined
+  isLoading: boolean
   /** 上傳對話框狀態 */
-  isUploadDialogOpen: boolean;
-  setIsUploadDialogOpen: (open: boolean) => void;
-  uploadFile: File | null;
-  setUploadFile: (file: File | null) => void;
-  uploadDescription: string;
-  setUploadDescription: (desc: string) => void;
-  handleFileUpload: () => void;
-  uploadPending: boolean;
-  deleteMutation: UseMutationResult<unknown, Error, number, unknown>;
+  isUploadDialogOpen: boolean
+  setIsUploadDialogOpen: (open: boolean) => void
+  uploadFile: File | null
+  setUploadFile: (file: File | null) => void
+  uploadDescription: string
+  setUploadDescription: (desc: string) => void
+  handleFileUpload: () => void
+  uploadPending: boolean
+  deleteMutation: UseMutationResult<unknown, Error, number, unknown>
 }
 
 /** 合約文件管理區域 */
@@ -47,7 +47,6 @@ export function DocumentsTab({
   isLoading,
   isUploadDialogOpen,
   setIsUploadDialogOpen,
-  uploadFile,
   setUploadFile,
   uploadDescription,
   setUploadDescription,
@@ -56,11 +55,8 @@ export function DocumentsTab({
   deleteMutation,
 }: DocumentsTabProps) {
   const handleDownload = (documentId: number) => {
-    window.open(
-      `/api/rental/contracts/${contractId}/documents/${documentId}/download`,
-      "_blank"
-    );
-  };
+    window.open(`/api/rental/contracts/${contractId}/documents/${documentId}/download`, "_blank")
+  }
 
   return (
     <Card>
@@ -91,7 +87,7 @@ export function DocumentsTab({
         )}
       </CardContent>
     </Card>
-  );
+  )
 }
 
 /** 上傳文件對話框 */
@@ -104,13 +100,13 @@ function UploadDialog({
   handleFileUpload,
   isPending,
 }: {
-  isOpen: boolean;
-  setIsOpen: (open: boolean) => void;
-  setUploadFile: (file: File | null) => void;
-  uploadDescription: string;
-  setUploadDescription: (desc: string) => void;
-  handleFileUpload: () => void;
-  isPending: boolean;
+  isOpen: boolean
+  setIsOpen: (open: boolean) => void
+  setUploadFile: (file: File | null) => void
+  uploadDescription: string
+  setUploadDescription: (desc: string) => void
+  handleFileUpload: () => void
+  isPending: boolean
 }) {
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -123,9 +119,7 @@ function UploadDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>上傳合約文件</DialogTitle>
-          <DialogDescription>
-            支援 PDF、Word 文件和圖片格式
-          </DialogDescription>
+          <DialogDescription>支援 PDF、Word 文件和圖片格式</DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <div>
@@ -157,7 +151,7 @@ function UploadDialog({
         </div>
       </DialogContent>
     </Dialog>
-  );
+  )
 }
 
 /** 文件列表表格 */
@@ -167,10 +161,10 @@ function DocumentsTable({
   onDelete,
   deleteDisabled,
 }: {
-  documents: ContractDocument[];
-  onDownload: (docId: number) => void;
-  onDelete: (docId: number) => void;
-  deleteDisabled: boolean;
+  documents: ContractDocument[]
+  onDownload: (docId: number) => void
+  onDelete: (docId: number) => void
+  deleteDisabled: boolean
 }) {
   return (
     <Table>
@@ -188,19 +182,11 @@ function DocumentsTable({
           <TableRow key={doc.id}>
             <TableCell className="font-medium">{doc.originalName}</TableCell>
             <TableCell>{doc.notes || "-"}</TableCell>
-            <TableCell>
-              {(doc.fileSize / 1024 / 1024).toFixed(2)} MB
-            </TableCell>
-            <TableCell>
-              {new Date(doc.uploadedAt).toLocaleDateString("zh-TW")}
-            </TableCell>
+            <TableCell>{(doc.fileSize / 1024 / 1024).toFixed(2)} MB</TableCell>
+            <TableCell>{new Date(doc.uploadedAt).toLocaleDateString("zh-TW")}</TableCell>
             <TableCell>
               <div className="flex space-x-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => onDownload(doc.id)}
-                >
+                <Button size="sm" variant="outline" onClick={() => onDownload(doc.id)}>
                   <Download className="h-4 w-4" />
                 </Button>
                 <Button
@@ -217,7 +203,7 @@ function DocumentsTable({
         ))}
       </TableBody>
     </Table>
-  );
+  )
 }
 
 /** 無文件時的空狀態 */
@@ -227,5 +213,5 @@ function EmptyDocumentsState() {
       <FileText className="h-12 w-12 mx-auto mb-4 text-gray-400" />
       <p>尚未上傳任何文件</p>
     </div>
-  );
+  )
 }

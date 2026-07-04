@@ -9,7 +9,7 @@ import {
   type InsertLoanPaymentHistory,
   type LoanPaymentSchedule,
 } from "@shared/schema"
-import { eq, and, sql, desc, ne, gte, lt, lte } from "drizzle-orm"
+import { eq, and, sql, desc, ne, gte, lt } from "drizzle-orm"
 import { createAuditLog } from "./payment-items"
 
 // === 借貸投資記錄 CRUD ===
@@ -581,10 +581,7 @@ export async function getLoanInvestmentStats(): Promise<LoanInvestmentStatsResul
       })
       .from(loanInvestmentRecords)
       .where(
-        and(
-          eq(loanInvestmentRecords.status, "active"),
-          sql`annual_interest_rate::numeric > 0`
-        )
+        and(eq(loanInvestmentRecords.status, "active"), sql`annual_interest_rate::numeric > 0`)
       )
 
     const [highRiskCount] = await db
@@ -593,10 +590,7 @@ export async function getLoanInvestmentStats(): Promise<LoanInvestmentStatsResul
       })
       .from(loanInvestmentRecords)
       .where(
-        and(
-          eq(loanInvestmentRecords.status, "active"),
-          sql`annual_interest_rate::numeric >= 15`
-        )
+        and(eq(loanInvestmentRecords.status, "active"), sql`annual_interest_rate::numeric >= 15`)
       )
 
     return {

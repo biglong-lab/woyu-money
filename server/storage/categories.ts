@@ -19,7 +19,7 @@ import {
   type ProjectCategoryTemplate,
   type InsertProjectCategoryTemplate,
 } from "@shared/schema"
-import { eq, and, sql, desc, gte, lt } from "drizzle-orm"
+import { eq, and, sql, gte, lt } from "drizzle-orm"
 
 // === 債務分類 ===
 

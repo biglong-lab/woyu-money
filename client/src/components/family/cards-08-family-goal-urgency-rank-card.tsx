@@ -2,7 +2,6 @@
  * family 卡片元件（自 family.tsx 機械拆分 cards-08-family-goal-urgency-rank-card，2026-07-03）
  */
 import { useQuery } from "@tanstack/react-query"
-import { Task, Jar } from "./family-shared"
 
 export function FamilyGoalUrgencyRankCard() {
   const { data } = useQuery<{

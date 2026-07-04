@@ -1,36 +1,42 @@
-import { useState, useEffect } from "react";
-import { Search, Filter, X, Calendar, DollarSign, Tag, Building2, SortAsc, SortDesc } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
-import { Label } from "@/components/ui/label";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { useState, useEffect } from "react"
+import { Search, Filter, X, SortAsc, SortDesc } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Badge } from "@/components/ui/badge"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Separator } from "@/components/ui/separator"
+import { Label } from "@/components/ui/label"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 
 interface EnhancedSearchFilterProps {
-  searchTerm: string;
-  setSearchTerm: (term: string) => void;
-  filterStatus: string | null;
-  setFilterStatus: (status: string | null) => void;
-  filterCategory: number | null;
-  setFilterCategory: (categoryId: number | null) => void;
-  selectedProjects: number[];
-  setSelectedProjects: (projectIds: number[]) => void;
-  amountRange: { min: string; max: string };
-  setAmountRange: (range: { min: string; max: string }) => void;
-  startDate: string;
-  setStartDate: (date: string) => void;
-  endDate: string;
-  setEndDate: (date: string) => void;
-  sortBy: string;
-  setSortBy: (sort: string) => void;
-  sortOrder: 'asc' | 'desc';
-  setSortOrder: (order: 'asc' | 'desc') => void;
-  categories: Array<{ id: number; categoryName: string }>;
-  projects: Array<{ id: number; projectName: string }>;
-  onClearAll: () => void;
+  searchTerm: string
+  setSearchTerm: (term: string) => void
+  filterStatus: string | null
+  setFilterStatus: (status: string | null) => void
+  filterCategory: number | null
+  setFilterCategory: (categoryId: number | null) => void
+  selectedProjects: number[]
+  setSelectedProjects: (projectIds: number[]) => void
+  amountRange: { min: string; max: string }
+  setAmountRange: (range: { min: string; max: string }) => void
+  startDate: string
+  setStartDate: (date: string) => void
+  endDate: string
+  setEndDate: (date: string) => void
+  sortBy: string
+  setSortBy: (sort: string) => void
+  sortOrder: "asc" | "desc"
+  setSortOrder: (order: "asc" | "desc") => void
+  categories: Array<{ id: number; categoryName: string }>
+  projects: Array<{ id: number; projectName: string }>
+  onClearAll: () => void
 }
 
 export function EnhancedSearchFilter({
@@ -53,63 +59,65 @@ export function EnhancedSearchFilter({
   sortOrder,
   setSortOrder,
   categories,
-  projects,
-  onClearAll
+  onClearAll,
 }: EnhancedSearchFilterProps) {
-  const [isFilterOpen, setIsFilterOpen] = useState(false);
-  const [searchHistory, setSearchHistory] = useState<string[]>([]);
+  const [isFilterOpen, setIsFilterOpen] = useState(false)
+  const [searchHistory, setSearchHistory] = useState<string[]>([])
 
   // 從 localStorage 載入搜索歷史
   useEffect(() => {
-    const saved = localStorage.getItem('payment-search-history');
+    const saved = localStorage.getItem("payment-search-history")
     if (saved) {
-      setSearchHistory(JSON.parse(saved));
+      setSearchHistory(JSON.parse(saved))
     }
-  }, []);
+  }, [])
 
   // 保存搜索歷史
   const saveSearchHistory = (term: string) => {
     if (term.trim() && !searchHistory.includes(term)) {
-      const newHistory = [term, ...searchHistory.slice(0, 4)]; // 保留最近5個搜索
-      setSearchHistory(newHistory);
-      localStorage.setItem('payment-search-history', JSON.stringify(newHistory));
+      const newHistory = [term, ...searchHistory.slice(0, 4)] // 保留最近5個搜索
+      setSearchHistory(newHistory)
+      localStorage.setItem("payment-search-history", JSON.stringify(newHistory))
     }
-  };
+  }
 
   // 處理搜索輸入
   const handleSearchChange = (value: string) => {
-    setSearchTerm(value);
+    setSearchTerm(value)
     if (value.trim()) {
-      saveSearchHistory(value);
+      saveSearchHistory(value)
     }
-  };
+  }
 
   // 獲取活動篩選器數量
   const getActiveFiltersCount = () => {
-    let count = 0;
-    if (filterStatus) count++;
-    if (filterCategory) count++;
-    if (selectedProjects.length > 0) count++;
-    if (amountRange.min || amountRange.max) count++;
-    if (startDate || endDate) count++;
-    return count;
-  };
+    let count = 0
+    if (filterStatus) count++
+    if (filterCategory) count++
+    if (selectedProjects.length > 0) count++
+    if (amountRange.min || amountRange.max) count++
+    if (startDate || endDate) count++
+    return count
+  }
 
   // 快速篩選預設
   const quickFilters = [
     { label: "待處理", action: () => setFilterStatus("pending") },
     { label: "已完成", action: () => setFilterStatus("completed") },
-    { label: "本月", action: () => {
-      const now = new Date();
-      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-      const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-      setStartDate(firstDay.toISOString().split('T')[0]);
-      setEndDate(lastDay.toISOString().split('T')[0]);
-    }},
-    { label: "高額項目", action: () => setAmountRange({ min: "50000", max: "" }) }
-  ];
+    {
+      label: "本月",
+      action: () => {
+        const now = new Date()
+        const firstDay = new Date(now.getFullYear(), now.getMonth(), 1)
+        const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+        setStartDate(firstDay.toISOString().split("T")[0])
+        setEndDate(lastDay.toISOString().split("T")[0])
+      },
+    },
+    { label: "高額項目", action: () => setAmountRange({ min: "50000", max: "" }) },
+  ]
 
-  const activeFiltersCount = getActiveFiltersCount();
+  const activeFiltersCount = getActiveFiltersCount()
 
   return (
     <div className="space-y-4">
@@ -134,12 +142,12 @@ export function EnhancedSearchFilter({
               <X className="h-3 w-3" />
             </Button>
           )}
-          
+
           {/* 搜索建議 */}
           {searchTerm.length > 0 && searchHistory.length > 0 && (
             <div className="absolute top-full left-0 right-0 mt-1 bg-background border rounded-md shadow-lg z-50 max-h-40 overflow-auto">
               {searchHistory
-                .filter(item => item.toLowerCase().includes(searchTerm.toLowerCase()))
+                .filter((item) => item.toLowerCase().includes(searchTerm.toLowerCase()))
                 .slice(0, 3)
                 .map((item, index) => (
                   <button
@@ -167,14 +175,18 @@ export function EnhancedSearchFilter({
               <SelectItem value="status">狀態</SelectItem>
             </SelectContent>
           </Select>
-          
+
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+            onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
             className="px-3"
           >
-            {sortOrder === 'asc' ? <SortAsc className="h-4 w-4" /> : <SortDesc className="h-4 w-4" />}
+            {sortOrder === "asc" ? (
+              <SortAsc className="h-4 w-4" />
+            ) : (
+              <SortDesc className="h-4 w-4" />
+            )}
           </Button>
         </div>
 
@@ -227,7 +239,10 @@ export function EnhancedSearchFilter({
                 {/* 狀態篩選 */}
                 <div>
                   <Label className="text-xs text-muted-foreground">狀態</Label>
-                  <Select value={filterStatus || ""} onValueChange={(value) => setFilterStatus(value || null)}>
+                  <Select
+                    value={filterStatus || ""}
+                    onValueChange={(value) => setFilterStatus(value || null)}
+                  >
                     <SelectTrigger className="mt-2">
                       <SelectValue placeholder="選擇狀態" />
                     </SelectTrigger>
@@ -244,13 +259,16 @@ export function EnhancedSearchFilter({
                 {/* 分類篩選 */}
                 <div>
                   <Label className="text-xs text-muted-foreground">分類</Label>
-                  <Select value={filterCategory?.toString() || ""} onValueChange={(value) => setFilterCategory(value ? parseInt(value) : null)}>
+                  <Select
+                    value={filterCategory?.toString() || ""}
+                    onValueChange={(value) => setFilterCategory(value ? parseInt(value) : null)}
+                  >
                     <SelectTrigger className="mt-2">
                       <SelectValue placeholder="選擇分類" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="">全部分類</SelectItem>
-                      {categories.map(category => (
+                      {categories.map((category) => (
                         <SelectItem key={category.id} value={category.id.toString()}>
                           {category.categoryName}
                         </SelectItem>
@@ -311,35 +329,26 @@ export function EnhancedSearchFilter({
           {filterStatus && (
             <Badge variant="secondary" className="gap-1">
               狀態: {filterStatus}
-              <X 
-                className="h-3 w-3 cursor-pointer" 
-                onClick={() => setFilterStatus(null)}
-              />
+              <X className="h-3 w-3 cursor-pointer" onClick={() => setFilterStatus(null)} />
             </Badge>
           )}
           {filterCategory && (
             <Badge variant="secondary" className="gap-1">
-              分類: {categories.find(cat => cat.id === filterCategory)?.categoryName}
-              <X 
-                className="h-3 w-3 cursor-pointer" 
-                onClick={() => setFilterCategory(null)}
-              />
+              分類: {categories.find((cat) => cat.id === filterCategory)?.categoryName}
+              <X className="h-3 w-3 cursor-pointer" onClick={() => setFilterCategory(null)} />
             </Badge>
           )}
           {selectedProjects.length > 0 && (
             <Badge variant="secondary" className="gap-1">
               專案: {selectedProjects.length}個
-              <X 
-                className="h-3 w-3 cursor-pointer" 
-                onClick={() => setSelectedProjects([])}
-              />
+              <X className="h-3 w-3 cursor-pointer" onClick={() => setSelectedProjects([])} />
             </Badge>
           )}
           {(amountRange.min || amountRange.max) && (
             <Badge variant="secondary" className="gap-1">
-              金額: {amountRange.min || '0'} - {amountRange.max || '無限'}
-              <X 
-                className="h-3 w-3 cursor-pointer" 
+              金額: {amountRange.min || "0"} - {amountRange.max || "無限"}
+              <X
+                className="h-3 w-3 cursor-pointer"
                 onClick={() => setAmountRange({ min: "", max: "" })}
               />
             </Badge>
@@ -347,14 +356,17 @@ export function EnhancedSearchFilter({
           {(startDate || endDate) && (
             <Badge variant="secondary" className="gap-1">
               日期範圍
-              <X 
-                className="h-3 w-3 cursor-pointer" 
-                onClick={() => { setStartDate(""); setEndDate(""); }}
+              <X
+                className="h-3 w-3 cursor-pointer"
+                onClick={() => {
+                  setStartDate("")
+                  setEndDate("")
+                }}
               />
             </Badge>
           )}
         </div>
       )}
     </div>
-  );
+  )
 }

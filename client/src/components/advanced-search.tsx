@@ -1,151 +1,157 @@
-import { useState, useCallback } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Search, X, Save, Settings } from 'lucide-react';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { useState, useCallback } from "react"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Search, X, Save, Settings } from "lucide-react"
+import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible"
 
 interface SearchFilter {
-  id: string;
-  name: string;
-  field: string;
-  operator: string;
-  value: string;
-  type: 'text' | 'number' | 'date' | 'select';
+  id: string
+  name: string
+  field: string
+  operator: string
+  value: string
+  type: "text" | "number" | "date" | "select"
 }
 
 interface SavedSearch {
-  id: string;
-  name: string;
-  filters: SearchFilter[];
-  createdAt: string;
+  id: string
+  name: string
+  filters: SearchFilter[]
+  createdAt: string
 }
 
 interface AdvancedSearchProps {
-  onSearch: (filters: SearchFilter[]) => void;
-  onClear: () => void;
+  onSearch: (filters: SearchFilter[]) => void
+  onClear: () => void
   availableFields: Array<{
-    key: string;
-    label: string;
-    type: 'text' | 'number' | 'date' | 'select';
-    options?: Array<{ value: string; label: string }>;
-  }>;
+    key: string
+    label: string
+    type: "text" | "number" | "date" | "select"
+    options?: Array<{ value: string; label: string }>
+  }>
 }
 
 export function AdvancedSearch({ onSearch, onClear, availableFields }: AdvancedSearchProps) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [filters, setFilters] = useState<SearchFilter[]>([]);
-  const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([]);
-  const [saveSearchName, setSaveSearchName] = useState('');
-  const [globalSearch, setGlobalSearch] = useState('');
+  const [isOpen, setIsOpen] = useState(false)
+  const [filters, setFilters] = useState<SearchFilter[]>([])
+  const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([])
+  const [saveSearchName, setSaveSearchName] = useState("")
+  const [globalSearch, setGlobalSearch] = useState("")
 
   // 新增篩選條件
   const addFilter = useCallback(() => {
     const newFilter: SearchFilter = {
       id: Date.now().toString(),
-      name: '',
-      field: availableFields[0]?.key || '',
-      operator: 'contains',
-      value: '',
-      type: availableFields[0]?.type || 'text'
-    };
-    setFilters(prev => [...prev, newFilter]);
-  }, [availableFields]);
+      name: "",
+      field: availableFields[0]?.key || "",
+      operator: "contains",
+      value: "",
+      type: availableFields[0]?.type || "text",
+    }
+    setFilters((prev) => [...prev, newFilter])
+  }, [availableFields])
 
   // 更新篩選條件
   const updateFilter = useCallback((id: string, updates: Partial<SearchFilter>) => {
-    setFilters(prev => prev.map(filter => 
-      filter.id === id ? { ...filter, ...updates } : filter
-    ));
-  }, []);
+    setFilters((prev) =>
+      prev.map((filter) => (filter.id === id ? { ...filter, ...updates } : filter))
+    )
+  }, [])
 
   // 移除篩選條件
   const removeFilter = useCallback((id: string) => {
-    setFilters(prev => prev.filter(filter => filter.id !== id));
-  }, []);
+    setFilters((prev) => prev.filter((filter) => filter.id !== id))
+  }, [])
 
   // 執行搜尋
   const handleSearch = useCallback(() => {
-    const activeFilters = filters.filter(f => f.field && f.value);
-    
+    const activeFilters = filters.filter((f) => f.field && f.value)
+
     // 如果有全域搜尋，加入到篩選條件中
     if (globalSearch.trim()) {
       const globalFilter: SearchFilter = {
-        id: 'global-search',
-        name: '全域搜尋',
-        field: 'global',
-        operator: 'contains',
+        id: "global-search",
+        name: "全域搜尋",
+        field: "global",
+        operator: "contains",
         value: globalSearch.trim(),
-        type: 'text'
-      };
-      activeFilters.unshift(globalFilter);
+        type: "text",
+      }
+      activeFilters.unshift(globalFilter)
     }
-    
-    onSearch(activeFilters);
-  }, [filters, globalSearch, onSearch]);
+
+    onSearch(activeFilters)
+  }, [filters, globalSearch, onSearch])
 
   // 清除搜尋
   const handleClear = useCallback(() => {
-    setFilters([]);
-    setGlobalSearch('');
-    onClear();
-  }, [onClear]);
+    setFilters([])
+    setGlobalSearch("")
+    onClear()
+  }, [onClear])
 
   // 儲存搜尋條件
   const saveSearch = useCallback(() => {
-    if (!saveSearchName.trim() || filters.length === 0) return;
-    
+    if (!saveSearchName.trim() || filters.length === 0) return
+
     const newSavedSearch: SavedSearch = {
       id: Date.now().toString(),
       name: saveSearchName.trim(),
       filters: [...filters],
-      createdAt: new Date().toISOString()
-    };
-    
-    setSavedSearches(prev => [...prev, newSavedSearch]);
-    setSaveSearchName('');
-    
+      createdAt: new Date().toISOString(),
+    }
+
+    setSavedSearches((prev) => [...prev, newSavedSearch])
+    setSaveSearchName("")
+
     // 在實際應用中，這裡應該保存到後端
-    localStorage.setItem('savedSearches', JSON.stringify([...savedSearches, newSavedSearch]));
-  }, [saveSearchName, filters, savedSearches]);
+    localStorage.setItem("savedSearches", JSON.stringify([...savedSearches, newSavedSearch]))
+  }, [saveSearchName, filters, savedSearches])
 
   // 載入已儲存的搜尋
   const loadSavedSearch = useCallback((savedSearch: SavedSearch) => {
-    setFilters(savedSearch.filters);
-    setIsOpen(true);
-  }, []);
+    setFilters(savedSearch.filters)
+    setIsOpen(true)
+  }, [])
 
   // 獲取操作符選項
   const getOperatorOptions = (type: string) => {
     switch (type) {
-      case 'number':
+      case "number":
         return [
-          { value: 'equals', label: '等於' },
-          { value: 'gt', label: '大於' },
-          { value: 'gte', label: '大於等於' },
-          { value: 'lt', label: '小於' },
-          { value: 'lte', label: '小於等於' },
-          { value: 'between', label: '介於' }
-        ];
-      case 'date':
+          { value: "equals", label: "等於" },
+          { value: "gt", label: "大於" },
+          { value: "gte", label: "大於等於" },
+          { value: "lt", label: "小於" },
+          { value: "lte", label: "小於等於" },
+          { value: "between", label: "介於" },
+        ]
+      case "date":
         return [
-          { value: 'equals', label: '等於' },
-          { value: 'after', label: '晚於' },
-          { value: 'before', label: '早於' },
-          { value: 'between', label: '介於' }
-        ];
+          { value: "equals", label: "等於" },
+          { value: "after", label: "晚於" },
+          { value: "before", label: "早於" },
+          { value: "between", label: "介於" },
+        ]
       default:
         return [
-          { value: 'contains', label: '包含' },
-          { value: 'equals', label: '等於' },
-          { value: 'startsWith', label: '開始於' },
-          { value: 'endsWith', label: '結束於' }
-        ];
+          { value: "contains", label: "包含" },
+          { value: "equals", label: "等於" },
+          { value: "startsWith", label: "開始於" },
+          { value: "endsWith", label: "結束於" },
+        ]
     }
-  };
+  }
 
   return (
     <div className="space-y-4">
@@ -158,7 +164,7 @@ export function AdvancedSearch({ onSearch, onClear, availableFields }: AdvancedS
             value={globalSearch}
             onChange={(e) => setGlobalSearch(e.target.value)}
             className="pl-10"
-            onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+            onKeyPress={(e) => e.key === "Enter" && handleSearch()}
           />
         </div>
         <Button onClick={handleSearch} variant="default">
@@ -198,7 +204,7 @@ export function AdvancedSearch({ onSearch, onClear, availableFields }: AdvancedS
             <CardContent className="space-y-4">
               {/* 篩選條件 */}
               {filters.map((filter, index) => {
-                const fieldConfig = availableFields.find(f => f.key === filter.field);
+                const fieldConfig = availableFields.find((f) => f.key === filter.field)
                 return (
                   <div key={filter.id} className="grid grid-cols-12 gap-2 items-end">
                     <div className="col-span-3">
@@ -206,11 +212,11 @@ export function AdvancedSearch({ onSearch, onClear, availableFields }: AdvancedS
                       <Select
                         value={filter.field}
                         onValueChange={(value) => {
-                          const field = availableFields.find(f => f.key === value);
-                          updateFilter(filter.id, { 
+                          const field = availableFields.find((f) => f.key === value)
+                          updateFilter(filter.id, {
                             field: value,
-                            type: field?.type || 'text'
-                          });
+                            type: field?.type || "text",
+                          })
                         }}
                       >
                         <SelectTrigger>
@@ -247,7 +253,7 @@ export function AdvancedSearch({ onSearch, onClear, availableFields }: AdvancedS
 
                     <div className="col-span-6">
                       <Label className="text-sm">值</Label>
-                      {fieldConfig?.type === 'select' ? (
+                      {fieldConfig?.type === "select" ? (
                         <Select
                           value={filter.value}
                           onValueChange={(value) => updateFilter(filter.id, { value })}
@@ -265,7 +271,13 @@ export function AdvancedSearch({ onSearch, onClear, availableFields }: AdvancedS
                         </Select>
                       ) : (
                         <Input
-                          type={filter.type === 'date' ? 'date' : filter.type === 'number' ? 'number' : 'text'}
+                          type={
+                            filter.type === "date"
+                              ? "date"
+                              : filter.type === "number"
+                                ? "number"
+                                : "text"
+                          }
                           value={filter.value}
                           onChange={(e) => updateFilter(filter.id, { value: e.target.value })}
                           placeholder="輸入搜尋值..."
@@ -274,16 +286,12 @@ export function AdvancedSearch({ onSearch, onClear, availableFields }: AdvancedS
                     </div>
 
                     <div className="col-span-1">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => removeFilter(filter.id)}
-                      >
+                      <Button variant="outline" size="sm" onClick={() => removeFilter(filter.id)}>
                         <X className="h-4 w-4" />
                       </Button>
                     </div>
                   </div>
-                );
+                )
               })}
 
               {/* 操作按鈕 */}
@@ -305,8 +313,8 @@ export function AdvancedSearch({ onSearch, onClear, availableFields }: AdvancedS
                       onChange={(e) => setSaveSearchName(e.target.value)}
                       className="w-40"
                     />
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       size="sm"
                       onClick={saveSearch}
                       disabled={!saveSearchName.trim() || filters.length === 0}
@@ -314,9 +322,7 @@ export function AdvancedSearch({ onSearch, onClear, availableFields }: AdvancedS
                       <Save className="h-4 w-4" />
                     </Button>
                   </div>
-                  <Button onClick={handleSearch}>
-                    執行搜尋
-                  </Button>
+                  <Button onClick={handleSearch}>執行搜尋</Button>
                 </div>
               </div>
             </CardContent>
@@ -331,26 +337,25 @@ export function AdvancedSearch({ onSearch, onClear, availableFields }: AdvancedS
           {globalSearch && (
             <Badge variant="default">
               全域: {globalSearch}
-              <X 
-                className="h-3 w-3 ml-1 cursor-pointer" 
-                onClick={() => setGlobalSearch('')}
-              />
+              <X className="h-3 w-3 ml-1 cursor-pointer" onClick={() => setGlobalSearch("")} />
             </Badge>
           )}
-          {filters.filter(f => f.value).map((filter) => {
-            const field = availableFields.find(f => f.key === filter.field);
-            return (
-              <Badge key={filter.id} variant="secondary">
-                {field?.label}: {filter.value}
-                <X 
-                  className="h-3 w-3 ml-1 cursor-pointer" 
-                  onClick={() => removeFilter(filter.id)}
-                />
-              </Badge>
-            );
-          })}
+          {filters
+            .filter((f) => f.value)
+            .map((filter) => {
+              const field = availableFields.find((f) => f.key === filter.field)
+              return (
+                <Badge key={filter.id} variant="secondary">
+                  {field?.label}: {filter.value}
+                  <X
+                    className="h-3 w-3 ml-1 cursor-pointer"
+                    onClick={() => removeFilter(filter.id)}
+                  />
+                </Badge>
+              )
+            })}
         </div>
       )}
     </div>
-  );
+  )
 }

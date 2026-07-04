@@ -22,8 +22,6 @@ import {
   autoConfirmBySource,
   rejectWebhook,
   reprocessWebhook,
-  verifyBearerToken,
-  verifyHmacSignature,
 } from "../storage/income"
 import { ZodError } from "zod"
 

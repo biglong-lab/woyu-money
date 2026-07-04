@@ -9,17 +9,10 @@ import { Router } from "express"
 import OpenAI from "openai"
 import { asyncHandler, AppError } from "../middleware/error-handler"
 import { getAiSettings, getAiSettingsMasked, updateAiSettings } from "../storage/ai-settings"
-import { getEmployees, createEmployee, getEmployee } from "../storage/hr-costs"
+import { getEmployees, createEmployee } from "../storage/hr-costs"
 import { calculateInsurance } from "../../shared/insurance-utils"
 import { db } from "../db"
-import {
-  dailyRevenues,
-  paymentProjects,
-  paymentRecords,
-  incomeWebhooks,
-  incomeSources,
-} from "@shared/schema"
-import { sql, and, gte, lte, desc } from "drizzle-orm"
+import { sql } from "drizzle-orm"
 import { z } from "zod"
 
 const router = Router()

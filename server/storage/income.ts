@@ -7,11 +7,10 @@ import {
   type IncomeSource,
   type InsertIncomeSource,
   type IncomeWebhook,
-  type InsertIncomeWebhook,
   type ConfirmWebhookInput,
   type BatchConfirmWebhookInput,
 } from "@shared/schema"
-import { eq, and, desc, isNull, inArray, sql } from "drizzle-orm"
+import { eq, and, desc, sql } from "drizzle-orm"
 import * as crypto from "crypto"
 
 // ─────────────────────────────────────────────

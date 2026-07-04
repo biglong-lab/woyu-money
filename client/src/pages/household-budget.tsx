@@ -22,17 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
-import {
-  Plus,
-  Camera,
-  Wallet,
-  TrendingDown,
-  TrendingUp,
-  Calendar,
-  Trash2,
-  Mic,
-  MicOff,
-} from "lucide-react"
+import { Plus, Wallet, TrendingDown, TrendingUp, Calendar, Trash2, Mic, MicOff } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { apiRequest } from "@/lib/queryClient"
 import { localDateISO, formatNT, cn } from "@/lib/utils"

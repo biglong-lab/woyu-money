@@ -3,8 +3,6 @@ import {
   paymentRecords,
   paymentItems,
   paymentProjects,
-  debtCategories,
-  fixedCategories,
   paymentSchedules,
   paymentItemNotes,
   type PaymentRecord,
@@ -14,7 +12,7 @@ import {
   type PaymentItemNote,
   type InsertPaymentItemNote,
 } from "@shared/schema"
-import { eq, and, desc, asc, sql, gte, lte, type SQL } from "drizzle-orm"
+import { eq, and, desc, sql, gte, lte, type SQL } from "drizzle-orm"
 
 // === 付款記錄 ===
 

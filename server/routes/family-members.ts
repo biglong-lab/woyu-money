@@ -18,7 +18,6 @@ import { db } from "../db"
 import { sql } from "drizzle-orm"
 import { randomBytes } from "crypto"
 import {
-  familyMembers,
   inviteFamilyMemberSchema,
   type InviteFamilyMemberInput,
 } from "@shared/schema/family-members"

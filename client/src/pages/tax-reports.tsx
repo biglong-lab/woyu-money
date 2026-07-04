@@ -22,7 +22,6 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { Separator } from "@/components/ui/separator"
 import { Receipt, FileText, Users, AlertTriangle, Info } from "lucide-react"
 import { apiRequest } from "@/lib/queryClient"
 import { useDocumentTitle } from "@/hooks/use-document-title"

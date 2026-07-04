@@ -1,18 +1,22 @@
 // 現金流預測 - 明細彈出視窗元件
-import { format } from 'date-fns';
-import { Info } from 'lucide-react';
-import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
-import type { DetailItem, PaidDetailItem, CategoryVisibility } from './types';
-import { CATEGORY_COLORS, CATEGORY_LABELS } from './types';
+import { format } from "date-fns"
+import { Info } from "lucide-react"
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card"
+import type { DetailItem, PaidDetailItem } from "./types"
+import { CATEGORY_COLORS, CATEGORY_LABELS } from "./types"
 
 // 一般分類明細
-export function DetailPopover({ details, category, amount }: {
-  details: DetailItem[];
-  category: keyof typeof CATEGORY_LABELS;
-  amount: number;
+export function DetailPopover({
+  details,
+  category,
+  amount,
+}: {
+  details: DetailItem[]
+  category: keyof typeof CATEGORY_LABELS
+  amount: number
 }) {
   if (details.length === 0 || amount === 0) {
-    return <span>${amount.toLocaleString()}</span>;
+    return <span>${amount.toLocaleString()}</span>
   }
 
   return (
@@ -30,16 +34,24 @@ export function DetailPopover({ details, category, amount }: {
       <HoverCardContent className="w-80" align="start">
         <div className="space-y-2">
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: CATEGORY_COLORS[category] }} />
+            <div
+              className="w-3 h-3 rounded-full"
+              style={{ backgroundColor: CATEGORY_COLORS[category] }}
+            />
             <h4 className="font-semibold text-sm">{CATEGORY_LABELS[category]} 明細</h4>
           </div>
           <div className="max-h-48 overflow-y-auto space-y-1">
             {details.map((item, idx) => (
-              <div key={`${item.id}-${idx}`} className="flex justify-between items-start text-sm p-2 bg-gray-50 rounded">
+              <div
+                key={`${item.id}-${idx}`}
+                className="flex justify-between items-start text-sm p-2 bg-gray-50 rounded"
+              >
                 <div className="flex-1 min-w-0">
                   <p className="font-medium truncate">{item.name}</p>
                   {item.project && <p className="text-xs text-gray-500 truncate">{item.project}</p>}
-                  {item.date && <p className="text-xs text-gray-400">{format(new Date(item.date), 'MM/dd')}</p>}
+                  {item.date && (
+                    <p className="text-xs text-gray-400">{format(new Date(item.date), "MM/dd")}</p>
+                  )}
                 </div>
                 <span className="font-medium ml-2" style={{ color: CATEGORY_COLORS[category] }}>
                   ${item.amount.toLocaleString()}
@@ -54,22 +66,26 @@ export function DetailPopover({ details, category, amount }: {
         </div>
       </HoverCardContent>
     </HoverCard>
-  );
+  )
 }
 
 // 已付款明細（分本月/他月項目）
-export function PaidDetailPopover({ paidCurrent, paidCarryOver, totalAmount }: {
-  paidCurrent: PaidDetailItem[];
-  paidCarryOver: PaidDetailItem[];
-  totalAmount: number;
+export function PaidDetailPopover({
+  paidCurrent,
+  paidCarryOver,
+  totalAmount,
+}: {
+  paidCurrent: PaidDetailItem[]
+  paidCarryOver: PaidDetailItem[]
+  totalAmount: number
 }) {
-  const totalItems = paidCurrent.length + paidCarryOver.length;
+  const totalItems = paidCurrent.length + paidCarryOver.length
   if (totalItems === 0 || totalAmount === 0) {
-    return <span>${totalAmount.toLocaleString()}</span>;
+    return <span>${totalAmount.toLocaleString()}</span>
   }
 
-  const currentTotal = paidCurrent.reduce((sum, item) => sum + item.amount, 0);
-  const carryOverTotal = paidCarryOver.reduce((sum, item) => sum + item.amount, 0);
+  const currentTotal = paidCurrent.reduce((sum, item) => sum + item.amount, 0)
+  const carryOverTotal = paidCarryOver.reduce((sum, item) => sum + item.amount, 0)
 
   return (
     <HoverCard openDelay={200} closeDelay={100}>
@@ -86,7 +102,10 @@ export function PaidDetailPopover({ paidCurrent, paidCarryOver, totalAmount }: {
       <HoverCardContent className="w-96" align="start">
         <div className="space-y-3">
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: CATEGORY_COLORS.paid }} />
+            <div
+              className="w-3 h-3 rounded-full"
+              style={{ backgroundColor: CATEGORY_COLORS.paid }}
+            />
             <h4 className="font-semibold text-sm">已付款 明細</h4>
           </div>
 
@@ -98,13 +117,24 @@ export function PaidDetailPopover({ paidCurrent, paidCarryOver, totalAmount }: {
               </div>
               <div className="max-h-24 overflow-y-auto space-y-1 pl-4">
                 {paidCurrent.map((item, idx) => (
-                  <div key={`current-${item.id}-${idx}`} className="flex justify-between items-start text-sm p-2 bg-gray-50 rounded">
+                  <div
+                    key={`current-${item.id}-${idx}`}
+                    className="flex justify-between items-start text-sm p-2 bg-gray-50 rounded"
+                  >
                     <div className="flex-1 min-w-0">
                       <p className="font-medium truncate">{item.name}</p>
-                      {item.project && <p className="text-xs text-gray-500 truncate">{item.project}</p>}
-                      {item.date && <p className="text-xs text-gray-400">{format(new Date(item.date), 'MM/dd')}</p>}
+                      {item.project && (
+                        <p className="text-xs text-gray-500 truncate">{item.project}</p>
+                      )}
+                      {item.date && (
+                        <p className="text-xs text-gray-400">
+                          {format(new Date(item.date), "MM/dd")}
+                        </p>
+                      )}
                     </div>
-                    <span className="font-medium ml-2 text-gray-600">${item.amount.toLocaleString()}</span>
+                    <span className="font-medium ml-2 text-gray-600">
+                      ${item.amount.toLocaleString()}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -123,16 +153,27 @@ export function PaidDetailPopover({ paidCurrent, paidCarryOver, totalAmount }: {
               </div>
               <div className="max-h-24 overflow-y-auto space-y-1 pl-4">
                 {paidCarryOver.map((item, idx) => (
-                  <div key={`carryover-${item.id}-${idx}`} className="flex justify-between items-start text-sm p-2 bg-orange-50 rounded border-l-2 border-orange-300">
+                  <div
+                    key={`carryover-${item.id}-${idx}`}
+                    className="flex justify-between items-start text-sm p-2 bg-orange-50 rounded border-l-2 border-orange-300"
+                  >
                     <div className="flex-1 min-w-0">
                       <p className="font-medium truncate">
                         {item.name}
                         <span className="ml-1 text-xs text-orange-500">({item.originLabel})</span>
                       </p>
-                      {item.project && <p className="text-xs text-gray-500 truncate">{item.project}</p>}
-                      {item.date && <p className="text-xs text-gray-400">付款: {format(new Date(item.date), 'MM/dd')}</p>}
+                      {item.project && (
+                        <p className="text-xs text-gray-500 truncate">{item.project}</p>
+                      )}
+                      {item.date && (
+                        <p className="text-xs text-gray-400">
+                          付款: {format(new Date(item.date), "MM/dd")}
+                        </p>
+                      )}
                     </div>
-                    <span className="font-medium ml-2 text-orange-600">${item.amount.toLocaleString()}</span>
+                    <span className="font-medium ml-2 text-orange-600">
+                      ${item.amount.toLocaleString()}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -150,5 +191,5 @@ export function PaidDetailPopover({ paidCurrent, paidCarryOver, totalAmount }: {
         </div>
       </HoverCardContent>
     </HoverCard>
-  );
+  )
 }

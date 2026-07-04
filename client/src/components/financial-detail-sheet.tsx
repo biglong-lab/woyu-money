@@ -37,7 +37,6 @@ import {
   CheckSquare,
   Sparkles,
   Wallet,
-  Trash2,
   X,
 } from "lucide-react"
 import { formatNT } from "@/lib/utils"

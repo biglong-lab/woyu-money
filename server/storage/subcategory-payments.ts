@@ -8,7 +8,7 @@ import {
   auditLogs,
   type PaymentItem,
 } from "@shared/schema"
-import { eq, and, sql, ne, desc } from "drizzle-orm"
+import { eq, and, sql, ne } from "drizzle-orm"
 
 // === 子分類付款狀態 ===
 

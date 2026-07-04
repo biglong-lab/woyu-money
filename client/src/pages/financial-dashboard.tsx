@@ -47,7 +47,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import {
-  BarChart,
   Bar,
   XAxis,
   YAxis,

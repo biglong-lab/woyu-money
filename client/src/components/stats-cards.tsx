@@ -1,19 +1,24 @@
-import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent } from "@/components/ui/card";
-import { TrendingUpIcon, TrendingDownIcon, WalletIcon, DatabaseIcon } from "lucide-react";
+import { useQuery } from "@tanstack/react-query"
+import { Card, CardContent } from "@/components/ui/card"
+import { TrendingUpIcon, TrendingDownIcon, WalletIcon } from "lucide-react"
 
 export default function StatsCards() {
   const { data: monthlyStats } = useQuery({
     queryKey: ["/api/stats/monthly"],
-  });
+  })
 
-  const { data: debtStats } = useQuery<{ thisMonthDue?: number; thisMonthPaid?: number; thisMonthUnpaid?: number; priorUnpaid?: number }>({
+  const { data: debtStats } = useQuery<{
+    thisMonthDue?: number
+    thisMonthPaid?: number
+    thisMonthUnpaid?: number
+    priorUnpaid?: number
+  }>({
     queryKey: ["/api/stats/debts"],
-  });
+  })
 
   const { data: migrationStatus } = useQuery({
     queryKey: ["/api/migration/status"],
-  });
+  })
 
   const statsData = [
     {
@@ -56,12 +61,12 @@ export default function StatsCards() {
       changeText: "本月之前",
       changeColor: debtStats?.priorUnpaid ? "text-purple-600" : "text-green-600",
     },
-  ];
+  ]
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
       {statsData.map((stat, index) => {
-        const Icon = stat.icon;
+        const Icon = stat.icon
         return (
           <Card key={index} className="border border-slate-200 shadow-sm">
             <CardContent className="p-6">
@@ -70,7 +75,9 @@ export default function StatsCards() {
                   <p className="text-slate-600 text-sm font-medium">{stat.title}</p>
                   <p className="text-2xl font-bold text-slate-900 mt-1">{stat.value}</p>
                 </div>
-                <div className={`w-12 h-12 ${stat.iconBg} rounded-lg flex items-center justify-center`}>
+                <div
+                  className={`w-12 h-12 ${stat.iconBg} rounded-lg flex items-center justify-center`}
+                >
                   <Icon className={`${stat.iconColor} w-6 h-6`} />
                 </div>
               </div>
@@ -80,8 +87,8 @@ export default function StatsCards() {
               </div>
             </CardContent>
           </Card>
-        );
+        )
       })}
     </div>
-  );
+  )
 }

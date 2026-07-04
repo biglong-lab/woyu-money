@@ -14,7 +14,7 @@
  *
  * 純前端計算、不需新 API
  */
-import { useState, useMemo, useEffect } from "react"
+import { useState, useMemo } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -30,7 +30,6 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import {
-  BarChart3,
   RotateCcw,
   TrendingUp,
   TrendingDown,

@@ -5,10 +5,6 @@ import { db } from "./db"
 import { paymentItems } from "@shared/schema"
 import { and, eq, lte, gte, sql } from "drizzle-orm"
 import { getTodayReminderStatusWith, fetchUnpaidFromDb } from "./services/late-fee.service"
-import {
-  getUserUnreadNotifications,
-  getUsersWithEmailNotificationEnabled,
-} from "./storage/notifications"
 
 class NotificationScheduler {
   private intervalId: NodeJS.Timeout | null = null

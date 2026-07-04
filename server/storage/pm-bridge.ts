@@ -13,7 +13,7 @@
 import { Pool } from "pg"
 import { db } from "../db"
 import { incomeSources, incomeWebhooks } from "@shared/schema"
-import { eq, and, isNull } from "drizzle-orm"
+import { eq, and } from "drizzle-orm"
 import { _createPaymentFromWebhook } from "./income"
 import { getCompanyToProjectMap } from "./pm-company-mapping"
 import { EXCLUDED_PM_COMPANY_IDS, isExcludedPmCompany } from "@shared/pm-excluded-companies"

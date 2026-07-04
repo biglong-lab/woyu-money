@@ -3,8 +3,15 @@
  * 支援：文字（Markdown）、圖片預覽、工具調用結果卡片
  */
 import { useState } from "react"
-import { Bot, User, ChevronDown, ChevronRight, Wrench, AlertCircle, CheckCircle2 } from "lucide-react"
-import { Badge } from "@/components/ui/badge"
+import {
+  Bot,
+  User,
+  ChevronDown,
+  ChevronRight,
+  Wrench,
+  AlertCircle,
+  CheckCircle2,
+} from "lucide-react"
 import type { ChatMessage, ToolCallResult } from "@/hooks/use-ai-chat"
 
 // ─────────────────────────────────────────────
@@ -33,29 +40,28 @@ function ToolResultCard({ tc }: { tc: ToolCallResult }) {
   const isError = tc.error !== undefined
 
   return (
-    <div className={`mt-1.5 rounded-lg border text-xs overflow-hidden ${
-      isError ? "border-red-200 bg-red-50" : "border-blue-200 bg-blue-50/60"
-    }`}>
+    <div
+      className={`mt-1.5 rounded-lg border text-xs overflow-hidden ${
+        isError ? "border-red-200 bg-red-50" : "border-blue-200 bg-blue-50/60"
+      }`}
+    >
       <button
         className="w-full flex items-center gap-2 px-3 py-2 text-left"
         onClick={() => isDone && setExpanded(!expanded)}
       >
         <Wrench className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
         <span className="font-medium text-blue-700 flex-1">{label}</span>
-        {!isDone && (
-          <span className="text-blue-400 animate-pulse">執行中…</span>
-        )}
+        {!isDone && <span className="text-blue-400 animate-pulse">執行中…</span>}
         {isDone && !isError && (
           <CheckCircle2 className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
         )}
-        {isError && (
-          <AlertCircle className="w-3.5 h-3.5 text-red-500 flex-shrink-0" />
-        )}
-        {isDone && (
-          expanded
-            ? <ChevronDown className="w-3.5 h-3.5 text-blue-400" />
-            : <ChevronRight className="w-3.5 h-3.5 text-blue-400" />
-        )}
+        {isError && <AlertCircle className="w-3.5 h-3.5 text-red-500 flex-shrink-0" />}
+        {isDone &&
+          (expanded ? (
+            <ChevronDown className="w-3.5 h-3.5 text-blue-400" />
+          ) : (
+            <ChevronRight className="w-3.5 h-3.5 text-blue-400" />
+          ))}
       </button>
       {expanded && isDone && (
         <div className="px-3 pb-2.5 pt-0 border-t border-blue-100">
@@ -95,10 +101,18 @@ function MarkdownText({ text }: { text: string }) {
 
         // 標題
         if (line.startsWith("## ")) {
-          return <p key={i} className="font-semibold text-gray-900 mt-1">{line.slice(3)}</p>
+          return (
+            <p key={i} className="font-semibold text-gray-900 mt-1">
+              {line.slice(3)}
+            </p>
+          )
         }
         if (line.startsWith("# ")) {
-          return <p key={i} className="font-bold text-gray-900 mt-1">{line.slice(2)}</p>
+          return (
+            <p key={i} className="font-bold text-gray-900 mt-1">
+              {line.slice(2)}
+            </p>
+          )
         }
 
         // 一般文字（處理粗體和程式碼）
@@ -110,7 +124,11 @@ function MarkdownText({ text }: { text: string }) {
                 return <strong key={j}>{part.slice(2, -2)}</strong>
               }
               if (part.startsWith("`") && part.endsWith("`")) {
-                return <code key={j} className="bg-gray-100 px-1 rounded text-xs font-mono">{part.slice(1, -1)}</code>
+                return (
+                  <code key={j} className="bg-gray-100 px-1 rounded text-xs font-mono">
+                    {part.slice(1, -1)}
+                  </code>
+                )
               }
               return <span key={j}>{part}</span>
             })}
@@ -176,14 +194,21 @@ export function AiMessageBubble({ message }: AiMessageBubbleProps) {
         {/* AI 回應文字 */}
         {(message.content || message.isStreaming) && (
           <div className="bg-white border border-gray-200 rounded-2xl rounded-tl-sm px-4 py-2.5 shadow-sm">
-            {message.content ? (
-              <MarkdownText text={message.content} />
-            ) : null}
+            {message.content ? <MarkdownText text={message.content} /> : null}
             {message.isStreaming && (
               <span className="inline-flex gap-0.5 ml-1">
-                <span className="w-1 h-1 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                <span className="w-1 h-1 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                <span className="w-1 h-1 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                <span
+                  className="w-1 h-1 bg-gray-400 rounded-full animate-bounce"
+                  style={{ animationDelay: "0ms" }}
+                />
+                <span
+                  className="w-1 h-1 bg-gray-400 rounded-full animate-bounce"
+                  style={{ animationDelay: "150ms" }}
+                />
+                <span
+                  className="w-1 h-1 bg-gray-400 rounded-full animate-bounce"
+                  style={{ animationDelay: "300ms" }}
+                />
               </span>
             )}
           </div>

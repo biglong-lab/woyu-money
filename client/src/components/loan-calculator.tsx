@@ -40,8 +40,6 @@ import {
   Brain,
   Lightbulb,
   Plus,
-  User,
-  Phone,
 } from "lucide-react"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { useForm } from "react-hook-form"

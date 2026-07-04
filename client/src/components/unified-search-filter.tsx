@@ -1,27 +1,8 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react"
-import {
-  Search,
-  Filter,
-  X,
-  Calendar,
-  AlertTriangle,
-  Clock,
-  Tag,
-  Building2,
-  ChevronDown,
-} from "lucide-react"
+import { Search, Filter, X, Calendar, AlertTriangle, Clock, Tag, Building2 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Card, CardContent } from "@/components/ui/card"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuCheckboxItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 
 export interface FilterConfig {

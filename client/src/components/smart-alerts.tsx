@@ -1,80 +1,91 @@
-import { useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Bell, AlertTriangle, Clock, TrendingUp, DollarSign, X } from "lucide-react";
-import { formatCurrency } from "@/lib/utils";
+import { useState } from "react"
+import { useQuery } from "@tanstack/react-query"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Bell, AlertTriangle, Clock, TrendingUp, DollarSign, X } from "lucide-react"
+import { formatCurrency } from "@/lib/utils"
 
 interface SmartAlert {
-  id: string;
-  type: "risk" | "due_soon" | "overdue" | "high_interest" | "payment_due";
-  title: string;
-  message: string;
-  severity: "low" | "medium" | "high" | "critical";
-  entityId?: number;
-  entityType?: string;
-  amount?: string;
-  dueDate?: string;
-  interestRate?: number;
-  isRead: boolean;
-  createdAt: string;
+  id: string
+  type: "risk" | "due_soon" | "overdue" | "high_interest" | "payment_due"
+  title: string
+  message: string
+  severity: "low" | "medium" | "high" | "critical"
+  entityId?: number
+  entityType?: string
+  amount?: string
+  dueDate?: string
+  interestRate?: number
+  isRead: boolean
+  createdAt: string
 }
 
 interface AlertStats {
-  totalAlerts: number;
-  criticalAlerts: number;
-  highRiskLoans: number;
-  dueSoonAmount: string;
-  overdueAmount: string;
+  totalAlerts: number
+  criticalAlerts: number
+  highRiskLoans: number
+  dueSoonAmount: string
+  overdueAmount: string
 }
 
 export function SmartAlertsPanel() {
-  const [dismissedAlerts, setDismissedAlerts] = useState<string[]>([]);
-  const [filterType, setFilterType] = useState<string>("all");
+  const [dismissedAlerts, setDismissedAlerts] = useState<string[]>([])
+  const [filterType, setFilterType] = useState<string>("all")
 
   const { data: alerts = [], isLoading: alertsLoading } = useQuery({
     queryKey: ["/api/smart-alerts"],
-  });
+  })
 
   const { data: alertStats = {} as AlertStats } = useQuery({
     queryKey: ["/api/smart-alerts/stats"],
-  });
+  })
 
-  const safeAlerts = alerts as SmartAlert[];
-  const safeStats = alertStats as AlertStats;
+  const safeAlerts = alerts as SmartAlert[]
+  const safeStats = alertStats as AlertStats
 
   // 過濾未被忽略的警示
-  const activeAlerts = safeAlerts.filter(alert => 
-    !dismissedAlerts.includes(alert.id) && 
-    (filterType === "all" || alert.type === filterType)
-  );
+  const activeAlerts = safeAlerts.filter(
+    (alert) =>
+      !dismissedAlerts.includes(alert.id) && (filterType === "all" || alert.type === filterType)
+  )
 
   const dismissAlert = (alertId: string) => {
-    setDismissedAlerts(prev => [...prev, alertId]);
-  };
+    setDismissedAlerts((prev) => [...prev, alertId])
+  }
 
   const getSeverityColor = (severity: string) => {
     switch (severity) {
-      case "critical": return "destructive";
-      case "high": return "destructive";
-      case "medium": return "secondary";
-      case "low": return "outline";
-      default: return "outline";
+      case "critical":
+        return "destructive"
+      case "high":
+        return "destructive"
+      case "medium":
+        return "secondary"
+      case "low":
+        return "outline"
+      default:
+        return "outline"
     }
-  };
+  }
 
   const getSeverityIcon = (type: string) => {
     switch (type) {
-      case "risk": return <AlertTriangle className="h-4 w-4" />;
-      case "due_soon": return <Clock className="h-4 w-4" />;
-      case "overdue": return <AlertTriangle className="h-4 w-4 text-red-500" />;
-      case "high_interest": return <TrendingUp className="h-4 w-4" />;
-      case "payment_due": return <DollarSign className="h-4 w-4" />;
-      default: return <Bell className="h-4 w-4" />;
+      case "risk":
+        return <AlertTriangle className="h-4 w-4" />
+      case "due_soon":
+        return <Clock className="h-4 w-4" />
+      case "overdue":
+        return <AlertTriangle className="h-4 w-4 text-red-500" />
+      case "high_interest":
+        return <TrendingUp className="h-4 w-4" />
+      case "payment_due":
+        return <DollarSign className="h-4 w-4" />
+      default:
+        return <Bell className="h-4 w-4" />
     }
-  };
+  }
 
   if (alertsLoading) {
     return (
@@ -93,7 +104,7 @@ export function SmartAlertsPanel() {
           </div>
         </CardContent>
       </Card>
-    );
+    )
   }
 
   return (
@@ -107,9 +118,7 @@ export function SmartAlertsPanel() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{safeStats.totalAlerts || 0}</div>
-            <p className="text-xs text-muted-foreground">
-              緊急: {safeStats.criticalAlerts || 0}
-            </p>
+            <p className="text-xs text-muted-foreground">緊急: {safeStats.criticalAlerts || 0}</p>
           </CardContent>
         </Card>
 
@@ -120,9 +129,7 @@ export function SmartAlertsPanel() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-red-600">{safeStats.highRiskLoans || 0}</div>
-            <p className="text-xs text-muted-foreground">
-              利息15%以上
-            </p>
+            <p className="text-xs text-muted-foreground">利息15%以上</p>
           </CardContent>
         </Card>
 
@@ -135,9 +142,7 @@ export function SmartAlertsPanel() {
             <div className="text-2xl font-bold text-yellow-600">
               {formatCurrency(safeStats.dueSoonAmount || 0)}
             </div>
-            <p className="text-xs text-muted-foreground">
-              30天內到期
-            </p>
+            <p className="text-xs text-muted-foreground">30天內到期</p>
           </CardContent>
         </Card>
 
@@ -150,9 +155,7 @@ export function SmartAlertsPanel() {
             <div className="text-2xl font-bold text-red-600">
               {formatCurrency(safeStats.overdueAmount || 0)}
             </div>
-            <p className="text-xs text-muted-foreground">
-              需立即處理
-            </p>
+            <p className="text-xs text-muted-foreground">需立即處理</p>
           </CardContent>
         </Card>
       </div>
@@ -212,18 +215,12 @@ export function SmartAlertsPanel() {
                       <AlertTitle className="flex items-center justify-between">
                         <span>{alert.title}</span>
                         <div className="flex items-center gap-2">
-                          <Badge variant={getSeverityColor(alert.severity)}>
-                            {alert.severity}
-                          </Badge>
+                          <Badge variant={getSeverityColor(alert.severity)}>{alert.severity}</Badge>
                           {alert.amount && (
-                            <Badge variant="outline">
-                              {formatCurrency(alert.amount)}
-                            </Badge>
+                            <Badge variant="outline">{formatCurrency(alert.amount)}</Badge>
                           )}
                           {alert.interestRate && (
-                            <Badge variant="outline">
-                              {alert.interestRate}%
-                            </Badge>
+                            <Badge variant="outline">{alert.interestRate}%</Badge>
                           )}
                         </div>
                       </AlertTitle>
@@ -252,18 +249,18 @@ export function SmartAlertsPanel() {
         </CardContent>
       </Card>
     </div>
-  );
+  )
 }
 
 export function AlertBadge() {
   const { data: alertStats = {} as AlertStats } = useQuery({
     queryKey: ["/api/smart-alerts/stats"],
-  });
+  })
 
-  const safeStats = alertStats as AlertStats;
-  const criticalCount = safeStats.criticalAlerts || 0;
+  const safeStats = alertStats as AlertStats
+  const criticalCount = safeStats.criticalAlerts || 0
 
-  if (criticalCount === 0) return null;
+  if (criticalCount === 0) return null
 
   return (
     <div className="relative">
@@ -272,5 +269,5 @@ export function AlertBadge() {
         {criticalCount > 9 ? "9+" : criticalCount}
       </span>
     </div>
-  );
+  )
 }

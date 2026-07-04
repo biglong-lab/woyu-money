@@ -1,19 +1,18 @@
-import { Link, useLocation } from "wouter";
-import { 
-  WalletIcon, 
-  ChartLineIcon, 
-  PlusCircleIcon, 
-  ListIcon, 
-  TagsIcon, 
-  ChartBarIcon, 
+import { Link, useLocation } from "wouter"
+import {
+  WalletIcon,
+  ChartLineIcon,
+  ListIcon,
+  TagsIcon,
+  ChartBarIcon,
   DatabaseIcon,
   UserIcon,
   SettingsIcon,
-  CheckCircleIcon
-} from "lucide-react";
+  CheckCircleIcon,
+} from "lucide-react"
 
 export default function NavigationSidebar() {
-  const [location] = useLocation();
+  const [location] = useLocation()
 
   const navigationItems = [
     { path: "/", label: "總覽", icon: ChartLineIcon },
@@ -21,7 +20,7 @@ export default function NavigationSidebar() {
     { path: "/categories", label: "分類管理", icon: TagsIcon },
     { path: "/reports", label: "館所帳務分析", icon: ChartBarIcon },
     { path: "/backup", label: "資料備份", icon: DatabaseIcon },
-  ];
+  ]
 
   return (
     <div className="w-64 bg-white shadow-lg border-r border-slate-200 flex flex-col">
@@ -53,23 +52,23 @@ export default function NavigationSidebar() {
       <nav className="flex-1 p-4">
         <ul className="space-y-2">
           {navigationItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = location === item.path;
-            
+            const Icon = item.icon
+            const isActive = location === item.path
+
             return (
               <li key={item.path}>
                 <Link href={item.path}>
-                  <a className={`flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors ${
-                    isActive 
-                      ? "bg-primary text-white" 
-                      : "text-slate-700 hover:bg-slate-100"
-                  }`}>
+                  <a
+                    className={`flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors ${
+                      isActive ? "bg-primary text-white" : "text-slate-700 hover:bg-slate-100"
+                    }`}
+                  >
                     <Icon className="w-4 h-4" />
                     <span className="font-medium">{item.label}</span>
                   </a>
                 </Link>
               </li>
-            );
+            )
           })}
         </ul>
       </nav>
@@ -90,5 +89,5 @@ export default function NavigationSidebar() {
         </div>
       </div>
     </div>
-  );
+  )
 }

@@ -12,8 +12,8 @@
 
 import { Router } from "express"
 import { db } from "../db"
-import { dailyRevenues, incomeWebhooks, incomeSources, paymentProjects } from "@shared/schema"
-import { eq, desc, sql, and, gte, lte, asc, inArray } from "drizzle-orm"
+import { dailyRevenues, paymentProjects } from "@shared/schema"
+import { eq, desc, sql, and, gte, lte } from "drizzle-orm"
 import { asyncHandler, AppError } from "../middleware/error-handler"
 import multer from "multer"
 import path from "path"
@@ -154,12 +154,9 @@ router.post(
 
     if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date))
       throw new AppError(400, "date 格式錯誤，需為 YYYY-MM-DD")
-    if (!amount || isNaN(parseFloat(amount)))
-      throw new AppError(400, "amount 格式錯誤")
+    if (!amount || isNaN(parseFloat(amount))) throw new AppError(400, "amount 格式錯誤")
 
-    const receiptImageUrl = req.file
-      ? `/uploads/receipts/${req.file.filename}`
-      : undefined
+    const receiptImageUrl = req.file ? `/uploads/receipts/${req.file.filename}` : undefined
 
     const [row] = await db
       .insert(dailyRevenues)
@@ -184,10 +181,7 @@ router.patch(
     const id = parseInt(req.params.id)
     if (isNaN(id)) throw new AppError(400, "無效的 id")
 
-    const existing = await db
-      .select()
-      .from(dailyRevenues)
-      .where(eq(dailyRevenues.id, id))
+    const existing = await db.select().from(dailyRevenues).where(eq(dailyRevenues.id, id))
     if (existing.length === 0) throw new AppError(404, "找不到記錄")
 
     const { projectId, date, amount, description } = req.body as Record<string, string>
@@ -240,14 +234,16 @@ router.get(
 
     const unionSql = buildRevenueUnionSQL(startDate, endDate)
 
-    const result = await db.execute(sql.raw(`
+    const result = await db.execute(
+      sql.raw(`
       SELECT
         COALESCE(SUM(amount), 0)::numeric AS total_revenue,
         COUNT(*)::int                      AS record_count,
         MIN(date)                          AS min_date,
         MAX(date)                          AS max_date
       FROM (${unionSql}) AS combined
-    `))
+    `)
+    )
 
     const row = result.rows[0] as {
       total_revenue: string
@@ -280,7 +276,8 @@ router.get(
 
     const unionSql = buildRevenueUnionSQL(startDate, endDate)
 
-    const result = await db.execute(sql.raw(`
+    const result = await db.execute(
+      sql.raw(`
       SELECT
         project_name,
         SUM(amount)::numeric AS total_revenue,
@@ -288,7 +285,8 @@ router.get(
       FROM (${unionSql}) AS combined
       GROUP BY project_name
       ORDER BY total_revenue DESC
-    `))
+    `)
+    )
 
     res.json(
       result.rows.map((r: Record<string, unknown>, idx: number) => ({
@@ -311,7 +309,8 @@ router.get(
 
     const unionSql = buildRevenueUnionSQL(startDate, endDate)
 
-    const result = await db.execute(sql.raw(`
+    const result = await db.execute(
+      sql.raw(`
       SELECT
         date,
         SUM(amount)::numeric AS total_revenue
@@ -320,7 +319,8 @@ router.get(
       GROUP BY date
       ORDER BY date DESC
       LIMIT ${limitN}
-    `))
+    `)
+    )
 
     // 回傳時間順序（舊→新）
     const rows = (result.rows as Array<{ date: string; total_revenue: string }>)
@@ -341,7 +341,8 @@ router.get(
 
     const unionSql = buildRevenueUnionSQL(startDate, endDate)
 
-    const result = await db.execute(sql.raw(`
+    const result = await db.execute(
+      sql.raw(`
       SELECT
         SUBSTR(date, 1, 7)       AS month,
         SUM(amount)::numeric     AS total_revenue
@@ -350,7 +351,8 @@ router.get(
       GROUP BY SUBSTR(date, 1, 7)
       ORDER BY month ASC
       LIMIT ${limitN}
-    `))
+    `)
+    )
 
     res.json(
       (result.rows as Array<{ month: string; total_revenue: string }>).map((r) => ({
@@ -367,7 +369,8 @@ router.get(
   asyncHandler(async (_req, res) => {
     const unionSql = buildRevenueUnionSQL()
 
-    const result = await db.execute(sql.raw(`
+    const result = await db.execute(
+      sql.raw(`
       SELECT
         EXTRACT(YEAR  FROM date::date)::int AS year,
         EXTRACT(MONTH FROM date::date)::int AS month,
@@ -376,7 +379,8 @@ router.get(
       WHERE date IS NOT NULL
       GROUP BY year, month
       ORDER BY year ASC, month ASC
-    `))
+    `)
+    )
 
     res.json(
       (result.rows as Array<{ year: number; month: number; total_revenue: string }>).map((r) => ({
@@ -396,14 +400,19 @@ router.get(
   "/api/revenue/reports/sources",
   asyncHandler(async (req, res) => {
     const startDate = parseOptionalDate(req.query.startDate)
-    const endDate   = parseOptionalDate(req.query.endDate)
+    const endDate = parseOptionalDate(req.query.endDate)
 
     const dateWhere = [
-      startDate ? `AND COALESCE(iw.raw_payload->>'date', iw.parsed_paid_at::date::text) >= '${startDate}'` : "",
-      endDate   ? `AND COALESCE(iw.raw_payload->>'date', iw.parsed_paid_at::date::text) <= '${endDate}'`   : "",
+      startDate
+        ? `AND COALESCE(iw.raw_payload->>'date', iw.parsed_paid_at::date::text) >= '${startDate}'`
+        : "",
+      endDate
+        ? `AND COALESCE(iw.raw_payload->>'date', iw.parsed_paid_at::date::text) <= '${endDate}'`
+        : "",
     ].join(" ")
 
-    const result = await db.execute(sql.raw(`
+    const result = await db.execute(
+      sql.raw(`
       SELECT
         src.source_name   AS source_name,
         src.source_key    AS source_key,
@@ -424,20 +433,25 @@ router.get(
       FROM daily_revenues dr
       WHERE 1=1
         ${startDate ? `AND dr.date >= '${startDate}'` : ""}
-        ${endDate   ? `AND dr.date <= '${endDate}'`   : ""}
+        ${endDate ? `AND dr.date <= '${endDate}'` : ""}
       HAVING COUNT(*) > 0
       ORDER BY total_revenue DESC
-    `))
+    `)
+    )
 
     res.json(
-      (result.rows as Array<{
-        source_name: string; source_key: string
-        total_revenue: string; record_count: number
-      }>).map((r) => ({
-        sourceName:   r.source_name,
-        sourceKey:    r.source_key,
+      (
+        result.rows as Array<{
+          source_name: string
+          source_key: string
+          total_revenue: string
+          record_count: number
+        }>
+      ).map((r) => ({
+        sourceName: r.source_name,
+        sourceKey: r.source_key,
         totalRevenue: Number(r.total_revenue),
-        recordCount:  r.record_count,
+        recordCount: r.record_count,
       }))
     )
   })

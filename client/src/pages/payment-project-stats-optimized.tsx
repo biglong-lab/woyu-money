@@ -1,7 +1,6 @@
 import { useState, useMemo } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import {
   Select,
@@ -14,14 +13,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Progress } from "@/components/ui/progress"
 import {
   TrendingUp,
-  TrendingDown,
   BarChart3,
   PieChart as PieChartIcon,
   Target,
   DollarSign,
-  Calendar,
   Building2,
-  Activity,
   ArrowUpRight,
   ArrowDownRight,
   Minus,
@@ -36,10 +32,6 @@ import {
   PieChart,
   Pie,
   Cell,
-  LineChart,
-  Line,
-  Area,
-  AreaChart,
 } from "recharts"
 import { useDocumentTitle } from "@/hooks/use-document-title"
 import { BackToTop } from "@/components/back-to-top"

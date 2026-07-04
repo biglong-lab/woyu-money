@@ -29,13 +29,7 @@ import {
   Image as ImageIcon,
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import {
   AlertDialog,
   AlertDialogAction,

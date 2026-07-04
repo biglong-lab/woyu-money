@@ -16,7 +16,7 @@ import {
   type InsertInstallmentPlan,
 } from "@shared/schema"
 import { eq, and, sql, desc, asc, like, gte, lte, or, inArray } from "drizzle-orm"
-import type { RentalPriceTier, InsertRentalPriceTier } from "@shared/schema"
+import type { RentalPriceTier } from "@shared/schema"
 
 /** 租約列表項目 */
 interface RentalContractListItem {

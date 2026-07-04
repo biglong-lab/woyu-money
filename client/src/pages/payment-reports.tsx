@@ -1,6 +1,6 @@
 import React, { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
-import { format, subMonths, startOfMonth, endOfMonth } from "date-fns"
+import { format } from "date-fns"
 import { zhTW } from "date-fns/locale"
 import {
   BarChart,
@@ -20,8 +20,6 @@ import {
 import {
   TrendingUp,
   TrendingDown,
-  DollarSign,
-  Calendar,
   FileText,
   Download,
   Filter,
@@ -33,8 +31,6 @@ import {
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
 import {
   Select,
   SelectContent,
@@ -43,7 +39,6 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { apiRequest } from "@/lib/queryClient"
 import type { PaymentItem, PaymentProject, DebtCategory } from "@shared/schema"
 import { useDocumentTitle } from "@/hooks/use-document-title"
 import { BackToTop } from "@/components/back-to-top"

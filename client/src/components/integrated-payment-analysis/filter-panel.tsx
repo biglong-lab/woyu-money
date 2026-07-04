@@ -62,7 +62,6 @@ export function FilterPanel({
   showDeletedItems,
   onShowDeletedItemsChange,
   selectedItemsCount,
-  showBatchActions,
   onShowBatchActionsToggle,
   projects,
 }: FilterPanelProps) {

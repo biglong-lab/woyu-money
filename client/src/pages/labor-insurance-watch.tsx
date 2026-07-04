@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { apiRequest, queryClient } from "@/lib/queryClient"
-import { localDateISO, formatNT, friendlyApiError } from "@/lib/utils"
+import { formatNT, friendlyApiError } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 import { useCopyAmount } from "@/hooks/use-copy-amount"
 import { MarkPaidConfirmDialog } from "@/components/mark-paid-confirm-dialog"

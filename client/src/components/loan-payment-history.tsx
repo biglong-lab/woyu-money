@@ -25,17 +25,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import {
-  Plus,
-  Edit,
-  Trash2,
-  Check,
-  X,
-  Upload,
-  Download,
-  AlertTriangle,
-  CheckCircle,
-} from "lucide-react"
+import { Plus, Edit, Trash2, Check, Upload, AlertTriangle, CheckCircle } from "lucide-react"
 import { format } from "date-fns"
 import { PaymentFileUpload } from "./payment-file-upload"
 import type { InsertLoanPaymentHistory } from "shared/schema/loan"

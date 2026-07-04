@@ -18,7 +18,7 @@
  */
 
 import { useState, useRef } from "react"
-import { Camera, X, Upload, Image as ImageIcon, Loader2 } from "lucide-react"
+import { Camera, X, Image as Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"

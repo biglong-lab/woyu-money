@@ -1,10 +1,6 @@
 import { db } from "../db"
 import {
   paymentItems,
-  paymentRecords,
-  debtCategories,
-  paymentProjects,
-  fixedCategories,
   auditLogs,
   type PaymentItem,
   type InsertPaymentItem,

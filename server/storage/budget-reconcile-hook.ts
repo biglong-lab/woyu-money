@@ -8,7 +8,7 @@
 
 import { sql, eq, and } from "drizzle-orm"
 import { db } from "../db"
-import { paymentItems, paymentRecords, budgetItems, budgetPlans } from "@shared/schema"
+import { paymentItems, budgetItems, budgetPlans } from "@shared/schema"
 import {
   matchBudgetItem,
   calcVariance,

@@ -32,7 +32,7 @@ import {
 import { Switch } from "@/components/ui/switch"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import type { PaymentItem, PaymentProject } from "./payment-project-types"
+import type { PaymentProject } from "./payment-project-types"
 import type { FixedCategory, DebtCategory } from "@/../../shared/schema/category"
 
 export interface PaymentProjectFiltersProps {

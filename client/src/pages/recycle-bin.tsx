@@ -24,7 +24,6 @@ import { apiRequest } from "@/lib/queryClient"
 import { formatNT } from "@/lib/utils"
 import {
   Trash2,
-  RefreshCw,
   History,
   RotateCcw,
   AlertTriangle,

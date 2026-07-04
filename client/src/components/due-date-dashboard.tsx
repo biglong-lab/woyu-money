@@ -1,20 +1,10 @@
 import { useMemo } from "react"
-import { format, differenceInDays, isAfter, isBefore, addDays } from "date-fns"
-import { zhTW } from "date-fns/locale"
-import {
-  AlertTriangle,
-  Clock,
-  Calendar,
-  CheckCircle,
-  CreditCard,
-  ChevronRight,
-  TrendingUp,
-} from "lucide-react"
+import { differenceInDays } from "date-fns"
+import { AlertTriangle, Clock, Calendar, CheckCircle, CreditCard, TrendingUp } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { formatNT } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Progress } from "@/components/ui/progress"
 import { ScrollArea } from "@/components/ui/scroll-area"
 
 export interface PaymentItem {
