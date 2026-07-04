@@ -54,6 +54,8 @@ export async function getPaymentRecords(
   const offset = (page - 1) * limit
 
   const whereConditions: SQL[] = []
+  // 軟刪除過濾（2026-07-04 task #338）：已刪除的付款記錄不進任何列表/統計
+  whereConditions.push(sql`NOT COALESCE(pr.is_deleted, false)`)
   if (filters.itemId) {
     whereConditions.push(sql`pr.payment_item_id = ${Number(filters.itemId)}`)
   }
@@ -130,6 +132,7 @@ export async function getPaymentRecordsByItemId(itemId: number): Promise<Payment
            receipt_image_url as "receiptImageUrl"
     FROM payment_records
     WHERE payment_item_id = ${itemId}
+      AND NOT COALESCE(is_deleted, false)
     ORDER BY payment_date DESC, created_at DESC
   `)
 
@@ -218,7 +221,8 @@ export async function getFilteredPaymentRecords(filters: {
     LEFT JOIN payment_projects pp ON pi.project_id = pp.id
     LEFT JOIN debt_categories dc ON pi.category_id = dc.id
     LEFT JOIN fixed_categories fc ON pi.fixed_category_id = fc.id
-    WHERE ${whereClause}
+    WHERE NOT COALESCE(pr.is_deleted, false)
+      AND ${whereClause}
     ORDER BY pr.payment_date DESC, pr.created_at DESC
   `
 
@@ -514,6 +518,7 @@ export async function updatePaymentItemAmounts(itemId: number): Promise<void> {
     SELECT COALESCE(SUM(amount_paid::numeric), 0) as total_paid
     FROM payment_records
     WHERE payment_item_id = ${itemId}
+      AND NOT COALESCE(is_deleted, false)
   `)
 
   const totalPaid = parseFloat(String(result.rows[0]?.total_paid || "0"))

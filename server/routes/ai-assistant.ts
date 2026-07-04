@@ -345,7 +345,8 @@ async function executeTool(name: string, args: Record<string, unknown>): Promise
           pr.payment_method,
           pi.item_name
         FROM payment_records pr
-        LEFT JOIN payment_items pi ON pi.id = pr.item_id
+        LEFT JOIN payment_items pi ON pi.id = pr.payment_item_id
+        WHERE NOT COALESCE(pr.is_deleted, false)
         ORDER BY pr.payment_date DESC
         LIMIT ${limit}
       `)

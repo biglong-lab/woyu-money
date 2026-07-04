@@ -213,6 +213,7 @@ const PAID_SQL = `
   LEFT JOIN fixed_categories fc ON pi.fixed_category_id = fc.id
   LEFT JOIN debt_categories dc ON pi.category_id = dc.id
   WHERE pi.is_deleted = false
+    AND NOT COALESCE(pr.is_deleted, false)
     AND EXTRACT(YEAR FROM COALESCE(pi.end_date, pi.start_date)) = $1
 `
 

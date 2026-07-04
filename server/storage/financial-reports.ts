@@ -37,7 +37,8 @@ export async function getIncomeStatement(year: number, month: number) {
     FROM payment_records pr
     LEFT JOIN payment_items pi ON pr.payment_item_id = pi.id
     LEFT JOIN debt_categories dc ON pi.category_id = dc.id
-    WHERE pr.payment_date >= ${startDate}
+    WHERE NOT COALESCE(pr.is_deleted, false)
+      AND pr.payment_date >= ${startDate}
       AND pr.payment_date < ${endDate}
       AND pi.item_type = 'income'
     GROUP BY dc.category_name
@@ -73,7 +74,8 @@ export async function getIncomeStatement(year: number, month: number) {
     FROM payment_records pr
     LEFT JOIN payment_items pi ON pr.payment_item_id = pi.id
     LEFT JOIN debt_categories dc ON pi.category_id = dc.id
-    WHERE pr.payment_date >= ${startDate}
+    WHERE NOT COALESCE(pr.is_deleted, false)
+      AND pr.payment_date >= ${startDate}
       AND pr.payment_date < ${endDate}
       AND (pi.item_type IS NULL OR pi.item_type != 'income')
     GROUP BY dc.category_name
@@ -134,7 +136,8 @@ export async function getBalanceSheet(year: number, month: number) {
       COALESCE(SUM(CASE WHEN pi.item_type IS NULL OR pi.item_type != 'income' THEN CAST(pr.amount_paid AS DECIMAL(12,2)) ELSE 0 END), 0) as total_expense
     FROM payment_records pr
     LEFT JOIN payment_items pi ON pr.payment_item_id = pi.id
-    WHERE pr.payment_date < ${endDate}
+    WHERE NOT COALESCE(pr.is_deleted, false)
+      AND pr.payment_date < ${endDate}
   `)
 
   // 外部同步累計現金（PM bridge / POS / 等）
@@ -229,7 +232,8 @@ export async function getCashFlowStatement(year: number, month: number) {
       COALESCE(SUM(CASE WHEN pi.item_type IS NULL OR pi.item_type != 'income' THEN CAST(pr.amount_paid AS DECIMAL(12,2)) ELSE 0 END), 0) as expense
     FROM payment_records pr
     LEFT JOIN payment_items pi ON pr.payment_item_id = pi.id
-    WHERE pr.payment_date >= ${startDate}
+    WHERE NOT COALESCE(pr.is_deleted, false)
+      AND pr.payment_date >= ${startDate}
       AND pr.payment_date < ${endDate}
   `)
 
@@ -427,7 +431,8 @@ export async function getBusinessTaxReport(year: number, period: number) {
     FROM payment_records pr
     LEFT JOIN payment_items pi ON pr.payment_item_id = pi.id
     LEFT JOIN debt_categories dc ON pi.category_id = dc.id
-    WHERE pr.payment_date >= ${startDate}
+    WHERE NOT COALESCE(pr.is_deleted, false)
+      AND pr.payment_date >= ${startDate}
       AND pr.payment_date < ${endDate}
       AND pi.item_type = 'income'
     GROUP BY dc.category_name
@@ -442,7 +447,8 @@ export async function getBusinessTaxReport(year: number, period: number) {
     FROM payment_records pr
     LEFT JOIN payment_items pi ON pr.payment_item_id = pi.id
     LEFT JOIN debt_categories dc ON pi.category_id = dc.id
-    WHERE pr.payment_date >= ${startDate}
+    WHERE NOT COALESCE(pr.is_deleted, false)
+      AND pr.payment_date >= ${startDate}
       AND pr.payment_date < ${endDate}
       AND (pi.item_type IS NULL OR pi.item_type != 'income')
     GROUP BY dc.category_name

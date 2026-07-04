@@ -73,6 +73,7 @@ router.get(
         AND NOT EXISTS (
           SELECT 1 FROM payment_records pr
           WHERE pr.payment_item_id = pi.id
+            AND NOT COALESCE(pr.is_deleted, false)
         )
       ORDER BY pi.created_at ASC
       LIMIT 50

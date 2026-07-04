@@ -144,6 +144,7 @@ router.get(
       LEFT JOIN debt_categories dc ON dc.id = pi.category_id
       WHERE EXTRACT(YEAR FROM pr.payment_date)::int = ${year}
         AND EXTRACT(MONTH FROM pr.payment_date)::int = ${month}
+        AND NOT COALESCE(pr.is_deleted, false)
         AND COALESCE(pi.is_deleted, false) = false
         AND pi.project_id IS NOT NULL
       GROUP BY pi.project_id, COALESCE(fc.category_name, dc.category_name)
