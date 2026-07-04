@@ -39,11 +39,12 @@
 **驗證**：全套 2,370 測試 / tsc strict / 生產 build / pre-push 全過
 
 ### 上階段遺留待處理
-- ⏸️ family-kids timing bug（task #339、需配 SQL DATE() AT TIME ZONE）
-- ⏸️ payment_records SELECT filter 補 20 處（task #338）
-- ⏸️ ESLint 314 warnings 分批清、安全 Headers 補齊
+- ✅ ~~family-kids timing bug（#339）~~ 27 處已修（localDateTPE）
+- ✅ ~~payment_records SELECT filter（#338）~~ 實查 8 處已補（另修 AI 欄位名 bug）
+- ✅ ~~ESLint 314 warnings~~ 已降至 94（CI 基線鎖 100）；⏸️ 安全 Headers 補齊（nginx 端）
+- ✅ **CI 歷史首次全綠**（2026-07-04、三種子 + lint 治理）
 - ⏸️ KidDashboard（1,025 行）/ HouseholdBudget（1,190 行）內聚元件手工拆分
-- ⏸️ family-kids 測試跨檔狀態污染（建議 tests/setup 加全域 truncate）
+- ✅ ~~family-kids 測試 flaky~~ 已根治（真根因=15% 隨機驚喜獎勵、非污染；FAMILY_KIDS_NO_BONUS=1）
 
 ### 歷史推進
 詳：[docs/changes/](docs/changes/)
