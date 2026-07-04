@@ -23,6 +23,8 @@ import {
   Wallet,
   History,
   Trash2,
+  CalendarClock,
+  Activity,
 } from "lucide-react"
 import {
   CommandDialog,
@@ -165,6 +167,20 @@ export function CommandPalette() {
             <Inbox className="mr-2 h-4 w-4 text-purple-600" />
             <span>單據收件箱（拍 / 上傳單據）</span>
           </CommandItem>
+          <CommandItem
+            onSelect={() => runCommand(() => setLocation("/bills"))}
+            keywords={["bills", "帳單", "繳費", "到期", "付款", "立即處理", "批次"]}
+          >
+            <CalendarClock className="mr-2 h-4 w-4 text-indigo-600" />
+            <span>帳單到期看板（立即 / 批次繳費）</span>
+          </CommandItem>
+          <CommandItem
+            onSelect={() => runCommand(() => setLocation("/financial-cockpit"))}
+            keywords={["cockpit", "駕駛艙", "總覽", "dashboard", "健康"]}
+          >
+            <Activity className="mr-2 h-4 w-4 text-rose-600" />
+            <span>財務駕駛艙（總覽主入口）</span>
+          </CommandItem>
         </CommandGroup>
 
         <CommandSeparator />
@@ -207,7 +223,7 @@ export function CommandPalette() {
         {/* 快速動作：建立 / 跳轉到常見操作頁 */}
         <CommandGroup heading="➕ 快速動作">
           <CommandItem
-            onSelect={() => runCommand(() => setLocation("/payment-projects"))}
+            onSelect={() => runCommand(() => setLocation("/payment-project"))}
             keywords={["new", "新增", "付款", "項目", "payment", "建立"]}
           >
             <PlusCircle className="mr-2 h-4 w-4 text-blue-600" />
@@ -215,7 +231,7 @@ export function CommandPalette() {
             <span className="ml-auto text-xs text-gray-400">付款專案頁</span>
           </CommandItem>
           <CommandItem
-            onSelect={() => runCommand(() => setLocation("/revenue-reports"))}
+            onSelect={() => runCommand(() => setLocation("/revenue/reports"))}
             keywords={["new", "新增", "收入", "revenue", "income", "記帳"]}
           >
             <Wallet className="mr-2 h-4 w-4 text-green-600" />
