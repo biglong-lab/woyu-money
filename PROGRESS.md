@@ -2,12 +2,25 @@
 
 ## 專案狀態：開發中
 
-**最後更新**: 2026-07-04
-**最新提交**: `a43531f` — 已部署生產（1.3.2）
+**最後更新**: 2026-07-06
+**最新提交**: `ead0aec` — 已部署生產（1.3.4、2026-07-06 14:37 GMT）
 
 ---
 
-## 🎯 當前階段：PM Schema 事故修復 + 選單 IA 重整 + 帳單可操作化 ✅ 完成（2026-07-04）
+## 🎯 當前階段：便利性套件 + 正確性修復 + CI 治理 ✅ 完成並部署（1.3.3/1.3.4）
+
+詳：[便利性套件](docs/changes/2026-07-04-convenience-loop.md)、[正確性/CI 循環](docs/changes/2026-07-04-correctness-ci-loop.md)
+
+- ✅ **1.3.3** 便利性 9 輪：批次拒絕/批次分帳、四模組匯出 CSV、收據拍照、Enter 快捷、Cmd+K 修復、E2E 護欄
+- ✅ **1.3.4** 正確性/體質：軟刪除過濾 8 處（#338）、跨日 timing 27 處（#339）、fc.color 500、
+  測試 flaky 根治、**CI 歷史首綠**、ESLint 644→94、安全 Headers 6/6
+- ⏸️ 待使用者決定：39 筆 PMS 月度累計 pending 是否整批拒絕歸零
+- ⏸️ 待外部：PMS 2、3 月資料請對方補登
+- ⏸️ 低優先：KidDashboard / HouseholdBudget 大元件手工拆分（工程大、效益低）
+
+---
+
+## 🎯 前階段：PM Schema 事故修復 + 選單 IA 重整 + 帳單可操作化 ✅ 完成（2026-07-04）
 
 詳：[docs/changes/2026-07-04-pm-schema-nav-ia-bills-actions.md](docs/changes/2026-07-04-pm-schema-nav-ia-bills-actions.md)
 
