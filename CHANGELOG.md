@@ -8,17 +8,23 @@
 
 ## [1.3.4] - 2026-07-04
 
-### 資料正確性修復 + 測試/CI 治理（循環後半）
+### 資料正確性修復 + 測試/CI 治理 + 生產巡檢（循環後半）
+
+詳見 `docs/changes/2026-07-04-correctness-ci-loop.md`。範圍 `2433cbe` → `ead0aec`。
+**2026-07-06 14:37 GMT 部署**（隨 1.3.3 便利性套件一併上線、六項驗證全綠）。
 
 - **payment_records 軟刪除過濾補齊 8 處**（task #338）：財務三表/現金累計/損益/
   發票統計/記錄列表/現金流/殭屍偵測/滯納金；關鍵修 updatePaymentItemAmounts
   （已刪記錄原本仍算進項目已付金額）；順修 AI 助理 pr.item_id 欄位不存在 bug
 - **family-kids 跨日 timing bug 27 處**（task #339）：台北 00:00~08:00 簽到/任務/
   統計記到前一天 → localDateTPE()；8 處判讀後刻意保留（UTC 容器下正確）
+- **fc.color 500 修復**（生產巡檢獵獲）：常用分類/家用支出列表查詢寫了不存在的
+  fixed_categories.color 欄位、自撰寫以來一直 500 → 改常數色
 - **根治測試 flaky 真根因**：approve 15% 隨機驚喜獎勵 → FAMILY_KIDS_NO_BONUS=1
   （曾長期誤判為資料污染；連 5 輪 411/411 驗證）
 - **CI 歷史首次全綠**：ESLint 644→94（清 169 未用 import、基線鎖 100）+
   admin/projectId=1/租金分類三種子（數百失敗→0、commit da31d4a）
+- **安全 Headers 補齊**：Referrer-Policy + Permissions-Policy（Express 層、6/6 齊全）
 - 進帳收件箱批次拒絕、流水帳批次分帳、四模組匯出 CSV 等見 1.3.3
 
 ---
