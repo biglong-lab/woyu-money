@@ -30,9 +30,11 @@
 
 ## 驗證
 
-每輪 tsc + build + 相關測試；E2E 本地實跑；pre-push 全檢通過（偶發 family-kids
-flaky 清表重推）。**全批未部署**、待使用者驗收指令。
+每輪 tsc + build + 相關測試；E2E 本地實跑；pre-push 全檢通過（當時偶發 family-kids
+flaky 清表重推 — 後由 [correctness-ci-loop](2026-07-04-correctness-ci-loop.md) 根治）。
+**2026-07-06 部署驗證全綠**。
 
 ## 相關文件
 
+- 循環後半（正確性/CI）：[correctness-ci-loop](2026-07-04-correctness-ci-loop.md)
 - 前批：[2026-07-04 PM schema/選單 IA/帳單可操作化](2026-07-04-pm-schema-nav-ia-bills-actions.md)
