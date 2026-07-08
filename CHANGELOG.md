@@ -6,11 +6,27 @@
 
 ---
 
+## [1.4.2] - 2026-07-08
+
+### 巨檔拆分 + 技術債清理（階段 3+4）
+
+詳見 `docs/changes/2026-07-08-bigfile-split-techdebt.md`。**未部署**。
+
+- **family.tsx 1,335 行 → 12 檔模組目錄**（最大 284 行；146 種元件使用逐一比對一致）
+- **household-budget.tsx 1,309 行 → 12 檔模組目錄**（最大 386 行；三個自訂 hooks 抽離）
+- **`shared/pm-schema-config.ts`**：t_wodao search_path 4 檔硬編 → 單一常數
+- **ManagementTab 付款資訊改 Dialog**（原 alert()、全站最後一個實質 TODO）
+- `installment_plans` 殘留表評估：rental 內部週轉用、保留不動
+- 全套 2391/2391 通過、tsc/lint 乾淨
+
+---
+
 ## [1.4.1] - 2026-07-08
 
 ### 介面整併與功能閉環（階段 2：去重 + 資料檢視動線）
 
-詳見 `docs/changes/2026-07-08-unified-cashflow.md`（含四階段計畫）。**未部署**。
+詳見 `docs/changes/2026-07-08-ui-consolidation.md`。
+**2026-07-08 14:57 GMT 部署**（容器重建、網站驗證正常）。
 
 - **三條新 tab 列**（沿用 1.3.0 連結式 tab 模式、新增泛用 LinkTabs 元件）：
   付款行動（帳單看板/現金分配/強執）、沙盤推演（12月推演/下月精算）、
