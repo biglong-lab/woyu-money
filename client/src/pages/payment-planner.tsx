@@ -20,6 +20,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { DistributeDialog } from "@/components/planner/distribute-dialog"
+import ScheduleTabs from "@/components/schedule-tabs"
 import { CalendarRange, ArrowLeft, ChevronRight, ChevronDown, Wand2 } from "lucide-react"
 
 // ─────────────────────────────────────────────
@@ -236,6 +237,7 @@ export default function PaymentPlannerPage() {
 
   return (
     <div className="container mx-auto py-4 sm:py-6 space-y-4">
+      <ScheduleTabs />
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">

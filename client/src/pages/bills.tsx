@@ -8,6 +8,7 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { CalendarClock, AlertCircle, CheckCircle2, Banknote, Download } from "lucide-react"
+import PaymentActionTabs from "@/components/payment-action-tabs"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -240,6 +241,7 @@ export default function BillsPage() {
 
   return (
     <div className="container mx-auto py-6 space-y-5">
+      <PaymentActionTabs />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2" data-testid="page-title">

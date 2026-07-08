@@ -18,6 +18,7 @@ import {
   endOfWeek,
 } from "date-fns"
 import { DragDropContext, type DropResult } from "@hello-pangea/dnd"
+import ScheduleTabs from "@/components/schedule-tabs"
 import { Button } from "@/components/ui/button"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -365,6 +366,7 @@ export default function PaymentScheduleOptimized() {
   // ========== 渲染 ==========
   return (
     <div className="space-y-4 sm:space-y-6 p-3 sm:p-6">
+      <ScheduleTabs />
       {/* 標題與月份控制 */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">

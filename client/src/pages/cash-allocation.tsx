@@ -12,6 +12,7 @@
 import { useState, useEffect } from "react"
 import { useMutation, useQuery } from "@tanstack/react-query"
 import { BackToTop } from "@/components/back-to-top"
+import PaymentActionTabs from "@/components/payment-action-tabs"
 import {
   AlertCircle,
   CheckCircle2,
@@ -501,6 +502,7 @@ export default function CashAllocationPage() {
 
   return (
     <div className="space-y-4 sm:space-y-6">
+      <PaymentActionTabs />
       {/* 頁首 */}
       <div>
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">💰 現金分配助理</h1>

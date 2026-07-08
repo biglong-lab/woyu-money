@@ -6,6 +6,7 @@
  * 與現有記帳窗口（進行中帳務）切開，互不干擾。
  */
 import { useState } from "react"
+import { Link } from "wouter"
 import { useQuery, useMutation } from "@tanstack/react-query"
 import { queryClient, apiRequest } from "@/lib/queryClient"
 import { useToast } from "@/hooks/use-toast"
@@ -161,7 +162,11 @@ export default function DebtsPage() {
             <ClipboardList className="h-6 w-6 text-rose-600" /> 歷史欠款整理
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            把過去散落的欠款先登打進來看全貌，再做分期還款與歸帳
+            把過去散落的欠款先登打進來看全貌，再做分期還款與歸帳。 被執行處追討的欠款請到{" "}
+            <Link href="/enforcement" className="text-rose-600 underline underline-offset-2">
+              強制執行管理
+            </Link>{" "}
+            登記（公文/圈存/分期）。
           </p>
         </div>
         <div className="flex gap-2">

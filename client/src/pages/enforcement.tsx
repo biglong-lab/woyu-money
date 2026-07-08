@@ -3,6 +3,7 @@
  * 對帳核心：強執總額 ≈ 圈存 + 分期（差異/未歸類清楚呈現）
  */
 import { useState } from "react"
+import { Link } from "wouter"
 import { useQuery, useMutation } from "@tanstack/react-query"
 import { apiRequest, queryClient } from "@/lib/queryClient"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -15,6 +16,7 @@ import { BackToTop } from "@/components/back-to-top"
 import { Gavel, Trash2, Plus, Download } from "lucide-react"
 import { formatNT } from "@/lib/utils"
 import EnforcementCaseDialog from "@/components/enforcement-case-dialog"
+import PaymentActionTabs from "@/components/payment-action-tabs"
 
 interface EnfCase {
   id: number
@@ -174,6 +176,7 @@ export default function EnforcementPage() {
 
   return (
     <div className="container mx-auto py-6 space-y-5">
+      <PaymentActionTabs />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2" data-testid="page-title">
@@ -181,7 +184,11 @@ export default function EnforcementPage() {
             強制執行管理
           </h1>
           <p className="text-gray-500 text-sm">
-            公文 / 圈存 / 分期對帳：強執總額 ≈ 圈存 + 分期，掌握被執行的錢歸屬
+            公文 / 圈存 / 分期對帳：強執總額 ≈ 圈存 + 分期，掌握被執行的錢歸屬。 未進強執的舊債到{" "}
+            <Link href="/debts" className="text-rose-600 underline underline-offset-2">
+              歷史欠款整理
+            </Link>{" "}
+            登打。
           </p>
         </div>
         <div className="flex gap-2">

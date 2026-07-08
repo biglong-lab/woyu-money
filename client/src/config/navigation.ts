@@ -145,6 +145,12 @@ export const tabPagesNavItems: NavItem[] = [
     icon: PieChart,
     description: "整合付款明細分析（付款報表 tab）",
   },
+  {
+    title: "專案付款統計",
+    href: "/payment-project-stats",
+    icon: BarChart3,
+    description: "專案付款統計報表（付款報表 tab）",
+  },
 ]
 
 // 💸 付款與排程 — 該付什麼 → 排程 → 對帳，一條動線
@@ -427,6 +433,12 @@ export const systemNavItems: NavItem[] = [
     icon: User,
   },
   {
+    title: "⚙️ Cron 健康觀測",
+    href: "/admin/cron-health",
+    icon: Activity,
+    description: "排程器 tick 紀錄與健康狀態（原孤兒頁、僅深連結可達）",
+  },
+  {
     title: "⚙️ 設定",
     href: "/settings",
     icon: Settings,
@@ -450,14 +462,8 @@ export const navigationCategories: NavCategory[] = [
   { title: "頁內分頁（tab 互達）", items: tabPagesNavItems },
 ]
 
-// 手機版底部 Tab Bar 項目（5 個主要入口）
-export const mobileTabItems: NavItem[] = [
-  { title: "首頁", href: "/", icon: Home },
-  { title: "單據", href: "/document-inbox", icon: Inbox },
-  { title: "付款", href: "/payment-management-menu", icon: CreditCard },
-  { title: "查看", href: "/view-menu", icon: BarChart3 },
-  { title: "更多", href: "/more-menu", icon: Settings },
-]
+// （已移除 mobileTabItems 死碼：href 指向不存在路由且無人 import，
+//  mobile-tab-bar.tsx 自行以 onClick 開 sheet — 2026-07-08 介面清理）
 
 // 麵包屑路徑配置
 export interface BreadcrumbItem {

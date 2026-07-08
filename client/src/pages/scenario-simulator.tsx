@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Slider } from "@/components/ui/slider"
 import { Switch } from "@/components/ui/switch"
+import ScenarioTabs from "@/components/scenario-tabs"
 import {
   Select,
   SelectContent,
@@ -495,6 +496,7 @@ export default function ScenarioSimulatorPage() {
 
   return (
     <div className="container mx-auto py-4 sm:py-6 space-y-4 sm:space-y-6">
+      <ScenarioTabs />
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">

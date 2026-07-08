@@ -15,6 +15,7 @@ import { useQuery, useMutation } from "@tanstack/react-query"
 import { apiRequest, queryClient } from "@/lib/queryClient"
 import { useToast } from "@/hooks/use-toast"
 import { useDocumentTitle } from "@/hooks/use-document-title"
+import ScenarioTabs from "@/components/scenario-tabs"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -210,6 +211,7 @@ export default function ScenarioPlannerPage() {
 
   return (
     <div className="container mx-auto py-4 sm:py-6 space-y-4">
+      <ScenarioTabs />
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">

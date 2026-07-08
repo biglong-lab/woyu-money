@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react"
 import { useQuery } from "@tanstack/react-query"
+import PaymentReportTabs from "@/components/payment-report-tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -236,6 +237,7 @@ export default function PaymentProjectStatsOptimized() {
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto p-4 lg:p-6 space-y-6">
+        <PaymentReportTabs />
         {/* 頁面標題和控制項 */}
         <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4">
           <div>

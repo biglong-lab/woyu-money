@@ -378,6 +378,7 @@ export default function FinancialCockpitPage() {
               title="本月收入"
               value={fmt(monthIncome)}
               tone="text-green-600"
+              href="/financial-dashboard"
               sub={
                 incomeMoM === null
                   ? undefined
@@ -388,17 +389,20 @@ export default function FinancialCockpitPage() {
               title="本月成本"
               value={fmt(monthExpense)}
               tone="text-red-500"
+              href="/financial-dashboard"
               sub="含強執繳款/欠款還款"
             />
             <StatCard
               title="本月淨利"
               value={monthProfit === null ? "—" : fmt(monthProfit)}
               tone={monthProfit !== null && monthProfit < 0 ? "text-red-600" : "text-indigo-600"}
+              href="/financial-dashboard"
             />
             <StatCard
               title="待付總額"
               value={fmt(priority?.totalUnpaid ?? 0)}
               tone="text-orange-600"
+              href="/bills"
               sub={`${priority?.counts.critical ?? 0} 筆須立刻付`}
             />
           </div>
@@ -583,14 +587,17 @@ function StatCard({
   value,
   tone,
   sub,
+  href,
 }: {
   title: string
   value: string
   tone: string
   sub?: string
+  /** 點擊跳轉目標（資料檢視閉環：數字可點開看明細） */
+  href?: string
 }) {
-  return (
-    <Card>
+  const card = (
+    <Card className={href ? "cursor-pointer transition hover:shadow-md hover:border-blue-300" : ""}>
       <CardContent className="pt-4">
         <div className="text-xs text-muted-foreground">{title}</div>
         <div className={`text-xl font-bold mt-1 ${tone}`}>{value}</div>
@@ -598,4 +605,5 @@ function StatCard({
       </CardContent>
     </Card>
   )
+  return href ? <Link href={href}>{card}</Link> : card
 }
