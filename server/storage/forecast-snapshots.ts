@@ -9,6 +9,7 @@ import { db } from "../db"
 import { sql, and, eq, gte } from "drizzle-orm"
 import { revenueForecastSnapshots, type RevenueForecastSnapshot } from "@shared/schema"
 import { EXCLUDED_PM_COMPANY_IDS } from "@shared/pm-excluded-companies"
+import { PM_SEARCH_PATH_OPTIONS } from "@shared/pm-schema-config"
 import pg from "pg"
 
 const PM_DATABASE_URL = process.env.PM_DATABASE_URL
