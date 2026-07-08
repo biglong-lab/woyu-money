@@ -4,6 +4,12 @@
  */
 import { db } from "../db"
 import { sql } from "drizzle-orm"
+import { buildUnifiedOperating } from "../services/unified-cashflow.service"
+import {
+  getEnforcementPaidBetween,
+  getLegacyDebtPaidBetween,
+  getCardClaimSettledBetween,
+} from "./unified-cashflow"
 
 /** SQL 原始查詢結果列 */
 type SqlRow = Record<string, string>
@@ -289,16 +295,24 @@ export async function getCashFlowStatement(year: number, month: number) {
     // 表可能不存在
   }
 
+  // 統一現金流匯總：強執繳款 / 欠款還款 併入營業活動（原本只有 payment_records、系統性低估流出）
+  // 卡請款到帳僅供參考對照（可能與 PM 收入重複計價、不併入總計）
+  const [enforcementPaid, legacyDebtPaid, cardClaimSettled] = await Promise.all([
+    getEnforcementPaidBetween(startDate, endDate),
+    getLegacyDebtPaidBetween(startDate, endDate),
+    getCardClaimSettledBetween(startDate, endDate),
+  ])
+  const operating = buildUnifiedOperating({
+    baseIncome: opIncome,
+    baseExpense: opExpense,
+    enforcementPaid,
+    legacyDebtPaid,
+  })
+
   return {
     year,
     month,
-    operating: {
-      items: [
-        { category: "營業收入", amount: opIncome },
-        { category: "營業支出", amount: -opExpense },
-      ],
-      total: opIncome - opExpense,
-    },
+    operating,
     investing: {
       items: [
         { category: "投資收回", amount: investReturn },
@@ -313,7 +327,12 @@ export async function getCashFlowStatement(year: number, month: number) {
       ],
       total: borrowed - repaid,
     },
-    netCashFlow: opIncome - opExpense + (investReturn - newInvest) + (borrowed - repaid),
+    netCashFlow: operating.total + (investReturn - newInvest) + (borrowed - repaid),
+    // 參考資訊：不計入 netCashFlow 的對照數字
+    reference: {
+      cardClaimSettled,
+      cardClaimNote: "信用卡請款到帳（與 PM 收入可能重複、僅供對照）",
+    },
   }
 }
 

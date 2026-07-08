@@ -9,6 +9,12 @@ import { db } from "../db"
 import { sql } from "drizzle-orm"
 import { getSeasonalForecast } from "../storage/forecast-snapshots"
 import { localDateTPE } from "@shared/date-utils"
+import {
+  ENFORCEMENT_CATEGORY,
+  LEGACY_DEBT_CATEGORY,
+  type MonthlyAmount,
+} from "../services/unified-cashflow.service"
+import { getEnforcementPaidMonthly, getLegacyDebtPaidMonthly } from "../storage/unified-cashflow"
 
 const router = Router()
 
@@ -165,6 +171,38 @@ router.get(
     }
     const monthsRaw = (rows as unknown as { rows: MonthRow[] }).rows
     const currentMonth = today.slice(0, 7)
+
+    // ── 統一現金流：強執繳款 / 歷史欠款還款 併入月度實際支出 ──
+    // 這兩套帳本不在 payment_items 內，原本 YTD 完全看不到 → 系統性低估流出
+    const [enforcementMonthly, legacyDebtMonthly] = await Promise.all([
+      getEnforcementPaidMonthly(dataStart, lookaheadEnd),
+      getLegacyDebtPaidMonthly(dataStart, lookaheadEnd),
+    ])
+    const monthKey = (m: MonthlyAmount) => `${m.year}-${String(m.month).padStart(2, "0")}`
+    const addToMonths = (extras: MonthlyAmount[]) => {
+      for (const ex of extras) {
+        const key = monthKey(ex)
+        const row = monthsRaw.find((m) => m.month === key)
+        if (row) {
+          row.expense_actual += ex.amount
+          row.profit_actual -= ex.amount
+          row.profit_total -= ex.amount
+        } else {
+          monthsRaw.push({
+            month: key,
+            income_actual: 0,
+            income_planned: 0,
+            expense_actual: ex.amount,
+            expense_planned: 0,
+            profit_actual: -ex.amount,
+            profit_total: -ex.amount,
+          })
+        }
+      }
+    }
+    addToMonths(enforcementMonthly)
+    addToMonths(legacyDebtMonthly)
+    monthsRaw.sort((a, b) => a.month.localeCompare(b.month))
 
     // ============================================================
     // 未來月份預估：4 大區塊都要有值（user 要求）
@@ -403,6 +441,23 @@ router.get(
       })
     }
 
+    // 統一現金流：強執 / 欠款 月度實付加進 breakdown（可點開看明細）
+    const addToBreakdown = (extras: MonthlyAmount[], category: string) => {
+      for (const ex of extras) {
+        const key = monthKey(ex)
+        if (!breakdown[key]) breakdown[key] = { expense: [], income: [] }
+        breakdown[key].expense.push({
+          category,
+          amount: ex.amount,
+          actual: ex.amount,
+          planned: 0,
+          count: ex.count ?? 0,
+        })
+      }
+    }
+    addToBreakdown(enforcementMonthly, ENFORCEMENT_CATEGORY)
+    addToBreakdown(legacyDebtMonthly, LEGACY_DEBT_CATEGORY)
+
     // 未來月補：人事成本（HR baseline）、季節性收入預測 — 加進 breakdown
     for (const m of months) {
       if (m.expenseHrEstimate && m.expenseHrEstimate > 0) {
@@ -500,6 +555,54 @@ router.get(
         source: "monthly_hr_costs",
         category,
         items: (hr as unknown as { rows: unknown[] }).rows,
+      })
+      return
+    }
+
+    // 特殊：強制執行繳款 → 從 enforcement_installment_payments
+    if (category === ENFORCEMENT_CATEGORY) {
+      const rows = await db.execute(sql`
+        SELECT p.id,
+               COALESCE(ei.plan_name, '強執分期') AS item_name,
+               p.amount::numeric AS amount,
+               p.payment_date AS start_date,
+               p.notes,
+               ec.agency,
+               ec.case_number
+        FROM enforcement_installment_payments p
+        LEFT JOIN enforcement_installments ei ON ei.id = p.installment_id
+        LEFT JOIN enforcement_cases ec ON ec.id = ei.case_id
+        WHERE p.payment_date >= ${monthStart}::date
+          AND p.payment_date < ${nextMonth}::date
+        ORDER BY p.payment_date
+      `)
+      res.json({
+        source: "enforcement_installment_payments",
+        category,
+        items: (rows as unknown as { rows: unknown[] }).rows,
+      })
+      return
+    }
+
+    // 特殊：歷史欠款還款 → 從 legacy_debt_payments
+    if (category === LEGACY_DEBT_CATEGORY) {
+      const rows = await db.execute(sql`
+        SELECT p.id,
+               COALESCE(d.creditor, '歷史欠款') AS item_name,
+               p.amount::numeric AS amount,
+               p.pay_date AS start_date,
+               p.note AS notes,
+               d.status AS debt_status
+        FROM legacy_debt_payments p
+        LEFT JOIN legacy_debts d ON d.id = p.debt_id
+        WHERE p.pay_date >= ${monthStart}::date
+          AND p.pay_date < ${nextMonth}::date
+        ORDER BY p.pay_date
+      `)
+      res.json({
+        source: "legacy_debt_payments",
+        category,
+        items: (rows as unknown as { rows: unknown[] }).rows,
       })
       return
     }

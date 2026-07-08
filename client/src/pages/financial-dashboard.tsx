@@ -1054,6 +1054,16 @@ export default function FinancialDashboardPage() {
                   資料來自 HR 系統（monthly_hr_costs）、含 8 員工完整薪資 + 雇主負擔
                 </div>
               )}
+              {detailFetch.data?.source === "enforcement_installment_payments" && (
+                <div className="text-xs text-amber-700 bg-amber-50 rounded p-2 mb-2">
+                  資料來自強制執行模組（分期實繳）、可到「強制執行管理」查看案件與對帳
+                </div>
+              )}
+              {detailFetch.data?.source === "legacy_debt_payments" && (
+                <div className="text-xs text-amber-700 bg-amber-50 rounded p-2 mb-2">
+                  資料來自歷史欠款整理（還款紀錄）、可到「歷史欠款整理」查看欠款全貌
+                </div>
+              )}
               {detailFetch.data?.items.map((it, i) => {
                 const isPaymentItem =
                   detailFetch.data?.source === "payment_items" && typeof it.id === "number"

@@ -60,6 +60,11 @@ interface CashFlowData {
   investing: { items: ReportItem[]; total: number }
   financing: { items: ReportItem[]; total: number }
   netCashFlow: number
+  /** 統一現金流參考資訊（不計入總計） */
+  reference?: {
+    cardClaimSettled: number
+    cardClaimNote: string
+  }
 }
 
 export default function FinancialStatements() {
@@ -466,8 +471,30 @@ export default function FinancialStatements() {
                   >
                     {cashFlow.netCashFlow >= 0 ? "+" : ""}${fmt(cashFlow.netCashFlow)}
                   </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    口徑：含強制執行繳款、歷史欠款還款（統一現金流）
+                  </p>
                 </CardContent>
               </Card>
+
+              {/* 卡請款到帳參考（與 PM 收入可能重複計價、不計入總計） */}
+              {cashFlow.reference && cashFlow.reference.cardClaimSettled > 0 && (
+                <Card className="bg-amber-50 border-amber-200">
+                  <CardContent className="pt-4 flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-amber-800">
+                        信用卡請款本月到帳（參考）
+                      </p>
+                      <p className="text-xs text-amber-600 mt-0.5">
+                        {cashFlow.reference.cardClaimNote}
+                      </p>
+                    </div>
+                    <p className="text-xl font-bold text-amber-700">
+                      ${fmt(cashFlow.reference.cardClaimSettled)}
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
 
               {/* 三區塊 */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">

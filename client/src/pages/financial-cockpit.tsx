@@ -384,7 +384,12 @@ export default function FinancialCockpitPage() {
                   : `較上月 ${incomeMoM >= 0 ? "▲" : "▼"} ${Math.abs(incomeMoM)}%`
               }
             />
-            <StatCard title="本月成本" value={fmt(monthExpense)} tone="text-red-500" />
+            <StatCard
+              title="本月成本"
+              value={fmt(monthExpense)}
+              tone="text-red-500"
+              sub="含強執繳款/欠款還款"
+            />
             <StatCard
               title="本月淨利"
               value={monthProfit === null ? "—" : fmt(monthProfit)}

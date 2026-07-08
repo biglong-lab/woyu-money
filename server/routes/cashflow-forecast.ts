@@ -17,6 +17,11 @@ import {
   type MonthlyRevenue,
   type MonthlyExpense,
 } from "@shared/revenue-forecaster"
+import {
+  projectEnforcementMonthly,
+  mergeMonthlyAmounts,
+} from "../services/unified-cashflow.service"
+import { getActiveInstallmentsForProjection } from "../storage/unified-cashflow"
 
 const router = Router()
 
@@ -97,9 +102,18 @@ router.get(
     ])
 
     const history = revResult.rows.map(toRevenue)
-    const expenses = expResult.rows.map(toExpense)
-
     const now = new Date()
+
+    // 統一現金流：把 active 強執分期投影進未來月支出（原本缺口分析看不到強執流出）
+    const activeInstallments = await getActiveInstallmentsForProjection()
+    const enforcementFuture = projectEnforcementMonthly(
+      activeInstallments,
+      now.getFullYear(),
+      now.getMonth() + 1,
+      monthsAhead + 1
+    )
+    const expenses = mergeMonthlyAmounts(expResult.rows.map(toExpense), enforcementFuture)
+
     const forecast = forecastRevenue(history, now.getFullYear(), now.getMonth() + 1, monthsAhead)
     const gapAnalysis = analyzeCashflowGap(forecast, expenses)
 
