@@ -1,7 +1,7 @@
 # 巨檔拆分 + 技術債清理（階段 3+4）— 2026-07-08
 
 > 範圍：前端兩大巨檔模組化 + ManagementTab Dialog + search_path 常數化
-> 狀態：已完成、待部署
+> 狀態：✅ 已部署（2026-07-08 15:48 GMT、容器重建、網站/API 驗證正常）
 > 前情：階段 1/2 見 [2026-07-08-unified-cashflow.md](2026-07-08-unified-cashflow.md)、
 > [2026-07-08-ui-consolidation.md](2026-07-08-ui-consolidation.md)
 

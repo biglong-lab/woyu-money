@@ -10,7 +10,8 @@
 
 ### 巨檔拆分 + 技術債清理（階段 3+4）
 
-詳見 `docs/changes/2026-07-08-bigfile-split-techdebt.md`。**未部署**。
+詳見 `docs/changes/2026-07-08-bigfile-split-techdebt.md`。
+**2026-07-08 15:48 GMT 部署**（容器重建、網站/API 驗證正常、生產 HEAD `05e3474`）。
 
 - **family.tsx 1,335 行 → 12 檔模組目錄**（最大 284 行；146 種元件使用逐一比對一致）
 - **household-budget.tsx 1,309 行 → 12 檔模組目錄**（最大 386 行；三個自訂 hooks 抽離）
