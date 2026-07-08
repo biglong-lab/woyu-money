@@ -1,7 +1,15 @@
 /** 合約管理 Tab 內容 */
 
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Play, Upload, DollarSign } from "lucide-react";
 import type { ContractData } from "./types";
 import { useGeneratePayments, useBatchDocumentUpload } from "./hooks";
