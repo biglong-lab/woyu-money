@@ -128,7 +128,7 @@ router.get(
     const pool = new Pool({
       connectionString: connStr,
       max: 1,
-      options: "-c search_path=t_wodao,public",
+      options: PM_SEARCH_PATH_OPTIONS,
     })
     try {
       // 排除不納入 Money 的公司（大號文創 6 / 大哉文旅 7）
@@ -164,7 +164,7 @@ router.get(
       const pool = new Pool({
         connectionString: connStr,
         max: 1,
-        options: "-c search_path=t_wodao,public",
+        options: PM_SEARCH_PATH_OPTIONS,
       })
       try {
         const r = await pool.query("SELECT COUNT(*) as cnt FROM revenues WHERE deleted_at IS NULL")
