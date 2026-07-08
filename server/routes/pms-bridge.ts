@@ -11,6 +11,7 @@ import { Router } from "express"
 import { asyncHandler, AppError } from "../middleware/error-handler"
 import { syncPmsRevenues, previewPmsRevenues, ensurePmsBridgeSource } from "../storage/pms-bridge"
 import { EXCLUDED_PM_COMPANY_IDS } from "@shared/pm-excluded-companies"
+import { PM_SEARCH_PATH_OPTIONS } from "@shared/pm-schema-config"
 
 const router = Router()
 
