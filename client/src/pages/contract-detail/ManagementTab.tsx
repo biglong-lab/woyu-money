@@ -103,17 +103,24 @@ export function ManagementTab({ contract }: ManagementTabProps) {
   );
 }
 
-/** 付款資訊卡片 */
+/** 付款資訊卡片（Dialog 顯示、取代原 alert） */
 function PaymentInfoCard({ contract }: { contract: ContractData }) {
-  const payeeInfo = contract.payeeName
+  const [open, setOpen] = useState(false);
+
+  const rows: Array<{ label: string; value: string }> = contract.payeeName
     ? [
-        `收款人：${contract.payeeName}`,
-        `收款單位：${contract.payeeUnit || "未設定"}`,
-        `銀行代碼：${contract.bankCode || "未設定"}`,
-        `帳戶號碼：${contract.accountNumber || "未設定"}`,
-        `付款日：每月${contract.contractPaymentDay || "未設定"}日`,
-      ].join("\n")
-    : "尚未設定付款資訊";
+        { label: "收款人", value: contract.payeeName },
+        { label: "收款單位", value: contract.payeeUnit || "未設定" },
+        { label: "銀行代碼", value: contract.bankCode || "未設定" },
+        { label: "帳戶號碼", value: contract.accountNumber || "未設定" },
+        {
+          label: "付款日",
+          value: contract.contractPaymentDay
+            ? `每月 ${contract.contractPaymentDay} 日`
+            : "未設定",
+        },
+      ]
+    : [];
 
   return (
     <Card>
@@ -127,17 +134,35 @@ function PaymentInfoCard({ contract }: { contract: ContractData }) {
         </p>
       </CardHeader>
       <CardContent>
-        <Button
-          className="w-full"
-          variant="outline"
-          onClick={() => {
-            // TODO: 改為使用 Dialog 元件顯示付款資訊
-            alert(`付款資訊：\n\n${payeeInfo}`);
-          }}
-        >
+        <Button className="w-full" variant="outline" onClick={() => setOpen(true)}>
           <DollarSign className="h-4 w-4 mr-2" />
           查看付款資訊
         </Button>
+        <Dialog open={open} onOpenChange={setOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>付款資訊</DialogTitle>
+              <DialogDescription>此合約的收款帳戶與付款日設定</DialogDescription>
+            </DialogHeader>
+            {rows.length > 0 ? (
+              <div className="space-y-2">
+                {rows.map((r) => (
+                  <div
+                    key={r.label}
+                    className="flex justify-between items-center p-2.5 bg-gray-50 rounded text-sm"
+                  >
+                    <span className="text-gray-500">{r.label}</span>
+                    <span className="font-medium">{r.value}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground py-4 text-center">
+                尚未設定付款資訊，可到「合約詳情」編輯收款人與帳戶。
+              </p>
+            )}
+          </DialogContent>
+        </Dialog>
       </CardContent>
     </Card>
   );
