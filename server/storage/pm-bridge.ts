@@ -28,8 +28,7 @@ function createPmPool(): Pool {
   if (!connStr) {
     throw new Error("環境變數 PM_DATABASE_URL 未設定")
   }
-  // PM 正式資料在 t_wodao schema（2026-06-14 起）；public.revenues 已無新資料
-  return new Pool({ connectionString: connStr, max: 3, options: "-c search_path=t_wodao,public" })
+  return new Pool({ connectionString: connStr, max: 3, options: PM_SEARCH_PATH_OPTIONS })
 }
 
 // ─────────────────────────────────────────────
