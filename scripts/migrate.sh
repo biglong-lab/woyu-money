@@ -18,12 +18,15 @@ EXTRA="${1:-}"
 
 MIG_DIR="$(cd "$(dirname "$0")/.." && pwd)/migrations"
 
+# 生產主機（2026-07-30：舊機 172.233.89.147 已停機，改 prod-osa）
+PROD_SSH="${PROD_SSH:-root@172.233.67.87}"
+
 # DB 連線設定（依模式）
 run_sql() {
   local sql="$1"
   case "$MODE" in
     prod)
-      ssh root@172.233.89.147 "docker exec -i woyu-money-db psql -U woyu -d woyu_money" <<< "$sql"
+      ssh "$PROD_SSH" "docker exec -i woyu-money-db psql -U woyu -d woyu_money" <<< "$sql"
       ;;
     local)
       docker exec -i woyu-postgres psql -U woyu -d woyu_money <<< "$sql"
@@ -35,9 +38,9 @@ run_sql_file() {
   local file="$1"
   case "$MODE" in
     prod)
-      scp -q "$file" root@172.233.89.147:/tmp/_mig.sql
-      ssh root@172.233.89.147 "docker exec -i woyu-money-db psql -U woyu -d woyu_money < /tmp/_mig.sql"
-      ssh root@172.233.89.147 "rm /tmp/_mig.sql"
+      scp -q "$file" "$PROD_SSH":/tmp/_mig.sql
+      ssh "$PROD_SSH" "docker exec -i woyu-money-db psql -U woyu -d woyu_money < /tmp/_mig.sql"
+      ssh "$PROD_SSH" "rm /tmp/_mig.sql"
       ;;
     local)
       docker exec -i woyu-postgres psql -U woyu -d woyu_money < "$file"

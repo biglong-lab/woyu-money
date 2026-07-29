@@ -8,7 +8,7 @@
 #   ./scripts/backup-full.sh prod /custom/path.dump
 #
 # 環境：
-#   prod 模式需 SSH 到 172.233.89.147、用 container woyu-money-db
+#   prod 模式需 SSH 到 prod-osa (172.233.67.87)、用 container woyu-money-db
 #   local 模式用本地 docker container woyu-postgres
 #
 # 還原：
@@ -17,14 +17,16 @@
 set -euo pipefail
 
 MODE="${1:-prod}"
+# 生產主機（2026-07-30：舊機 172.233.89.147 已停機，改 prod-osa）
+PROD_SSH="${PROD_SSH:-root@172.233.67.87}"
 DATE_TAG=$(date +%Y%m%d-%H%M%S)
 DEFAULT_OUT="/tmp/woyu-backup-${MODE}-${DATE_TAG}.dump"
 OUT_PATH="${2:-$DEFAULT_OUT}"
 
 case "$MODE" in
   prod)
-    echo "📦 備份生產 DB（SSH → 172.233.89.147）..."
-    ssh root@172.233.89.147 \
+    echo "📦 備份生產 DB（SSH → $PROD_SSH）..."
+    ssh "$PROD_SSH" \
       "docker exec woyu-money-db pg_dump -U woyu -d woyu_money --format=custom --no-owner --no-acl" \
       > "$OUT_PATH"
     ;;
