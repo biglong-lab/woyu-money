@@ -3,8 +3,18 @@ name: CI
 on:
   push:
     branches: [main]
+    # 純文件/紀錄變更不跑 CI（只加在 push，PR 仍照跑，避免 required check 卡住）
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - '.claude/**'
   pull_request:
     branches: [main]
+
+# 同分支連續 push 只保留最新一次，舊 run 立即取消（此 workflow 不含部署，取消安全）
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   check:
