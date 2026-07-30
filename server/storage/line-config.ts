@@ -4,12 +4,8 @@
  */
 
 import { db } from "../db"
-import {
-  lineConfigs,
-  type LineConfig,
-  type InsertLineConfig,
-} from "@shared/schema"
-import { eq } from "drizzle-orm"
+import { lineConfigs, type LineConfig, type InsertLineConfig } from "@shared/schema"
+import { sql, eq } from "drizzle-orm"
 
 /**
  * 取得 LINE 設定
@@ -32,8 +28,8 @@ export async function createLineConfig(config: InsertLineConfig): Promise<LineCo
     .insert(lineConfigs)
     .values({
       ...config,
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      createdAt: sql`now()`,
+      updatedAt: sql`now()`,
     })
     .returning()
   return newConfig
@@ -42,12 +38,15 @@ export async function createLineConfig(config: InsertLineConfig): Promise<LineCo
 /**
  * 更新 LINE 設定
  */
-export async function updateLineConfig(id: number, config: Partial<InsertLineConfig>): Promise<LineConfig> {
+export async function updateLineConfig(
+  id: number,
+  config: Partial<InsertLineConfig>
+): Promise<LineConfig> {
   const [updatedConfig] = await db
     .update(lineConfigs)
     .set({
       ...config,
-      updatedAt: new Date(),
+      updatedAt: sql`now()`,
     })
     .where(eq(lineConfigs.id, id))
     .returning()
@@ -112,16 +111,25 @@ async function testLineConnectionWithFormat(
 
     // 檢查 Channel ID 格式（應為數字）
     if (!/^\d+$/.test(config.channelId)) {
-      return { success: false, message: `LINE連線測試失敗：Channel ID格式錯誤（應為純數字），目前值：${config.channelId}` }
+      return {
+        success: false,
+        message: `LINE連線測試失敗：Channel ID格式錯誤（應為純數字），目前值：${config.channelId}`,
+      }
     }
 
     // 檢查 Channel Secret 格式（應為 32 位英數字）
     if (config.channelSecret.length !== 32) {
-      return { success: false, message: `LINE連線測試失敗：Channel Secret長度錯誤（應為32位），目前長度：${config.channelSecret.length}` }
+      return {
+        success: false,
+        message: `LINE連線測試失敗：Channel Secret長度錯誤（應為32位），目前長度：${config.channelSecret.length}`,
+      }
     }
 
     if (!/^[a-fA-F0-9]{32}$/.test(config.channelSecret)) {
-      return { success: false, message: "LINE連線測試失敗：Channel Secret格式錯誤（應為32位16進制字符）" }
+      return {
+        success: false,
+        message: "LINE連線測試失敗：Channel Secret格式錯誤（應為32位16進制字符）",
+      }
     }
 
     // 檢查 Callback URL 格式

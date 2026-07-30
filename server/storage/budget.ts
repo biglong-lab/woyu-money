@@ -12,7 +12,7 @@ import {
   type BudgetItem,
   type InsertBudgetItem,
 } from "@shared/schema"
-import { eq, and, desc } from "drizzle-orm"
+import { sql, eq, and, desc } from "drizzle-orm"
 import { localDateTPE } from "@shared/date-utils"
 
 // === 預算計劃篩選條件 ===
@@ -64,7 +64,7 @@ export async function updateBudgetPlan(
 ): Promise<BudgetPlan | undefined> {
   const [updatedPlan] = await db
     .update(budgetPlans)
-    .set({ ...data, updatedAt: new Date() })
+    .set({ ...data, updatedAt: sql`now()` })
     .where(eq(budgetPlans.id, id))
     .returning()
   return updatedPlan
@@ -136,7 +136,7 @@ export async function updateBudgetItem(
 ): Promise<BudgetItem | undefined> {
   const [updatedItem] = await db
     .update(budgetItems)
-    .set({ ...data, updatedAt: new Date() })
+    .set({ ...data, updatedAt: sql`now()` })
     .where(eq(budgetItems.id, id))
     .returning()
   return updatedItem
@@ -146,7 +146,7 @@ export async function updateBudgetItem(
 export async function softDeleteBudgetItem(id: number): Promise<BudgetItem | undefined> {
   const [item] = await db
     .update(budgetItems)
-    .set({ isDeleted: true, updatedAt: new Date() })
+    .set({ isDeleted: true, updatedAt: sql`now()` })
     .where(eq(budgetItems.id, id))
     .returning()
   return item
@@ -165,7 +165,7 @@ export async function updateBudgetPlanActualSpent(planId: number): Promise<void>
 
   await db
     .update(budgetPlans)
-    .set({ actualSpent: totalActual.toFixed(2), updatedAt: new Date() })
+    .set({ actualSpent: totalActual.toFixed(2), updatedAt: sql`now()` })
     .where(eq(budgetPlans.id, planId))
 }
 
@@ -228,8 +228,8 @@ export async function convertBudgetItemToPayment(
     .set({
       convertedToPayment: true,
       linkedPaymentItemId: newPaymentItem.id,
-      conversionDate: new Date(),
-      updatedAt: new Date(),
+      conversionDate: sql`now()`,
+      updatedAt: sql`now()`,
     })
     .where(eq(budgetItems.id, budgetItemId))
     .returning()

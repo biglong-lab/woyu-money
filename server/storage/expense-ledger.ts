@@ -41,7 +41,7 @@ export async function updateEntry(
   data: Partial<InsertExpenseLedgerEntry>
 ): Promise<ExpenseLedgerEntry | undefined> {
   // 有填分類/科目時自動標記 classified（除非明確指定 status）
-  const patch: Record<string, unknown> = { ...data, updatedAt: new Date() }
+  const patch: Record<string, unknown> = { ...data, updatedAt: sql`now()` }
   if (!data.status && (data.categoryId || data.accountCode)) {
     patch.status = "classified"
   }

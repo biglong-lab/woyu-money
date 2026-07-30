@@ -10,7 +10,7 @@ import {
   type InsertEmployee,
   type MonthlyHrCost,
 } from "@shared/schema"
-import { eq, and, asc } from "drizzle-orm"
+import { sql, eq, and, asc } from "drizzle-orm"
 import { localDateTPE } from "@shared/date-utils"
 
 // === 員工 CRUD ===
@@ -51,7 +51,7 @@ export async function updateEmployee(
 ): Promise<Employee | undefined> {
   const [result] = await db
     .update(employees)
-    .set({ ...data, updatedAt: new Date() })
+    .set({ ...data, updatedAt: sql`now()` })
     .where(eq(employees.id, id))
     .returning()
   return result
@@ -64,7 +64,7 @@ export async function softDeleteEmployee(id: number): Promise<Employee | undefin
     .set({
       isActive: false,
       terminationDate: localDateTPE(),
-      updatedAt: new Date(),
+      updatedAt: sql`now()`,
     })
     .where(eq(employees.id, id))
     .returning()
@@ -132,7 +132,7 @@ export async function updateMonthlyHrCost(
 ): Promise<MonthlyHrCost | undefined> {
   const [result] = await db
     .update(monthlyHrCosts)
-    .set({ ...data, updatedAt: new Date() })
+    .set({ ...data, updatedAt: sql`now()` })
     .where(eq(monthlyHrCosts.id, id))
     .returning()
   return result

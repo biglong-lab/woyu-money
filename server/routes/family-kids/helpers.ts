@@ -80,7 +80,7 @@ export async function ensureMonthlyAllowance(kidId: number): Promise<number> {
   `)
   await db
     .update(kidsAccounts)
-    .set({ lastAllowanceMonth: currentMonth, updatedAt: new Date() })
+    .set({ lastAllowanceMonth: currentMonth, updatedAt: sql`now()` })
     .where(eq(kidsAccounts.id, kidId))
 
   // 寫進主系統（複用既有 tags=kids,allowance 規範）

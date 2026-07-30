@@ -13,7 +13,7 @@
 import { Pool } from "pg"
 import { db } from "../db"
 import { incomeSources, incomeWebhooks } from "@shared/schema"
-import { eq, and } from "drizzle-orm"
+import { sql, eq, and } from "drizzle-orm"
 import { _createPaymentFromWebhook } from "./income"
 import { getCompanyToProjectMap } from "./pm-company-mapping"
 import { EXCLUDED_PM_COMPANY_IDS, isExcludedPmCompany } from "@shared/pm-excluded-companies"
@@ -295,8 +295,8 @@ export async function syncPmRevenues(
       .update(incomeSources)
       .set({
         totalReceived: countResult.length,
-        lastReceivedAt: new Date(),
-        updatedAt: new Date(),
+        lastReceivedAt: sql`now()`,
+        updatedAt: sql`now()`,
       })
       .where(eq(incomeSources.id, sourceId))
   }

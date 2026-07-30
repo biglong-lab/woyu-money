@@ -143,7 +143,7 @@ export async function updateLoanInvestmentRecord(
   try {
     const [record] = await db
       .update(loanInvestmentRecords)
-      .set({ ...recordData, updatedAt: new Date() })
+      .set({ ...recordData, updatedAt: sql`now()` })
       .where(eq(loanInvestmentRecords.id, id))
       .returning()
 
@@ -158,7 +158,7 @@ export async function deleteLoanInvestmentRecord(id: number): Promise<void> {
   try {
     await db
       .update(loanInvestmentRecords)
-      .set({ status: "cancelled", updatedAt: new Date() })
+      .set({ status: "cancelled", updatedAt: sql`now()` })
       .where(eq(loanInvestmentRecords.id, id))
   } catch (error) {
     console.error("Error deleting loan investment record:", error)
@@ -291,7 +291,7 @@ export async function addLoanPayment(
       .update(loanInvestmentRecords)
       .set({
         totalPaidAmount: newPaid.toString(),
-        updatedAt: new Date(),
+        updatedAt: sql`now()`,
       })
       .where(eq(loanInvestmentRecords.id, recordId))
 
@@ -342,7 +342,7 @@ export async function updateLoanPaymentHistory(
       .update(loanPaymentHistory)
       .set({
         ...paymentData,
-        updatedAt: new Date(),
+        updatedAt: sql`now()`,
       })
       .where(eq(loanPaymentHistory.id, id))
       .returning()
@@ -389,7 +389,7 @@ export async function deleteLoanPaymentHistory(id: number): Promise<void> {
           .update(loanInvestmentRecords)
           .set({
             totalPaidAmount: newPaid.toString(),
-            updatedAt: new Date(),
+            updatedAt: sql`now()`,
           })
           .where(eq(loanInvestmentRecords.id, payment.recordId))
 
@@ -440,7 +440,7 @@ export async function verifyLoanPayment(
         isVerified: true,
         verifiedBy: verifiedBy,
         notes: notes || null,
-        updatedAt: new Date(),
+        updatedAt: sql`now()`,
       })
       .where(eq(loanPaymentHistory.id, id))
       .returning()

@@ -80,7 +80,7 @@ export async function listApiKeys(): Promise<Omit<IntegrationApiKey, "keyHash">[
 export async function revokeApiKey(id: number): Promise<boolean> {
   const result = await db
     .update(integrationApiKeys)
-    .set({ isActive: false, updatedAt: new Date() })
+    .set({ isActive: false, updatedAt: sql`now()` })
     .where(eq(integrationApiKeys.id, id))
     .returning({ id: integrationApiKeys.id })
   return result.length > 0
@@ -149,10 +149,10 @@ export async function recordApiKeyUsage(id: number, ip: string | null): Promise<
     await db
       .update(integrationApiKeys)
       .set({
-        lastUsedAt: new Date(),
+        lastUsedAt: sql`now()`,
         lastUsedIp: ip,
         usageCount: sql`${integrationApiKeys.usageCount} + 1`,
-        updatedAt: new Date(),
+        updatedAt: sql`now()`,
       })
       .where(eq(integrationApiKeys.id, id))
   } catch (err) {

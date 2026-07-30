@@ -1,6 +1,6 @@
 import { db } from "./db"
 import { users } from "@shared/schema"
-import { eq } from "drizzle-orm"
+import { sql, eq } from "drizzle-orm"
 import { hashPassword } from "./auth"
 
 async function initializeAdminUser() {
@@ -36,8 +36,8 @@ async function initializeAdminUser() {
       fullName: "系統管理員",
       role: "admin",
       isActive: true,
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      createdAt: sql`now()`,
+      updatedAt: sql`now()`,
     })
 
     console.info("管理員帳戶建立成功")

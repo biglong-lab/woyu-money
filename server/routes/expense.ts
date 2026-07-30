@@ -66,7 +66,7 @@ router.put(
       const partial = insertExpenseSourceSchema.partial().parse(req.body)
       const [row] = await db
         .update(expenseSources)
-        .set({ ...partial, updatedAt: new Date() })
+        .set({ ...partial, updatedAt: sql`now()` })
         .where(eq(expenseSources.id, id))
         .returning()
       if (!row) throw new AppError(404, "來源不存在")
@@ -88,7 +88,7 @@ router.delete(
     if (!Number.isInteger(id) || id < 1) throw new AppError(400, "無效的 ID")
     const [row] = await db
       .update(expenseSources)
-      .set({ isActive: false, updatedAt: new Date() })
+      .set({ isActive: false, updatedAt: sql`now()` })
       .where(eq(expenseSources.id, id))
       .returning()
     if (!row) throw new AppError(404, "來源不存在")
@@ -202,9 +202,9 @@ router.post(
       .set({
         status: "rejected",
         reviewedByUserId: userId,
-        reviewedAt: new Date(),
+        reviewedAt: sql`now()`,
         reviewNote,
-        updatedAt: new Date(),
+        updatedAt: sql`now()`,
       })
       .where(eq(expenseWebhooks.id, id))
       .returning()
@@ -228,7 +228,7 @@ router.post(
         reviewedAt: null,
         reviewNote: null,
         errorMessage: null,
-        updatedAt: new Date(),
+        updatedAt: sql`now()`,
       })
       .where(eq(expenseWebhooks.id, id))
       .returning()

@@ -32,7 +32,7 @@ export async function createCase(data: InsertEnforcementCase) {
 export async function updateCase(id: number, data: Partial<InsertEnforcementCase>) {
   const [r] = await db
     .update(enforcementCases)
-    .set({ ...data, updatedAt: new Date() })
+    .set({ ...data, updatedAt: sql`now()` })
     .where(eq(enforcementCases.id, id))
     .returning()
   return r
@@ -55,7 +55,7 @@ export async function createSeizure(data: InsertEnforcementSeizure) {
 export async function updateSeizure(id: number, data: Partial<InsertEnforcementSeizure>) {
   const [r] = await db
     .update(enforcementSeizures)
-    .set({ ...data, updatedAt: new Date() })
+    .set({ ...data, updatedAt: sql`now()` })
     .where(eq(enforcementSeizures.id, id))
     .returning()
   return r
@@ -75,7 +75,7 @@ export async function createInstallment(data: InsertEnforcementInstallment) {
 export async function updateInstallment(id: number, data: Partial<InsertEnforcementInstallment>) {
   const [r] = await db
     .update(enforcementInstallments)
-    .set({ ...data, updatedAt: new Date() })
+    .set({ ...data, updatedAt: sql`now()` })
     .where(eq(enforcementInstallments.id, id))
     .returning()
   return r

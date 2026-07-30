@@ -254,7 +254,7 @@ export async function reconcileBudgetItemForPayment(
       actualAmount: newActual.toString(),
       variance: variance.toString(),
       variancePercentage: variancePercentage.toString(),
-      updatedAt: new Date(),
+      updatedAt: sql`now()`,
     })
     .where(eq(budgetItems.id, match.budgetItemId))
 
@@ -389,7 +389,7 @@ export async function recomputeMonthBudgetActuals(
         actualAmount: newActual.toString(),
         variance: variance.toString(),
         variancePercentage: variancePercentage.toString(),
-        updatedAt: new Date(),
+        updatedAt: sql`now()`,
       })
       .where(eq(budgetItems.id, r.id))
 

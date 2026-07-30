@@ -1,20 +1,13 @@
 import { db } from "../db"
-import {
-  fileAttachments,
-  type FileAttachment,
-  type InsertFileAttachment,
-} from "@shared/schema"
-import { eq, and, desc } from "drizzle-orm"
+import { fileAttachments, type FileAttachment, type InsertFileAttachment } from "@shared/schema"
+import { sql, eq, and, desc } from "drizzle-orm"
 
 // 建立檔案附件
 export async function createFileAttachment(
   attachment: InsertFileAttachment
 ): Promise<FileAttachment> {
   try {
-    const [created] = await db
-      .insert(fileAttachments)
-      .values(attachment)
-      .returning()
+    const [created] = await db.insert(fileAttachments).values(attachment).returning()
     return created
   } catch (error) {
     console.error("建立檔案附件失敗:", error)
@@ -23,14 +16,9 @@ export async function createFileAttachment(
 }
 
 // 根據 ID 取得單一檔案附件
-export async function getFileAttachment(
-  id: number
-): Promise<FileAttachment | undefined> {
+export async function getFileAttachment(id: number): Promise<FileAttachment | undefined> {
   try {
-    const [attachment] = await db
-      .select()
-      .from(fileAttachments)
-      .where(eq(fileAttachments.id, id))
+    const [attachment] = await db.select().from(fileAttachments).where(eq(fileAttachments.id, id))
     return attachment
   } catch (error) {
     console.error("取得檔案附件失敗:", error)
@@ -48,10 +36,7 @@ export async function getFileAttachments(
       .select()
       .from(fileAttachments)
       .where(
-        and(
-          eq(fileAttachments.entityType, entityType),
-          eq(fileAttachments.entityId, entityId)
-        )
+        and(eq(fileAttachments.entityType, entityType), eq(fileAttachments.entityId, entityId))
       )
       .orderBy(desc(fileAttachments.createdAt))
   } catch (error) {
@@ -68,7 +53,7 @@ export async function updateFileAttachment(
   try {
     const [updated] = await db
       .update(fileAttachments)
-      .set({ ...updates, updatedAt: new Date() })
+      .set({ ...updates, updatedAt: sql`now()` })
       .where(eq(fileAttachments.id, id))
       .returning()
     return updated

@@ -6,7 +6,7 @@ import {
   type User,
   type InsertUser,
 } from "@shared/schema"
-import { eq, desc, count } from "drizzle-orm"
+import { sql, eq, desc, count } from "drizzle-orm"
 
 // 使用者認證方法
 
@@ -35,8 +35,8 @@ export async function createUser(user: InsertUser): Promise<User> {
     .insert(users)
     .values({
       ...user,
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      createdAt: sql`now()`,
+      updatedAt: sql`now()`,
     })
     .returning()
   return newUser
@@ -47,7 +47,7 @@ export async function updateUser(id: number, user: Partial<InsertUser>): Promise
     .update(users)
     .set({
       ...user,
-      updatedAt: new Date(),
+      updatedAt: sql`now()`,
     })
     .where(eq(users.id, id))
     .returning()
@@ -64,7 +64,7 @@ export async function updateUserLoginAttempts(
     .set({
       failedLoginAttempts: attempts,
       lockedUntil: lockedUntil,
-      updatedAt: new Date(),
+      updatedAt: sql`now()`,
     })
     .where(eq(users.id, id))
 }
@@ -80,7 +80,7 @@ export async function updateUserRole(id: number, role: string): Promise<User> {
     .update(users)
     .set({
       role: role,
-      updatedAt: new Date(),
+      updatedAt: sql`now()`,
     })
     .where(eq(users.id, id))
     .returning()
@@ -92,7 +92,7 @@ export async function updateUserPermissions(id: number, permissions: unknown): P
     .update(users)
     .set({
       menuPermissions: permissions,
-      updatedAt: new Date(),
+      updatedAt: sql`now()`,
     })
     .where(eq(users.id, id))
     .returning()
@@ -104,7 +104,7 @@ export async function updateUserPassword(id: number, hashedPassword: string): Pr
     .update(users)
     .set({
       password: hashedPassword,
-      updatedAt: new Date(),
+      updatedAt: sql`now()`,
     })
     .where(eq(users.id, id))
 }
@@ -114,7 +114,7 @@ export async function toggleUserStatus(id: number, isActive: boolean): Promise<U
     .update(users)
     .set({
       isActive: isActive,
-      updatedAt: new Date(),
+      updatedAt: sql`now()`,
     })
     .where(eq(users.id, id))
     .returning()

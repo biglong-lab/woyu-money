@@ -40,7 +40,7 @@ export async function updateUserRole(userId: number, role: string): Promise<User
       .update(users)
       .set({
         role: role,
-        updatedAt: new Date(),
+        updatedAt: sql`now()`,
       })
       .where(eq(users.id, userId))
       .returning()
@@ -67,7 +67,7 @@ export async function toggleUserStatus(userId: number): Promise<User> {
       .update(users)
       .set({
         isActive: newStatus,
-        updatedAt: new Date(),
+        updatedAt: sql`now()`,
       })
       .where(eq(users.id, userId))
       .returning()

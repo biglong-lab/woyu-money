@@ -228,8 +228,8 @@ export async function confirmExpenseWebhook(
         source: sourceValue,
         paymentType: "single",
         itemType: "project",
-        createdAt: new Date(),
-        updatedAt: new Date(),
+        createdAt: sql`now()`,
+        updatedAt: sql`now()`,
       })
       .returning()
 
@@ -259,10 +259,10 @@ export async function confirmExpenseWebhook(
         linkedItemId: newItem.id,
         linkedRecordId: recordId ?? null,
         reviewedByUserId: userId,
-        reviewedAt: new Date(),
+        reviewedAt: sql`now()`,
         reviewNote: input.reviewNote ?? null,
-        processedAt: new Date(),
-        updatedAt: new Date(),
+        processedAt: sql`now()`,
+        updatedAt: sql`now()`,
       })
       .where(eq(expenseWebhooks.id, webhookId))
 
@@ -408,8 +408,8 @@ export async function receiveExpenseWebhook(
       status: source.autoConfirm ? "confirmed" : "pending",
       requestIp: requestIp ?? null,
       requestHeaders: (requestHeaders ?? {}) as Record<string, string>,
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      createdAt: sql`now()`,
+      updatedAt: sql`now()`,
     })
     .returning()
 
@@ -418,8 +418,8 @@ export async function receiveExpenseWebhook(
     .update(expenseSources)
     .set({
       totalReceived: sql`${expenseSources.totalReceived} + 1`,
-      lastReceivedAt: new Date(),
-      updatedAt: new Date(),
+      lastReceivedAt: sql`now()`,
+      updatedAt: sql`now()`,
     })
     .where(eq(expenseSources.id, source.id))
 
@@ -466,7 +466,7 @@ async function _createPaymentFromExpenseWebhook(
   // 更新 webhook linkedItemId
   await db
     .update(expenseWebhooks)
-    .set({ linkedItemId: item.id, processedAt: new Date(), updatedAt: new Date() })
+    .set({ linkedItemId: item.id, processedAt: sql`now()`, updatedAt: sql`now()` })
     .where(eq(expenseWebhooks.id, webhookId))
 
   // 若 as_paid，建立對應 payment_record
@@ -484,7 +484,7 @@ async function _createPaymentFromExpenseWebhook(
 
     await db
       .update(expenseWebhooks)
-      .set({ linkedRecordId: record.id, updatedAt: new Date() })
+      .set({ linkedRecordId: record.id, updatedAt: sql`now()` })
       .where(eq(expenseWebhooks.id, webhookId))
   }
 }

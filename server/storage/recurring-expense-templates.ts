@@ -30,7 +30,7 @@ export async function createTemplate(
 ): Promise<RecurringExpenseTemplate> {
   const [row] = await db
     .insert(recurringExpenseTemplates)
-    .values({ ...data, updatedAt: new Date() })
+    .values({ ...data, updatedAt: sql`now()` })
     .returning()
   return row
 }
@@ -41,7 +41,7 @@ export async function updateTemplate(
 ): Promise<RecurringExpenseTemplate | undefined> {
   const [row] = await db
     .update(recurringExpenseTemplates)
-    .set({ ...data, updatedAt: new Date() })
+    .set({ ...data, updatedAt: sql`now()` })
     .where(eq(recurringExpenseTemplates.id, id))
     .returning()
   return row
@@ -164,8 +164,8 @@ export async function generateItemsForMonth(
         tags: tpl.tags ?? `週期估算,模板#${tpl.id}`,
         notes: `🧮 估算占位：由「${tpl.templateName}」模板自動產出（template id=${tpl.id}）\n估算金額：$${tpl.estimatedAmount}\n實際支付時請更新金額並改為 paid（不要新增另一筆）`,
         priority: 3,
-        createdAt: new Date(),
-        updatedAt: new Date(),
+        createdAt: sql`now()`,
+        updatedAt: sql`now()`,
       })
       .returning({ id: paymentItems.id })
 
@@ -174,7 +174,7 @@ export async function generateItemsForMonth(
     // 5. 更新 lastGeneratedMonth
     await db
       .update(recurringExpenseTemplates)
-      .set({ lastGeneratedMonth: targetMonth, updatedAt: new Date() })
+      .set({ lastGeneratedMonth: targetMonth, updatedAt: sql`now()` })
       .where(eq(recurringExpenseTemplates.id, tpl.id))
   }
 
@@ -265,7 +265,7 @@ export async function linkItemToTemplate(params: {
   const update: Record<string, unknown> = {
     recurringTemplateId: templateId,
     notes: newNotes,
-    updatedAt: new Date(),
+    updatedAt: sql`now()`,
   }
   if (item.categoryId === null && tpl.categoryId) update.categoryId = tpl.categoryId
   if (item.fixedCategoryId === null && tpl.fixedCategoryId)
@@ -354,7 +354,7 @@ export async function replaceScheduledWithActual(params: {
         paidAmount: actualAmount.toFixed(2),
         status: "paid",
         notes: updatedNotes,
-        updatedAt: new Date(),
+        updatedAt: sql`now()`,
       })
       .where(eq(paymentItems.id, itemId))
 
@@ -368,8 +368,8 @@ export async function replaceScheduledWithActual(params: {
         paymentMethod: paymentMethod ?? null,
         notes: notes?.trim() || `由「模板占位 → 實際金額」介面新增`,
         receiptImageUrl: receiptImageUrl ?? null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
+        createdAt: sql`now()`,
+        updatedAt: sql`now()`,
       })
       .returning({ id: paymentRecords.id })
 
@@ -448,8 +448,8 @@ export async function recordTemplateMonthPayment(params: {
         tags: tpl.tags ?? `週期估算,模板#${tpl.id}`,
         notes: `🧮 估算占位（由固定開銷矩陣付款介面建立、template id=${tpl.id}）`,
         priority: 3,
-        createdAt: new Date(),
-        updatedAt: new Date(),
+        createdAt: sql`now()`,
+        updatedAt: sql`now()`,
       })
       .returning({ id: paymentItems.id })
     itemId = item.id

@@ -202,7 +202,7 @@ export async function processSubcategoryPayment(
       .set({
         paidAmount: newPaidAmount.toFixed(2),
         status: isFullyPaid ? "paid" : "partial",
-        updatedAt: new Date(),
+        updatedAt: sql`now()`,
       })
       .where(eq(paymentItems.id, item.id))
 
@@ -363,7 +363,7 @@ export async function executeUnifiedPayment(
       .set({
         paidAmount: newPaidAmount.toFixed(2),
         status: isFullyPaid ? "paid" : "partial",
-        updatedAt: new Date(),
+        updatedAt: sql`now()`,
       })
       .where(eq(paymentItems.id, item.id))
 

@@ -20,7 +20,7 @@
 import { Pool } from "pg"
 import { db } from "../db"
 import { incomeSources, incomeWebhooks } from "@shared/schema"
-import { eq } from "drizzle-orm"
+import { sql, eq } from "drizzle-orm"
 
 // ─────────────────────────────────────────────
 // PMS 資料庫連線（唯讀）
@@ -49,9 +49,9 @@ interface PmsMonthlyRevenue {
   branch_id: number
   branch_name: string
   branch_code: string
-  month: string          // YYYY-MM
+  month: string // YYYY-MM
   last_entry_date: string // 最後更新日期
-  revenue: string         // 當月實際收入（最後一筆累計值）
+  revenue: string // 當月實際收入（最後一筆累計值）
 }
 
 export interface PmsSyncResult {
@@ -83,7 +83,8 @@ export async function ensurePmsBridgeSource(): Promise<number> {
       sourceName: "浯島 PMS 績效管理系統",
       sourceKey: "pms-bridge",
       sourceType: "custom_api",
-      description: "從 PMS 績效管理系統同步月度收入（含4個分店：浯島文旅/輕旅、總兵招待所、魁星背包棧）",
+      description:
+        "從 PMS 績效管理系統同步月度收入（含4個分店：浯島文旅/輕旅、總兵招待所、魁星背包棧）",
       authType: "token",
       isActive: true,
       autoConfirm: false,
@@ -113,7 +114,8 @@ async function fetchPmsMonthlyRevenues(
     const branches = branchResult.rows
 
     // 每月每分店取最後一筆（即最大日期的記錄 = 最新累計值）
-    const result = await pool.query<PmsMonthlyRevenue>(`
+    const result = await pool.query<PmsMonthlyRevenue>(
+      `
       WITH latest_per_month AS (
         SELECT DISTINCT ON (branch_id, TO_CHAR(date, 'YYYY-MM'))
           pe.branch_id,
@@ -130,7 +132,9 @@ async function fetchPmsMonthlyRevenues(
       )
       SELECT * FROM latest_per_month
       ORDER BY month, branch_id
-    `, [startMonth, endMonth])
+    `,
+      [startMonth, endMonth]
+    )
 
     return { revenues: result.rows, branches }
   } finally {
@@ -195,7 +199,7 @@ export async function syncPmsRevenues(
               parsedAmountTwd: amount.toFixed(2),
               parsedPaidAt: new Date(twDateStr),
               rawPayload: buildRawPayload(rev),
-              updatedAt: new Date(),
+              updatedAt: sql`now()`,
             })
             .where(eq(incomeWebhooks.externalTransactionId, externalId))
 

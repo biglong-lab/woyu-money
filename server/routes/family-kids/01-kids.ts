@@ -84,7 +84,7 @@ router.put(
       const g = Number(body.giveRatio ?? 0)
       if (s + sv + g !== 100) throw new AppError(400, "三罐比例總和必須為 100")
     }
-    body.updatedAt = new Date()
+    body.updatedAt = sql`now()`
     const [updated] = await db
       .update(kidsAccounts)
       .set(body)
@@ -103,7 +103,7 @@ router.delete(
     // 軟刪除：isActive=false（cascade 留資料、避免 jars/tasks/goals/badges 一起刪）
     await db
       .update(kidsAccounts)
-      .set({ isActive: false, updatedAt: new Date() })
+      .set({ isActive: false, updatedAt: sql`now()` })
       .where(eq(kidsAccounts.id, id))
     res.json({ ok: true })
   })
@@ -492,7 +492,7 @@ router.put(
       body.kidId = req.body.kidId === null ? null : Number(req.body.kidId)
     }
     if (Object.keys(body).length === 0) throw new AppError(400, "至少需提供一個欄位")
-    body.updatedAt = new Date()
+    body.updatedAt = sql`now()`
     const [updated] = await db.update(kidsTasks).set(body).where(eq(kidsTasks.id, id)).returning()
     res.json(updated)
   })
@@ -553,7 +553,7 @@ router.post(
     if (!kid) throw new AppError(404, "小孩不存在")
     const [updated] = await db
       .update(kidsTasks)
-      .set({ kidId: kidIdN, updatedAt: new Date() })
+      .set({ kidId: kidIdN, updatedAt: sql`now()` })
       .where(eq(kidsTasks.id, id))
       .returning()
     res.json({ ok: true, task: updated })
@@ -607,7 +607,7 @@ router.post(
       .update(kidsTasks)
       .set({
         status: "rejected",
-        updatedAt: new Date(),
+        updatedAt: sql`now()`,
         notes: req.body?.notes ?? task.notes,
         ...(parentFeedback ? { parentFeedback } : {}),
       })

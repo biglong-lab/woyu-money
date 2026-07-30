@@ -6,7 +6,7 @@
  *  - 但實際 lateFeeRate 從 DB 讀取（若有對應 policy）
  */
 import { db } from "../db"
-import { eq } from "drizzle-orm"
+import { sql, eq } from "drizzle-orm"
 import { lateFeePolicies, type LateFeePolicy, type InsertLateFeePolicy } from "@shared/schema"
 import { CATEGORY_RULES } from "@shared/payment-priority"
 
@@ -127,7 +127,7 @@ export async function updatePolicy(
 ): Promise<LateFeePolicy | undefined> {
   const [row] = await db
     .update(lateFeePolicies)
-    .set({ ...data, updatedAt: new Date() })
+    .set({ ...data, updatedAt: sql`now()` })
     .where(eq(lateFeePolicies.categoryKey, categoryKey))
     .returning()
   return row

@@ -186,7 +186,7 @@ router.patch(
 
     const { projectId, date, amount, description } = req.body as Record<string, string>
 
-    const updates: Record<string, unknown> = { updatedAt: new Date() }
+    const updates: Record<string, unknown> = { updatedAt: sql`now()` }
     if (date) {
       if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new AppError(400, "date 格式錯誤")
       updates.date = date

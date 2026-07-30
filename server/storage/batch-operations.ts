@@ -5,7 +5,7 @@
 
 import { db } from "../db"
 import { paymentItems } from "@shared/schema"
-import { eq, inArray } from "drizzle-orm"
+import { sql, eq, inArray } from "drizzle-orm"
 
 /**
  * 批量更新付款項目
@@ -58,33 +58,33 @@ export async function batchUpdatePaymentItems(
               .set({
                 status: "paid",
                 paidAmount: item.totalAmount,
-                updatedAt: new Date(),
+                updatedAt: sql`now()`,
               })
               .where(eq(paymentItems.id, item.id))
           }
         } else {
           await db
             .update(paymentItems)
-            .set({ status: data.status, updatedAt: new Date() })
+            .set({ status: data.status, updatedAt: sql`now()` })
             .where(idsClause)
         }
         break
       case "updatePriority":
         await db
           .update(paymentItems)
-          .set({ priority: data.priority, updatedAt: new Date() })
+          .set({ priority: data.priority, updatedAt: sql`now()` })
           .where(idsClause)
         break
       case "updateCategory":
         await db
           .update(paymentItems)
-          .set({ categoryId: data.categoryId, updatedAt: new Date() })
+          .set({ categoryId: data.categoryId, updatedAt: sql`now()` })
           .where(idsClause)
         break
       case "archive":
         await db
           .update(paymentItems)
-          .set({ isDeleted: true, deletedAt: new Date() })
+          .set({ isDeleted: true, deletedAt: sql`now()` })
           .where(idsClause)
         break
       case "delete":
@@ -139,8 +139,8 @@ export async function bulkImportPaymentItems(
           projectId: projectId,
           status: "pending",
           startDate: item.date || new Date().toISOString(),
-          createdAt: new Date(),
-          updatedAt: new Date(),
+          createdAt: sql`now()`,
+          updatedAt: sql`now()`,
         })
         importResults.successful++
       } catch (error: unknown) {

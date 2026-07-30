@@ -35,6 +35,11 @@ vi.mock("@shared/schema", () => ({
 
 // Mock drizzle-orm
 vi.mock("drizzle-orm", () => ({
+  // 2026-07-30：程式改用 sql`now()` 寫 timestamp（交給 DB 算，見 shared/date-utils.ts）
+  sql: vi.fn((strings: TemplateStringsArray) => ({
+    type: "sql",
+    text: Array.from(strings).join("?"),
+  })),
   eq: vi.fn((field, value) => ({ type: "eq", field, value })),
   desc: vi.fn((field) => ({ type: "desc", field })),
   count: vi.fn(() => "count(*)"),
@@ -208,8 +213,8 @@ describe("createUser", () => {
     await createUser({ username: "test", password: "hashed" })
 
     const insertedValues = valuesFn.mock.calls[0][0]
-    expect(insertedValues.createdAt).toBeInstanceOf(Date)
-    expect(insertedValues.updatedAt).toBeInstanceOf(Date)
+    expect(insertedValues.createdAt).toEqual({ type: "sql", text: "now()" }) // 由 DB now() 產生，非 JS new Date()
+    expect(insertedValues.updatedAt).toEqual({ type: "sql", text: "now()" }) // 由 DB now() 產生，非 JS new Date()
   })
 })
 
@@ -231,7 +236,7 @@ describe("updateUser", () => {
     await updateUser(1, { username: "test" })
 
     const setArgs = mockDb.update.mock.results[0].value.set.mock.calls[0][0]
-    expect(setArgs.updatedAt).toBeInstanceOf(Date)
+    expect(setArgs.updatedAt).toEqual({ type: "sql", text: "now()" }) // 由 DB now() 產生，非 JS new Date()
   })
 })
 
@@ -245,7 +250,7 @@ describe("updateUserLoginAttempts", () => {
 
     const setArgs = setFn.mock.calls[0][0]
     expect(setArgs.failedLoginAttempts).toBe(3)
-    expect(setArgs.updatedAt).toBeInstanceOf(Date)
+    expect(setArgs.updatedAt).toEqual({ type: "sql", text: "now()" }) // 由 DB now() 產生，非 JS new Date()
   })
 
   it("有鎖定時間時應一併更新", async () => {
@@ -333,7 +338,7 @@ describe("updateUserPassword", () => {
 
     const setArgs = mockDb.update.mock.results[0].value.set.mock.calls[0][0]
     expect(setArgs.password).toBe("newHashedPassword")
-    expect(setArgs.updatedAt).toBeInstanceOf(Date)
+    expect(setArgs.updatedAt).toEqual({ type: "sql", text: "now()" }) // 由 DB now() 產生，非 JS new Date()
   })
 })
 

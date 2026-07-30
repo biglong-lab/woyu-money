@@ -218,7 +218,7 @@ export async function updateDebtCategory(
   try {
     const [category] = await db
       .update(debtCategories)
-      .set({ ...categoryData, updatedAt: new Date() })
+      .set({ ...categoryData, updatedAt: sql`now()` })
       .where(eq(debtCategories.id, id))
       .returning()
     return category
@@ -232,7 +232,7 @@ export async function deleteDebtCategory(id: number): Promise<void> {
   try {
     await db
       .update(debtCategories)
-      .set({ isDeleted: true, updatedAt: new Date() })
+      .set({ isDeleted: true, updatedAt: sql`now()` })
       .where(eq(debtCategories.id, id))
   } catch (error) {
     console.error("Error deleting debt category:", error)
@@ -337,7 +337,7 @@ export async function deletePaymentProject(id: number): Promise<void> {
   if (itemCount.count > 0) {
     await db
       .update(paymentProjects)
-      .set({ isDeleted: true, updatedAt: new Date() })
+      .set({ isDeleted: true, updatedAt: sql`now()` })
       .where(eq(paymentProjects.id, id))
   } else {
     await db.delete(paymentProjects).where(eq(paymentProjects.id, id))
@@ -443,7 +443,7 @@ export async function updateFixedCategorySubOption(
   try {
     const [updatedSubOption] = await db
       .update(fixedCategorySubOptions)
-      .set({ ...subOption, updatedAt: new Date() })
+      .set({ ...subOption, updatedAt: sql`now()` })
       .where(eq(fixedCategorySubOptions.id, id))
       .returning()
     return updatedSubOption
@@ -457,7 +457,7 @@ export async function deleteFixedCategorySubOption(id: number): Promise<void> {
   try {
     await db
       .update(fixedCategorySubOptions)
-      .set({ isActive: false, updatedAt: new Date() })
+      .set({ isActive: false, updatedAt: sql`now()` })
       .where(eq(fixedCategorySubOptions.id, id))
   } catch (error) {
     console.error("Error deleting fixed category sub option:", error)
@@ -500,7 +500,7 @@ export async function updateProjectCategoryTemplate(
 ): Promise<ProjectCategoryTemplate> {
   const [template] = await db
     .update(projectCategoryTemplates)
-    .set({ ...templateData, updatedAt: new Date() })
+    .set({ ...templateData, updatedAt: sql`now()` })
     .where(eq(projectCategoryTemplates.id, id))
     .returning()
   return template
@@ -509,6 +509,6 @@ export async function updateProjectCategoryTemplate(
 export async function deleteProjectCategoryTemplate(id: number): Promise<void> {
   await db
     .update(projectCategoryTemplates)
-    .set({ isActive: false, updatedAt: new Date() })
+    .set({ isActive: false, updatedAt: sql`now()` })
     .where(eq(projectCategoryTemplates.id, id))
 }

@@ -157,7 +157,7 @@ export async function createDebt(data: InsertDebt): Promise<Debt> {
 }
 
 export async function updateDebt(id: number, data: Partial<InsertDebt>): Promise<Debt | undefined> {
-  const patch: Record<string, unknown> = { ...data, updatedAt: new Date() }
+  const patch: Record<string, unknown> = { ...data, updatedAt: sql`now()` }
   // 切到/離開「已歸帳」時，自動記錄/清除歸帳時間
   if (data.status === "reconciled") patch.reconciledAt = new Date()
   else if (data.status === "open" || data.status === "cancelled") patch.reconciledAt = null
@@ -187,7 +187,10 @@ export async function addPayment(debtId: number, data: InsertDebtPayment): Promi
     .insert(debtPayments)
     .values({ ...data, debtId })
     .returning()
-  await db.update(debts).set({ updatedAt: new Date() }).where(eq(debts.id, debtId))
+  await db
+    .update(debts)
+    .set({ updatedAt: sql`now()` })
+    .where(eq(debts.id, debtId))
   return row
 }
 

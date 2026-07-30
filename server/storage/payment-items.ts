@@ -436,7 +436,7 @@ export async function restorePaymentItem(
     .set({
       isDeleted: false,
       deletedAt: null,
-      updatedAt: new Date(),
+      updatedAt: sql`now()`,
     })
     .where(eq(paymentItems.id, id))
     .returning()

@@ -247,7 +247,7 @@ export async function updateClaim(
   data: Partial<InsertCardClaim> & { propertyIds?: number[] }
 ): Promise<CardClaim | undefined> {
   const { propertyIds, ...claimData } = data
-  const patch: Record<string, unknown> = { ...claimData, updatedAt: new Date() }
+  const patch: Record<string, unknown> = { ...claimData, updatedAt: sql`now()` }
   if (propertyIds) patch.propertyId = propertyIds.length > 0 ? propertyIds[0] : null
   const [row] = await db.update(cardClaims).set(patch).where(eq(cardClaims.id, id)).returning()
   if (row && propertyIds) await setPropertyLinks(id, propertyIds)

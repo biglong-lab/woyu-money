@@ -368,7 +368,7 @@ router.put(
   "/api/family/goals/:id",
   asyncHandler(async (req, res) => {
     const id = Number(req.params.id)
-    const body = { ...req.body, updatedAt: new Date() }
+    const body = { ...req.body, updatedAt: sql`now()` }
     const [updated] = await db.update(kidsGoals).set(body).where(eq(kidsGoals.id, id)).returning()
     if (!updated) throw new AppError(404, "目標不存在")
     res.json(updated)

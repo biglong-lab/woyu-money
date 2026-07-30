@@ -33,7 +33,7 @@ export async function setHouseholdBudget(
       .update(householdBudgets)
       .set({
         budgetAmount: budgetData.budgetAmount,
-        updatedAt: new Date(),
+        updatedAt: sql`now()`,
       })
       .where(eq(householdBudgets.month, budgetData.month))
       .returning()
@@ -86,7 +86,7 @@ export async function createOrUpdateHouseholdBudget(
         .update(householdBudgets)
         .set({
           budgetAmount: budgetData.budgetAmount,
-          updatedAt: new Date(),
+          updatedAt: sql`now()`,
         })
         .where(
           and(
@@ -183,7 +183,7 @@ export async function updateHouseholdExpense(
 ): Promise<HouseholdExpense> {
   const [expense] = await db
     .update(householdExpenses)
-    .set({ ...expenseData, updatedAt: new Date() })
+    .set({ ...expenseData, updatedAt: sql`now()` })
     .where(eq(householdExpenses.id, id))
     .returning()
   return expense
@@ -195,9 +195,9 @@ export async function deleteHouseholdExpense(id: number, userId?: number): Promi
     .update(householdExpenses)
     .set({
       isDeleted: true,
-      deletedAt: new Date(),
+      deletedAt: sql`now()`,
       deletedByUserId: userId ?? null,
-      updatedAt: new Date(),
+      updatedAt: sql`now()`,
     })
     .where(eq(householdExpenses.id, id))
 }
@@ -273,7 +273,7 @@ export async function createHouseholdBudget(
       .update(householdBudgets)
       .set({
         budgetAmount: budgetData.budgetAmount,
-        updatedAt: new Date(),
+        updatedAt: sql`now()`,
       })
       .where(eq(householdBudgets.id, latestRecord.id))
       .returning()
@@ -285,7 +285,7 @@ export async function createHouseholdBudget(
       .update(householdBudgets)
       .set({
         budgetAmount: budgetData.budgetAmount,
-        updatedAt: new Date(),
+        updatedAt: sql`now()`,
       })
       .where(eq(householdBudgets.id, existingBudgets[0].id))
       .returning()
@@ -302,7 +302,7 @@ export async function updateHouseholdBudget(
 ): Promise<HouseholdBudget> {
   const [budget] = await db
     .update(householdBudgets)
-    .set({ ...budgetData, updatedAt: new Date() })
+    .set({ ...budgetData, updatedAt: sql`now()` })
     .where(eq(householdBudgets.id, id))
     .returning()
   return budget
@@ -314,7 +314,7 @@ export async function updateHouseholdCategoryBudget(
 ): Promise<HouseholdBudget> {
   const [budget] = await db
     .update(householdBudgets)
-    .set({ ...budgetData, updatedAt: new Date() })
+    .set({ ...budgetData, updatedAt: sql`now()` })
     .where(eq(householdBudgets.id, id))
     .returning()
   return budget
@@ -486,7 +486,7 @@ export async function createOrUpdateYearlyBudget(
       .update(householdBudgets)
       .set({
         budgetAmount: budgetAmount.toString(),
-        updatedAt: new Date(),
+        updatedAt: sql`now()`,
       })
       .where(eq(householdBudgets.id, existingBudget.id))
       .returning()
@@ -499,8 +499,8 @@ export async function createOrUpdateYearlyBudget(
         year,
         month,
         budgetAmount: budgetAmount.toString(),
-        createdAt: new Date(),
-        updatedAt: new Date(),
+        createdAt: sql`now()`,
+        updatedAt: sql`now()`,
       })
       .returning()
     return newBudget

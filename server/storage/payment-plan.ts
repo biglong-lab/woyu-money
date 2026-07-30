@@ -12,7 +12,7 @@ import {
   type PaymentPlanItemCategory,
   type PaymentPlanCategoryBudget,
 } from "@shared/schema"
-import { eq, inArray, and } from "drizzle-orm"
+import { sql, eq, inArray, and } from "drizzle-orm"
 
 export async function getAllocations(): Promise<PaymentPlanAllocation[]> {
   return db.select().from(paymentPlanAllocations)
@@ -31,7 +31,7 @@ export async function updateAllocation(
 ): Promise<PaymentPlanAllocation | undefined> {
   const [row] = await db
     .update(paymentPlanAllocations)
-    .set({ ...data, updatedAt: new Date() })
+    .set({ ...data, updatedAt: sql`now()` })
     .where(eq(paymentPlanAllocations.id, id))
     .returning()
   return row
@@ -73,7 +73,7 @@ export async function setItemCategory(
     .values({ paymentItemId, category })
     .onConflictDoUpdate({
       target: paymentPlanItemCategories.paymentItemId,
-      set: { category, updatedAt: new Date() },
+      set: { category, updatedAt: sql`now()` },
     })
     .returning()
   return row
@@ -115,7 +115,7 @@ export async function setCategoryBudget(
   if (existing.length > 0) {
     await db
       .update(paymentPlanCategoryBudgets)
-      .set({ amount, updatedAt: new Date() })
+      .set({ amount, updatedAt: sql`now()` })
       .where(eq(paymentPlanCategoryBudgets.id, existing[0].id))
   } else {
     await db.insert(paymentPlanCategoryBudgets).values({ category, plannedMonth, amount })

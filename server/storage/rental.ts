@@ -413,7 +413,7 @@ export async function generateRentalPayments(
             .set({
               totalAmount: monthlyAmount.toString(),
               notes: `${contract.contractName} 第${currentYear}年租金 (已更新)`,
-              updatedAt: new Date(),
+              updatedAt: sql`now()`,
             })
             .where(eq(paymentItems.id, existingItem.id))
         }
@@ -733,7 +733,7 @@ export async function updateContractPaymentInfo(
         bankCode: paymentInfo.bankCode,
         accountNumber: paymentInfo.accountNumber,
         contractPaymentDay: paymentInfo.contractPaymentDay,
-        updatedAt: new Date(),
+        updatedAt: sql`now()`,
       })
       .where(eq(rentalContracts.id, contractId))
       .returning()

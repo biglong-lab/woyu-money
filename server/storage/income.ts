@@ -93,8 +93,8 @@ export async function createIncomeSource(data: InsertIncomeSource): Promise<Inco
     .insert(incomeSources)
     .values({
       ...data,
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      createdAt: sql`now()`,
+      updatedAt: sql`now()`,
     })
     .returning()
   return row
@@ -106,7 +106,7 @@ export async function updateIncomeSource(
 ): Promise<IncomeSource | null> {
   const [row] = await db
     .update(incomeSources)
-    .set({ ...data, updatedAt: new Date() })
+    .set({ ...data, updatedAt: sql`now()` })
     .where(eq(incomeSources.id, id))
     .returning()
   return row ?? null
@@ -116,7 +116,7 @@ export async function deleteIncomeSource(id: number): Promise<boolean> {
   // 停用而非刪除（保留歷史紀錄）
   const [row] = await db
     .update(incomeSources)
-    .set({ isActive: false, updatedAt: new Date() })
+    .set({ isActive: false, updatedAt: sql`now()` })
     .where(eq(incomeSources.id, id))
     .returning()
   return !!row
@@ -355,8 +355,8 @@ export async function receiveWebhook(input: ReceiveWebhookInput): Promise<Receiv
       status: source.autoConfirm ? "confirmed" : "pending",
       requestIp: requestIp ?? null,
       requestHeaders: (requestHeaders ?? {}) as Record<string, string>,
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      createdAt: sql`now()`,
+      updatedAt: sql`now()`,
     })
     .returning()
 
@@ -365,8 +365,8 @@ export async function receiveWebhook(input: ReceiveWebhookInput): Promise<Receiv
     .update(incomeSources)
     .set({
       totalReceived: sql`${incomeSources.totalReceived} + 1`,
-      lastReceivedAt: new Date(),
-      updatedAt: new Date(),
+      lastReceivedAt: sql`now()`,
+      updatedAt: sql`now()`,
     })
     .where(eq(incomeSources.id, source.id))
 
@@ -412,12 +412,12 @@ export async function confirmWebhook(
     .set({
       status: "confirmed",
       reviewedByUserId: userId,
-      reviewedAt: new Date(),
+      reviewedAt: sql`now()`,
       reviewNote: input.reviewNote ?? null,
       linkedItemId: paymentItemId,
       linkedRecordId: paymentRecordId,
-      processedAt: new Date(),
-      updatedAt: new Date(),
+      processedAt: sql`now()`,
+      updatedAt: sql`now()`,
     })
     .where(eq(incomeWebhooks.id, webhookId))
 
@@ -518,9 +518,9 @@ export async function rejectWebhook(
     .set({
       status: "rejected",
       reviewedByUserId: userId,
-      reviewedAt: new Date(),
+      reviewedAt: sql`now()`,
       reviewNote: reviewNote ?? null,
-      updatedAt: new Date(),
+      updatedAt: sql`now()`,
     })
     .where(and(eq(incomeWebhooks.id, webhookId), eq(incomeWebhooks.status, "pending")))
     .returning()
@@ -539,7 +539,7 @@ export async function reprocessWebhook(webhookId: number): Promise<boolean> {
       reviewedByUserId: null,
       reviewedAt: null,
       reviewNote: null,
-      updatedAt: new Date(),
+      updatedAt: sql`now()`,
     })
     .where(eq(incomeWebhooks.id, webhookId))
     .returning()
@@ -574,8 +574,8 @@ export async function _createPaymentFromWebhook(
       status: "paid",
       paidAmount: amount.toString(),
       source: "webhook",
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      createdAt: sql`now()`,
+      updatedAt: sql`now()`,
     })
     .returning()
 
@@ -596,8 +596,8 @@ export async function _createPaymentFromWebhook(
           .filter(Boolean)
           .join(" | ") || null,
       isPartialPayment: false,
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      createdAt: sql`now()`,
+      updatedAt: sql`now()`,
     })
     .returning()
 

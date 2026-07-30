@@ -78,7 +78,7 @@ export async function markNotificationAsRead(
       .update(notifications)
       .set({
         isRead: true,
-        readAt: new Date(),
+        readAt: sql`now()`,
       })
       .where(and(eq(notifications.id, parseInt(notificationId)), eq(notifications.userId, userId)))
   } catch (error) {
@@ -93,7 +93,7 @@ export async function markAllNotificationsAsRead(userId: number): Promise<void> 
       .update(notifications)
       .set({
         isRead: true,
-        readAt: new Date(),
+        readAt: sql`now()`,
       })
       .where(and(eq(notifications.userId, userId), eq(notifications.isRead, false)))
   } catch (error) {
@@ -136,7 +136,7 @@ export async function updateNotificationSettings(
   try {
     const [result] = await db
       .update(notificationSettings)
-      .set({ ...settings, updatedAt: new Date() })
+      .set({ ...settings, updatedAt: sql`now()` })
       .where(eq(notificationSettings.userId, userId))
       .returning()
 

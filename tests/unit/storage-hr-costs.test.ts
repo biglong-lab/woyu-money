@@ -60,6 +60,11 @@ vi.mock("../../server/db", () => ({
 
 // 模擬 drizzle-orm 運算子
 vi.mock("drizzle-orm", () => ({
+  // 2026-07-30：程式改用 sql`now()` 寫 timestamp（交給 DB 算，見 shared/date-utils.ts）
+  sql: vi.fn((strings: TemplateStringsArray) => ({
+    type: "sql",
+    text: Array.from(strings).join("?"),
+  })),
   eq: vi.fn((col, val) => ({ col, val, op: "eq" })),
   and: vi.fn((...conditions) => ({ conditions, op: "and" })),
   asc: vi.fn((col) => ({ col, dir: "asc" })),

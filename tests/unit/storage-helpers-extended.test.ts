@@ -51,6 +51,11 @@ vi.mock("@shared/schema", () => ({
 
 // Mock drizzle-orm
 vi.mock("drizzle-orm", () => ({
+  // 2026-07-30：程式改用 sql`now()` 寫 timestamp（交給 DB 算，見 shared/date-utils.ts）
+  sql: vi.fn((strings: TemplateStringsArray) => ({
+    type: "sql",
+    text: Array.from(strings).join("?"),
+  })),
   eq: vi.fn((field, value) => ({ type: "eq", field, value })),
   and: vi.fn((...conditions) => ({ type: "and", conditions })),
 }))
@@ -227,7 +232,7 @@ describe("createAuditLogAsync", () => {
     expect(mockValuesFn).toHaveBeenCalledWith(
       expect.objectContaining({
         ...logData,
-        createdAt: expect.any(Date),
+        createdAt: { type: "sql", text: "now()" },
       })
     )
   })
@@ -278,8 +283,8 @@ describe("createFixedCategorySubOptionAsync", () => {
         subOptionName: "水電費",
         displayName: "水電費",
         isActive: true,
-        createdAt: expect.any(Date),
-        updatedAt: expect.any(Date),
+        createdAt: { type: "sql", text: "now()" },
+        updatedAt: { type: "sql", text: "now()" },
       })
     )
   })

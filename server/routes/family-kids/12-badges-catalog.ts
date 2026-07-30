@@ -264,7 +264,7 @@ router.post(
     }
     await db
       .update(kidsAccounts)
-      .set({ pin: newPin, updatedAt: new Date() })
+      .set({ pin: newPin, updatedAt: sql`now()` })
       .where(eq(kidsAccounts.id, id))
     res.json({ ok: true })
   })
@@ -298,7 +298,7 @@ router.put(
     if (Object.keys(body).length === 0) {
       throw new AppError(400, "至少需提供 avatar 或 color")
     }
-    body.updatedAt = new Date()
+    body.updatedAt = sql`now()`
     const [updated] = await db
       .update(kidsAccounts)
       .set(body)
@@ -489,7 +489,7 @@ router.put(
       const v = Number(req.body.estimatedPrice)
       body.estimatedPrice = v > 0 ? v.toFixed(2) : null
     }
-    body.updatedAt = new Date()
+    body.updatedAt = sql`now()`
     const [updated] = await db.update(kidsWishes).set(body).where(eq(kidsWishes.id, id)).returning()
     if (!updated) throw new AppError(404, "願望不存在")
     res.json(updated)
@@ -546,7 +546,7 @@ router.post(
       .set({
         status: "promoted_to_goal",
         promotedGoalId: goal.id,
-        updatedAt: new Date(),
+        updatedAt: sql`now()`,
       })
       .where(eq(kidsWishes.id, id))
       .returning()

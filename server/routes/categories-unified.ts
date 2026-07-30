@@ -243,7 +243,7 @@ router.post(
     const ids = candidates.map((c) => c.id)
     await db
       .update(debtCategories)
-      .set({ isDeleted: true, updatedAt: new Date() })
+      .set({ isDeleted: true, updatedAt: sql`now()` })
       .where(inArray(debtCategories.id, ids))
 
     res.json({

@@ -5,7 +5,7 @@
  * - DELETE /api/scenario-presets/:id  刪除
  */
 import { Router } from "express"
-import { eq } from "drizzle-orm"
+import { sql, eq } from "drizzle-orm"
 import { asyncHandler, AppError } from "../middleware/error-handler"
 import { db } from "../db"
 import { scenarioPresets, insertScenarioPresetSchema } from "@shared/schema"
@@ -38,7 +38,7 @@ router.post(
     if (existing.length > 0) {
       const [row] = await db
         .update(scenarioPresets)
-        .set({ levers: parsed.data.levers, updatedAt: new Date() })
+        .set({ levers: parsed.data.levers, updatedAt: sql`now()` })
         .where(eq(scenarioPresets.id, existing[0].id))
         .returning()
       return res.json(row)

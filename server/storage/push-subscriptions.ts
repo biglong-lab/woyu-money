@@ -56,8 +56,8 @@ export async function subscribePush(input: {
         auth: input.auth,
         userAgent: input.userAgent ?? null,
         isActive: true,
-        lastUsedAt: new Date(),
-        updatedAt: new Date(),
+        lastUsedAt: sql`now()`,
+        updatedAt: sql`now()`,
       })
       .where(eq(pushSubscriptions.id, existing[0].id))
       .returning()
@@ -83,7 +83,7 @@ export async function subscribePush(input: {
 export async function unsubscribePush(endpoint: string): Promise<boolean> {
   const result = await db
     .update(pushSubscriptions)
-    .set({ isActive: false, updatedAt: new Date() })
+    .set({ isActive: false, updatedAt: sql`now()` })
     .where(eq(pushSubscriptions.endpoint, endpoint))
     .returning({ id: pushSubscriptions.id })
   return result.length > 0
@@ -142,7 +142,7 @@ export async function sendPushToUser(
       // 更新 lastUsedAt
       await db
         .update(pushSubscriptions)
-        .set({ lastUsedAt: new Date() })
+        .set({ lastUsedAt: sql`now()` })
         .where(eq(pushSubscriptions.id, sub.id))
         .catch(() => {})
     } catch (err) {
@@ -152,7 +152,7 @@ export async function sendPushToUser(
       if (code === 410 || code === 404) {
         await db
           .update(pushSubscriptions)
-          .set({ isActive: false, updatedAt: new Date() })
+          .set({ isActive: false, updatedAt: sql`now()` })
           .where(eq(pushSubscriptions.id, sub.id))
           .catch(() => {})
         console.info(`[push] subscription ${sub.id} expired, marked inactive`)

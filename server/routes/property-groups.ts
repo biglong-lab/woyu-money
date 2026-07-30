@@ -14,7 +14,7 @@
  */
 
 import { Router } from "express"
-import { eq } from "drizzle-orm"
+import { sql, eq } from "drizzle-orm"
 import { db } from "../db"
 import { propertyGroups, propertyGroupMembers, paymentProjects } from "@shared/schema"
 import { requireAuth } from "../auth"
@@ -123,7 +123,7 @@ router.put(
 
     const [updated] = await db
       .update(propertyGroups)
-      .set({ ...parsed.data, updatedAt: new Date() })
+      .set({ ...parsed.data, updatedAt: sql`now()` })
       .where(eq(propertyGroups.id, id))
       .returning()
 

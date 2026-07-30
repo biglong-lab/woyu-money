@@ -306,9 +306,9 @@ export async function deletePaymentRecord(id: number, deletedByUserId?: number):
     .update(paymentRecords)
     .set({
       isDeleted: true,
-      deletedAt: new Date(),
+      deletedAt: sql`now()`,
       deletedByUserId: deletedByUserId ?? null,
-      updatedAt: new Date(),
+      updatedAt: sql`now()`,
     })
     .where(eq(paymentRecords.id, id))
 }
@@ -366,7 +366,7 @@ export async function updatePaymentSchedule(
 ): Promise<PaymentSchedule> {
   const [schedule] = await db
     .update(paymentSchedules)
-    .set({ ...scheduleData, updatedAt: new Date() })
+    .set({ ...scheduleData, updatedAt: sql`now()` })
     .where(eq(paymentSchedules.id, id))
     .returning()
   return schedule
@@ -397,7 +397,7 @@ export async function reschedulePayment(
       rescheduleCount: sql`${paymentSchedules.rescheduleCount} + 1`,
       status: "rescheduled",
       notes: notes,
-      updatedAt: new Date(),
+      updatedAt: sql`now()`,
     })
     .where(eq(paymentSchedules.id, id))
     .returning()
@@ -496,7 +496,7 @@ export async function updatePaymentItemNote(
 ): Promise<PaymentItemNote> {
   const [updatedNote] = await db
     .update(paymentItemNotes)
-    .set({ ...note, updatedAt: new Date() })
+    .set({ ...note, updatedAt: sql`now()` })
     .where(eq(paymentItemNotes.id, id))
     .returning()
   return updatedNote
@@ -505,7 +505,7 @@ export async function updatePaymentItemNote(
 export async function deletePaymentItemNote(id: number): Promise<void> {
   await db
     .update(paymentItemNotes)
-    .set({ isDeleted: true, updatedAt: new Date() })
+    .set({ isDeleted: true, updatedAt: sql`now()` })
     .where(eq(paymentItemNotes.id, id))
 }
 

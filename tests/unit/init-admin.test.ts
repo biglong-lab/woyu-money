@@ -37,6 +37,11 @@ vi.mock("@shared/schema", () => ({
 
 // Mock drizzle-orm eq 函式
 vi.mock("drizzle-orm", () => ({
+  // 2026-07-30：程式改用 sql`now()` 寫 timestamp（交給 DB 算，見 shared/date-utils.ts）
+  sql: vi.fn((strings: TemplateStringsArray) => ({
+    type: "sql",
+    text: Array.from(strings).join("?"),
+  })),
   eq: vi.fn((col, val) => ({ col, val })),
 }))
 

@@ -300,7 +300,7 @@ export async function updateDocumentAiResult(
         recognizedDescription: result.extractedData.description || null,
         recognizedCategory: result.extractedData.category || null,
         recognizedInvoiceNumber: result.extractedData.invoiceNumber || null,
-        updatedAt: new Date(),
+        updatedAt: sql`now()`,
       })
       .where(eq(documentInbox.id, id))
   } else {
@@ -322,7 +322,7 @@ export async function updateDocumentAiResult(
 export async function setDocumentProcessing(id: number): Promise<void> {
   await db
     .update(documentInbox)
-    .set({ status: "processing", updatedAt: new Date() })
+    .set({ status: "processing", updatedAt: sql`now()` })
     .where(eq(documentInbox.id, id))
 }
 
@@ -330,7 +330,7 @@ export async function setDocumentProcessing(id: number): Promise<void> {
 export async function setDocumentFailed(id: number): Promise<void> {
   await db
     .update(documentInbox)
-    .set({ status: "failed", updatedAt: new Date() })
+    .set({ status: "failed", updatedAt: sql`now()` })
     .where(eq(documentInbox.id, id))
 }
 
@@ -347,8 +347,8 @@ export async function updateDocumentNotes(
       notes: notes || null,
       editedByUserId: editedByUserId,
       editedByUsername,
-      editedAt: new Date(),
-      updatedAt: new Date(),
+      editedAt: sql`now()`,
+      updatedAt: sql`now()`,
     })
     .where(eq(documentInbox.id, id))
     .returning()

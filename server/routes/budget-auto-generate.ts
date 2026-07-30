@@ -208,7 +208,7 @@ router.post(
     const totalBudget = generated.reduce((sum, g) => sum + g.plannedAmount, 0)
     await db
       .update(budgetPlans)
-      .set({ totalBudget: totalBudget.toString(), updatedAt: new Date() })
+      .set({ totalBudget: totalBudget.toString(), updatedAt: sql`now()` })
       .where(sql`id = ${plan.id}`)
 
     // ── 8. 返回結果 ────────────────────────────────
@@ -488,7 +488,7 @@ router.post(
         const totalBudget = generated.reduce((s, g) => s + g.plannedAmount, 0)
         await db
           .update(budgetPlans)
-          .set({ totalBudget: totalBudget.toString(), updatedAt: new Date() })
+          .set({ totalBudget: totalBudget.toString(), updatedAt: sql`now()` })
           .where(sql`id = ${plan.id}`)
 
         results.push({
@@ -792,7 +792,7 @@ router.post(
     const newTotal = allItems.reduce((s, r) => s + parseFloat(r.planned ?? "0"), 0)
     await db
       .update(budgetPlans)
-      .set({ totalBudget: newTotal.toString(), updatedAt: new Date() })
+      .set({ totalBudget: newTotal.toString(), updatedAt: sql`now()` })
       .where(eq(budgetPlans.id, plan.id))
 
     res.json({

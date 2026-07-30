@@ -1,7 +1,7 @@
 import { db, pool, handleDatabaseError } from "../db"
 import { auditLogs, debtCategories, fixedCategorySubOptions } from "@shared/schema"
 import type { InsertAuditLog } from "@shared/schema"
-import { eq, and } from "drizzle-orm"
+import { sql, eq, and } from "drizzle-orm"
 
 // 資料庫操作重試機制
 export async function withRetry<T>(
@@ -66,7 +66,7 @@ export async function getCachedCategoryType(categoryId: number): Promise<string>
 // 非同步創建審計日誌
 export async function createAuditLogAsync(logData: InsertAuditLog): Promise<void> {
   try {
-    await db.insert(auditLogs).values({ ...logData, createdAt: new Date() })
+    await db.insert(auditLogs).values({ ...logData, createdAt: sql`now()` })
   } catch (error) {
     console.error("非同步創建審計日誌失敗:", error)
   }
@@ -98,8 +98,8 @@ export async function createFixedCategorySubOptionAsync(
         subOptionName: itemName,
         displayName: itemName,
         isActive: true,
-        createdAt: new Date(),
-        updatedAt: new Date(),
+        createdAt: sql`now()`,
+        updatedAt: sql`now()`,
       })
     }
   } catch (error) {

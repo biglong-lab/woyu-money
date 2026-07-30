@@ -35,7 +35,23 @@
  * 曾造成的實際 bug：台北 00:00-08:00 approve 的任務不出現在「今日任務列表」
  * 「今日排行榜」「今日重點」「家庭 streak」「活動 heatmap」。
  *
- * ⚠️ 歷史資料中仍有以 `new Date()` 寫入的列（偏移 8 小時），尚未回填。
+ * ### 現況（2026-07-30 階段 A + B 完成後）
+ *
+ * - `server/` 內 timestamp 欄位的寫入已統一為 ``sql`now()` ``（171 處）
+ * - 例外：8 處位於帶 `as Partial<...>` 型別斷言的中間物件，型別上無法塞 `SQL`，
+ *   仍用 `new Date()`（`document-inbox.ts`、`forecast-snapshots.ts`、
+ *   `payment-items.ts`、`statistics.ts`）。這些欄位目前沒有被拿去跟
+ *   `CURRENT_DATE` 比對，不影響正確性；日後若要用於日期比對需先處理。
+ * - ⚠️ **歷史資料中仍有以 `new Date()` 寫入的列（偏移 8 小時），尚未回填。**
+ *   若要轉 `timestamptz`，必須先接受這批歷史列會被誤讀 —— 同一欄位混了兩種
+ *   慣例、逐列無法分辨。
+ *
+ * ### 單元測試
+ *
+ * mock `drizzle-orm` 的測試需在 factory 補 `sql`，否則會報
+ * `No "sql" export is defined on the "drizzle-orm" mock`。
+ * 斷言請驗 `{ type: "sql", text: "now()" }` 而非 `toBeInstanceOf(Date)`——
+ * 這樣才能擋住日後被改回 `new Date()`。
  */
 
 const DEFAULT_TZ = "Asia/Taipei"
