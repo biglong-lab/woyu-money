@@ -171,8 +171,11 @@ router.post(
       .set({
         currentAmount: newCurrent.toFixed(2),
         status: reached ? "completed" : "active",
-        completedAt: reached ? new Date() : null,
-        updatedAt: new Date(),
+        // ⚠️ 用 sql`now()` 而非 new Date()：drizzle 會把 JS Date 存成 UTC 牆鐘，
+        // 但查詢端是 DATE(completed_at) = CURRENT_DATE（DB session 時區 = Asia/Taipei），
+        // 兩者在台北 00:00-08:00 差一天 → 當天的資料查不到。
+        completedAt: reached ? sql`now()` : null,
+        updatedAt: sql`now()`,
       })
       .where(eq(familyPots.id, id))
       .returning()
@@ -195,7 +198,8 @@ router.post(
     if (pot.status === "completed") throw new AppError(400, "已完成")
     const [updated] = await db
       .update(familyPots)
-      .set({ status: "completed", completedAt: new Date(), updatedAt: new Date() })
+      // sql`now()` 而非 new Date()，理由同上（避免 UTC 牆鐘 vs CURRENT_DATE 差一天）
+      .set({ status: "completed", completedAt: sql`now()`, updatedAt: sql`now()` })
       .where(eq(familyPots.id, id))
       .returning()
     res.json({ ok: true, pot: updated })

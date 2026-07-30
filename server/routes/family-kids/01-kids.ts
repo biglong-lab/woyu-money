@@ -5,7 +5,7 @@
 import { Router } from "express"
 import { asyncHandler, AppError } from "../../middleware/error-handler"
 import { db } from "../../db"
-import { eq, and, desc } from "drizzle-orm"
+import { sql, eq, and, desc } from "drizzle-orm"
 import {
   kidsAccounts,
   kidsTasks,
@@ -579,8 +579,11 @@ router.post(
       .update(kidsTasks)
       .set({
         status: "submitted",
-        completedAt: new Date(),
-        updatedAt: new Date(),
+        // ⚠️ 用 sql`now()` 而非 new Date()：drizzle 會把 JS Date 存成 UTC 牆鐘，
+        // 但查詢端是 DATE(completed_at) = CURRENT_DATE（DB session 時區 = Asia/Taipei），
+        // 兩者在台北 00:00-08:00 差一天 → 當天的資料查不到。
+        completedAt: sql`now()`,
+        updatedAt: sql`now()`,
         ...(proofImageUrl ? { proofImageUrl } : {}),
         ...(submissionNote ? { submissionNote } : {}),
       })

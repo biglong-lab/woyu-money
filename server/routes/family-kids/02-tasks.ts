@@ -163,9 +163,12 @@ router.post(
       .update(kidsTasks)
       .set({
         status: "approved",
-        approvedAt: new Date(),
+        // ⚠️ 用 sql`now()` 而非 new Date()：drizzle 會把 JS Date 存成 UTC 牆鐘，
+        // 但查詢端是 DATE(approved_at) = CURRENT_DATE（DB session 時區 = Asia/Taipei），
+        // 兩者在台北 00:00-08:00 差一天 → 當天的資料查不到。詳見 shared/date-utils.ts 註解。
+        approvedAt: sql`now()`,
         paymentRecordId: mainPaymentRecordId,
-        updatedAt: new Date(),
+        updatedAt: sql`now()`,
         ...(parentFeedback ? { parentFeedback } : {}),
       })
       .where(eq(kidsTasks.id, id))
@@ -318,8 +321,9 @@ router.post(
       .set({
         currentAmount: newCurrent.toFixed(2),
         status: reached ? "completed" : "active",
-        completedAt: reached ? new Date() : null,
-        updatedAt: new Date(),
+        // sql`now()` 而非 new Date()，理由同上（避免 UTC 牆鐘 vs CURRENT_DATE 差一天）
+        completedAt: reached ? sql`now()` : null,
+        updatedAt: sql`now()`,
         ...(reached && completedReflection ? { completedReflection } : {}),
       })
       .where(eq(kidsGoals.id, id))

@@ -7,6 +7,35 @@
  * 例如 TPE 2026-04-15 早上 6:00 = UTC 2026-04-14 22:00：
  * - `new Date().toISOString()` → "2026-04-14T22:00:00.000Z"
  * - 取前 10 字元 → "2026-04-14" ❌（正確應為 "2026-04-15"）
+ *
+ * ---
+ *
+ * ## 🔴 專案的日期慣例（2026-07-30 釐清，動日期相關程式前務必先讀）
+ *
+ * 生產與 CI 的 PostgreSQL 都設 `PGTZ=Asia/Taipei`，所以 **`CURRENT_DATE` = 台北日期**。
+ * 所有寫入都必須跟它同源，否則在台北 00:00-08:00 會差一天。
+ *
+ * | 欄位型別 | 正確寫法 | 為什麼 |
+ * |---|---|---|
+ * | `date` 欄位（`checkin_date`、`spend_date`）| `localDateTPE()` | 直接產生台北日期字串 |
+ * | `timestamp` 欄位（`completed_at`、`approved_at`…）| ``sql`now()` `` 或 `.defaultNow()` | 交給 DB 算，用 session 時區 |
+ *
+ * ### ❌ 不要用 `new Date()` 寫 timestamp 欄位
+ *
+ * drizzle 會把 JS `Date` 序列化成 **UTC 牆鐘**存進 `timestamp without time zone`，
+ * 而 `.defaultNow()` 與 raw `sql` 存的是 **session（台北）牆鐘** —— 兩者差 8 小時。
+ * 實測（PGTZ=Asia/Taipei，當下 UTC 16:30 / 台北 00:30）：
+ *
+ * ```
+ * drizzle .values({ ts: new Date() })      → 2026-07-29 16:30:59   DATE()=07-29  ❌
+ * sql`... VALUES (${new Date()})`          → 2026-07-30 00:30:59   DATE()=07-30  ✅
+ * DEFAULT now()                            → 2026-07-30 00:37:50   DATE()=07-30  ✅
+ * ```
+ *
+ * 曾造成的實際 bug：台北 00:00-08:00 approve 的任務不出現在「今日任務列表」
+ * 「今日排行榜」「今日重點」「家庭 streak」「活動 heatmap」。
+ *
+ * ⚠️ 歷史資料中仍有以 `new Date()` 寫入的列（偏移 8 小時），尚未回填。
  */
 
 const DEFAULT_TZ = "Asia/Taipei"

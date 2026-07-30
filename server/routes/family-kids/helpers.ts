@@ -296,9 +296,12 @@ export async function bulkApproveOne(
     .update(kidsTasks)
     .set({
       status: "approved",
-      approvedAt: new Date(),
+      // ⚠️ 用 sql`now()` 而非 new Date()：drizzle 會把 JS Date 存成 UTC 牆鐘，
+      // 但查詢端是 DATE(approved_at) = CURRENT_DATE（DB session 時區 = Asia/Taipei），
+      // 兩者在台北 00:00-08:00 差一天 → 當天的資料查不到。
+      approvedAt: sql`now()`,
       paymentRecordId,
-      updatedAt: new Date(),
+      updatedAt: sql`now()`,
       ...(parentFeedback ? { parentFeedback } : {}),
     })
     .where(eq(kidsTasks.id, taskId))

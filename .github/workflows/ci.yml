@@ -27,6 +27,11 @@ jobs:
           POSTGRES_USER: woyu
           POSTGRES_PASSWORD: woyu123
           POSTGRES_DB: woyu_money
+          # 與生產 docker-compose.yml 一致：CURRENT_DATE 必須是台北日期，
+          # 否則 checkin_date / spend_date（由 localDateTPE() 寫入台北日期）
+          # 在台北 00:00-08:00 會對不上 → 測試每天固定紅 8 小時。
+          TZ: Asia/Taipei
+          PGTZ: Asia/Taipei
         ports:
           - 5432:5432
         options: >-
@@ -40,6 +45,8 @@ jobs:
       SESSION_SECRET: ci-test-secret
       NODE_ENV: test
       PORT: 5001
+      # 與生產一致（生產 compose 的 app 容器也設 TZ=Asia/Taipei）
+      TZ: Asia/Taipei
 
     steps:
       - uses: actions/checkout@v4
